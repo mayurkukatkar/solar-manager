@@ -2,7 +2,6 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { jsPDF } from 'jspdf';
-import autoTable from 'jspdf-autotable';
 import { FileText, Plus, User, Calendar, IndianRupee, Download } from 'lucide-react';
 
 export default function Quotations() {
@@ -82,36 +81,48 @@ export default function Quotations() {
       const safeDiscount = Number(quote.discount || 0);
       const safeTotal = Number(quote.total || 0);
 
-      // Items Table
-      const tableData = [
-        ['Solar System Installation & Equipment', '1', `Rs. ${safeSubtotal.toLocaleString()}`, `Rs. ${safeSubtotal.toLocaleString()}`]
-      ];
+      // Draw Table Header
+      let y = 65;
+      doc.setFillColor(16, 185, 129);
+      doc.rect(14, y, 182, 10, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(10);
+      doc.text("Description", 18, y + 7);
+      doc.text("Qty", 120, y + 7);
+      doc.text("Unit Price", 140, y + 7);
+      doc.text("Total", 170, y + 7);
 
-      autoTable(doc, {
-        startY: 60,
-        head: [['Description', 'Qty', 'Unit Price', 'Total']],
-        body: tableData,
-        theme: 'grid',
-        headStyles: { fillColor: [16, 185, 129] },
-        styles: { fontSize: 10, cellPadding: 5 }
-      });
+      // Draw Table Row
+      y += 15;
+      doc.setTextColor(60, 60, 60);
+      doc.text("Solar System Installation & Equipment", 18, y);
+      doc.text("1", 120, y);
+      doc.text(`Rs. ${safeSubtotal.toLocaleString()}`, 140, y);
+      doc.text(`Rs. ${safeSubtotal.toLocaleString()}`, 170, y);
+
+      // Draw Line
+      y += 5;
+      doc.setDrawColor(200, 200, 200);
+      doc.line(14, y, 196, y);
 
       // Summary
-      const finalY = (doc as any).lastAutoTable?.finalY || 100;
+      y += 15;
+      doc.text("Subtotal:", 140, y);
+      doc.text(`Rs. ${safeSubtotal.toLocaleString()}`, 190, y, { align: 'right' });
       
-      doc.text("Subtotal:", 130, finalY + 15);
-      doc.text(`Rs. ${safeSubtotal.toLocaleString()}`, 190, finalY + 15, { align: 'right' });
+      y += 8;
+      doc.text("Tax:", 140, y);
+      doc.text(`Rs. ${safeTax.toLocaleString()}`, 190, y, { align: 'right' });
       
-      doc.text("Tax:", 130, finalY + 23);
-      doc.text(`Rs. ${safeTax.toLocaleString()}`, 190, finalY + 23, { align: 'right' });
+      y += 8;
+      doc.text("Discount:", 140, y);
+      doc.text(`-Rs. ${safeDiscount.toLocaleString()}`, 190, y, { align: 'right' });
       
-      doc.text("Discount:", 130, finalY + 31);
-      doc.text(`-Rs. ${safeDiscount.toLocaleString()}`, 190, finalY + 31, { align: 'right' });
-      
+      y += 12;
       doc.setFontSize(12);
       doc.setTextColor(16, 185, 129);
-      doc.text("Grand Total:", 130, finalY + 41);
-      doc.text(`Rs. ${safeTotal.toLocaleString()}`, 190, finalY + 41, { align: 'right' });
+      doc.text("Grand Total:", 140, y);
+      doc.text(`Rs. ${safeTotal.toLocaleString()}`, 190, y, { align: 'right' });
 
       // Footer
       doc.setFontSize(10);
@@ -121,7 +132,7 @@ export default function Quotations() {
       doc.save(`${quote.qNumber || 'Quotation'}.pdf`);
     } catch (error) {
       console.error("PDF Generation Error:", error);
-      alert("Failed to generate PDF. Please try again.");
+      alert("Failed to generate PDF. Check console for details.");
     }
   };
 
