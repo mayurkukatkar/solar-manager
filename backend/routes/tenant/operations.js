@@ -6,7 +6,7 @@ const upload = require('../../middleware/upload');
 const tenantInstallationsRoutes = require('./installations');
 const { validate } = require('../../middleware/validate');
 const { createTaskSchema } = require('../validations');
-const PDFDocument = require('pdfkit');
+
 
 // TENANT ADMIN - PHASE 2: CORE OPERATIONS
 // ----------------------------------------------------
@@ -89,6 +89,7 @@ router.post('/api/tenant/quotations', requireTenantAuth, async (req, res) => {
 });
 
 
+const { PDFDocument, StandardFonts, rgb } = require('pdf-lib');
 
 router.get('/api/tenant/quotations/:id/pdf', requireTenantAuth, async (req, res) => {
   try {
@@ -99,40 +100,39 @@ router.get('/api/tenant/quotations/:id/pdf', requireTenantAuth, async (req, res)
     
     if (!quote) return res.status(404).json({ error: 'Quotation not found' });
     
-    const doc = new PDFDocument({ margin: 50 });
+    const pdfDoc = await PDFDocument.create();
+    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
     
-    const buffers = [];
-    doc.on('data', buffers.push.bind(buffers));
-    doc.on('end', () => {
-      const pdfData = Buffer.concat(buffers);
-      res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `attachment; filename="${quote.qNumber || 'Quotation'}.pdf"`);
-      res.end(pdfData);
-    });
+    const page = pdfDoc.addPage();
+    const { width, height } = page.getSize();
+    
+    let y = height - 50;
+    
+    const drawText = (text, x, yPos, size = 10, isBold = false, color = rgb(0.4, 0.4, 0.4)) => {
+      page.drawText(text, { x, y: yPos, size, font: isBold ? fontBold : font, color });
+    };
     
     // Header
-    doc.fontSize(22).fillColor('#10B981').text("QUOTATION", { align: 'left' });
-    doc.moveDown();
+    drawText("QUOTATION", 50, y, 22, true, rgb(0.06, 0.72, 0.5));
+    y -= 30;
     
-    doc.fontSize(10).fillColor('#666666');
-    doc.text(`Quote No: ${quote.qNumber || 'Unknown'}`);
-    doc.text(`Date: ${new Date(quote.date || quote.createdAt).toLocaleDateString()}`);
-    
+    drawText(`Quote No: ${quote.qNumber || 'Unknown'}`, 50, y, 10);
+    y -= 15;
+    drawText(`Date: ${new Date(quote.date || quote.createdAt).toLocaleDateString()}`, 50, y, 10);
+    y -= 15;
     const validUntil = new Date(quote.date || quote.createdAt);
     validUntil.setDate(validUntil.getDate() + (quote.validityDays || 15));
-    doc.text(`Valid Until: ${validUntil.toLocaleDateString()}`);
-    
-    doc.moveDown(2);
+    drawText(`Valid Until: ${validUntil.toLocaleDateString()}`, 50, y, 10);
     
     // Client Info
-    doc.fontSize(12).fillColor('#1E1E1E').text("Bill To:");
-    doc.fontSize(10).fillColor('#666666');
+    drawText("Bill To:", 300, height - 80, 12, true, rgb(0.12, 0.12, 0.12));
     const client = quote.customer || quote.lead;
-    doc.text(client?.name || 'Customer');
-    if (client?.email) doc.text(String(client.email));
-    if (client?.mobile) doc.text(String(client.mobile));
-    
-    doc.moveDown(2);
+    let clientY = height - 100;
+    drawText(client?.name || 'Customer', 300, clientY, 10);
+    clientY -= 15;
+    if (client?.email) { drawText(String(client.email), 300, clientY, 10); clientY -= 15; }
+    if (client?.mobile) { drawText(String(client.mobile), 300, clientY, 10); clientY -= 15; }
     
     // Safe Numbers
     const safeSubtotal = Number(quote.subtotal || 0);
@@ -140,46 +140,52 @@ router.get('/api/tenant/quotations/:id/pdf', requireTenantAuth, async (req, res)
     const safeDiscount = Number(quote.discount || 0);
     const safeTotal = Number(quote.total || 0);
 
+    y = clientY < y ? clientY - 30 : y - 30;
+
     // Table Header
-    doc.rect(50, doc.y, 500, 20).fill('#10B981');
-    doc.fillColor('#FFFFFF').text("Description", 60, doc.y - 14);
-    doc.text("Qty", 350, doc.y - 14);
-    doc.text("Unit Price", 400, doc.y - 14);
-    doc.text("Total", 480, doc.y - 14);
+    page.drawRectangle({ x: 50, y: y - 5, width: 500, height: 20, color: rgb(0.06, 0.72, 0.5) });
+    drawText("Description", 60, y, 10, true, rgb(1, 1, 1));
+    drawText("Qty", 350, y, 10, true, rgb(1, 1, 1));
+    drawText("Unit Price", 400, y, 10, true, rgb(1, 1, 1));
+    drawText("Total", 480, y, 10, true, rgb(1, 1, 1));
+    
+    y -= 25;
     
     // Table Row
-    doc.moveDown(1.5);
-    doc.fillColor('#3C3C3C');
-    doc.text("Solar System Installation & Equipment", 60, doc.y);
-    doc.text("1", 350, doc.y - 12);
-    doc.text(`Rs. ${safeSubtotal.toLocaleString()}`, 400, doc.y - 12);
-    doc.text(`Rs. ${safeSubtotal.toLocaleString()}`, 480, doc.y - 12);
+    drawText("Solar System Installation & Equipment", 60, y, 10, false, rgb(0.2, 0.2, 0.2));
+    drawText("1", 350, y, 10, false, rgb(0.2, 0.2, 0.2));
+    drawText(`Rs. ${safeSubtotal.toLocaleString()}`, 400, y, 10, false, rgb(0.2, 0.2, 0.2));
+    drawText(`Rs. ${safeSubtotal.toLocaleString()}`, 480, y, 10, false, rgb(0.2, 0.2, 0.2));
     
-    doc.moveDown(1.5);
-    doc.moveTo(50, doc.y).lineTo(550, doc.y).strokeColor('#CCCCCC').stroke();
+    y -= 15;
+    page.drawLine({ start: { x: 50, y }, end: { x: 550, y }, thickness: 1, color: rgb(0.8, 0.8, 0.8) });
     
-    doc.moveDown();
+    y -= 30;
     
     // Summary
-    doc.text("Subtotal:", 380, doc.y);
-    doc.text(`Rs. ${safeSubtotal.toLocaleString()}`, 480, doc.y - 12, { align: 'right' });
+    drawText("Subtotal:", 380, y, 10);
+    drawText(`Rs. ${safeSubtotal.toLocaleString()}`, 480, y, 10);
+    y -= 20;
     
-    doc.moveDown();
-    doc.text("Tax:", 380, doc.y);
-    doc.text(`Rs. ${safeTax.toLocaleString()}`, 480, doc.y - 12, { align: 'right' });
+    drawText("Tax:", 380, y, 10);
+    drawText(`Rs. ${safeTax.toLocaleString()}`, 480, y, 10);
+    y -= 20;
     
-    doc.moveDown();
-    doc.text("Discount:", 380, doc.y);
-    doc.text(`-Rs. ${safeDiscount.toLocaleString()}`, 480, doc.y - 12, { align: 'right' });
+    drawText("Discount:", 380, y, 10);
+    drawText(`-Rs. ${safeDiscount.toLocaleString()}`, 480, y, 10);
+    y -= 30;
     
-    doc.moveDown(1.5);
-    doc.fontSize(12).fillColor('#10B981').text("Grand Total:", 380, doc.y);
-    doc.text(`Rs. ${safeTotal.toLocaleString()}`, 480, doc.y - 14, { align: 'right' });
+    drawText("Grand Total:", 380, y, 12, true, rgb(0.06, 0.72, 0.5));
+    drawText(`Rs. ${safeTotal.toLocaleString()}`, 480, y, 12, true, rgb(0.12, 0.12, 0.12));
     
-    doc.moveDown(4);
-    doc.fontSize(10).fillColor('#999999').text("Thank you for choosing Solar ERP. This is a system generated quotation.", { align: 'center' });
+    // Footer
+    drawText("Thank you for choosing Solar ERP. This is a system generated quotation.", 150, 50, 9, false, rgb(0.6, 0.6, 0.6));
     
-    doc.end();
+    const pdfBytes = await pdfDoc.save();
+    
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${quote.qNumber || 'Quotation'}.pdf"`);
+    res.end(Buffer.from(pdfBytes));
     
   } catch (error) {
     console.error("PDF Generation Route Error:", error);
