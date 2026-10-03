@@ -1,0 +1,1126 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ----------------------------------------------------
+// 1. TENANT & CONFIGURATION
+// ----------------------------------------------------
+enum TenantStatus {
+  TRIAL
+  ACTIVE
+  PAST_DUE
+  SUSPENDED
+  CANCELLED
+  EXPIRED
+}
+
+model Tenant {
+  id        String       @id @default(uuid())
+  name      String
+  legalName String?
+  email     String?
+  phone     String?
+  address   String?
+  city      String?
+  state     String?
+  country   String       @default("India")
+  pincode   String?
+  gstin     String?
+  pan       String?
+  status    TenantStatus @default(TRIAL)
+
+  users          User[]
+  leads          Lead[]
+  projects       Project[]
+  products       Product[]
+  warehouses     Warehouse[]
+  supportTickets SupportTicket[]
+  customers      Customer[]
+  siteSurveys    SiteSurvey[]
+  quotations     Quotation[]
+
+  purchaseOrders     PurchaseOrder[]
+  stockLedgers       StockLedger[]
+  goodsReceipts      GoodsReceipt[]
+  materialDispatches MaterialDispatch[]
+  stockTransfers     StockTransfer[]
+  amcs               AMC[]
+  invoices           Invoice[]
+  subsidies          SubsidyApplication[]
+  loans              LoanApplication[]
+
+  subscription Subscription?
+
+  installations          InstallationJob[]
+  completionCertificates CompletionCertificate[]
+  checklistTemplates     InstallationChecklistTemplate[]
+  createdAt              DateTime                        @default(now())
+  updatedAt              DateTime                        @updatedAt
+}
+
+// ----------------------------------------------------
+// 1.5 SUBSCRIPTIONS & PLANS (PHASE 3)
+// ----------------------------------------------------
+model Plan {
+  id           String  @id @default(uuid())
+  name         String
+  code         String  @unique
+  description  String?
+  price        Float   @default(0)
+  billingCycle String  @default("MONTHLY") // MONTHLY, ANNUAL
+  trialDays    Int     @default(14)
+  userLimit    Int     @default(5)
+  storageLimit Int     @default(5) // in GB
+  isActive     Boolean @default(true)
+  features     Json    @default("{}")
+
+  subscriptions Subscription[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Subscription {
+  id       String @id @default(uuid())
+  tenantId String @unique
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  planId String
+  plan   Plan   @relation(fields: [planId], references: [id])
+
+  status        String   @default("ACTIVE") // ACTIVE, TRIAL, EXPIRED, CANCELLED
+  startDate     DateTime @default(now())
+  endDate       DateTime
+  amount        Float    @default(0)
+  paymentStatus String   @default("PAID") // PAID, PENDING, FAILED
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ----------------------------------------------------
+// 2. USERS & AUTHORIZATION (3-TIER RBAC)
+// ----------------------------------------------------
+enum RoleType {
+  SUPER_ADMIN
+  TENANT_ADMIN
+  TENANT_SUB_ADMIN
+}
+
+model User {
+  id       String   @id @default(uuid())
+  email    String   @unique
+  password String
+  name     String
+  role     RoleType
+
+  tenantId String? // null if SUPER_ADMIN
+  tenant   Tenant? @relation(fields: [tenantId], references: [id])
+
+  mustChangePassword Boolean @default(false)
+
+  // Granular Sub-Admin Permissions (Stored as JSON for infinite scalability)
+  permissions Json?
+
+  installationAssignments InstallationAssignment[]
+  createdAt               DateTime                 @default(now())
+  updatedAt               DateTime                 @updatedAt
+
+  assignedLeads   Lead[]          @relation("LeadAssignee")
+  assignedTasks   ProjectTask[]   @relation("TaskAssignee")
+  assignedTickets SupportTicket[] @relation("TicketAssignee")
+  projectsOwned   Project[]       @relation("ProjectOwner")
+}
+
+// ----------------------------------------------------
+// 3. CRM & SALES
+// ----------------------------------------------------
+enum LeadStatus {
+  NEW
+  CONTACTED
+  QUALIFIED
+  SITE_SURVEY
+  PROPOSAL_SENT
+  NEGOTIATION
+  WON
+  LOST
+  ON_HOLD
+}
+
+model Lead {
+  id       String @id @default(uuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  leadNumber     String?
+  name           String
+  company        String?
+  customerType   String  @default("RESIDENTIAL")
+  email          String?
+  mobile         String
+  alternatePhone String?
+  address        String?
+  city           String?
+  state          String?
+  pincode        String?
+
+  status                LeadStatus @default(NEW)
+  estimatedValue        Float?
+  estimatedCap          Float?
+  capacityUnit          String     @default("KW")
+  systemType            String?
+  monthlyBill           Float?
+  roofType              String?
+  roofArea              Float?
+  electricityConnection String?
+  sanctionedLoad        Float?
+
+  source     String?
+  campaignId String?
+  notes      String?
+
+  assigneeId String?
+  assignee   User?   @relation("LeadAssignee", fields: [assigneeId], references: [id])
+
+  lastActivityAt DateTime?
+  nextFollowupAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  customer   Customer?
+  surveys    SiteSurvey[]
+  quotations Quotation[]
+  projects   Project[]
+
+  activities LeadActivity[]
+  followUps  LeadFollowUp[]
+  leadNotes  LeadNote[]
+}
+
+model LeadActivity {
+  id          String   @id @default(uuid())
+  leadId      String
+  lead        Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  type        String // STATUS_CHANGE, CALL, EMAIL, WHATSAPP, NOTE, ASSIGNMENT, SURVEY_SCHEDULED, QUOTE_SENT
+  description String
+  performedBy String? // User ID or 'SYSTEM'
+  createdAt   DateTime @default(now())
+}
+
+model LeadFollowUp {
+  id          String   @id @default(uuid())
+  leadId      String
+  lead        Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  type        String // CALL, WHATSAPP, EMAIL, MEETING
+  scheduledAt DateTime
+  notes       String?
+  status      String   @default("PENDING") // PENDING, COMPLETED, CANCELLED
+  assignedTo  String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model LeadNote {
+  id        String   @id @default(uuid())
+  leadId    String
+  lead      Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  content   String
+  createdBy String? // User ID
+  createdAt DateTime @default(now())
+}
+
+model Customer {
+  id       String @id @default(uuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  leadId String? @unique
+  lead   Lead?   @relation(fields: [leadId], references: [id])
+
+  name         String
+  company      String?
+  email        String?
+  mobile       String
+  address      String?
+  city         String?
+  customerType String  @default("RESIDENTIAL") // RESIDENTIAL, COMMERCIAL, INDUSTRIAL
+
+  projects   Project[]
+  surveys    SiteSurvey[]
+  quotations Quotation[]
+  invoices   Invoice[]
+  tickets    SupportTicket[]
+  amcs       AMC[]
+  subsidies  SubsidyApplication[]
+  loans      LoanApplication[]
+
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  InstallationJob InstallationJob[]
+}
+
+model SiteSurvey {
+  id       String @id @default(uuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  customerId String?
+  customer   Customer? @relation(fields: [customerId], references: [id])
+
+  leadId String?
+  lead   Lead?   @relation(fields: [leadId], references: [id])
+
+  surveyDate  DateTime?
+  proposedCap Float?
+  roofType    String?
+  notes       String?
+  photos      String[]  @default([]) // Cloudinary URLs
+  status      String    @default("SCHEDULED") // SCHEDULED, IN_PROGRESS, SUBMITTED, APPROVED
+
+  projects Project[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Quotation {
+  id       String @id @default(uuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  customerId String?
+  customer   Customer? @relation(fields: [customerId], references: [id])
+
+  leadId String?
+  lead   Lead?   @relation(fields: [leadId], references: [id])
+
+  qNumber      String
+  date         DateTime @default(now())
+  validityDays Int      @default(15)
+  subtotal     Float    @default(0)
+  tax          Float    @default(0)
+  discount     Float    @default(0)
+  total        Float    @default(0)
+  status       String   @default("DRAFT") // DRAFT, SENT, ACCEPTED, REJECTED
+
+  items    QuotationItem[]
+  projects Project[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model QuotationItem {
+  id          String    @id @default(uuid())
+  quotationId String
+  quotation   Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+
+  productId String?
+  product   Product? @relation(fields: [productId], references: [id])
+
+  description String
+  quantity    Float  @default(1)
+  unitPrice   Float  @default(0)
+  taxRate     Float  @default(0)
+  total       Float  @default(0)
+}
+
+// ----------------------------------------------------
+// 4. INVENTORY & PRODUCTS
+// ----------------------------------------------------
+model Product {
+  id       String @id @default(uuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  sku          String?
+  name         String
+  category     String
+  brand        String?
+  unit         String  @default("NOS")
+  purchaseCost Float   @default(0)
+  sellingPrice Float   @default(0)
+  taxRate      Float   @default(0)
+
+  minStock       Int     @default(0)
+  reorderLevel   Int     @default(0)
+  currentStock   Int     @default(0) // Used as aggregate cache
+  isSerialized   Boolean @default(false)
+  isBatchTracked Boolean @default(false)
+
+  installationConsumptions InstallationMaterialConsumption[]
+  createdAt                DateTime                          @default(now())
+  updatedAt                DateTime                          @updatedAt
+
+  quotationItems QuotationItem[]
+  poItems        PurchaseOrderItem[]
+  stockBalances  StockBalance[]
+  stockLedgers   StockLedger[]
+  serialNumbers  SerialNumber[]
+  materialReqs   ProjectMaterialRequirement[]
+  receiptItems   GoodsReceiptItem[]
+  dispatchItems  MaterialDispatchItem[]
+  transferItems  StockTransferItem[]
+}
+
+model Warehouse {
+  id       String @id @default(uuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  name     String
+  location String?
+
+  balances      StockBalance[]
+  ledgers       StockLedger[]
+  serialNumbers SerialNumber[]
+  receipts      GoodsReceipt[]
+  dispatches    MaterialDispatch[]
+
+  transfersOut StockTransfer[] @relation("TransferSource")
+  transfersIn  StockTransfer[] @relation("TransferDestination")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model StockBalance {
+  id String @id @default(uuid())
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  warehouseId String
+  warehouse   Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+
+  quantity          Float @default(0) // Physical stock
+  reservedQuantity  Float @default(0)
+  availableQuantity Float @default(0) // quantity - reservedQuantity
+  averageCost       Float @default(0)
+
+  updatedAt DateTime @updatedAt
+
+  @@unique([productId, warehouseId])
+}
+
+model StockLedger {
+  id       String @id @default(uuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  warehouseId String
+  warehouse   Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+
+  movementType   String // OPENING_BALANCE, RECEIPT, DISPATCH, TRANSFER_IN, TRANSFER_OUT, RETURN, ADJUSTMENT
+  quantity       Float
+  quantityBefore Float  @default(0)
+  quantityAfter  Float  @default(0)
+
+  referenceType String? // PO, PROJECT, TRANSFER, MANUAL
+  referenceId   String?
+
+  userId String?
+  notes  String?
+
+  createdAt DateTime @default(now())
+}
+
+model SerialNumber {
+  id String @id @default(uuid())
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  serialNumber String
+  status       String @default("AVAILABLE") // AVAILABLE, RESERVED, INSTALLED, RETURNED, DAMAGED
+
+  warehouseId String?
+  warehouse   Warehouse? @relation(fields: [warehouseId], references: [id])
+
+  projectId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([productId, serialNumber])
+}
+
+model GoodsReceipt {
+  id       String @id @default(uuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  grnNumber   String
+  warehouseId String
+  warehouse   Warehouse @relation(fields: [warehouseId], references: [id])
+
+  purchaseOrderId String?
+  vendor          String?
+
+  date   DateTime @default(now())
+  status String   @default("DRAFT") // DRAFT, APPROVED
+
+  items GoodsReceiptItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model GoodsReceiptItem {
+  id             String       @id @default(uuid())
+  goodsReceiptId String
+  goodsReceipt   GoodsReceipt @relation(fields: [goodsReceiptId], references: [id], onDelete: Cascade)
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+
+  receivedQty Float @default(1)
+  acceptedQty Float @default(1)
+  unitCost    Float @default(0)
+  totalCost   Float @default(0)
+}
+
+model MaterialDispatch {
+  id       String @id @default(uuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  dispatchNumber String
+  projectId      String
+
+  warehouseId String
+  warehouse   Warehouse @relation(fields: [warehouseId], references: [id])
+
+  date   DateTime @default(now())
+  status String   @default("DRAFT") // DRAFT, APPROVED, DISPATCHED, DELIVERED
+
+  receiverName String?
+  notes        String?
+
+  items MaterialDispatchItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model MaterialDispatchItem {
+  id                 String           @id @default(uuid())
+  materialDispatchId String
+  materialDispatch   MaterialDispatch @relation(fields: [materialDispatchId], references: [id], onDelete: Cascade)
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+
+  quantity      Float    @default(1)
+  serialNumbers String[] @default([]) // Store picked serials here
+}
+
+model StockTransfer {
+  id       String @id @default(uuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  transferNumber String
+
+  sourceWarehouseId String
+  sourceWarehouse   Warehouse @relation("TransferSource", fields: [sourceWarehouseId], references: [id])
+
+  destWarehouseId String
+  destWarehouse   Warehouse @relation("TransferDestination", fields: [destWarehouseId], references: [id])
+
+  date   DateTime @default(now())
+  status String   @default("DRAFT") // DRAFT, IN_TRANSIT, RECEIVED
+
+  items StockTransferItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model StockTransferItem {
+  id              String        @id @default(uuid())
+  stockTransferId String
+  stockTransfer   StockTransfer @relation(fields: [stockTransferId], references: [id], onDelete: Cascade)
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+
+  quantity Float @default(1)
+}
+
+model PurchaseOrder {
+  id       String @id @default(uuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  poNumber String
+  vendor   String
+  date     DateTime @default(now())
+  status   String   @default("DRAFT") // DRAFT, APPROVED, SENT, PARTIAL, RECEIVED, CLOSED
+
+  projectId String?
+  project   Project? @relation(fields: [projectId], references: [id])
+
+  items PurchaseOrderItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model PurchaseOrderItem {
+  id              String        @id @default(uuid())
+  purchaseOrderId String
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+
+  quantity    Int   @default(1)
+  receivedQty Int   @default(0)
+  unitPrice   Float @default(0)
+  total       Float @default(0)
+}
+
+// ----------------------------------------------------
+// 5. PROJECTS & INSTALLATION
+// ----------------------------------------------------
+model Project {
+  id       String @id @default(uuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  projectNumber String?
+  name          String
+
+  projectType  String?
+  systemType   String?
+  capacity     Float?
+  capacityUnit String  @default("kW")
+
+  customerId String?
+  customer   Customer? @relation(fields: [customerId], references: [id])
+
+  leadId String?
+  lead   Lead?   @relation(fields: [leadId], references: [id])
+
+  surveyId String?
+  survey   SiteSurvey? @relation(fields: [surveyId], references: [id])
+
+  quotationId String?
+  quotation   Quotation? @relation(fields: [quotationId], references: [id])
+
+  projectOwnerId String?
+  projectOwner   User?   @relation("ProjectOwner", fields: [projectOwnerId], references: [id])
+
+  installationAddress String?
+  city                String?
+  state               String?
+  pincode             String?
+
+  startDate              DateTime?
+  expectedCompletionDate DateTime?
+  actualCompletionDate   DateTime?
+
+  currentStage String @default("Planning")
+  status       String @default("Not Started")
+  priority     String @default("Medium")
+
+  estimatedValue Float @default(0)
+  estimatedCost  Float @default(0)
+  actualCost     Float @default(0)
+
+  progressPercent Float @default(0)
+
+  stageHistory   ProjectStageHistory[]
+  timelineEvents ProjectTimelineEvent[]
+  statusUpdates  ProjectStatusUpdate[]
+  tasks          ProjectTask[]
+  milestones     ProjectMilestone[]
+  materialReqs   ProjectMaterialRequirement[]
+  costs          ProjectCost[]
+
+  purchaseOrders PurchaseOrder[]
+  invoices       Invoice[]
+  tickets        SupportTicket[]
+  subsidies      SubsidyApplication[]
+  loans          LoanApplication[]
+  amcs           AMC[]
+
+  createdBy String?
+
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime                @updatedAt
+  InstallationJob       InstallationJob[]
+  CompletionCertificate CompletionCertificate[]
+}
+
+model ProjectStageHistory {
+  id        String  @id @default(uuid())
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  previousStage String?
+  newStage      String
+  changedBy     String?
+  comment       String?
+
+  createdAt DateTime @default(now())
+}
+
+model ProjectTimelineEvent {
+  id        String  @id @default(uuid())
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  title       String
+  description String?
+  eventType   String // STAGE_CHANGE, STATUS_UPDATE, TASK_UPDATE, MILESTONE, GENERIC
+  createdBy   String?
+
+  createdAt DateTime @default(now())
+}
+
+model ProjectStatusUpdate {
+  id        String  @id @default(uuid())
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  status     String
+  progress   Float?
+  updateText String
+  nextAction String?
+  updatedBy  String?
+
+  createdAt DateTime @default(now())
+}
+
+model ProjectTask {
+  id        String  @id @default(uuid())
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  name        String
+  description String?
+  status      String  @default("To Do") // To Do, In Progress, Blocked, Completed, Cancelled
+  priority    String  @default("Medium") // Low, Medium, High
+  progress    Float   @default(0)
+
+  startDate DateTime?
+  dueDate   DateTime?
+
+  assigneeId String?
+  assignee   User?   @relation("TaskAssignee", fields: [assigneeId], references: [id])
+
+  dependencies  ProjectTaskDependency[] @relation("DependentTask")
+  prerequisites ProjectTaskDependency[] @relation("PrerequisiteTask")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ProjectTaskDependency {
+  id String @id @default(uuid())
+
+  taskId String
+  task   ProjectTask @relation("DependentTask", fields: [taskId], references: [id], onDelete: Cascade)
+
+  prerequisiteId String
+  prerequisite   ProjectTask @relation("PrerequisiteTask", fields: [prerequisiteId], references: [id], onDelete: Cascade)
+}
+
+model ProjectMilestone {
+  id        String  @id @default(uuid())
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  name        String
+  description String?
+  status      String  @default("Pending") // Pending, Completed, Delayed
+
+  targetDate DateTime?
+  actualDate DateTime?
+
+  responsibleId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ProjectMaterialRequirement {
+  id        String  @id @default(uuid())
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  productId String?
+  product   Product? @relation(fields: [productId], references: [id])
+
+  description String
+  quantity    Float  @default(1)
+  status      String @default("Required") // Required, Procured, Dispatched, Consumed
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ProjectCost {
+  id        String  @id @default(uuid())
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  category String // Modules, Inverter, Structure, Labour, Transport
+  budget   Float  @default(0)
+  actual   Float  @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ----------------------------------------------------
+// PHASE 6: SUPPORT & COMMUNICATION
+// ----------------------------------------------------
+model SupportTicket {
+  id       String @id @default(uuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  customerId String?
+  customer   Customer? @relation(fields: [customerId], references: [id])
+
+  projectId String?
+  project   Project? @relation(fields: [projectId], references: [id])
+
+  subject     String
+  description String?
+  priority    String  @default("MEDIUM") // LOW, MEDIUM, HIGH, CRITICAL
+  status      String  @default("OPEN") // OPEN, ASSIGNED, IN_PROGRESS, WAITING, RESOLVED, CLOSED
+
+  assigneeId String?
+  assignee   User?   @relation("TicketAssignee", fields: [assigneeId], references: [id])
+
+  visits ServiceVisit[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ServiceVisit {
+  id       String        @id @default(uuid())
+  ticketId String
+  ticket   SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  visitDate DateTime @default(now())
+  notes     String?
+  status    String   @default("COMPLETED")
+
+  createdAt DateTime @default(now())
+}
+
+model AMC {
+  id       String @id @default(uuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id])
+
+  projectId String?
+  project   Project? @relation(fields: [projectId], references: [id])
+
+  contractNumber String
+  startDate      DateTime
+  endDate        DateTime
+  value          Float    @default(0)
+  status         String   @default("ACTIVE") // ACTIVE, EXPIRED
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ----------------------------------------------------
+// PHASE 7: FINANCE, SUBSIDY, LOAN
+// ----------------------------------------------------
+model Invoice {
+  id       String @id @default(uuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id])
+
+  projectId String?
+  project   Project? @relation(fields: [projectId], references: [id])
+
+  invoiceNumber String
+  date          DateTime  @default(now())
+  dueDate       DateTime?
+  amount        Float     @default(0)
+  status        String    @default("UNPAID") // UNPAID, PARTIAL, PAID
+
+  payments Payment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Payment {
+  id        String  @id @default(uuid())
+  invoiceId String
+  invoice   Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  amount    Float    @default(0)
+  date      DateTime @default(now())
+  mode      String   @default("BANK_TRANSFER")
+  reference String?
+
+  createdAt DateTime @default(now())
+}
+
+model SubsidyApplication {
+  id       String @id @default(uuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id])
+
+  projectId String?
+  project   Project? @relation(fields: [projectId], references: [id])
+
+  applicationNo String?
+  status        String  @default("SUBMITTED") // SUBMITTED, PROCESSING, APPROVED, REJECTED
+  amount        Float?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model LoanApplication {
+  id       String @id @default(uuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id])
+
+  projectId String?
+  project   Project? @relation(fields: [projectId], references: [id])
+
+  lender        String?
+  applicationNo String?
+  status        String  @default("APPLIED") // APPLIED, REVIEW, APPROVED, DISBURSED, REJECTED
+  amount        Float?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Announcement {
+  id        String    @id @default(uuid())
+  title     String
+  message   String
+  type      String    @default("INFO") // INFO, WARNING, SUCCESS
+  target    String    @default("ALL") // ALL, SPECIFIC_PLAN, SPECIFIC_TENANT
+  expiresAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ----------------------------------------------------
+// PHASE 8: SECURITY & AUDIT LOGS
+// ----------------------------------------------------
+model AuditLog {
+  id        String  @id @default(uuid())
+  actorId   String
+  tenantId  String?
+  action    String
+  entity    String
+  entityId  String?
+  details   Json?
+  ipAddress String?
+
+  createdAt DateTime @default(now())
+}
+
+// ----------------------------------------------------
+// 5.1 INSTALLATION MANAGEMENT
+// ----------------------------------------------------
+
+model InstallationJob {
+  id       String @id @default(uuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  jobId String
+
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id])
+
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id])
+
+  status          String @default("SCHEDULED") // SCHEDULED, ASSIGNED, EN_ROUTE, ON_SITE, IN_PROGRESS, TESTING, PENDING_REVIEW, COMPLETED, DELAYED, CANCELLED
+  progressPercent Int    @default(0)
+  priority        String @default("NORMAL") // LOW, NORMAL, HIGH, URGENT
+
+  scheduledDate      DateTime?
+  scheduledStartTime String?
+  estimatedDuration  Float?
+
+  actualStartAt DateTime?
+  actualEndAt   DateTime?
+
+  delayReason String?
+  notes       String?
+
+  installationAddress String?
+  city                String?
+  state               String?
+  pincode             String?
+
+  assignments InstallationAssignment[]
+  checklists  InstallationChecklistResponse[]
+  photos      InstallationPhoto[]
+  materials   InstallationMaterialConsumption[]
+  issues      InstallationIssue[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model InstallationAssignment {
+  id             String          @id @default(uuid())
+  installationId String
+  installation   InstallationJob @relation(fields: [installationId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  role   String @default("TECHNICIAN") // LEAD, TECHNICIAN, QA
+  status String @default("ASSIGNED") // ASSIGNED, ACCEPTED, EN_ROUTE, ON_SITE, COMPLETED
+
+  createdAt DateTime @default(now())
+}
+
+model InstallationChecklistTemplate {
+  id       String @id @default(uuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  name        String
+  description String?
+  systemType  String? // E.g., 5kW Residential
+
+  items InstallationChecklistItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model InstallationChecklistItem {
+  id         String                        @id @default(uuid())
+  templateId String
+  template   InstallationChecklistTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  category      String // PRE_INSTALLATION, INSTALLATION, TESTING, HANDOVER
+  item          String
+  isRequired    Boolean @default(true)
+  requiresPhoto Boolean @default(false)
+  isPassFail    Boolean @default(false)
+  order         Int     @default(0)
+}
+
+model InstallationChecklistResponse {
+  id             String          @id @default(uuid())
+  installationId String
+  installation   InstallationJob @relation(fields: [installationId], references: [id], onDelete: Cascade)
+
+  itemId   String
+  // Store item text to prevent template changes breaking history
+  category String
+  item     String
+
+  isChecked Boolean @default(false)
+  status    String? // PASS, FAIL, N/A
+  comment   String?
+
+  completedBy String?
+  completedAt DateTime?
+}
+
+model InstallationPhoto {
+  id             String          @id @default(uuid())
+  installationId String
+  installation   InstallationJob @relation(fields: [installationId], references: [id], onDelete: Cascade)
+
+  category String // SITE_BEFORE, ROOF, INVERTER, PANELS, WIRING, METER
+  url      String
+  caption  String?
+
+  uploadedBy String?
+  createdAt  DateTime @default(now())
+}
+
+model InstallationMaterialConsumption {
+  id             String          @id @default(uuid())
+  installationId String
+  installation   InstallationJob @relation(fields: [installationId], references: [id], onDelete: Cascade)
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+
+  dispatchedQty Float @default(0)
+  consumedQty   Float @default(0)
+  returnedQty   Float @default(0)
+
+  serialNumbers String[] @default([])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model InstallationIssue {
+  id             String          @id @default(uuid())
+  installationId String
+  installation   InstallationJob @relation(fields: [installationId], references: [id], onDelete: Cascade)
+
+  category    String // ELECTRICAL, CIVIL, MATERIAL, CUSTOMER
+  severity    String @default("LOW") // LOW, MEDIUM, HIGH, BLOCKER
+  description String
+  status      String @default("OPEN") // OPEN, IN_PROGRESS, RESOLVED, CLOSED
+
+  reportedBy String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model CompletionCertificate {
+  id       String @id @default(uuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  certificateNo String
+
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id])
+
+  installationId String
+
+  customerName   String
+  systemCapacity String?
+
+  pdfUrl String?
+
+  issuedBy String?
+  issuedAt DateTime @default(now())
+}
