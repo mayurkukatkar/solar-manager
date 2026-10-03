@@ -17,8 +17,8 @@ export default function Procurement() {
   const fetchData = async () => {
     try {
       const [poRes, invRes] = await Promise.all([
-         axios.get(`\${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/procurement`, { withCredentials: true }),
-         axios.get(`\${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/inventory`, { withCredentials: true })
+         axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/procurement`, { withCredentials: true }),
+         axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/inventory`, { withCredentials: true })
       ]);
       setProcurement(poRes.data.procurement);
       setInventory(invRes.data.inventory);
@@ -36,7 +36,7 @@ export default function Procurement() {
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await axios.post(`\${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/procurement`, {
+      await axios.post(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/procurement`, {
         ...formData, 
         qty: Number(formData.qty)
       }, { withCredentials: true });

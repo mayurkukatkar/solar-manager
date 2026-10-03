@@ -34,9 +34,9 @@ export default function NewMaterialDispatch() {
   const fetchData = async () => {
     try {
       const [projRes, wareRes, prodRes] = await Promise.all([
-        axios.get(`\${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/projects`, { withCredentials: true }),
-        axios.get(`\${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/inventory/warehouses`, { withCredentials: true }),
-        axios.get(`\${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/inventory/products`, { withCredentials: true })
+        axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/projects`, { withCredentials: true }),
+        axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/inventory/warehouses`, { withCredentials: true }),
+        axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/inventory/products`, { withCredentials: true })
       ]);
       setProjects(projRes.data.projects || []);
       setWarehouses(wareRes.data.warehouses || []);
@@ -92,7 +92,7 @@ export default function NewMaterialDispatch() {
 
     setSubmitting(true);
     try {
-      await axios.post(`\${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/inventory/dispatch`, {
+      await axios.post(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/inventory/dispatch`, {
         projectId,
         warehouseId,
         receiverName,

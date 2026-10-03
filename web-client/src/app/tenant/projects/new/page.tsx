@@ -37,8 +37,8 @@ export default function NewProject() {
     const fetchData = async () => {
       try {
         const [leadsRes, usersRes] = await Promise.all([
-          axios.get(`\${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/leads`, { withCredentials: true }),
-          axios.get(`\${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/staff`, { withCredentials: true }).catch(() => ({ data: { staff: [] } }))
+          axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/leads`, { withCredentials: true }),
+          axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/staff`, { withCredentials: true }).catch(() => ({ data: { staff: [] } }))
         ]);
         
         // Only show WON leads that can be converted, or ALL leads if needed. For simplicity, just get leads with their quotations
@@ -79,7 +79,7 @@ export default function NewProject() {
     e.preventDefault();
     setLoading(true);
     try {
-      const res = await axios.post(`\${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/projects`, formData, { withCredentials: true });
+      const res = await axios.post(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/projects`, formData, { withCredentials: true });
       router.push(`/tenant/projects/${res.data.project.id}`);
     } catch (err) {
       console.error(err);

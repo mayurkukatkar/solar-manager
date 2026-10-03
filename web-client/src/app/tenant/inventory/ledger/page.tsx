@@ -17,7 +17,7 @@ export default function StockLedgerView() {
 
   const fetchLedger = async () => {
     try {
-      const res = await axios.get(`\${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/inventory/stock-ledger`, { withCredentials: true });
+      const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/inventory/stock-ledger`, { withCredentials: true });
       setLedger(res.data.ledger);
     } catch (err) {
       console.error(err);

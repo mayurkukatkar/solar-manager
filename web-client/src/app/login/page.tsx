@@ -22,7 +22,7 @@ export default function SuperAdminLogin() {
     setError('');
     
     try {
-      const res = await axios.post(`\${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/login`, { email, password }, { withCredentials: true });
+      const res = await axios.post(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/login`, { email, password }, { withCredentials: true });
       
       if (res.data.requiresPasswordReset) {
         setRequiresReset(true);
@@ -46,7 +46,7 @@ export default function SuperAdminLogin() {
     setSuccess('');
 
     try {
-      const res = await axios.post(`\${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/force-reset-password`, {
+      const res = await axios.post(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/force-reset-password`, {
         email,
         temporaryPassword: password,
         newPassword

@@ -50,7 +50,7 @@ export default function CreateTenant() {
     setError('');
     try {
       // Create Tenant (Using existing Phase 1 API, ignoring extra wizard fields until backend upgrade)
-      await axios.post(`\${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/super-admin/tenants`, formData, { withCredentials: true });
+      await axios.post(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/super-admin/tenants`, formData, { withCredentials: true });
       router.push('/super-admin/tenants');
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to provision tenant');

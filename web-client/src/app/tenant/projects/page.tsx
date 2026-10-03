@@ -17,7 +17,7 @@ export default function ProjectsDashboard() {
 
   const fetchProjects = async () => {
     try {
-      const res = await axios.get(`\${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/projects`, { withCredentials: true });
+      const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/projects`, { withCredentials: true });
       setProjects(res.data.projects || []);
       setMetrics(res.data.metrics || {});
     } catch (err) {

@@ -19,7 +19,7 @@ export default function AuditLogs() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    axios.get(`\${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/super-admin/audit-logs`, { withCredentials: true })
+    axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/super-admin/audit-logs`, { withCredentials: true })
       .then(res => setLogs(res.data.logs || []))
       .catch(err => console.error(err))
       .finally(() => setLoading(false));

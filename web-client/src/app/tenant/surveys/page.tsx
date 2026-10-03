@@ -18,8 +18,8 @@ export default function SiteSurveys() {
   const fetchData = async () => {
     try {
       const [surveyRes, customerRes] = await Promise.all([
-        axios.get(`\${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/surveys`, { withCredentials: true }),
-        axios.get(`\${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/customers`, { withCredentials: true })
+        axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/surveys`, { withCredentials: true }),
+        axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/customers`, { withCredentials: true })
       ]);
       setSurveys(surveyRes.data.surveys);
       setCustomers(customerRes.data.customers);
@@ -37,7 +37,7 @@ export default function SiteSurveys() {
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await axios.post(`\${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/surveys`, formData, { withCredentials: true });
+      await axios.post(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/surveys`, formData, { withCredentials: true });
       setShowModal(false);
       fetchData();
     } catch (err) {

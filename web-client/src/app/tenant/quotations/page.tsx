@@ -17,8 +17,8 @@ export default function Quotations() {
   const fetchData = async () => {
     try {
       const [quoteRes, customerRes] = await Promise.all([
-        axios.get(`\${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/quotations`, { withCredentials: true }),
-        axios.get(`\${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/customers`, { withCredentials: true })
+        axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/quotations`, { withCredentials: true }),
+        axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/customers`, { withCredentials: true })
       ]);
       setQuotations(quoteRes.data.quotations);
       setCustomers(customerRes.data.customers);
@@ -37,7 +37,7 @@ export default function Quotations() {
     e.preventDefault();
     try {
       const total = Number(formData.subtotal) + Number(formData.tax) - Number(formData.discount);
-      await axios.post(`\${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/quotations`, { ...formData, total }, { withCredentials: true });
+      await axios.post(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/quotations`, { ...formData, total }, { withCredentials: true });
       setShowModal(false);
       fetchData();
     } catch (err) {

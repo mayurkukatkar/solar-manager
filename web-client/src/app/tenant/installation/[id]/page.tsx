@@ -19,7 +19,7 @@ export default function InstallationDetails() {
 
   const fetchJob = async () => {
     try {
-      const res = await axios.get(`\${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/installations/` + id, { withCredentials: true });
+      const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/installations/` + id, { withCredentials: true });
       setJob(res.data.installation);
     } catch (err) {
       console.error(err);

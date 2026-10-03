@@ -20,7 +20,7 @@ export default function PlansList() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    axios.get(`\${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/super-admin/plans`, { withCredentials: true })
+    axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/super-admin/plans`, { withCredentials: true })
       .then(res => setPlans(res.data.plans || []))
       .catch(err => console.error(err))
       .finally(() => setLoading(false));

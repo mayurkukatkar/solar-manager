@@ -18,7 +18,7 @@ export default function InstallationJobsList() {
   const fetchJobs = async () => {
     setLoading(true);
     try {
-      const res = await axios.get(`\${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/installations`, {
+      const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/installations`, {
         params: { status: statusFilter },
         withCredentials: true
       });

@@ -23,7 +23,7 @@ export default function LeadsList() {
 
   const fetchDashboard = async () => {
     try {
-      const res = await axios.get(`\${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/leads/dashboard`, { withCredentials: true });
+      const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/leads/dashboard`, { withCredentials: true });
       setDashboard(res.data.dashboard);
     } catch (err) {
       console.error(err);
@@ -33,7 +33,7 @@ export default function LeadsList() {
   const fetchLeads = async () => {
     try {
       setLoading(true);
-      let url = `\${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/leads?`;
+      let url = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/leads?`;
       if (search) url += `search=${search}&`;
       if (statusFilter) url += `status=${statusFilter}&`;
       if (sourceFilter) url += `source=${sourceFilter}`;
@@ -62,7 +62,7 @@ export default function LeadsList() {
     e.preventDefault();
     setErrorMsg('');
     try {
-      await axios.post(`\${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/leads`, {
+      await axios.post(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/leads`, {
         ...formData,
         estimatedCap: formData.estimatedCap ? parseFloat(formData.estimatedCap) : null
       }, { withCredentials: true });

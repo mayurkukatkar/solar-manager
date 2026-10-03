@@ -17,8 +17,8 @@ export default function Tasks() {
   const fetchData = async () => {
     try {
       const [taskRes, projRes] = await Promise.all([
-        axios.get(`\${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/tasks`, { withCredentials: true }),
-        axios.get(`\${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/projects`, { withCredentials: true })
+        axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/tasks`, { withCredentials: true }),
+        axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/projects`, { withCredentials: true })
       ]);
       setTasks(taskRes.data.tasks);
       setProjects(projRes.data.projects);
@@ -43,7 +43,7 @@ export default function Tasks() {
       if (formData.description) payload.description = formData.description;
       if (formData.dueDate) payload.dueDate = new Date(formData.dueDate).toISOString();
 
-      await axios.post(`\${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/tasks`, payload, { withCredentials: true });
+      await axios.post(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/tasks`, payload, { withCredentials: true });
       setShowModal(false);
       fetchData();
     } catch (err) {

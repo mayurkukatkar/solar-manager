@@ -15,7 +15,7 @@ export default function SurveyDetail() {
     try {
       // In a real app we would have a GET /surveys/:id endpoint.
       // For now, let's just fetch all and find the one.
-      const res = await axios.get(`\${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/surveys`, { withCredentials: true });
+      const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/surveys`, { withCredentials: true });
       const found = res.data.surveys.find((s: any) => s.id === params.id);
       setSurvey(found);
     } catch (err) {
@@ -39,7 +39,7 @@ export default function SurveyDetail() {
     }
 
     try {
-      const res = await axios.post(`\${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/surveys/${params.id}/photos`, formData, {
+      const res = await axios.post(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/surveys/${params.id}/photos`, formData, {
         withCredentials: true,
         headers: { 'Content-Type': 'multipart/form-data' }
       });

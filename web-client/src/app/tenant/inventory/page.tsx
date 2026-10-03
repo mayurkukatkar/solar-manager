@@ -16,7 +16,7 @@ export default function InventoryDashboard() {
 
   const fetchData = async () => {
     try {
-      const res = await axios.get(`\${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/inventory/dashboard`, { withCredentials: true });
+      const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/inventory/dashboard`, { withCredentials: true });
       setData(res.data);
     } catch (err) {
       console.error(err);

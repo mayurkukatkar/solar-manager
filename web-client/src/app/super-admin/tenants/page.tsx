@@ -20,7 +20,7 @@ export default function TenantList() {
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
 
   useEffect(() => {
-    axios.get(`\${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/super-admin/tenants`, { withCredentials: true })
+    axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/super-admin/tenants`, { withCredentials: true })
       .then(res => setTenants(res.data.tenants || []))
       .catch(err => console.error(err))
       .finally(() => setLoading(false));
@@ -29,7 +29,7 @@ export default function TenantList() {
   const handleStatusToggle = async (tenantId: string, currentStatus: string) => {
     try {
       const newStatus = currentStatus === 'SUSPENDED' ? 'ACTIVE' : 'SUSPENDED';
-      await axios.put(`\${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/super-admin/tenants/${tenantId}/status`, { status: newStatus }, { withCredentials: true });
+      await axios.put(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/super-admin/tenants/${tenantId}/status`, { status: newStatus }, { withCredentials: true });
       setTenants(tenants.map(t => t.id === tenantId ? { ...t, status: newStatus } : t));
       setOpenDropdown(null);
     } catch (err) {

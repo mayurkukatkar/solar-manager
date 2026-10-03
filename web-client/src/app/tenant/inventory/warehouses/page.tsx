@@ -16,7 +16,7 @@ export default function WarehousesList() {
 
   const fetchWarehouses = async () => {
     try {
-      const res = await axios.get(`\${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/inventory/warehouses`, { withCredentials: true });
+      const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/inventory/warehouses`, { withCredentials: true });
       setWarehouses(res.data.warehouses);
     } catch (err) {
       console.error(err);

@@ -18,7 +18,7 @@ export default function Customer360View() {
   useEffect(() => {
     const fetchCustomer = async () => {
       try {
-        const res = await axios.get(`\${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/customers/${params.id}`, { withCredentials: true });
+        const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/customers/${params.id}`, { withCredentials: true });
         setCustomer(res.data.customer);
       } catch (err) {
         console.error(err);
@@ -192,7 +192,7 @@ export default function Customer360View() {
                          <button onClick={async () => {
                              if(!window.confirm('Convert quote to active Project?')) return;
                              try {
-                               await axios.post(`\${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/quotations/${quote.id}/convert`, {}, { withCredentials: true });
+                               await axios.post(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/quotations/${quote.id}/convert`, {}, { withCredentials: true });
                                window.location.reload();
                              } catch(err) { alert('Failed to convert'); }
                          }} className="px-6 py-2 bg-amber-500 text-white rounded-xl text-sm font-bold shadow-md hover:bg-amber-600 transition-colors">

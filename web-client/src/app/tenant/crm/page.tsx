@@ -12,7 +12,7 @@ export default function CustomerList() {
   useEffect(() => {
     const fetchCustomers = async () => {
       try {
-        const res = await axios.get(`\${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/customers`, { withCredentials: true });
+        const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/customers`, { withCredentials: true });
         setCustomers(res.data.customers);
       } catch (err) {
         console.error(err);

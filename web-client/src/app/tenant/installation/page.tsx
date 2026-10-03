@@ -16,7 +16,7 @@ export default function InstallationDashboard() {
 
   const fetchDashboard = async () => {
     try {
-      const res = await axios.get(`\${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/installations/dashboard`, { withCredentials: true });
+      const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/installations/dashboard`, { withCredentials: true });
       setData(res.data);
     } catch (err) {
       console.error(err);

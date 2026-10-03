@@ -68,7 +68,7 @@ export default function SuperAdminLayout({ children }: { children: React.ReactNo
 
   const handleLogout = async () => {
     try {
-      await axios.post(`\${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/logout`, {}, { withCredentials: true });
+      await axios.post(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/logout`, {}, { withCredentials: true });
       router.push('/login');
     } catch (e) {
       console.error(e);

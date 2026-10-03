@@ -11,7 +11,7 @@ export default function TenantDetails() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    axios.get(`\${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/super-admin/tenants/${id}`, { withCredentials: true })
+    axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/super-admin/tenants/${id}`, { withCredentials: true })
       .then(res => setTenant(res.data.tenant))
       .catch(err => console.error(err))
       .finally(() => setLoading(false));

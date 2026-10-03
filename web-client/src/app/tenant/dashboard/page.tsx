@@ -23,7 +23,7 @@ export default function TenantDashboard() {
   useEffect(() => {
     const fetchDashboard = async () => {
       try {
-        const res = await axios.get(`\${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/dashboard`, { withCredentials: true });
+        const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/dashboard`, { withCredentials: true });
         setData(res.data);
       } catch (err: any) {
         console.error(err);

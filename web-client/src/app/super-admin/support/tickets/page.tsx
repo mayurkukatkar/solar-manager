@@ -17,7 +17,7 @@ export default function SupportTickets() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    axios.get(`\${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/super-admin/tickets`, { withCredentials: true })
+    axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/super-admin/tickets`, { withCredentials: true })
       .then(res => setTickets(res.data.tickets || []))
       .catch(err => console.error(err))
       .finally(() => setLoading(false));

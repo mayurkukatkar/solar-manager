@@ -29,7 +29,7 @@ export default function ProjectDetails() {
 
   const fetchProject = async () => {
     try {
-      const res = await axios.get(`\${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/projects/${params.id}`, { withCredentials: true });
+      const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/projects/${params.id}`, { withCredentials: true });
       setProject(res.data.project);
     } catch (err) {
       console.error(err);
@@ -40,7 +40,7 @@ export default function ProjectDetails() {
 
   const fetchProducts = async () => {
     try {
-      const res = await axios.get(`\${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/products`, { withCredentials: true });
+      const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/products`, { withCredentials: true });
       setProducts(res.data.products);
     } catch (err) {
       console.error(err);
@@ -55,7 +55,7 @@ export default function ProjectDetails() {
   const handleStageChange = async (e: any) => {
     const newStage = e.target.value;
     try {
-      await axios.patch(`\${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/projects/${params.id}/stage`, { newStage, comment: `Stage updated to ${newStage}` }, { withCredentials: true });
+      await axios.patch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/projects/${params.id}/stage`, { newStage, comment: `Stage updated to ${newStage}` }, { withCredentials: true });
       fetchProject();
     } catch (err) {
       console.error(err);
@@ -65,7 +65,7 @@ export default function ProjectDetails() {
   const handleStatusChange = async (e: any) => {
     const status = e.target.value;
     try {
-      await axios.patch(`\${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/projects/${params.id}/status`, { status, updateText: `Status changed to ${status}` }, { withCredentials: true });
+      await axios.patch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/projects/${params.id}/status`, { status, updateText: `Status changed to ${status}` }, { withCredentials: true });
       fetchProject();
     } catch (err) {
       console.error(err);
@@ -76,7 +76,7 @@ export default function ProjectDetails() {
   const handleCreateTask = async (e: any) => {
     e.preventDefault();
     try {
-      await axios.post(`\${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/projects/${params.id}/tasks`, newTask, { withCredentials: true });
+      await axios.post(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/projects/${params.id}/tasks`, newTask, { withCredentials: true });
       setShowTaskModal(false);
       setNewTask({ name: '', description: '', priority: 'Medium', dueDate: '' });
       fetchProject();
@@ -85,7 +85,7 @@ export default function ProjectDetails() {
   
   const handleTaskStatusChange = async (taskId: string, status: string) => {
     try {
-      await axios.patch(`\${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/tasks/${taskId}`, { status, progress: status === 'Completed' ? 100 : undefined }, { withCredentials: true });
+      await axios.patch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/tasks/${taskId}`, { status, progress: status === 'Completed' ? 100 : undefined }, { withCredentials: true });
       fetchProject();
     } catch (err) {}
   };
@@ -94,7 +94,7 @@ export default function ProjectDetails() {
   const handleCreateMilestone = async (e: any) => {
     e.preventDefault();
     try {
-      await axios.post(`\${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/projects/${params.id}/milestones`, newMilestone, { withCredentials: true });
+      await axios.post(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/projects/${params.id}/milestones`, newMilestone, { withCredentials: true });
       setShowMilestoneModal(false);
       setNewMilestone({ name: '', description: '', targetDate: '' });
       fetchProject();
@@ -103,7 +103,7 @@ export default function ProjectDetails() {
 
   const handleMilestoneStatusChange = async (id: string, status: string) => {
     try {
-      await axios.patch(`\${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/milestones/${id}`, { status, actualDate: status === 'Completed' ? new Date().toISOString() : null }, { withCredentials: true });
+      await axios.patch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/milestones/${id}`, { status, actualDate: status === 'Completed' ? new Date().toISOString() : null }, { withCredentials: true });
       fetchProject();
     } catch (err) {}
   };
@@ -112,7 +112,7 @@ export default function ProjectDetails() {
   const handleCreateMaterial = async (e: any) => {
     e.preventDefault();
     try {
-      await axios.post(`\${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/projects/${params.id}/materials`, newMaterial, { withCredentials: true });
+      await axios.post(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/projects/${params.id}/materials`, newMaterial, { withCredentials: true });
       setShowMaterialModal(false);
       setNewMaterial({ productId: '', description: '', quantity: 1 });
       fetchProject();
@@ -121,7 +121,7 @@ export default function ProjectDetails() {
 
   const handleMaterialStatusChange = async (id: string, status: string) => {
     try {
-      await axios.patch(`\${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/materials/${id}`, { status }, { withCredentials: true });
+      await axios.patch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/materials/${id}`, { status }, { withCredentials: true });
       fetchProject();
     } catch (err) {}
   };

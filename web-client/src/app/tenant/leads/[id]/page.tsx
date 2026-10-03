@@ -31,7 +31,7 @@ export default function LeadDetails() {
 
   const fetchLead = async () => {
     try {
-      const res = await axios.get(`\${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/leads/${params.id}`, { withCredentials: true });
+      const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/leads/${params.id}`, { withCredentials: true });
       setLead(res.data.lead);
     } catch (err) {
       console.error(err);
@@ -42,7 +42,7 @@ export default function LeadDetails() {
 
   const fetchQuotations = async () => {
     try {
-      const res = await axios.get(`\${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/leads/${params.id}/quotations`, { withCredentials: true });
+      const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/leads/${params.id}/quotations`, { withCredentials: true });
       setQuotations(res.data.quotations);
     } catch (err) {
       console.error(err);
@@ -51,7 +51,7 @@ export default function LeadDetails() {
 
   const fetchProducts = async () => {
     try {
-      const res = await axios.get(`\${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/products`, { withCredentials: true });
+      const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/products`, { withCredentials: true });
       setProducts(res.data.products);
     } catch (err) {
       console.error(err);
@@ -71,7 +71,7 @@ export default function LeadDetails() {
        return;
     }
     try {
-      await axios.patch(`\${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/leads/${params.id}`, { status: newStatus }, { withCredentials: true });
+      await axios.patch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/leads/${params.id}`, { status: newStatus }, { withCredentials: true });
       fetchLead();
     } catch (err) {
       console.error(err);
@@ -81,7 +81,7 @@ export default function LeadDetails() {
   const handleAddNote = async (e: any) => {
     e.preventDefault();
     try {
-      await axios.post(`\${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/leads/${params.id}/notes`, { content: noteContent }, { withCredentials: true });
+      await axios.post(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/leads/${params.id}/notes`, { content: noteContent }, { withCredentials: true });
       setShowNoteModal(false);
       setNoteContent('');
       fetchLead();
@@ -93,7 +93,7 @@ export default function LeadDetails() {
   const handleAddFollowup = async (e: any) => {
     e.preventDefault();
     try {
-      await axios.post(`\${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/leads/${params.id}/followups`, followupData, { withCredentials: true });
+      await axios.post(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/leads/${params.id}/followups`, followupData, { withCredentials: true });
       setShowFollowupModal(false);
       setFollowupData({ type: 'CALL', scheduledAt: '', notes: '' });
       fetchLead();
@@ -105,7 +105,7 @@ export default function LeadDetails() {
   const handleConvertLead = async (e: any) => {
     e.preventDefault();
     try {
-      await axios.post(`\${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/leads/${params.id}/convert`, convertData, { withCredentials: true });
+      await axios.post(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/leads/${params.id}/convert`, convertData, { withCredentials: true });
       setShowConvertModal(false);
       fetchLead();
     } catch (err) {
@@ -159,7 +159,7 @@ export default function LeadDetails() {
   const handleGenerateQuote = async (e: any) => {
     e.preventDefault();
     try {
-      await axios.post(`\${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/leads/${params.id}/quotations`, {
+      await axios.post(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/leads/${params.id}/quotations`, {
         items: quoteItems.map(item => ({
           ...item,
           quantity: parseFloat(item.quantity),
@@ -180,7 +180,7 @@ export default function LeadDetails() {
 
   const handleQuoteStatusChange = async (quoteId: string, status: string) => {
     try {
-      await axios.patch(`\${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/quotations/${quoteId}`, { status }, { withCredentials: true });
+      await axios.patch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/quotations/${quoteId}`, { status }, { withCredentials: true });
       fetchQuotations();
     } catch (err) {
       console.error(err);
