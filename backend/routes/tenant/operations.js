@@ -88,7 +88,7 @@ router.post('/api/tenant/quotations', requireTenantAuth, async (req, res) => {
   }
 });
 
-const PDFDocument = require('pdfkit');
+
 
 router.get('/api/tenant/quotations/:id/pdf', requireTenantAuth, async (req, res) => {
   try {
