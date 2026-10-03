@@ -1,7 +1,6 @@
 "use client";
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { jsPDF } from 'jspdf';
 import { FileText, Plus, User, Calendar, IndianRupee, Download } from 'lucide-react';
 
 export default function Quotations() {
@@ -47,92 +46,24 @@ export default function Quotations() {
     }
   };
 
-  const handleDownload = (quote: any) => {
+  const handleDownload = async (quote: any) => {
     try {
-      const doc = new jsPDF();
+      const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/quotations/${quote.id}/pdf`, {
+        responseType: 'blob',
+        withCredentials: true
+      });
       
-      // Header
-      doc.setFontSize(22);
-      doc.setTextColor(16, 185, 129); // emerald-500
-      doc.text("QUOTATION", 14, 22);
-      
-      doc.setFontSize(10);
-      doc.setTextColor(100, 100, 100);
-      doc.text(`Quote No: ${quote.qNumber || 'Unknown'}`, 14, 32);
-      doc.text(`Date: ${new Date(quote.date || Date.now()).toLocaleDateString()}`, 14, 38);
-      
-      const validUntil = new Date(quote.date || Date.now());
-      validUntil.setDate(validUntil.getDate() + (quote.validityDays || 15));
-      doc.text(`Valid Until: ${validUntil.toLocaleDateString()}`, 14, 44);
-      
-      // Client Info
-      doc.setFontSize(12);
-      doc.setTextColor(30, 30, 30);
-      doc.text("Bill To:", 130, 32);
-      doc.setFontSize(10);
-      doc.setTextColor(100, 100, 100);
-      doc.text(quote.lead?.name || 'Customer', 130, 38);
-      if(quote.lead?.email) doc.text(quote.lead.email, 130, 44);
-      if(quote.lead?.mobile) doc.text(String(quote.lead.mobile), 130, 50);
-
-      // Safe Numbers
-      const safeSubtotal = Number(quote.subtotal || 0);
-      const safeTax = Number(quote.tax || 0);
-      const safeDiscount = Number(quote.discount || 0);
-      const safeTotal = Number(quote.total || 0);
-
-      // Draw Table Header
-      let y = 65;
-      doc.setFillColor(16, 185, 129);
-      doc.rect(14, y, 182, 10, 'F');
-      doc.setTextColor(255, 255, 255);
-      doc.setFontSize(10);
-      doc.text("Description", 18, y + 7);
-      doc.text("Qty", 120, y + 7);
-      doc.text("Unit Price", 140, y + 7);
-      doc.text("Total", 170, y + 7);
-
-      // Draw Table Row
-      y += 15;
-      doc.setTextColor(60, 60, 60);
-      doc.text("Solar System Installation & Equipment", 18, y);
-      doc.text("1", 120, y);
-      doc.text(`Rs. ${safeSubtotal.toLocaleString()}`, 140, y);
-      doc.text(`Rs. ${safeSubtotal.toLocaleString()}`, 170, y);
-
-      // Draw Line
-      y += 5;
-      doc.setDrawColor(200, 200, 200);
-      doc.line(14, y, 196, y);
-
-      // Summary
-      y += 15;
-      doc.text("Subtotal:", 140, y);
-      doc.text(`Rs. ${safeSubtotal.toLocaleString()}`, 190, y, { align: 'right' });
-      
-      y += 8;
-      doc.text("Tax:", 140, y);
-      doc.text(`Rs. ${safeTax.toLocaleString()}`, 190, y, { align: 'right' });
-      
-      y += 8;
-      doc.text("Discount:", 140, y);
-      doc.text(`-Rs. ${safeDiscount.toLocaleString()}`, 190, y, { align: 'right' });
-      
-      y += 12;
-      doc.setFontSize(12);
-      doc.setTextColor(16, 185, 129);
-      doc.text("Grand Total:", 140, y);
-      doc.text(`Rs. ${safeTotal.toLocaleString()}`, 190, y, { align: 'right' });
-
-      // Footer
-      doc.setFontSize(10);
-      doc.setTextColor(150, 150, 150);
-      doc.text("Thank you for choosing Solar ERP. This is a system generated quotation.", 14, 280);
-
-      doc.save(`${quote.qNumber || 'Quotation'}.pdf`);
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `${quote.qNumber || 'Quotation'}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode?.removeChild(link);
+      window.URL.revokeObjectURL(url);
     } catch (error) {
-      console.error("PDF Generation Error:", error);
-      alert("Failed to generate PDF. Check console for details.");
+      console.error("PDF Download Error:", error);
+      alert("Failed to download PDF. Please try again.");
     }
   };
 

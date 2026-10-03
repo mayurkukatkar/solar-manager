@@ -6,6 +6,7 @@ const upload = require('../../middleware/upload');
 const tenantInstallationsRoutes = require('./installations');
 const { validate } = require('../../middleware/validate');
 const { createTaskSchema } = require('../validations');
+const PDFDocument = require('pdfkit');
 
 // TENANT ADMIN - PHASE 2: CORE OPERATIONS
 // ----------------------------------------------------
@@ -84,6 +85,93 @@ router.post('/api/tenant/quotations', requireTenantAuth, async (req, res) => {
     res.json({ quotation });
   } catch (error) {
     res.status(500).json({ error: 'Failed to create quotation' });
+  }
+});
+
+router.get('/api/tenant/quotations/:id/pdf', requireTenantAuth, async (req, res) => {
+  try {
+    const quote = await prisma.quotation.findFirst({
+      where: { id: req.params.id, tenantId: req.user.tenantId },
+      include: { customer: true, lead: true, items: true }
+    });
+    
+    if (!quote) return res.status(404).json({ error: 'Quotation not found' });
+    
+    const doc = new PDFDocument({ margin: 50 });
+    
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${quote.qNumber}.pdf"`);
+    
+    doc.pipe(res);
+    
+    // Header
+    doc.fontSize(22).fillColor('#10B981').text("QUOTATION", { align: 'left' });
+    doc.moveDown();
+    
+    doc.fontSize(10).fillColor('#666666');
+    doc.text(`Quote No: ${quote.qNumber}`);
+    doc.text(`Date: ${new Date(quote.date || quote.createdAt).toLocaleDateString()}`);
+    
+    const validUntil = new Date(quote.date || quote.createdAt);
+    validUntil.setDate(validUntil.getDate() + (quote.validityDays || 15));
+    doc.text(`Valid Until: ${validUntil.toLocaleDateString()}`);
+    
+    doc.moveDown(2);
+    
+    // Client Info
+    doc.fontSize(12).fillColor('#1E1E1E').text("Bill To:");
+    doc.fontSize(10).fillColor('#666666');
+    const client = quote.customer || quote.lead;
+    doc.text(client?.name || 'Customer');
+    if (client?.email) doc.text(client.email);
+    if (client?.mobile) doc.text(client.mobile);
+    
+    doc.moveDown(2);
+    
+    // Table Header
+    doc.rect(50, doc.y, 500, 20).fill('#10B981');
+    doc.fillColor('#FFFFFF').text("Description", 60, doc.y - 14);
+    doc.text("Qty", 350, doc.y - 14);
+    doc.text("Unit Price", 400, doc.y - 14);
+    doc.text("Total", 480, doc.y - 14);
+    
+    // Table Row
+    doc.moveDown(1.5);
+    doc.fillColor('#3C3C3C');
+    doc.text("Solar System Installation & Equipment", 60, doc.y);
+    doc.text("1", 350, doc.y - 12);
+    doc.text(`Rs. ${(quote.subtotal || 0).toLocaleString()}`, 400, doc.y - 12);
+    doc.text(`Rs. ${(quote.subtotal || 0).toLocaleString()}`, 480, doc.y - 12);
+    
+    doc.moveDown(1.5);
+    doc.moveTo(50, doc.y).lineTo(550, doc.y).strokeColor('#CCCCCC').stroke();
+    
+    doc.moveDown();
+    
+    // Summary
+    doc.text("Subtotal:", 380, doc.y);
+    doc.text(`Rs. ${(quote.subtotal || 0).toLocaleString()}`, 480, doc.y - 12, { align: 'right' });
+    
+    doc.moveDown();
+    doc.text("Tax:", 380, doc.y);
+    doc.text(`Rs. ${(quote.tax || 0).toLocaleString()}`, 480, doc.y - 12, { align: 'right' });
+    
+    doc.moveDown();
+    doc.text("Discount:", 380, doc.y);
+    doc.text(`-Rs. ${(quote.discount || 0).toLocaleString()}`, 480, doc.y - 12, { align: 'right' });
+    
+    doc.moveDown(1.5);
+    doc.fontSize(12).fillColor('#10B981').text("Grand Total:", 380, doc.y);
+    doc.text(`Rs. ${(quote.total || 0).toLocaleString()}`, 480, doc.y - 14, { align: 'right' });
+    
+    doc.moveDown(4);
+    doc.fontSize(10).fillColor('#999999').text("Thank you for choosing Solar ERP. This is a system generated quotation.", { align: 'center' });
+    
+    doc.end();
+    
+  } catch (error) {
+    console.error("PDF Generation Route Error:", error);
+    res.status(500).json({ error: 'Failed to generate PDF' });
   }
 });
 
