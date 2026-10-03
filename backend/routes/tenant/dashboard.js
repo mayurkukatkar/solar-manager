@@ -8,8 +8,8 @@ const { requireTenantAuth } = require('../../middleware/auth');
 router.get('/api/tenant/dashboard', requireTenantAuth, async (req, res) => {
   try {
     const tenantId = req.user.tenantId;
-    const totalLeads = await prisma.lead.count({ where: { tenantId } });
-    const totalProjects = await prisma.project.count({ where: { tenantId } });
+    const totalLeads = await prisma.lead.count({ where: { tenantId, status: { notIn: ['WON', 'LOST'] } } });
+    const totalProjects = await prisma.project.count({ where: { tenantId, status: { notIn: ['COMPLETED', 'HANDOVER'] } } });
     const wonLeads = await prisma.lead.count({ where: { tenantId, status: 'WON' } });
     
     res.json({ totalLeads, totalProjects, totalCustomers: wonLeads });
