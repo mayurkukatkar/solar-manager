@@ -63,6 +63,7 @@ export default function Quotations() {
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">Quotations & Proposals</h1>
           <p className="text-sm text-slate-500 mt-1">Generate and track commercial proposals for your leads.</p>
         </div>
+        <button 
           onClick={() => setShowModal(true)}
           className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-full font-bold text-sm transition-colors flex items-center justify-center gap-2 shadow-sm"
         >
