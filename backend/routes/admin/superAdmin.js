@@ -118,7 +118,7 @@ router.put('/tenants/:id/status', requireSuperAdmin, async (req, res) => {
       where: { id: req.params.id },
       data: { status }
     });
-    res.json({ message: \`Tenant status updated to \${status}\`, tenant });
+    res.json({ message: `Tenant status updated to ${status}`, tenant });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Failed to update tenant status' });
