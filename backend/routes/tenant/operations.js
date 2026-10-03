@@ -101,12 +101,44 @@ router.post('/api/tenant/quotations/:id/convert', requireTenantAuth, async (req,
       data: { status: 'ACCEPTED' }
     });
 
+    let customerId = quotation.customerId;
+
+    // If quotation is linked to a lead, convert lead to customer
+    if (quotation.leadId) {
+      // Mark Lead as WON
+      await prisma.lead.update({
+        where: { id: quotation.leadId },
+        data: { status: 'WON' }
+      });
+
+      const lead = await prisma.lead.findUnique({ where: { id: quotation.leadId } });
+
+      let customer = await prisma.customer.findFirst({ where: { leadId: quotation.leadId, tenantId } });
+      if (!customer && lead) {
+        customer = await prisma.customer.create({
+          data: {
+            tenantId,
+            leadId: quotation.leadId,
+            name: lead.name,
+            email: lead.email,
+            mobile: lead.mobile,
+            company: lead.company,
+            address: lead.address,
+            city: lead.city,
+          }
+        });
+      }
+      if (customer) {
+        customerId = customer.id;
+      }
+    }
+
     // Create Project
     const project = await prisma.project.create({
       data: {
         tenantId,
         quotationId: id,
-        customerId: quotation.customerId,
+        customerId: customerId,
         leadId: quotation.leadId,
         name: `PRJ-${quotation.qNumber}`,
         status: 'PLANNING',

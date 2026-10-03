@@ -31,7 +31,11 @@ router.get('/api/tenant/leads', requireTenantAuth, async (req, res) => {
     const { source, status, assigneeId, search } = req.query;
     let where = { tenantId: req.user.tenantId };
     if (source) where.source = source;
-    if (status) where.status = status;
+    if (status) {
+      where.status = status;
+    } else {
+      where.status = { notIn: ['WON', 'LOST'] }; // Default to active leads only
+    }
     if (assigneeId) where.assigneeId = assigneeId;
     if (search) {
       where.OR = [
