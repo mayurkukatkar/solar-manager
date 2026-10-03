@@ -23,16 +23,16 @@ app.use('/api/auth', authRoutes);
 const superAdminRoutes = require('./routes/admin/superAdmin');
 app.use('/api/super-admin', superAdminRoutes);
 const dashboardRoutes = require('./routes/tenant/dashboard');
-app.use('/api/tenant', dashboardRoutes);
+app.use('/', dashboardRoutes);
 // ----------------------------------------------------
 const crmRoutes = require('./routes/tenant/crm');
-app.use('/api/tenant', crmRoutes);
+app.use('/', crmRoutes);
 const operationsRoutes = require('./routes/tenant/operations');
-app.use('/api/tenant', operationsRoutes);
+app.use('/', operationsRoutes);
 const workflowRoutes = require('./routes/tenant/workflow');
-app.use('/api/tenant', workflowRoutes);
+app.use('/', workflowRoutes);
 const financeRoutes = require('./routes/tenant/finance');
-app.use('/api/tenant', financeRoutes);
+app.use('/', financeRoutes);
 if (process.env.NODE_ENV !== 'production') {
   app.listen(PORT, () => {
     console.log(`Solar ERP Backend running on port ${PORT}`);
