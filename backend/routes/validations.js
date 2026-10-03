@@ -24,32 +24,32 @@ const createPlanSchema = z.object({
 // CRM / Leads
 const createLeadSchema = z.object({
   name: z.string().min(2, "Name is required"),
-  email: z.string().email().optional().or(z.literal('')),
+  email: z.string().email("Invalid email").nullish().or(z.literal('')),
   mobile: z.string().min(10, "Valid mobile is required"),
-  company: z.string().optional(),
-  source: z.string().optional(),
-  estimatedCap: z.number().optional()
+  company: z.string().nullish().or(z.literal('')),
+  source: z.string().nullish().or(z.literal('')),
+  estimatedCap: z.number().nullish()
 });
 
 // Inventory
 const createProductSchema = z.object({
   name: z.string().min(2, "Name is required"),
   category: z.string().min(2, "Category is required"),
-  sku: z.string().optional(),
-  brand: z.string().optional(),
+  sku: z.string().nullish().or(z.literal('')),
+  brand: z.string().nullish().or(z.literal('')),
   unit: z.string().min(1),
-  purchaseCost: z.number().min(0).optional(),
-  sellingPrice: z.number().min(0).optional(),
-  minStock: z.number().min(0).optional(),
-  reorderLevel: z.number().min(0).optional()
+  purchaseCost: z.number().min(0).nullish(),
+  sellingPrice: z.number().min(0).nullish(),
+  minStock: z.number().min(0).nullish(),
+  reorderLevel: z.number().min(0).nullish()
 });
 
 // Task
 const createTaskSchema = z.object({
   name: z.string().min(2, "Task name is required"),
-  projectId: z.string().optional().or(z.literal('')),
-  description: z.string().optional(),
-  dueDate: z.string().optional().or(z.literal(''))
+  projectId: z.string().nullish().or(z.literal('')),
+  description: z.string().nullish().or(z.literal('')),
+  dueDate: z.string().nullish().or(z.literal(''))
 });
 
 module.exports = {
