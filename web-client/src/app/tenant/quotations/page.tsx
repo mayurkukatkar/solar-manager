@@ -1,6 +1,8 @@
 "use client";
 import { useState, useEffect } from 'react';
 import axios from 'axios';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { FileText, Plus, User, Calendar, IndianRupee, Download } from 'lucide-react';
 
 export default function Quotations() {
@@ -44,6 +46,72 @@ export default function Quotations() {
       console.error(err);
       alert('Failed to create quotation');
     }
+  };
+
+  const handleDownload = (quote: any) => {
+    const doc = new jsPDF();
+    
+    // Header
+    doc.setFontSize(22);
+    doc.setTextColor(16, 185, 129); // emerald-500
+    doc.text("QUOTATION", 14, 22);
+    
+    doc.setFontSize(10);
+    doc.setTextColor(100, 100, 100);
+    doc.text(`Quote No: ${quote.qNumber}`, 14, 32);
+    doc.text(`Date: ${new Date(quote.date).toLocaleDateString()}`, 14, 38);
+    
+    const validUntil = new Date(quote.date);
+    validUntil.setDate(validUntil.getDate() + (quote.validityDays || 15));
+    doc.text(`Valid Until: ${validUntil.toLocaleDateString()}`, 14, 44);
+    
+    // Client Info
+    doc.setFontSize(12);
+    doc.setTextColor(30, 30, 30);
+    doc.text("Bill To:", 130, 32);
+    doc.setFontSize(10);
+    doc.setTextColor(100, 100, 100);
+    doc.text(quote.lead?.name || 'Customer', 130, 38);
+    if(quote.lead?.email) doc.text(quote.lead.email, 130, 44);
+    if(quote.lead?.mobile) doc.text(quote.lead.mobile, 130, 50);
+
+    // Items Table
+    const tableData = [
+      ['Solar System Installation & Equipment', '1', `Rs. ${quote.subtotal.toLocaleString()}`, `Rs. ${quote.subtotal.toLocaleString()}`]
+    ];
+
+    autoTable(doc, {
+      startY: 60,
+      head: [['Description', 'Qty', 'Unit Price', 'Total']],
+      body: tableData,
+      theme: 'grid',
+      headStyles: { fillColor: [16, 185, 129] },
+      styles: { fontSize: 10, cellPadding: 5 }
+    });
+
+    // Summary
+    const finalY = (doc as any).lastAutoTable.finalY || 100;
+    
+    doc.text("Subtotal:", 130, finalY + 15);
+    doc.text(`Rs. ${quote.subtotal.toLocaleString()}`, 190, finalY + 15, { align: 'right' });
+    
+    doc.text("Tax:", 130, finalY + 23);
+    doc.text(`Rs. ${quote.tax.toLocaleString()}`, 190, finalY + 23, { align: 'right' });
+    
+    doc.text("Discount:", 130, finalY + 31);
+    doc.text(`-Rs. ${quote.discount.toLocaleString()}`, 190, finalY + 31, { align: 'right' });
+    
+    doc.setFontSize(12);
+    doc.setTextColor(16, 185, 129);
+    doc.text("Grand Total:", 130, finalY + 41);
+    doc.text(`Rs. ${quote.total.toLocaleString()}`, 190, finalY + 41, { align: 'right' });
+
+    // Footer
+    doc.setFontSize(10);
+    doc.setTextColor(150, 150, 150);
+    doc.text("Thank you for choosing Solar ERP. This is a system generated quotation.", 14, 280);
+
+    doc.save(`${quote.qNumber}.pdf`);
   };
 
   const getStatusColor = (status: string) => {
@@ -130,7 +198,7 @@ export default function Quotations() {
                       </span>
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <button className="p-2 text-slate-400 hover:text-emerald-600 rounded-full hover:bg-emerald-50 transition-colors">
+                      <button onClick={() => handleDownload(quote)} className="p-2 text-slate-400 hover:text-emerald-600 rounded-full hover:bg-emerald-50 transition-colors">
                         <Download size={18} />
                       </button>
                     </td>
