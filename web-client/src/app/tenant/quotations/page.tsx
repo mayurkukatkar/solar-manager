@@ -9,19 +9,19 @@ export default function Quotations() {
 
   // Modal State
   const [showModal, setShowModal] = useState(false);
-  const [customers, setCustomers] = useState<any[]>([]);
+  const [leads, setLeads] = useState<any[]>([]);
   const [formData, setFormData] = useState({
-    customerId: '', subtotal: 0, tax: 0, discount: 0, validityDays: 15
+    leadId: '', subtotal: 0, tax: 0, discount: 0, validityDays: 15
   });
 
   const fetchData = async () => {
     try {
-      const [quoteRes, customerRes] = await Promise.all([
+      const [quoteRes, leadRes] = await Promise.all([
         axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/quotations`, { withCredentials: true }),
-        axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/customers`, { withCredentials: true })
+        axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/leads`, { withCredentials: true })
       ]);
       setQuotations(quoteRes.data.quotations);
-      setCustomers(customerRes.data.customers);
+      setLeads(leadRes.data.leads || leadRes.data);
     } catch (err) {
       console.error(err);
     } finally {
@@ -61,9 +61,8 @@ export default function Quotations() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">Quotations & Proposals</h1>
-          <p className="text-sm text-slate-500 mt-1">Generate and track commercial proposals for your customers.</p>
+          <p className="text-sm text-slate-500 mt-1">Generate and track commercial proposals for your leads.</p>
         </div>
-        <button 
           onClick={() => setShowModal(true)}
           className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-full font-bold text-sm transition-colors flex items-center justify-center gap-2 shadow-sm"
         >
@@ -77,7 +76,7 @@ export default function Quotations() {
             <thead className="bg-slate-50 text-slate-500 uppercase tracking-wider text-xs font-bold border-b border-slate-200">
               <tr>
                 <th className="px-6 py-4">Quote Number</th>
-                <th className="px-6 py-4">Customer</th>
+                <th className="px-6 py-4">Lead</th>
                 <th className="px-6 py-4">Date & Validity</th>
                 <th className="px-6 py-4">Total Amount</th>
                 <th className="px-6 py-4">Status</th>
@@ -110,7 +109,7 @@ export default function Quotations() {
                         <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-slate-600">
                           <User size={12} />
                         </div>
-                        <span className="font-semibold text-slate-800">{quote.customer?.name || 'Unknown'}</span>
+                        <span className="font-semibold text-slate-800">{quote.lead?.name || 'Unknown'}</span>
                       </div>
                     </td>
                     <td className="px-6 py-4">
@@ -153,11 +152,11 @@ export default function Quotations() {
             
             <form onSubmit={handleCreate} className="p-6 space-y-4">
               <div className="space-y-1">
-                <label className="text-xs font-extrabold text-slate-600 uppercase tracking-wider">Customer *</label>
-                <select required value={formData.customerId} onChange={e => setFormData({...formData, customerId: e.target.value})} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all bg-white font-medium text-slate-700">
-                  <option value="">Select a Customer</option>
-                  {customers.map(c => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
+                <label className="text-xs font-extrabold text-slate-600 uppercase tracking-wider">Lead *</label>
+                <select required value={formData.leadId} onChange={e => setFormData({...formData, leadId: e.target.value})} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all bg-white font-medium text-slate-700">
+                  <option value="">Select a Lead</option>
+                  {leads.map(l => (
+                    <option key={l.id} value={l.id}>{l.name}</option>
                   ))}
                 </select>
               </div>

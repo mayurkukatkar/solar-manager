@@ -63,7 +63,7 @@ router.get('/api/tenant/quotations', requireTenantAuth, async (req, res) => {
   try {
     const quotations = await prisma.quotation.findMany({
       where: { tenantId: req.user.tenantId },
-      include: { customer: true, items: true },
+      include: { customer: true, lead: true, items: true },
       orderBy: { createdAt: 'desc' }
     });
     res.json({ quotations });
