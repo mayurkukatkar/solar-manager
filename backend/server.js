@@ -33,7 +33,6 @@ const workflowRoutes = require('./routes/tenant/workflow');
 app.use('/api/tenant', workflowRoutes);
 const financeRoutes = require('./routes/tenant/finance');
 app.use('/api/tenant', financeRoutes);
-const PORT = process.env.PORT || 5000;
 if (process.env.NODE_ENV !== 'production') {
   app.listen(PORT, () => {
     console.log(`Solar ERP Backend running on port ${PORT}`);
