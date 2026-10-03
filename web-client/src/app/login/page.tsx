@@ -32,8 +32,8 @@ export default function SuperAdminLogin() {
         router.push('/tenant/dashboard');
       }
     } catch (err: any) {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
-      setError(err.response?.data?.error || `Network Error: ${err.message} (Tried to connect to ${apiUrl})`);
+      const fullUrl = err.config?.url || 'unknown url';
+      setError(err.response?.data?.error || `Network Error: ${err.message} (URL: ${fullUrl})`);
     } finally {
       setLoading(false);
     }
