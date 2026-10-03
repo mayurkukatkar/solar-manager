@@ -32,7 +32,8 @@ export default function SuperAdminLogin() {
         router.push('/tenant/dashboard');
       }
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Authentication Failed');
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      setError(err.response?.data?.error || `Network Error: ${err.message} (Tried to connect to ${apiUrl})`);
     } finally {
       setLoading(false);
     }

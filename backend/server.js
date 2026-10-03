@@ -106,8 +106,8 @@ app.post('/api/auth/login', async (req, res) => {
     const cookieName = user.role === 'SUPER_ADMIN' ? 'super_admin_token' : 'tenant_token';
     res.cookie(cookieName, token, {
       httpOnly: true,
-      secure: false, // Set true in production with HTTPS
-      sameSite: 'lax',
+      secure: true, 
+      sameSite: 'none',
       maxAge: 24 * 60 * 60 * 1000 // 1 day
     });
 
