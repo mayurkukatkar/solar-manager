@@ -88,7 +88,7 @@ router.post('/api/tenant/quotations', requireTenantAuth, async (req, res) => {
   }
 });
 
-const { jsPDF } = require('jspdf');
+const PDFDocument = require('pdfkit');
 
 router.get('/api/tenant/quotations/:id/pdf', requireTenantAuth, async (req, res) => {
   try {
@@ -99,92 +99,87 @@ router.get('/api/tenant/quotations/:id/pdf', requireTenantAuth, async (req, res)
     
     if (!quote) return res.status(404).json({ error: 'Quotation not found' });
     
-    const doc = new jsPDF();
+    const doc = new PDFDocument({ margin: 50 });
+    
+    const buffers = [];
+    doc.on('data', buffers.push.bind(buffers));
+    doc.on('end', () => {
+      const pdfData = Buffer.concat(buffers);
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${quote.qNumber || 'Quotation'}.pdf"`);
+      res.end(pdfData);
+    });
     
     // Header
-    doc.setFontSize(22);
-    doc.setTextColor(16, 185, 129); // emerald-500
-    doc.text("QUOTATION", 14, 22);
+    doc.fontSize(22).fillColor('#10B981').text("QUOTATION", { align: 'left' });
+    doc.moveDown();
     
-    doc.setFontSize(10);
-    doc.setTextColor(100, 100, 100);
-    doc.text(`Quote No: ${quote.qNumber || 'Unknown'}`, 14, 32);
-    doc.text(`Date: ${new Date(quote.date || quote.createdAt).toLocaleDateString()}`, 14, 38);
+    doc.fontSize(10).fillColor('#666666');
+    doc.text(`Quote No: ${quote.qNumber || 'Unknown'}`);
+    doc.text(`Date: ${new Date(quote.date || quote.createdAt).toLocaleDateString()}`);
     
     const validUntil = new Date(quote.date || quote.createdAt);
     validUntil.setDate(validUntil.getDate() + (quote.validityDays || 15));
-    doc.text(`Valid Until: ${validUntil.toLocaleDateString()}`, 14, 44);
+    doc.text(`Valid Until: ${validUntil.toLocaleDateString()}`);
+    
+    doc.moveDown(2);
     
     // Client Info
-    doc.setFontSize(12);
-    doc.setTextColor(30, 30, 30);
-    doc.text("Bill To:", 130, 32);
-    doc.setFontSize(10);
-    doc.setTextColor(100, 100, 100);
+    doc.fontSize(12).fillColor('#1E1E1E').text("Bill To:");
+    doc.fontSize(10).fillColor('#666666');
     const client = quote.customer || quote.lead;
-    doc.text(client?.name || 'Customer', 130, 38);
-    if(client?.email) doc.text(client.email, 130, 44);
-    if(client?.mobile) doc.text(String(client.mobile), 130, 50);
-
+    doc.text(client?.name || 'Customer');
+    if (client?.email) doc.text(String(client.email));
+    if (client?.mobile) doc.text(String(client.mobile));
+    
+    doc.moveDown(2);
+    
     // Safe Numbers
     const safeSubtotal = Number(quote.subtotal || 0);
     const safeTax = Number(quote.tax || 0);
     const safeDiscount = Number(quote.discount || 0);
     const safeTotal = Number(quote.total || 0);
 
-    // Draw Table Header
-    let y = 65;
-    doc.setFillColor(16, 185, 129);
-    doc.rect(14, y, 182, 10, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(10);
-    doc.text("Description", 18, y + 7);
-    doc.text("Qty", 120, y + 7);
-    doc.text("Unit Price", 140, y + 7);
-    doc.text("Total", 170, y + 7);
-
-    // Draw Table Row
-    y += 15;
-    doc.setTextColor(60, 60, 60);
-    doc.text("Solar System Installation & Equipment", 18, y);
-    doc.text("1", 120, y);
-    doc.text(`Rs. ${safeSubtotal.toLocaleString()}`, 140, y);
-    doc.text(`Rs. ${safeSubtotal.toLocaleString()}`, 170, y);
-
-    // Draw Line
-    y += 5;
-    doc.setDrawColor(200, 200, 200);
-    doc.line(14, y, 196, y);
-
+    // Table Header
+    doc.rect(50, doc.y, 500, 20).fill('#10B981');
+    doc.fillColor('#FFFFFF').text("Description", 60, doc.y - 14);
+    doc.text("Qty", 350, doc.y - 14);
+    doc.text("Unit Price", 400, doc.y - 14);
+    doc.text("Total", 480, doc.y - 14);
+    
+    // Table Row
+    doc.moveDown(1.5);
+    doc.fillColor('#3C3C3C');
+    doc.text("Solar System Installation & Equipment", 60, doc.y);
+    doc.text("1", 350, doc.y - 12);
+    doc.text(`Rs. ${safeSubtotal.toLocaleString()}`, 400, doc.y - 12);
+    doc.text(`Rs. ${safeSubtotal.toLocaleString()}`, 480, doc.y - 12);
+    
+    doc.moveDown(1.5);
+    doc.moveTo(50, doc.y).lineTo(550, doc.y).strokeColor('#CCCCCC').stroke();
+    
+    doc.moveDown();
+    
     // Summary
-    y += 15;
-    doc.text("Subtotal:", 140, y);
-    doc.text(`Rs. ${safeSubtotal.toLocaleString()}`, 190, y, { align: 'right' });
+    doc.text("Subtotal:", 380, doc.y);
+    doc.text(`Rs. ${safeSubtotal.toLocaleString()}`, 480, doc.y - 12, { align: 'right' });
     
-    y += 8;
-    doc.text("Tax:", 140, y);
-    doc.text(`Rs. ${safeTax.toLocaleString()}`, 190, y, { align: 'right' });
+    doc.moveDown();
+    doc.text("Tax:", 380, doc.y);
+    doc.text(`Rs. ${safeTax.toLocaleString()}`, 480, doc.y - 12, { align: 'right' });
     
-    y += 8;
-    doc.text("Discount:", 140, y);
-    doc.text(`-Rs. ${safeDiscount.toLocaleString()}`, 190, y, { align: 'right' });
+    doc.moveDown();
+    doc.text("Discount:", 380, doc.y);
+    doc.text(`-Rs. ${safeDiscount.toLocaleString()}`, 480, doc.y - 12, { align: 'right' });
     
-    y += 12;
-    doc.setFontSize(12);
-    doc.setTextColor(16, 185, 129);
-    doc.text("Grand Total:", 140, y);
-    doc.text(`Rs. ${safeTotal.toLocaleString()}`, 190, y, { align: 'right' });
-
-    // Footer
-    doc.setFontSize(10);
-    doc.setTextColor(150, 150, 150);
-    doc.text("Thank you for choosing Solar ERP. This is a system generated quotation.", 14, 280);
-
-    const pdfBuffer = Buffer.from(doc.output('arraybuffer'));
-
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="${quote.qNumber || 'Quotation'}.pdf"`);
-    res.send(pdfBuffer);
+    doc.moveDown(1.5);
+    doc.fontSize(12).fillColor('#10B981').text("Grand Total:", 380, doc.y);
+    doc.text(`Rs. ${safeTotal.toLocaleString()}`, 480, doc.y - 14, { align: 'right' });
+    
+    doc.moveDown(4);
+    doc.fontSize(10).fillColor('#999999').text("Thank you for choosing Solar ERP. This is a system generated quotation.", { align: 'center' });
+    
+    doc.end();
     
   } catch (error) {
     console.error("PDF Generation Route Error:", error);
