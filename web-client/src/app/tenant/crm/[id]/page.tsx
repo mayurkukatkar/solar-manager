@@ -140,16 +140,44 @@ export default function Customer360View() {
           
           {/* LEAD INFO */}
           {activeStage === 'LEAD' && (
-            <div className="space-y-4 max-w-2xl">
-               <InfoRow label="Requirement" value={lead?.estimatedCap ? `${lead.estimatedCap} kW` : 'Not Specified'} />
-               <InfoRow label="Source" value={lead?.source || 'Direct Entry'} />
-               <InfoRow label="Company" value={customer.company || 'Individual'} />
-               <InfoRow label="Conversion Date" value={new Date(customer.createdAt).toLocaleDateString()} />
-               <div className="pt-6 border-t border-slate-100 mt-6 flex gap-3">
-                 <Link href="/tenant/surveys" className="px-6 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-bold shadow-md shadow-slate-900/20 hover:bg-slate-800 transition-colors">
-                   Schedule Site Survey
-                 </Link>
-               </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl">
+              <div className="space-y-4">
+                 <h3 className="font-bold text-slate-900 mb-4 text-lg">Lead Details</h3>
+                 <div className="bg-slate-50/50 border border-slate-100 rounded-xl p-5">
+                   <InfoRow label="Requirement" value={lead?.estimatedCap ? `${lead.estimatedCap} kW` : 'Not Specified'} />
+                   <InfoRow label="Source" value={lead?.source || 'Direct Entry'} />
+                   <InfoRow label="Company" value={customer.company || 'Individual'} />
+                   <InfoRow label="Conversion Date" value={new Date(customer.createdAt).toLocaleDateString()} />
+                 </div>
+                 
+                 <div className="pt-4 border-t border-slate-100 mt-4 flex gap-3">
+                   <Link href="/tenant/surveys" className="px-6 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-bold shadow-md shadow-slate-900/20 hover:bg-slate-800 transition-colors">
+                     Schedule Site Survey
+                   </Link>
+                 </div>
+              </div>
+              
+              <div>
+                 <h3 className="font-bold text-slate-900 mb-4 text-lg">Activity Timeline</h3>
+                 <div className="space-y-4 max-h-[300px] overflow-y-auto custom-scrollbar pr-2">
+                   {lead?.activities?.map((activity: any) => (
+                     <div key={activity.id} className="flex gap-4">
+                        <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-500 flex items-center justify-center shrink-0 mt-1">
+                          <CheckCircle2 size={14} />
+                        </div>
+                        <div className="flex-1 bg-white border border-slate-100 p-3 rounded-xl shadow-sm">
+                          <p className="text-sm font-semibold text-slate-800">{activity.description}</p>
+                          <p className="text-xs text-slate-400 mt-1">{new Date(activity.createdAt).toLocaleString()}</p>
+                        </div>
+                     </div>
+                   ))}
+                   {!lead?.activities?.length && (
+                     <div className="text-slate-500 text-sm italic p-4 text-center border border-dashed border-slate-200 rounded-xl">
+                       No activities recorded yet.
+                     </div>
+                   )}
+                 </div>
+              </div>
             </div>
           )}
 

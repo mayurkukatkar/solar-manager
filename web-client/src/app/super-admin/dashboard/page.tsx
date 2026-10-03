@@ -7,10 +7,15 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+
 interface KPI {
   totalTenants: number;
   activeTenants: number;
   totalUsers: number;
+  totalRevenue: number;
+  tenantGrowth: { month: string, tenants: number }[];
+  recentActivity: { action: string, entity: string, createdAt: string }[];
 }
 
 export default function Dashboard() {
@@ -23,7 +28,10 @@ export default function Dashboard() {
         setStats({
           totalTenants: res.data.totalTenants,
           activeTenants: res.data.activeTenants,
-          totalUsers: res.data.totalUsers
+          totalUsers: res.data.totalUsers,
+          totalRevenue: res.data.totalRevenue,
+          tenantGrowth: res.data.tenantGrowth || [],
+          recentActivity: res.data.recentActivity || []
         });
       })
       .catch(err => console.error(err))
@@ -31,9 +39,9 @@ export default function Dashboard() {
   }, []);
 
   const kpis = [
-    { title: 'Total Tenants', value: stats?.totalTenants ?? '-', trend: '+12% this month', icon: Building2, positive: true },
-    { title: 'Active Tenants', value: stats?.activeTenants ?? '-', trend: '+5% this month', icon: TrendingUp, positive: true },
-    { title: 'Monthly Revenue', value: '₹2,45,000', trend: 'Data pending Phase 3', icon: CreditCard, positive: true },
+    { title: 'Total Tenants', value: stats?.totalTenants ?? '-', trend: 'Live', icon: Building2, positive: true },
+    { title: 'Active Tenants', value: stats?.activeTenants ?? '-', trend: 'Live', icon: TrendingUp, positive: true },
+    { title: 'Monthly Revenue', value: stats ? `₹${stats.totalRevenue.toLocaleString('en-IN')}` : '-', trend: 'From Active Subs', icon: CreditCard, positive: true },
     { title: 'Platform Users', value: stats?.totalUsers ?? '-', trend: 'Across all tenants', icon: Users, positive: true },
   ];
 
@@ -100,11 +108,20 @@ export default function Dashboard() {
               <option>This Year</option>
             </select>
           </div>
-          <div className="flex-1 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-center text-slate-400 min-h-[300px]">
-            <div className="text-center">
-              <BarChart3 size={32} className="mx-auto mb-2 text-slate-300" />
-              <p className="font-medium">Analytics Engine Pending (Phase 5)</p>
-            </div>
+          <div className="flex-1 bg-white min-h-[300px]">
+            {loading ? (
+              <div className="w-full h-full flex items-center justify-center text-slate-400">Loading...</div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={stats?.tenantGrowth || []}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="month" axisLine={false} tickLine={false} />
+                  <YAxis axisLine={false} tickLine={false} />
+                  <Tooltip cursor={{ fill: '#f8fafc' }} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                  <Bar dataKey="tenants" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
           </div>
         </div>
 
@@ -112,19 +129,15 @@ export default function Dashboard() {
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col">
            <h3 className="text-lg font-bold text-slate-900 mb-6">Recent Platform Activity</h3>
            <div className="flex-1 space-y-6">
-              {[
-                { action: 'New tenant provisioned', entity: 'SolarTech Pro', time: '10 mins ago', icon: Building2, color: 'text-blue-500 bg-blue-50' },
-                { action: 'Subscription upgraded', entity: 'SunPower Energy', time: '2 hours ago', icon: CreditCard, color: 'text-emerald-500 bg-emerald-50' },
-                { action: 'Support ticket created', entity: 'EcoSolar Inc', time: '5 hours ago', icon: Ticket, color: 'text-amber-500 bg-amber-50' },
-                { action: 'Tenant admin registered', entity: 'SolarTech Pro', time: '1 day ago', icon: Users, color: 'text-purple-500 bg-purple-50' },
-              ].map((activity, i) => (
+              {stats?.recentActivity?.length === 0 && <p className="text-sm text-slate-500">No recent activity found.</p>}
+              {stats?.recentActivity?.map((activity, i) => (
                 <div key={i} className="flex gap-4">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${activity.color}`}>
-                    <activity.icon size={18} />
+                  <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 text-blue-500 bg-blue-50">
+                    <AlertCircle size={18} />
                   </div>
                   <div>
                     <p className="text-sm font-semibold text-slate-900">{activity.action}</p>
-                    <p className="text-xs text-slate-500 mt-0.5">{activity.entity} • {activity.time}</p>
+                    <p className="text-xs text-slate-500 mt-0.5">{activity.entity} • {new Date(activity.createdAt).toLocaleString()}</p>
                   </div>
                 </div>
               ))}

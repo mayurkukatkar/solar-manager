@@ -33,6 +33,30 @@ export default function Tasks() {
     fetchData();
   }, []);
 
+  const handleDragStart = (e: any, taskId: string) => {
+    e.dataTransfer.setData("taskId", taskId);
+  };
+
+  const handleDragOver = (e: any) => {
+    e.preventDefault();
+  };
+
+  const handleDrop = async (e: any, newStatus: string) => {
+    e.preventDefault();
+    const taskId = e.dataTransfer.getData("taskId");
+    if (!taskId) return;
+    
+    // Optimistic update
+    setTasks(tasks.map(t => t.id === taskId ? { ...t, status: newStatus } : t));
+
+    try {
+      await axios.patch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/tasks/${taskId}`, { status: newStatus }, { withCredentials: true });
+    } catch (err) {
+      console.error(err);
+      fetchData(); // Revert on failure
+    }
+  };
+
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -85,48 +109,64 @@ export default function Tasks() {
         {/* Kanban Board Layout */}
         <div className="flex gap-6 h-full overflow-x-auto pb-4 custom-scrollbar">
            
-           {/* TODO COLUMN */}
-           <div className="flex-shrink-0 w-80 flex flex-col gap-4">
-              <div className="flex items-center justify-between px-1">
-                 <h3 className="font-extrabold text-slate-700 uppercase tracking-wider text-xs">To Do</h3>
-                 <span className="bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full text-[10px] font-black">{tasks.filter(t => t.status === 'PENDING').length}</span>
-              </div>
-              <div className="flex-1 overflow-y-auto custom-scrollbar space-y-3 pr-2">
-                 {loading ? (
-                    <div className="text-center py-4"><div className="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-emerald-500"></div></div>
-                 ) : (
-                    tasks.filter(t => t.status === 'PENDING').map(task => (
-                      <TaskCard key={task.id} task={task} />
-                    ))
-                 )}
-              </div>
-           </div>
+           {[
+             { id: 'PENDING', label: 'To Do', color: 'slate' },
+             { id: 'IN_PROGRESS', label: 'In Progress', color: 'amber' },
+             { id: 'REVIEW', label: 'Review', color: 'purple' },
+             { id: 'COMPLETED', label: 'Completed', color: 'emerald' },
+           ].map(column => (
+             <div 
+               key={column.id} 
+               className="flex-shrink-0 w-80 flex flex-col gap-4"
+               onDragOver={handleDragOver}
+               onDrop={(e) => handleDrop(e, column.id)}
+             >
+                <div className="flex items-center justify-between px-1">
+                   <h3 className={`font-extrabold text-${column.color}-600 uppercase tracking-wider text-xs`}>{column.label}</h3>
+                   <span className={`bg-${column.color}-100 text-${column.color}-700 px-2 py-0.5 rounded-full text-[10px] font-black`}>
+                     {tasks.filter(t => t.status === column.id).length}
+                   </span>
+                </div>
+                <div className="flex-1 overflow-y-auto custom-scrollbar space-y-3 pr-2 pb-10">
+                   {loading && column.id === 'PENDING' ? (
+                      <div className="text-center py-4"><div className="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-emerald-500"></div></div>
+                   ) : (
+                      tasks.filter(t => t.status === column.id).map(task => (
+                        <div 
+                          key={task.id} 
+                          draggable 
+                          onDragStart={(e) => handleDragStart(e, task.id)}
+                          className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 hover:shadow-md transition-shadow cursor-grab active:cursor-grabbing"
+                        >
+                           <div className="flex items-start justify-end mb-2">
+                             <button className="text-slate-400 hover:text-emerald-600">
+                               <CheckSquare size={16} />
+                             </button>
+                           </div>
+                           <h4 className="font-bold text-slate-900 mb-1 leading-snug">{task.name}</h4>
+                           
+                           {task.project && (
+                             <div className="flex items-center gap-1.5 text-xs text-slate-500 mb-4">
+                               <Briefcase size={12} className="text-emerald-500" />
+                               <span className="truncate">{task.project.name}</span>
+                             </div>
+                           )}
 
-           {/* IN PROGRESS COLUMN */}
-           <div className="flex-shrink-0 w-80 flex flex-col gap-4">
-              <div className="flex items-center justify-between px-1">
-                 <h3 className="font-extrabold text-amber-600 uppercase tracking-wider text-xs">In Progress</h3>
-                 <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full text-[10px] font-black">{tasks.filter(t => t.status === 'IN_PROGRESS').length}</span>
-              </div>
-              <div className="flex-1 overflow-y-auto custom-scrollbar space-y-3 pr-2">
-                 {tasks.filter(t => t.status === 'IN_PROGRESS').map(task => (
-                    <TaskCard key={task.id} task={task} />
-                 ))}
-              </div>
-           </div>
-
-           {/* COMPLETED COLUMN */}
-           <div className="flex-shrink-0 w-80 flex flex-col gap-4">
-              <div className="flex items-center justify-between px-1">
-                 <h3 className="font-extrabold text-emerald-600 uppercase tracking-wider text-xs">Completed</h3>
-                 <span className="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full text-[10px] font-black">{tasks.filter(t => t.status === 'COMPLETED').length}</span>
-              </div>
-              <div className="flex-1 overflow-y-auto custom-scrollbar space-y-3 pr-2">
-                 {tasks.filter(t => t.status === 'COMPLETED').map(task => (
-                    <TaskCard key={task.id} task={task} />
-                 ))}
-              </div>
-           </div>
+                           <div className="flex items-center justify-between mt-4 pt-4 border-t border-slate-100">
+                             <div className="flex items-center gap-2 text-[10px] font-bold text-slate-500">
+                               <Clock size={12} />
+                               {task.dueDate ? new Date(task.dueDate).toLocaleDateString() : 'No Date'}
+                             </div>
+                             <div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center border border-emerald-200">
+                               <User size={10} />
+                             </div>
+                           </div>
+                        </div>
+                      ))
+                   )}
+                </div>
+             </div>
+           ))}
 
         </div>
       </div>
@@ -184,32 +224,3 @@ export default function Tasks() {
   );
 }
 
-function TaskCard({ task }: { task: any }) {
-  return (
-    <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 hover:shadow-md transition-shadow cursor-grab">
-       <div className="flex items-start justify-end mb-2">
-         <button className="text-slate-400 hover:text-emerald-600">
-           <CheckSquare size={16} />
-         </button>
-       </div>
-       <h4 className="font-bold text-slate-900 mb-1 leading-snug">{task.name}</h4>
-       
-       {task.project && (
-         <div className="flex items-center gap-1.5 text-xs text-slate-500 mb-4">
-           <Briefcase size={12} className="text-emerald-500" />
-           <span className="truncate">{task.project.name}</span>
-         </div>
-       )}
-
-       <div className="flex items-center justify-between mt-4 pt-4 border-t border-slate-100">
-         <div className="flex items-center gap-2 text-[10px] font-bold text-slate-500">
-           <Clock size={12} />
-           {task.dueDate ? new Date(task.dueDate).toLocaleDateString() : 'No Date'}
-         </div>
-         <div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center border border-emerald-200">
-           <User size={10} />
-         </div>
-       </div>
-    </div>
-  );
-}

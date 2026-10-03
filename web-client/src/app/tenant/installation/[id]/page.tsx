@@ -160,21 +160,97 @@ export default function InstallationDetails() {
         )}
 
         {activeTab === 'CHECKLIST' && (
-          <div className="text-center py-12">
-            <CheckCircle size={48} className="mx-auto text-slate-200 mb-4" />
-            <h3 className="text-lg font-bold text-slate-700">No Checklist Assigned</h3>
-            <p className="text-slate-500 max-w-sm mx-auto mt-2 text-sm">Assign a checklist template (e.g., Residential 5kW) to track installation steps.</p>
-            <button className="mt-6 px-4 py-2 bg-indigo-50 text-indigo-600 font-semibold rounded-xl hover:bg-indigo-100 transition-colors text-sm">
-              Assign Template
-            </button>
+          <div className="space-y-4">
+            {job.checklists && job.checklists.length > 0 ? (
+              <div className="space-y-3">
+                {job.checklists.map((item: any) => (
+                  <div key={item.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-6 h-6 rounded-md flex items-center justify-center ${item.isCompleted ? 'bg-emerald-500 text-white' : 'bg-white border border-slate-300'}`}>
+                        {item.isCompleted && <CheckCircle size={14} />}
+                      </div>
+                      <span className={`font-medium ${item.isCompleted ? 'text-slate-500 line-through' : 'text-slate-800'}`}>{item.taskName}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-12">
+                <CheckCircle size={48} className="mx-auto text-slate-200 mb-4" />
+                <h3 className="text-lg font-bold text-slate-700">No Checklist Assigned</h3>
+                <p className="text-slate-500 max-w-sm mx-auto mt-2 text-sm">Assign a checklist template (e.g., Residential 5kW) to track installation steps.</p>
+                <button className="mt-6 px-4 py-2 bg-indigo-50 text-indigo-600 font-semibold rounded-xl hover:bg-indigo-100 transition-colors text-sm">
+                  Assign Template
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'TEAM' && (
+          <div className="space-y-4">
+            <h3 className="font-bold text-slate-800 mb-4 text-lg">Assigned Personnel</h3>
+            {job.assignments && job.assignments.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {job.assignments.map((assignment: any) => (
+                  <div key={assignment.id} className="flex items-center gap-4 p-4 border border-slate-200 rounded-xl bg-white shadow-sm">
+                    <div className="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center font-bold text-lg">
+                      {assignment.user?.name?.charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                      <p className="font-bold text-slate-900">{assignment.user?.name}</p>
+                      <p className="text-sm text-slate-500">{assignment.role}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-slate-500 py-8 text-center font-medium border border-dashed border-slate-200 rounded-2xl">
+                No team members assigned yet.
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'MATERIALS' && (
+          <div className="space-y-4">
+            <h3 className="font-bold text-slate-800 mb-4 text-lg">Required Materials</h3>
+            {job.materials && job.materials.length > 0 ? (
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="border-b border-slate-200 text-sm text-slate-500">
+                    <th className="pb-3 font-semibold">Product Name</th>
+                    <th className="pb-3 font-semibold text-right">Quantity</th>
+                    <th className="pb-3 font-semibold text-center">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {job.materials.map((mat: any) => (
+                    <tr key={mat.id}>
+                      <td className="py-4 text-sm font-semibold text-slate-800">{mat.product?.name || 'Custom Item'}</td>
+                      <td className="py-4 text-sm text-slate-600 text-right">{mat.quantity}</td>
+                      <td className="py-4 text-center">
+                        <span className={`px-2 py-1 text-xs font-bold rounded-md ${mat.isDispatched ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>
+                          {mat.isDispatched ? 'DISPATCHED' : 'PENDING'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <div className="text-slate-500 py-8 text-center font-medium border border-dashed border-slate-200 rounded-2xl">
+                No materials requested for this installation.
+              </div>
+            )}
           </div>
         )}
 
         {/* Placeholder for other tabs */}
-        {['TEAM', 'MATERIALS', 'PHOTOS', 'ISSUES'].includes(activeTab) && (
+        {['PHOTOS', 'ISSUES'].includes(activeTab) && (
           <div className="text-center py-12">
             <Wrench size={48} className="mx-auto text-slate-200 mb-4" />
-            <h3 className="text-lg font-bold text-slate-700">Module Component Required</h3>
+            <h3 className="text-lg font-bold text-slate-700">Coming Soon</h3>
             <p className="text-slate-500 max-w-sm mx-auto mt-2 text-sm">The {activeTab.toLowerCase()} component will be injected dynamically.</p>
           </div>
         )}

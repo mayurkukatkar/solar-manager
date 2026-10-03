@@ -10,10 +10,18 @@ cloudinary.config({
 
 const storage = new CloudinaryStorage({
   cloudinary: cloudinary,
-  params: {
-    folder: 'solar-erp/surveys',
-    allowed_formats: ['jpg', 'png', 'jpeg']
-  },
+  params: async (req, file) => {
+    let folder = 'solar-erp/uploads';
+    if (req.originalUrl.includes('/surveys')) folder = 'solar-erp/surveys';
+    if (req.originalUrl.includes('/invoices')) folder = 'solar-erp/invoices';
+    if (req.originalUrl.includes('/quotations')) folder = 'solar-erp/quotations';
+    
+    return {
+      folder: folder,
+      resource_type: 'auto',
+      allowed_formats: ['jpg', 'png', 'jpeg', 'pdf']
+    };
+  }
 });
 
 const upload = multer({ storage: storage });

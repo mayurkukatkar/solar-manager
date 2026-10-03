@@ -4,6 +4,8 @@ const prisma = require('../../db');
 const { requireTenantAuth } = require('../../middleware/auth');
 const upload = require('../../middleware/upload');
 const tenantInstallationsRoutes = require('./installations');
+const { validate } = require('../../middleware/validate');
+const { createTaskSchema } = require('../validations');
 
 // TENANT ADMIN - PHASE 2: CORE OPERATIONS
 // ----------------------------------------------------
@@ -192,7 +194,7 @@ router.get('/api/tenant/tasks', requireTenantAuth, async (req, res) => {
   }
 });
 
-router.post('/api/tenant/tasks', requireTenantAuth, async (req, res) => {
+router.post('/api/tenant/tasks', requireTenantAuth, validate(createTaskSchema), async (req, res) => {
   try {
     const task = await prisma.projectTask.create({
       data: req.body

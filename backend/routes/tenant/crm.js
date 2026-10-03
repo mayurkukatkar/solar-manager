@@ -1,5 +1,7 @@
 const express = require('express');
 const router = express.Router();
+const { validate } = require('../../middleware/validate');
+const { createLeadSchema, createProductSchema } = require('../validations');
 const prisma = require('../../db');
 const { requireTenantAuth } = require('../../middleware/auth');
 
@@ -71,7 +73,7 @@ router.get('/api/tenant/leads/:id', requireTenantAuth, async (req, res) => {
   }
 });
 
-router.post('/api/tenant/leads', requireTenantAuth, async (req, res) => {
+router.post('/api/tenant/leads', requireTenantAuth, validate(createLeadSchema), async (req, res) => {
   try {
     const { mobile, email, forceCreate, ...rest } = req.body;
     
@@ -337,7 +339,7 @@ router.get('/api/tenant/products', requireTenantAuth, async (req, res) => {
   }
 });
 
-router.post('/api/tenant/products', requireTenantAuth, async (req, res) => {
+router.post('/api/tenant/products', requireTenantAuth, validate(createProductSchema), async (req, res) => {
   try {
     const { name, category, sku, brand, unit, purchaseCost, sellingPrice, taxRate, minStock, currentStock } = req.body;
     
@@ -476,7 +478,7 @@ router.get('/api/tenant/inventory/products', requireTenantAuth, async (req, res)
   }
 });
 
-router.post('/api/tenant/inventory/products', requireTenantAuth, async (req, res) => {
+router.post('/api/tenant/inventory/products', requireTenantAuth, validate(createProductSchema), async (req, res) => {
   try {
     const product = await prisma.product.create({
       data: {
@@ -1111,7 +1113,13 @@ router.get('/api/tenant/customers/:id', requireTenantAuth, async (req, res) => {
     const customer = await prisma.customer.findUnique({
       where: { id: req.params.id, tenantId: req.user.tenantId },
       include: { 
-        lead: true,
+        lead: {
+          include: {
+            activities: { orderBy: { createdAt: 'desc' } },
+            followUps: { orderBy: { scheduledAt: 'asc' } },
+            notes: { orderBy: { createdAt: 'desc' } }
+          }
+        },
         surveys: true,
         quotations: true,
         projects: true,

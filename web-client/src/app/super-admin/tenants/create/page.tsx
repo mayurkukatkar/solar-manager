@@ -1,5 +1,5 @@
 "use client";
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -24,9 +24,21 @@ export default function CreateTenant() {
   const [formData, setFormData] = useState({
     name: '', email: '', phone: '', city: '', gst: '',
     adminName: '', adminEmail: '',
-    plan: 'PRO', billingCycle: 'ANNUAL',
+    planId: '', billingCycle: 'ANNUAL',
     modules: { crm: true, projects: true, inventory: true, finance: false }
   });
+  const [plans, setPlans] = useState<any[]>([]);
+
+  useEffect(() => {
+    axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/super-admin/plans`, { withCredentials: true })
+      .then(res => {
+        setPlans(res.data.plans || []);
+        if (res.data.plans?.length > 0) {
+          setFormData(prev => ({ ...prev, planId: res.data.plans[0].id }));
+        }
+      })
+      .catch(console.error);
+  }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -131,30 +143,26 @@ export default function CreateTenant() {
           </div>
         )}
 
-        {/* STEP 3: PLAN */}
         {step === 3 && (
           <div className="animate-in fade-in slide-in-from-right-4 duration-300">
             <h2 className="text-xl font-bold text-slate-900 mb-6">Subscription Plan</h2>
-            <p className="text-sm text-amber-600 font-bold bg-amber-50 p-3 rounded-lg border border-amber-100 mb-6">
-              Full Subscription API logic will be implemented in Phase 3. This is a UI mockup.
-            </p>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {['STARTER', 'PRO', 'ENTERPRISE'].map(plan => (
+              {plans.map(plan => (
                 <div 
-                  key={plan}
-                  onClick={() => setFormData({...formData, plan})}
+                  key={plan.id}
+                  onClick={() => setFormData({...formData, planId: plan.id})}
                   className={`cursor-pointer rounded-xl border-2 p-6 transition-all ${
-                    formData.plan === plan ? 'border-blue-600 bg-blue-50 shadow-md' : 'border-slate-200 hover:border-blue-300 bg-white'
+                    formData.planId === plan.id ? 'border-blue-600 bg-blue-50 shadow-md' : 'border-slate-200 hover:border-blue-300 bg-white'
                   }`}
                 >
                   <div className="flex justify-between items-center mb-4">
-                    <h3 className="font-bold text-lg text-slate-900">{plan}</h3>
-                    {formData.plan === plan && <CheckCircle2 size={20} className="text-blue-600" />}
+                    <h3 className="font-bold text-lg text-slate-900">{plan.name}</h3>
+                    {formData.planId === plan.id && <CheckCircle2 size={20} className="text-blue-600" />}
                   </div>
                   <div className="text-3xl font-black text-slate-900 mb-1">
-                    {plan === 'STARTER' ? '₹4,999' : plan === 'PRO' ? '₹9,999' : 'Custom'}
+                    ₹{plan.price.toLocaleString('en-IN')}
                   </div>
-                  <p className="text-xs text-slate-500 font-medium">per month / billed annually</p>
+                  <p className="text-xs text-slate-500 font-medium">per month / billed {plan.billingCycle.toLowerCase()}</p>
                 </div>
               ))}
             </div>
@@ -202,7 +210,7 @@ export default function CreateTenant() {
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div><span className="text-slate-500 font-medium">Company Name:</span> <br/><span className="font-bold text-slate-900 text-base">{formData.name}</span></div>
                   <div><span className="text-slate-500 font-medium">Admin Login:</span> <br/><span className="font-bold text-slate-900 text-base">{formData.adminEmail}</span></div>
-                  <div><span className="text-slate-500 font-medium">Selected Plan:</span> <br/><span className="font-bold text-slate-900 text-base">{formData.plan}</span></div>
+                  <div><span className="text-slate-500 font-medium">Selected Plan:</span> <br/><span className="font-bold text-slate-900 text-base">{plans.find(p => p.id === formData.planId)?.name || 'None'}</span></div>
                   <div>
                     <span className="text-slate-500 font-medium">Modules:</span> <br/>
                     <div className="flex gap-2 mt-1">

@@ -1,5 +1,7 @@
 const express = require('express');
 const router = express.Router();
+const { validate } = require('../../middleware/validate');
+const { createTenantSchema, createPlanSchema } = require('../validations');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
@@ -23,8 +25,8 @@ router.get('/tenants', requireSuperAdmin, async (req, res) => {
 });
 
 // 4. Create New Tenant
-router.post('/tenants', requireSuperAdmin, async (req, res) => {
-  const { name, legalName, email, phone, city, state, adminName, adminEmail } = req.body;
+router.post('/tenants', requireSuperAdmin, validate(createTenantSchema), async (req, res) => {
+  const { name, legalName, email, phone, city, state, adminName, adminEmail, planId } = req.body;
   
   if (!name || !adminEmail) {
     return res.status(400).json({ error: 'Company Name and Admin Email are required' });
@@ -51,6 +53,26 @@ router.post('/tenants', requireSuperAdmin, async (req, res) => {
           mustChangePassword: true
         }
       });
+      
+      // Create Subscription if planId is provided
+      if (planId) {
+        const plan = await tx.plan.findUnique({ where: { id: planId } });
+        if (plan) {
+          const endDate = new Date();
+          if (plan.billingCycle === 'ANNUAL') endDate.setFullYear(endDate.getFullYear() + 1);
+          else endDate.setMonth(endDate.getMonth() + 1);
+          
+          await tx.subscription.create({
+            data: {
+              tenantId: tenant.id,
+              planId: plan.id,
+              status: 'ACTIVE',
+              amount: plan.price,
+              endDate: endDate
+            }
+          });
+        }
+      }
       
       return tenant;
     });
@@ -153,6 +175,26 @@ router.post('/plans', requireSuperAdmin, async (req, res) => {
   }
 });
 
+// 7.5 Update Plan
+router.put('/plans/:id', requireSuperAdmin, async (req, res) => {
+  try {
+    const plan = await prisma.plan.update({ where: { id: req.params.id }, data: req.body });
+    res.json({ message: 'Plan updated successfully', plan });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to update plan' });
+  }
+});
+
+// 7.6 Delete Plan
+router.delete('/plans/:id', requireSuperAdmin, async (req, res) => {
+  try {
+    await prisma.plan.delete({ where: { id: req.params.id } });
+    res.json({ message: 'Plan deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to delete plan' });
+  }
+});
+
 // 8. Get All Subscriptions
 router.get('/subscriptions', requireSuperAdmin, async (req, res) => {
   try {
@@ -209,8 +251,29 @@ router.get('/kpis', requireSuperAdmin, async (req, res) => {
     const activeTenants = await prisma.tenant.count({ where: { status: 'ACTIVE' } });
     const totalUsers = await prisma.user.count({ where: { role: { not: 'SUPER_ADMIN' } } });
     
-    res.json({ totalTenants, activeTenants, totalUsers });
+    const revenueResult = await prisma.subscription.aggregate({
+      _sum: { amount: true },
+      where: { status: 'ACTIVE' }
+    });
+    const totalRevenue = revenueResult._sum.amount || 0;
+    
+    const tenants = await prisma.tenant.findMany({ select: { createdAt: true } });
+    const growthMap = {};
+    tenants.forEach(t => {
+      const month = t.createdAt.toLocaleString('default', { month: 'short' });
+      growthMap[month] = (growthMap[month] || 0) + 1;
+    });
+    const tenantGrowth = Object.keys(growthMap).map(k => ({ month: k, tenants: growthMap[k] }));
+
+    const recentActivity = await prisma.auditLog.findMany({
+      take: 5,
+      orderBy: { createdAt: 'desc' },
+      select: { action: true, entity: true, createdAt: true }
+    });
+    
+    res.json({ totalTenants, activeTenants, totalUsers, totalRevenue, tenantGrowth, recentActivity });
   } catch (error) {
+    console.error(error);
     res.status(500).json({ error: 'Failed to fetch KPIs' });
   }
 });
