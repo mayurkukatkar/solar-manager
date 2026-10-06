@@ -50,7 +50,7 @@ router.get('/api/tenant/documents', requireTenantAuth, async (req, res) => {
       include: {
         user: { select: { name: true, email: true } },
         customer: { select: { name: true } },
-        project: { select: { name: true, projectId: true } },
+        project: { select: { id: true, name: true, projectNumber: true } },
         tags: { include: { tag: true } },
         documentType: true
       }
