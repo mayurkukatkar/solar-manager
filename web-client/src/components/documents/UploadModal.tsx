@@ -29,8 +29,8 @@ export default function UploadModal({
 
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!file) {
-      setError('Please choose a file to upload first.');
+    if (!file && !title) {
+      setError('Please choose a file or enter a document title to create a placeholder.');
       return;
     }
 
@@ -38,7 +38,7 @@ export default function UploadModal({
     setError('');
 
     const formData = new FormData();
-    formData.append('file', file);
+    if (file) formData.append('file', file);
     if (title) formData.append('title', title);
     if (description) formData.append('description', description);
     formData.append('category', category);
@@ -110,7 +110,7 @@ export default function UploadModal({
             <div className="space-y-3">
               <div className="flex items-center gap-2">
                 <span className="flex items-center justify-center w-6 h-6 rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold">1</span>
-                <h3 className="text-base font-semibold text-gray-900">Choose your file</h3>
+                <h3 className="text-base font-semibold text-gray-900">Choose your file (Optional)</h3>
               </div>
               
               <div className="relative group">
@@ -160,15 +160,16 @@ export default function UploadModal({
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">What is this document called?</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">What is this document called? *</label>
                   <input 
                     type="text" 
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
+                    required={!file}
                     className="w-full bg-white border border-gray-300 rounded-lg px-4 py-2.5 text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 shadow-sm"
                     placeholder="E.g., Electricity Bill Aug 2026"
                   />
-                  <p className="text-xs text-gray-500 mt-1.5">If left empty, we'll use the file name.</p>
+                  <p className="text-xs text-gray-500 mt-1.5">{file ? "If left empty, we'll use the file name." : "Required if no file is selected."}</p>
                 </div>
                 
                 <div>
@@ -229,9 +230,9 @@ export default function UploadModal({
           <button 
             type="submit"
             form="upload-form"
-            disabled={uploading || !file}
+            disabled={uploading || (!file && !title)}
             className={`px-8 py-2.5 font-medium rounded-lg transition-all flex items-center gap-2 shadow-sm
-              ${uploading || !file 
+              ${uploading || (!file && !title) 
                 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' 
                 : 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-500/20'
               }
@@ -240,7 +241,7 @@ export default function UploadModal({
             {uploading ? (
               <>
                 <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                Uploading...
+                Saving...
               </>
             ) : (
               'Save Document'

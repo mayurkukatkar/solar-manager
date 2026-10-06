@@ -137,12 +137,11 @@ router.post('/api/tenant/documents/upload', requireTenantAuth, upload.single('fi
       documentTypeId, customerId, projectId, documentDate, expiryDate 
     } = req.body;
 
-    if (!req.file) {
-      return res.status(400).json({ error: 'No file uploaded' });
+    if (!req.file && !title) {
+      return res.status(400).json({ error: 'Please provide a file or a title for the document.' });
     }
 
-    // Auto-name document if customer/project info is available (Optional logic here)
-    let finalTitle = title || req.file.originalname;
+    let finalTitle = title || (req.file ? req.file.originalname : 'Untitled Document');
 
     const document = await prisma.document.create({
       data: {
@@ -151,9 +150,9 @@ router.post('/api/tenant/documents/upload', requireTenantAuth, upload.single('fi
         title: finalTitle,
         description,
         category,
-        fileUrl: req.file.path,
-        fileType: req.file.mimetype,
-        fileSize: req.file.size,
+        fileUrl: req.file ? req.file.path : null,
+        fileType: req.file ? req.file.mimetype : null,
+        fileSize: req.file ? req.file.size : null,
         entityType,
         entityId,
         customerId: customerId || null,
@@ -161,12 +160,14 @@ router.post('/api/tenant/documents/upload', requireTenantAuth, upload.single('fi
         documentDate: documentDate ? new Date(documentDate) : null,
         expiryDate: expiryDate ? new Date(expiryDate) : null,
         uploadedBy: userId,
-        status: 'UPLOADED',
+        status: req.file ? 'UPLOADED' : 'PENDING_UPLOAD',
         version: 1
       }
     });
 
-    await trackActivity(document.id, userId, 'UPLOADED', { filename: req.file.originalname });
+    await trackActivity(document.id, userId, req.file ? 'UPLOADED' : 'REQUESTED', { 
+      filename: req.file ? req.file.originalname : null 
+    });
 
     res.status(201).json(document);
   } catch (error) {
