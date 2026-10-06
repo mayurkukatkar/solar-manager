@@ -6,8 +6,9 @@ import Link from 'next/link';
 import { 
   ArrowLeft, Briefcase, Calendar, MapPin, Zap, User, Users,
   CheckSquare, Flag, Box, History, DollarSign, Activity, Settings, Plus,
-  CheckCircle2, Clock, AlertTriangle, MessageSquare, Trash2
+  CheckCircle2, Clock, AlertTriangle, MessageSquare, Trash2, FileText, Download
 } from 'lucide-react';
+import { WorkCompletionReport, GuaranteeCertificate, DcrDeclaration, AnnexureProforma } from '@/components/pdf/MsedclFormsPDF';
 
 export default function ProjectDetails() {
   const params = useParams();
@@ -16,6 +17,26 @@ export default function ProjectDetails() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('OVERVIEW');
   const [products, setProducts] = useState<any[]>([]);
+
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  const [selectedForm, setSelectedForm] = useState<string | null>(null);
+
+  const handleDownloadForm = (formType: string) => {
+    setSelectedForm(formType);
+    setIsGeneratingPDF(true);
+    setTimeout(async () => {
+      try {
+        const { generateDiscomPDF } = await import('@/components/pdf/MsedclFormsPDF');
+        await generateDiscomPDF(`discom-${formType}`, `${project.projectNumber}_${formType}.pdf`);
+      } catch (err) {
+        console.error(err);
+        alert('Failed to generate PDF');
+      } finally {
+        setIsGeneratingPDF(false);
+        setSelectedForm(null);
+      }
+    }, 500);
+  };
 
   // Modals state
   const [showTaskModal, setShowTaskModal] = useState(false);
@@ -226,8 +247,11 @@ export default function ProjectDetails() {
               <div className="flex items-center gap-3"><Box size={18} /> Material Reqs</div>
               <span className="bg-slate-100 text-slate-500 py-0.5 px-2 rounded-full text-xs">{project.materialReqs?.length || 0}</span>
             </button>
-            <button onClick={() => setActiveTab('TIMELINE')} className={`w-full flex items-center gap-3 px-5 py-4 text-sm font-medium transition-colors ${activeTab === 'TIMELINE' ? 'bg-emerald-50 text-emerald-700 border-l-4 border-l-emerald-600' : 'text-slate-600 hover:bg-slate-50'}`}>
+            <button onClick={() => setActiveTab('TIMELINE')} className={`w-full flex items-center gap-3 px-5 py-4 text-sm font-medium transition-colors border-b border-slate-100 ${activeTab === 'TIMELINE' ? 'bg-emerald-50 text-emerald-700 border-l-4 border-l-emerald-600' : 'text-slate-600 hover:bg-slate-50'}`}>
               <History size={18} /> Activity & Timeline
+            </button>
+            <button onClick={() => setActiveTab('DISCOM')} className={`w-full flex items-center gap-3 px-5 py-4 text-sm font-medium transition-colors ${activeTab === 'DISCOM' ? 'bg-emerald-50 text-emerald-700 border-l-4 border-l-emerald-600' : 'text-slate-600 hover:bg-slate-50'}`}>
+              <FileText size={18} /> Discom Forms
             </button>
           </div>
         </div>
@@ -490,6 +514,49 @@ export default function ProjectDetails() {
               </div>
             </div>
           )}
+
+          {/* DISCOM FORMS TAB */}
+          {activeTab === 'DISCOM' && (
+            <div className="animate-in fade-in duration-300 h-full flex flex-col">
+              <div className="p-5 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+                <div>
+                  <h2 className="font-bold text-slate-800">MSEDCL Discom Forms</h2>
+                  <p className="text-xs text-slate-500 mt-0.5">Auto-generated official forms pre-filled with project data.</p>
+                </div>
+              </div>
+              <div className="p-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {[
+                    { id: 'WCR', name: 'Work Completion Report (WCR)', desc: 'Official report for completed solar plant' },
+                    { id: 'AnnexureI', name: 'Annexure-I & Proforma-A', desc: 'Provisional Commissioning Report' },
+                    { id: 'DCR', name: 'DCR Declaration', desc: 'Domestic Content Requirement fulfillment' },
+                    { id: 'Guarantee', name: 'Guarantee Certificate', desc: '5-year comprehensive maintenance contract' },
+                  ].map(form => (
+                    <div key={form.id} className="border border-slate-200 rounded-xl p-5 hover:shadow-md transition-shadow bg-white flex flex-col justify-between group">
+                      <div>
+                        <div className="w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mb-4 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+                          <FileText size={20} />
+                        </div>
+                        <h4 className="font-bold text-slate-900 mb-1">{form.name}</h4>
+                        <p className="text-xs text-slate-500 leading-relaxed mb-6">{form.desc}</p>
+                      </div>
+                      <button 
+                        onClick={() => handleDownloadForm(form.id)}
+                        disabled={isGeneratingPDF && selectedForm === form.id}
+                        className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-sm rounded-lg flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
+                      >
+                        {isGeneratingPDF && selectedForm === form.id ? (
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-slate-700"></div>
+                        ) : (
+                          <><Download size={16} /> Generate PDF</>
+                        )}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -599,6 +666,49 @@ export default function ProjectDetails() {
         </div>
       )}
 
+      {/* HIDDEN PDF CONTAINERS FOR DISCOM FORMS */}
+      {selectedForm && (
+        <div style={{ position: 'absolute', top: 0, left: 0, opacity: 0, pointerEvents: 'none', zIndex: -50 }}>
+          <div id={`discom-${selectedForm}`}>
+            {selectedForm === 'WCR' && <WorkCompletionReport data={{
+              vendorName: "Apex Solar Solutions",
+              customerName: project.customer?.name || "Consumer",
+              consumerNumber: "1234567890",
+              address: project.installationAddress || "Installation Address",
+              city: project.city,
+              capacity: project.capacity,
+              moduleMake: project.materialReqs?.find((r:any) => r.description?.toLowerCase().includes('panel'))?.description?.split(' ')[0] || "Waaree",
+              moduleWattage: 540,
+              moduleQuantity: Math.ceil((project.capacity * 1000) / 540),
+              inverterMake: project.materialReqs?.find((r:any) => r.description?.toLowerCase().includes('inverter'))?.description?.split(' ')[0] || "Growatt",
+            }} />}
+            {selectedForm === 'Guarantee' && <GuaranteeCertificate data={{
+              customerName: project.customer?.name || "Consumer",
+            }} />}
+            {selectedForm === 'DCR' && <DcrDeclaration data={{
+              vendorName: "Apex Solar Solutions",
+              customerName: project.customer?.name || "Consumer",
+              address: project.installationAddress || "Installation Address",
+              capacity: project.capacity,
+              moduleMake: project.materialReqs?.find((r:any) => r.description?.toLowerCase().includes('panel'))?.description?.split(' ')[0] || "Waaree",
+              moduleWattage: 540,
+              moduleQuantity: Math.ceil((project.capacity * 1000) / 540),
+            }} />}
+            {selectedForm === 'AnnexureI' && <AnnexureProforma data={{
+              vendorName: "Apex Solar Solutions",
+              customerName: project.customer?.name || "Consumer",
+              customerPhone: project.customer?.phone || "+91 9999999999",
+              customerEmail: project.customer?.email || "customer@example.com",
+              address: project.installationAddress || "Installation Address",
+              city: project.city,
+              capacity: project.capacity,
+              moduleMake: project.materialReqs?.find((r:any) => r.description?.toLowerCase().includes('panel'))?.description?.split(' ')[0] || "Waaree",
+              moduleQuantity: Math.ceil((project.capacity * 1000) / 540),
+              inverterMake: project.materialReqs?.find((r:any) => r.description?.toLowerCase().includes('inverter'))?.description?.split(' ')[0] || "Growatt",
+            }} />}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
