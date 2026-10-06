@@ -15,6 +15,7 @@ const storage = new CloudinaryStorage({
     if (req.originalUrl.includes('/surveys')) folder = 'solar-erp/surveys';
     if (req.originalUrl.includes('/invoices')) folder = 'solar-erp/invoices';
     if (req.originalUrl.includes('/quotations')) folder = 'solar-erp/quotations';
+    if (req.originalUrl.includes('/documents')) folder = 'solar-erp/documents';
     
     return {
       folder: folder,
