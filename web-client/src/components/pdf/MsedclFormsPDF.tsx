@@ -307,6 +307,8 @@ export const AnnexureProforma = ({ data }: { data: any }) => (
         <tr><td className="py-1">9</td><td className="py-1">Capacity Type</td><td className="py-1">KW</td></tr>
         <tr><td className="py-1">10</td><td className="py-1">Project Model</td><td className="py-1">CAPEX</td></tr>
         <tr><td className="py-1">11</td><td className="py-1">RE installed Capacity(Rooftop)(KW)</td><td className="py-1">{data.capacity}</td></tr>
+        <tr><td className="py-1">12</td><td className="py-1">RE installed Capacity(Rooftop + Ground)(KW)</td><td className="py-1">{data.capacity}</td></tr>
+        <tr><td className="py-1">13</td><td className="py-1">RE installed Capacity(Ground)(KW)</td><td className="py-1">0</td></tr>
         <tr><td className="py-1">14</td><td className="py-1">Installation date</td><td className="py-1 border border-black px-2">{new Date().toLocaleDateString()}</td></tr>
         <tr><td colSpan={3} className="py-3 font-bold">15 SolarPV Details</td></tr>
         <tr><td></td><td className="py-1 pl-4">Inverter Capacity(KW)</td><td className="py-1 border border-black px-2">{data.capacity}</td></tr>
@@ -321,15 +323,28 @@ export const AnnexureProforma = ({ data }: { data: any }) => (
       <p className="text-center font-bold text-sm mb-6 uppercase">Commissioning Report (Provisional) for Grid Connected Solar Photovoltaic Power Plant (with Net-metering facility)</p>
       
       <p className="text-justify leading-loose font-medium">
-        Certified that a Grid Connected SPV Power Plant of <strong>{data.capacity} KWp</strong> capacity has been installed at the site <strong>{data.address}</strong> 
+        Certified that a Grid Connected SPV Power Plant of <strong>{data.capacity}</strong> KWp capacity has been installed at the site <strong>{data.address}</strong> 
         District <strong>{data.city || '________________'}</strong> of MAHARASHTRA which has been installed by M/S <strong>{data.vendorName}</strong> on 
         <strong> {new Date().toLocaleDateString()}</strong>. The system is as per BIS/MNRE specifications. The system has been checked for its 
         performance and found in order for further commissioning.
       </p>
 
-      <div className="flex justify-between mt-24">
+      <div className="flex justify-between mt-12 mb-12">
         <div className="font-bold">Signature of the beneficiary</div>
         <div className="font-bold">Signature of the agency with name, seal and date</div>
+      </div>
+
+      <p className="text-justify leading-loose font-medium">
+        The above RTS installation has been inspected by me for Pre-Commissioning Testing of Roof Top Solar Connection on 
+        dt………………………. as per guidelines issued by the office of The Chief Engineer vide letter no 21653 on dt. 
+        18.08.2022 and found in order for commissioning.
+      </p>
+      
+      <div className="mt-8">
+        <p className="font-bold">Signature of the MSEDCL Officer</p>
+        <p className="font-bold mt-6">Name,</p>
+        <p className="font-bold">Designation</p>
+        <p className="font-bold">Date and seal</p>
       </div>
     </div>
   </PdfPage>
@@ -470,11 +485,11 @@ export const NetMeteringAgreement = ({ data }: { data: any }) => (
         </div>
         <div>
           <p className="font-bold mb-8"></p>
-          <p className="border-t border-black pt-2 w-64">Witness 1 (VENDOR)</p>
+          <p className="border-t border-black pt-2 w-64">Witness 1 (VENDOR):</p>
         </div>
         <div>
           <p className="font-bold mb-8"></p>
-          <p className="border-t border-black pt-2 w-64">Witness 2</p>
+          <p className="border-t border-black pt-2 w-64">Witness 1:</p>
         </div>
       </div>
     </PdfPage>
