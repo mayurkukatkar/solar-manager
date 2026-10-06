@@ -232,7 +232,7 @@ export default function Quotations() {
 
       {/* HIDDEN PDF CONTAINER FOR GENERATION */}
       {selectedQuoteForPdf && (
-        <div style={{ position: 'absolute', top: '-9999px', left: '-9999px' }}>
+        <div style={{ position: 'absolute', top: 0, left: 0, opacity: 0, pointerEvents: 'none', zIndex: -50 }}>
           <div id="hidden-pdf-container">
             <QuotationPDF 
               data={{

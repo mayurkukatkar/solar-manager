@@ -105,7 +105,8 @@ export const generatePDF = async (elementId: string, filename: string) => {
   };
 
   // @ts-ignore
-  const html2pdf = (await import("html2pdf.js")).default;
+  const html2pdfModule = await import("html2pdf.js");
+  const html2pdf = html2pdfModule.default || html2pdfModule;
 
   return html2pdf().set(opt).from(element).save();
 };
