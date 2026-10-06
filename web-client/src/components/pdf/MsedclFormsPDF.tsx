@@ -11,8 +11,11 @@ export const generateDiscomPDF = async (elementId: string, filename: string) => 
   window.getComputedStyle = function(el, pseudoElt) {
     const style = originalGetComputedStyle.call(window, el, pseudoElt);
     return new Proxy(style, {
-      get(target, prop, receiver) {
-        let value = Reflect.get(target, prop, receiver);
+      get(target, prop) {
+        let value = (target as any)[prop];
+        if (typeof value === 'function') {
+          return value.bind(target);
+        }
         if (typeof value === 'string' && (value.includes('lab(') || value.includes('oklch(') || value.includes('color('))) {
           if (prop === 'color' || prop === 'backgroundColor') return 'rgb(0, 0, 0)';
           return 'rgba(0, 0, 0, 0)'; 
