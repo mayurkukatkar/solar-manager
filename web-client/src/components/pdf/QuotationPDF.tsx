@@ -17,8 +17,7 @@ import {
   Activity,
   FileText
 } from "lucide-react";
-// @ts-ignore
-import html2pdf from "html2pdf.js";
+
 
 interface QuotationData {
   quotation_number: string;
@@ -92,7 +91,7 @@ interface QuotationData {
   };
 }
 
-export const generatePDF = (elementId: string, filename: string) => {
+export const generatePDF = async (elementId: string, filename: string) => {
   const element = document.getElementById(elementId);
   if (!element) return;
   
@@ -104,6 +103,9 @@ export const generatePDF = (elementId: string, filename: string) => {
     jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
     pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
   };
+
+  // @ts-ignore
+  const html2pdf = (await import("html2pdf.js")).default;
 
   return html2pdf().set(opt).from(element).save();
 };
