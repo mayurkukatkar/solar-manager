@@ -2,17 +2,20 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { FileText, Plus, User, Calendar, IndianRupee, Download } from 'lucide-react';
+import { QuotationPDF } from '@/components/pdf/QuotationPDF';
 
 export default function Quotations() {
   const [quotations, setQuotations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Modal State
   const [showModal, setShowModal] = useState(false);
   const [leads, setLeads] = useState<any[]>([]);
   const [formData, setFormData] = useState({
     leadId: '', subtotal: 0, tax: 0, discount: 0, validityDays: 15
   });
+
+  const [selectedQuoteForPdf, setSelectedQuoteForPdf] = useState<any>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   const fetchData = async () => {
     try {
@@ -48,19 +51,24 @@ export default function Quotations() {
 
   const handleDownload = async (quote: any) => {
     try {
-      const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/quotations/${quote.id}/pdf`, {
-        responseType: 'blob',
-        withCredentials: true
-      });
+      // Set the selected quote so the hidden PDF component can render it
+      setSelectedQuoteForPdf(quote);
+      setIsGenerating(true);
       
-      const url = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', `${quote.qNumber || 'Quotation'}.pdf`);
-      document.body.appendChild(link);
-      link.click();
-      link.parentNode?.removeChild(link);
-      window.URL.revokeObjectURL(url);
+      // Wait for React to render the hidden component
+      setTimeout(async () => {
+        try {
+          const filename = `Quotation_${quote.qNumber || 'New'}.pdf`;
+          const { generatePDF } = await import('@/components/pdf/QuotationPDF');
+          await generatePDF("hidden-pdf-container", filename);
+        } catch (error) {
+          console.error("PDF generation failed:", error);
+          alert("Failed to generate new PDF. Please try again.");
+        } finally {
+          setIsGenerating(false);
+          setSelectedQuoteForPdf(null);
+        }
+      }, 500); // 500ms delay to ensure DOM is fully updated
     } catch (error) {
       console.error("PDF Download Error:", error);
       alert("Failed to download PDF. Please try again.");
@@ -221,6 +229,68 @@ export default function Quotations() {
           </div>
         </div>
       )}
+
+      {/* HIDDEN PDF CONTAINER FOR GENERATION */}
+      {selectedQuoteForPdf && (
+        <div style={{ position: 'absolute', top: '-9999px', left: '-9999px' }}>
+          <div id="hidden-pdf-container">
+            <QuotationPDF 
+              data={{
+                quotation_number: selectedQuoteForPdf.qNumber || "QT-NEW",
+                quotation_date: new Date(selectedQuoteForPdf.date).toLocaleDateString(),
+                valid_until: `${selectedQuoteForPdf.validityDays} Days`,
+                company_name: "Apex Solar Solutions",
+                company_logo: "",
+                company_address: "Tech Park, Building 4, 12th Floor, Mumbai, MH 400001",
+                company_phone: "+91 98765 43210",
+                company_email: "hello@apexsolar.in",
+                company_website: "www.apexsolar.in",
+                customer_name: selectedQuoteForPdf.lead?.name || "Customer",
+                customer_phone: selectedQuoteForPdf.lead?.phone || "+91 XXXXX XXXXX",
+                customer_email: selectedQuoteForPdf.lead?.email || "customer@example.com",
+                project_address: selectedQuoteForPdf.lead?.address || "Site Address",
+                system_capacity: 10,
+                annual_generation: 14600,
+                panel_type: "Mono PERC Half-Cut 550Wp",
+                inverter_brand: "Growatt / Sungrow",
+                system_type: "Grid-Tied On-Grid",
+                phase: "3-Phase",
+                roof_type: "RCC Flat Roof",
+                installation_type: "Elevated Structure",
+                expected_timeline: "15-20 Working Days",
+                components: [
+                  { category: "Solar PV Modules", brand: "Waaree / Vikram", model: "550Wp", specification: "ALMM Approved", quantity: 18, warranty: "25 Yrs" },
+                  { category: "Inverter", brand: "Growatt", model: "10kW", specification: "IP65", quantity: 1, warranty: "10 Yrs" },
+                  { category: "Mounting Structure", brand: "Apex Custom", model: "HDG", specification: "80 micron", quantity: "1 Set", warranty: "5 Yrs" }
+                ],
+                scope_of_supply: ["Solar PV Modules", "Grid-Tied Inverter", "Module Mounting Structure", "DC Cables & AC Cables", "Installation & Commissioning", "Net Metering Assistance"],
+                pricing: [
+                  { description: "Complete System Material", qty: 1, unit_price: selectedQuoteForPdf.total * 0.8, amount: selectedQuoteForPdf.total * 0.8 },
+                  { description: "Installation & Services", qty: 1, unit_price: selectedQuoteForPdf.total * 0.2, amount: selectedQuoteForPdf.total * 0.2 }
+                ],
+                subtotal: selectedQuoteForPdf.total,
+                discount: 0,
+                taxable_amount: selectedQuoteForPdf.total,
+                gov_charges: 0,
+                other_charges: 0,
+                grand_total: selectedQuoteForPdf.total,
+                annual_savings: 116800,
+                monthly_savings: 9733,
+                payback_period: 4.8,
+                lifetime_generation: 365000,
+                payment_terms: [
+                  { percentage: 40, description: "Advance along with the Work Order confirmation." },
+                  { percentage: 60, description: "Against delivery & installation." }
+                ],
+                warranties: { modules: "25 Yrs Performance", inverter: "10 Yrs", structure: "5 Yrs", installation: "1 Yr", other: "OEM Terms" },
+                terms_and_conditions: ["The quotation is valid for 15 days.", "Any additional cable/structure requirements will be charged extra on actuals."],
+                exclusions: ["Any major civil work or roof reinforcement not mentioned.", "DISCOM statutory application/processing fees."]
+              }} 
+            />
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
