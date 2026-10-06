@@ -61,9 +61,9 @@ export default function Quotations() {
           const filename = `Quotation_${quote.qNumber || 'New'}.pdf`;
           const { generatePDF } = await import('@/components/pdf/QuotationPDF');
           await generatePDF("hidden-pdf-container", filename);
-        } catch (error) {
+        } catch (error: any) {
           console.error("PDF generation failed:", error);
-          alert("Failed to generate new PDF. Please try again.");
+          alert("Failed to generate new PDF. Error: " + (error.message || error));
         } finally {
           setIsGenerating(false);
           setSelectedQuoteForPdf(null);

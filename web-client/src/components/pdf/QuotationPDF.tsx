@@ -104,11 +104,14 @@ export const generatePDF = async (elementId: string, filename: string) => {
     pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
   };
 
-  // @ts-ignore
-  const html2pdfModule = await import("html2pdf.js");
-  const html2pdf = html2pdfModule.default || html2pdfModule;
-
-  return html2pdf().set(opt).from(element).save();
+  try {
+    const _html2pdf = require("html2pdf.js");
+    const html2pdf = _html2pdf.default || _html2pdf;
+    return await html2pdf().set(opt).from(element).save();
+  } catch (err: any) {
+    console.error("Inner PDF generation error:", err);
+    throw err;
+  }
 };
 
 export const QuotationPDF = ({ data }: { data: QuotationData }) => {
