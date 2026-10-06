@@ -677,10 +677,10 @@ export default function ProjectDetails() {
               address: project.installationAddress || "Installation Address",
               city: project.city,
               capacity: project.capacity,
-              moduleMake: project.materialReqs?.find((r:any) => r.description?.toLowerCase().includes('panel'))?.description?.split(' ')[0] || "Waaree",
+              moduleMake: project.materialReqs?.find((r:any) => r.description?.toLowerCase()?.includes('panel'))?.description?.split(' ')[0] || "Waaree",
               moduleWattage: 540,
               moduleQuantity: Math.ceil((project.capacity * 1000) / 540),
-              inverterMake: project.materialReqs?.find((r:any) => r.description?.toLowerCase().includes('inverter'))?.description?.split(' ')[0] || "Growatt",
+              inverterMake: project.materialReqs?.find((r:any) => r.description?.toLowerCase()?.includes('inverter'))?.description?.split(' ')[0] || "Growatt",
             }} />}
             {selectedForm === 'Guarantee' && <GuaranteeCertificate data={{
               customerName: project.customer?.name || "Consumer",
@@ -690,7 +690,7 @@ export default function ProjectDetails() {
               customerName: project.customer?.name || "Consumer",
               address: project.installationAddress || "Installation Address",
               capacity: project.capacity,
-              moduleMake: project.materialReqs?.find((r:any) => r.description?.toLowerCase().includes('panel'))?.description?.split(' ')[0] || "Waaree",
+              moduleMake: project.materialReqs?.find((r:any) => r.description?.toLowerCase()?.includes('panel'))?.description?.split(' ')[0] || "Waaree",
               moduleWattage: 540,
               moduleQuantity: Math.ceil((project.capacity * 1000) / 540),
             }} />}
@@ -702,9 +702,9 @@ export default function ProjectDetails() {
               address: project.installationAddress || "Installation Address",
               city: project.city,
               capacity: project.capacity,
-              moduleMake: project.materialReqs?.find((r:any) => r.description?.toLowerCase().includes('panel'))?.description?.split(' ')[0] || "Waaree",
+              moduleMake: project.materialReqs?.find((r:any) => r.description?.toLowerCase()?.includes('panel'))?.description?.split(' ')[0] || "Waaree",
               moduleQuantity: Math.ceil((project.capacity * 1000) / 540),
-              inverterMake: project.materialReqs?.find((r:any) => r.description?.toLowerCase().includes('inverter'))?.description?.split(' ')[0] || "Growatt",
+              inverterMake: project.materialReqs?.find((r:any) => r.description?.toLowerCase()?.includes('inverter'))?.description?.split(' ')[0] || "Growatt",
             }} />}
           </div>
         </div>
