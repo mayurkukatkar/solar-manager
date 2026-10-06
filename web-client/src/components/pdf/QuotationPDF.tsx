@@ -115,6 +115,25 @@ export const generatePDF = async (elementId: string, filename: string) => {
   const element = document.getElementById(elementId);
   if (!element) return;
   
+  // Patch window.getComputedStyle to strip lab/oklch colors for html2canvas
+  // Tailwind v4 uses modern CSS colors which crash older html2canvas versions
+  const originalGetComputedStyle = window.getComputedStyle;
+  window.getComputedStyle = function(el, pseudoElt) {
+    const style = originalGetComputedStyle.call(window, el, pseudoElt);
+    return new Proxy(style, {
+      get(target, prop, receiver) {
+        let value = Reflect.get(target, prop, receiver);
+        if (typeof value === 'string' && (value.includes('lab(') || value.includes('oklch(') || value.includes('color('))) {
+          // If it's a border or text color that fell back to a modern CSS variable, 
+          // we force it to a safe standard color to prevent html2canvas from crashing.
+          if (prop === 'color' || prop === 'backgroundColor') return 'rgb(0, 0, 0)';
+          return 'rgba(0, 0, 0, 0)'; 
+        }
+        return value;
+      }
+    });
+  };
+
   const opt: any = {
     margin: 0,
     filename: filename,
@@ -131,6 +150,9 @@ export const generatePDF = async (elementId: string, filename: string) => {
   } catch (err: any) {
     console.error("Inner PDF generation error:", err);
     throw err;
+  } finally {
+    // Restore original getComputedStyle
+    window.getComputedStyle = originalGetComputedStyle;
   }
 };
 
