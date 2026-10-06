@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const prisma = require('../../db');
 const { requireTenantAuth } = require('../../middleware/auth');
+const upload = require('../../middleware/upload');
 
 // TENANT - SETTINGS & COMPANY PROFILE
 // ----------------------------------------------------
@@ -31,7 +32,7 @@ router.patch('/api/tenant/settings', requireTenantAuth, async (req, res) => {
       return res.status(403).json({ error: 'Only Tenant Admin can update settings' });
     }
 
-    const { name, legalName, email, phone, address, city, state, country, pincode, gstin, pan } = req.body;
+    const { name, legalName, email, phone, address, city, state, country, pincode, gstin, pan, logoUrl, signatureUrl } = req.body;
     const updateData = {};
     if (name) updateData.name = name;
     if (legalName !== undefined) updateData.legalName = legalName;
@@ -44,6 +45,8 @@ router.patch('/api/tenant/settings', requireTenantAuth, async (req, res) => {
     if (pincode !== undefined) updateData.pincode = pincode;
     if (gstin !== undefined) updateData.gstin = gstin;
     if (pan !== undefined) updateData.pan = pan;
+    if (logoUrl !== undefined) updateData.logoUrl = logoUrl;
+    if (signatureUrl !== undefined) updateData.signatureUrl = signatureUrl;
 
     const tenant = await prisma.tenant.update({
       where: { id: req.user.tenantId },
@@ -53,6 +56,17 @@ router.patch('/api/tenant/settings', requireTenantAuth, async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Failed to update settings' });
+  }
+});
+
+// Upload image (logo / signature)
+router.post('/api/tenant/settings/upload', requireTenantAuth, upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No file provided' });
+    res.json({ url: req.file.path });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to upload file' });
   }
 });
 

@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Receipt, Plus, Search, Calendar, FileText, IndianRupee, ArrowUpRight } from 'lucide-react';
+import { Receipt, Plus, Search, Calendar, FileText, IndianRupee, ArrowUpRight, Download } from 'lucide-react';
 
 export default function Finance() {
   const [invoices, setInvoices] = useState<any[]>([]);
@@ -11,20 +11,24 @@ export default function Finance() {
   const [showModal, setShowModal] = useState(false);
   const [customers, setCustomers] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
+  const [tenant, setTenant] = useState<any>(null);
+  const [generatingPdf, setGeneratingPdf] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     customerId: '', projectId: '', amount: 0, status: 'PENDING'
   });
 
   const fetchData = async () => {
     try {
-      const [finRes, custRes, projRes] = await Promise.all([
+      const [finRes, custRes, projRes, tenantRes] = await Promise.all([
         axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/finance`, { withCredentials: true }),
         axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/customers`, { withCredentials: true }),
-        axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/projects`, { withCredentials: true })
+        axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/projects`, { withCredentials: true }),
+        axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/settings`, { withCredentials: true })
       ]);
       setInvoices(finRes.data.finance);
       setCustomers(custRes.data.customers);
       setProjects(projRes.data.projects);
+      setTenant(tenantRes.data.tenant);
     } catch (err) {
       console.error(err);
     } finally {
@@ -49,6 +53,29 @@ export default function Finance() {
       console.error(err);
       alert('Failed to generate invoice');
     }
+  };
+
+  const generatePDF = async (invoice: any) => {
+    setGeneratingPdf(invoice.id);
+    try {
+      // Dynamic import to avoid SSR issues
+      const html2pdf = (await import('html2pdf.js')).default;
+      const element = document.getElementById(`invoice-template-${invoice.id}`);
+      
+      const opt = {
+        margin: 0.5,
+        filename: `Invoice_${invoice.id}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true },
+        jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
+      };
+      
+      await html2pdf().set(opt).from(element).save();
+    } catch (err) {
+      console.error(err);
+      alert('Failed to generate PDF');
+    }
+    setGeneratingPdf(null);
   };
 
   const getStatusColor = (status: string) => {
@@ -117,6 +144,7 @@ export default function Finance() {
                 <th className="px-6 py-4">Date</th>
                 <th className="px-6 py-4">Amount</th>
                 <th className="px-6 py-4">Status</th>
+                <th className="px-6 py-4 text-right">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -158,6 +186,16 @@ export default function Finance() {
                       <span className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider ${getStatusColor(inv.status)}`}>
                         {inv.status}
                       </span>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <button 
+                        onClick={() => generatePDF(inv)}
+                        disabled={generatingPdf === inv.id}
+                        className="text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 p-2 rounded-lg transition-colors inline-flex items-center gap-1 text-xs font-bold"
+                      >
+                        <Download size={14} /> 
+                        {generatingPdf === inv.id ? 'Wait...' : 'PDF'}
+                      </button>
                     </td>
                   </tr>
                 ))
@@ -223,6 +261,91 @@ export default function Finance() {
           </div>
         </div>
       )}
+
+      {/* HIDDEN INVOICE TEMPLATES FOR PDF GENERATION */}
+      <div style={{ position: 'absolute', left: '-9999px', top: 0 }}>
+        {invoices.map(inv => (
+          <div key={`template-${inv.id}`} id={`invoice-template-${inv.id}`} className="bg-white p-10 w-[800px] text-slate-800" style={{ fontFamily: 'sans-serif' }}>
+            
+            {/* Header */}
+            <div className="flex justify-between items-start mb-10 border-b border-slate-200 pb-8">
+              <div>
+                {tenant?.logoUrl ? (
+                  <img src={tenant.logoUrl} alt="Logo" className="h-16 object-contain mb-4" crossOrigin="anonymous" />
+                ) : (
+                  <h1 className="text-3xl font-black text-slate-900 mb-2">{tenant?.name || 'Company Name'}</h1>
+                )}
+                <p className="text-sm text-slate-500 max-w-xs">{tenant?.address || 'Company Address'}</p>
+                <p className="text-sm text-slate-500">{tenant?.city}, {tenant?.state} {tenant?.pincode}</p>
+                {tenant?.gstin && <p className="text-sm font-semibold text-slate-600 mt-2">GSTIN: {tenant.gstin}</p>}
+              </div>
+              <div className="text-right">
+                <h2 className="text-4xl font-black text-slate-200 uppercase tracking-widest mb-4">INVOICE</h2>
+                <p className="text-sm font-bold text-slate-800">Invoice No: <span className="text-slate-500 font-normal">{inv.id}</span></p>
+                <p className="text-sm font-bold text-slate-800 mt-1">Date: <span className="text-slate-500 font-normal">{new Date(inv.date).toLocaleDateString()}</span></p>
+                <p className="text-sm font-bold text-slate-800 mt-1">Status: <span className={`uppercase ${inv.status === 'PAID' ? 'text-emerald-600' : 'text-amber-600'}`}>{inv.status}</span></p>
+              </div>
+            </div>
+
+            {/* Bill To */}
+            <div className="mb-10">
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Billed To:</p>
+              <h3 className="text-lg font-bold text-slate-800">{inv.customer?.name}</h3>
+              <p className="text-sm text-slate-600">{inv.customer?.email}</p>
+              <p className="text-sm text-slate-600">{inv.customer?.phone}</p>
+              {inv.project && <p className="text-sm font-semibold text-emerald-600 mt-2">Project: {inv.project.name}</p>}
+            </div>
+
+            {/* Line Items */}
+            <table className="w-full text-left mb-10 border-collapse">
+              <thead>
+                <tr className="border-b-2 border-slate-800">
+                  <th className="py-3 font-bold text-sm text-slate-800">Description</th>
+                  <th className="py-3 font-bold text-sm text-slate-800 text-right">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr className="border-b border-slate-200">
+                  <td className="py-4 text-sm text-slate-700">{inv.project ? `Payment for Project: ${inv.project.name}` : 'Solar Installation Services'}</td>
+                  <td className="py-4 text-sm font-bold text-slate-900 text-right">₹ {inv.amount.toLocaleString()}</td>
+                </tr>
+              </tbody>
+            </table>
+
+            {/* Totals */}
+            <div className="flex justify-end mb-16">
+              <div className="w-64">
+                <div className="flex justify-between py-2 border-b border-slate-200">
+                  <span className="text-sm text-slate-500">Subtotal</span>
+                  <span className="text-sm font-bold text-slate-800">₹ {inv.amount.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between py-3">
+                  <span className="text-base font-bold text-slate-900">Total Due</span>
+                  <span className="text-base font-black text-emerald-600">₹ {inv.amount.toLocaleString()}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer / Signature */}
+            <div className="mt-20 pt-8 border-t border-slate-200 flex justify-between items-end">
+              <div>
+                <p className="text-xs text-slate-400 font-medium">Thank you for your business!</p>
+                <p className="text-xs text-slate-400 font-medium mt-1">{tenant?.email} • {tenant?.phone}</p>
+              </div>
+              <div className="text-center">
+                {tenant?.signatureUrl ? (
+                  <img src={tenant.signatureUrl} alt="Signature" className="h-16 mx-auto mb-2 object-contain" crossOrigin="anonymous" />
+                ) : (
+                  <div className="h-16 w-32 mx-auto border-b-2 border-slate-200 mb-2"></div>
+                )}
+                <p className="text-xs font-bold text-slate-800 uppercase tracking-widest">Authorized Signatory</p>
+                <p className="text-xs text-slate-500 mt-1">{tenant?.name}</p>
+              </div>
+            </div>
+            
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import axios from "axios";
-import { Settings, Save, Building2, MapPin, FileText, CreditCard } from "lucide-react";
+import { Settings, Save, Building2, MapPin, FileText, CreditCard, Image as ImageIcon, UploadCloud } from "lucide-react";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
 
@@ -10,6 +10,8 @@ export default function SettingsPage() {
   const [form, setForm] = useState({});
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [uploadingSig, setUploadingSig] = useState(false);
 
   useEffect(() => {
     axios.get(`${API}/api/tenant/settings`, { withCredentials: true })
@@ -28,6 +30,30 @@ export default function SettingsPage() {
       setTimeout(() => setSaved(false), 3000);
     } catch (err) { alert(err.response?.data?.error || "Failed to save"); }
     setSaving(false);
+  };
+
+  const handleUpload = async (e, field) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (field === 'logoUrl') setUploadingLogo(true);
+    if (field === 'signatureUrl') setUploadingSig(true);
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const res = await axios.post(`${API}/api/tenant/settings/upload`, formData, { 
+        withCredentials: true,
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      setForm(prev => ({ ...prev, [field]: res.data.url }));
+    } catch (err) {
+      alert("Failed to upload image");
+    } finally {
+      if (field === 'logoUrl') setUploadingLogo(false);
+      if (field === 'signatureUrl') setUploadingSig(false);
+    }
   };
 
   if (!tenant) return <div className="flex items-center justify-center h-64 text-slate-400">Loading settings...</div>;
@@ -125,6 +151,54 @@ export default function SettingsPage() {
           <div className="grid md:grid-cols-2 gap-4">
             <InputField label="GSTIN" field="gstin" placeholder="22AAAAA0000A1Z5" icon={FileText} />
             <InputField label="PAN" field="pan" placeholder="AAAAA0000A" icon={CreditCard} />
+          </div>
+        </div>
+
+        {/* Branding & Assets */}
+        <div className="bg-white rounded-xl border border-slate-200 p-6 md:col-span-2">
+          <h3 className="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2"><ImageIcon size={16} className="text-emerald-600" /> Branding & Assets</h3>
+          <div className="grid md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-2">Company Logo</label>
+              <div className="flex items-center gap-4">
+                <div className="w-24 h-24 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 flex items-center justify-center overflow-hidden">
+                  {form.logoUrl ? (
+                    <img src={form.logoUrl} alt="Logo" className="w-full h-full object-contain" />
+                  ) : (
+                    <Building2 size={24} className="text-slate-300" />
+                  )}
+                </div>
+                <div className="flex-1">
+                  <label className={`cursor-pointer inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg transition-all ${uploadingLogo ? 'bg-slate-100 text-slate-400' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'}`}>
+                    <UploadCloud size={16} />
+                    {uploadingLogo ? 'Uploading...' : 'Upload Logo'}
+                    <input type="file" accept="image/*" className="hidden" disabled={uploadingLogo} onChange={e => handleUpload(e, 'logoUrl')} />
+                  </label>
+                  <p className="text-xs text-slate-500 mt-2">Recommended: Square image, max 2MB (PNG/JPG)</p>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-2">Authorized Signature</label>
+              <div className="flex items-center gap-4">
+                <div className="w-32 h-16 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 flex items-center justify-center overflow-hidden">
+                  {form.signatureUrl ? (
+                    <img src={form.signatureUrl} alt="Signature" className="w-full h-full object-contain" />
+                  ) : (
+                    <FileText size={24} className="text-slate-300" />
+                  )}
+                </div>
+                <div className="flex-1">
+                  <label className={`cursor-pointer inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg transition-all ${uploadingSig ? 'bg-slate-100 text-slate-400' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'}`}>
+                    <UploadCloud size={16} />
+                    {uploadingSig ? 'Uploading...' : 'Upload Signature'}
+                    <input type="file" accept="image/*" className="hidden" disabled={uploadingSig} onChange={e => handleUpload(e, 'signatureUrl')} />
+                  </label>
+                  <p className="text-xs text-slate-500 mt-2">Recommended: Transparent background (PNG)</p>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>

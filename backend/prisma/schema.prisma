@@ -31,9 +31,11 @@ model Tenant {
   state     String?
   country   String       @default("India")
   pincode   String?
-  gstin     String?
-  pan       String?
-  status    TenantStatus @default(TRIAL)
+  gstin        String?
+  pan          String?
+  logoUrl      String?
+  signatureUrl String?
+  status       TenantStatus @default(TRIAL)
 
   users          User[]
   leads          Lead[]
