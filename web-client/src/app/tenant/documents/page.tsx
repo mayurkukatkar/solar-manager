@@ -59,7 +59,7 @@ export default function DocumentsDashboard() {
   const missingDocs = documents.filter(d => d.status === 'MISSING').length;
 
   if (loading) {
-    return <div className="p-8 text-white/70 flex items-center justify-center min-h-screen">Loading documents module...</div>;
+    return <div className="p-8 text-gray-600 flex items-center justify-center min-h-screen">Loading documents module...</div>;
   }
 
   return (
@@ -68,8 +68,8 @@ export default function DocumentsDashboard() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-white tracking-tight">Documents</h1>
-          <p className="text-white/60 mt-1">Central repository for all project and customer documentation.</p>
+          <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Documents</h1>
+          <p className="text-gray-500 mt-1">Central repository for all project and customer documentation.</p>
         </div>
         <button 
           onClick={() => setShowUpload(true)}
@@ -82,12 +82,12 @@ export default function DocumentsDashboard() {
 
       {/* Statistics Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white/5 border border-white/10 p-5 rounded-xl flex items-start justify-between">
+        <div className="bg-white shadow-sm border border-gray-200 p-5 rounded-xl flex items-start justify-between">
           <div>
-            <p className="text-white/50 text-sm font-medium mb-1">Total Documents</p>
-            <h3 className="text-2xl font-bold text-white">{totalDocs}</h3>
+            <p className="text-gray-500 text-sm font-medium mb-1">Total Documents</p>
+            <h3 className="text-2xl font-bold text-gray-900">{totalDocs}</h3>
           </div>
-          <div className="p-3 bg-white/5 rounded-lg text-white"><FileBox className="w-6 h-6" /></div>
+          <div className="p-3 bg-white shadow-sm rounded-lg text-gray-900"><FileBox className="w-6 h-6" /></div>
         </div>
         
         <div className="bg-emerald-500/5 border border-emerald-500/10 p-5 rounded-xl flex items-start justify-between">
@@ -117,23 +117,23 @@ export default function DocumentsDashboard() {
 
       {/* Main Content Area */}
       <div className="space-y-4">
-        <div className="flex flex-col sm:flex-row gap-4 justify-between items-center bg-black/20 p-4 rounded-xl border border-white/5">
+        <div className="flex flex-col sm:flex-row gap-4 justify-between items-center bg-gray-100 p-4 rounded-xl border border-gray-100">
           <div className="flex gap-4">
-            <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
               <PieChart className="w-5 h-5 text-emerald-400" />
               Document Library
             </h2>
           </div>
           <div className="flex gap-3 w-full sm:w-auto">
             <div className="relative flex-1 sm:w-64">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input 
                 type="text" 
                 placeholder="Search documents..."
-                className="w-full pl-9 pr-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder:text-white/40 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                className="w-full pl-9 pr-4 py-2 bg-white shadow-sm border border-gray-200 rounded-lg text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-emerald-500"
               />
             </div>
-            <button className="p-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-white/70 transition-colors">
+            <button className="p-2 bg-white shadow-sm hover:bg-gray-100 border border-gray-200 rounded-lg text-gray-600 transition-colors">
               <Filter className="w-5 h-5" />
             </button>
           </div>
