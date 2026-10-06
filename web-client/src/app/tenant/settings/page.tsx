@@ -12,13 +12,17 @@ export default function SettingsPage() {
   const [saved, setSaved] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [uploadingSig, setUploadingSig] = useState(false);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     axios.get(`${API}/api/tenant/settings`, { withCredentials: true })
       .then(res => {
-        setTenant(res.data.tenant);
+        setTenant(res.data.tenant || {});
         setForm(res.data.tenant || {});
-      }).catch(console.error);
+      }).catch(err => {
+        console.error(err);
+        setError("Failed to load settings. Please check your connection or backend server.");
+      });
   }, []);
 
   const handleSave = async () => {
@@ -56,6 +60,7 @@ export default function SettingsPage() {
     }
   };
 
+  if (error) return <div className="flex items-center justify-center h-64 text-red-500 font-semibold">{error}</div>;
   if (!tenant) return <div className="flex items-center justify-center h-64 text-slate-400">Loading settings...</div>;
 
   const InputField = ({ label, field, placeholder, icon: Icon }) => (
