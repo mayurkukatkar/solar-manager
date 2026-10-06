@@ -331,3 +331,149 @@ export const AnnexureProforma = ({ data }: { data: any }) => (
     </div>
   </PdfPage>
 );
+
+export const NetMeteringAgreement = ({ data }: { data: any }) => (
+  <div className="flex flex-col">
+    <PdfPage className="text-[13px] leading-relaxed text-justify">
+      <h2 className="text-center font-bold text-lg mb-6">Net Metering Connection Agreement</h2>
+      <p className="mb-4">
+        This Agreement is made and entered into at <strong>{data.city || '________________'}</strong> on this <strong>{new Date().getDate()}</strong> day of <strong>{new Date().getMonth()+1}/{new Date().getFullYear()}</strong> between the Eligible Consumer <strong>{data.customerName}</strong> having premises at <strong>{data.address}</strong> and Consumer No. <strong>{data.consumerNumber || '________________'}</strong> As the first Party,
+      </p>
+      <p className="text-center font-bold my-4">AND</p>
+      <p className="mb-4">
+        The Distribution Licensee- Maharashtra State Electricity Distribution Co. Ltd; and having its Registered Office at Prakashgad, Plot No. G-9, Anant Kanekar Marg, Bandra (E), Mumbai 400051 as second Party of this Agreement;
+      </p>
+      <p className="mb-4">
+        Whereas, the Eligible Consumer has applied to the Licensee for approval of a Net Metering Arrangement under the provisions of the Maharashtra Electricity Regulatory Commission (Net Metering for Roof-top Solar Photo Voltaic Systems) Regulations, 2015 ('the Net Metering Regulations') and sought its connectivity to the Licensee's Distribution Network;
+      </p>
+      <p className="mb-4">
+        And whereas, the Licensee has agreed to provide Network connectivity to the Eligible Consumer for injection of electricity generated from its Roof-top Solar PV System of <strong>{data.capacity}</strong> kilowatt;
+      </p>
+      <p className="mb-4 font-bold">Both Parties hereby agree as follows:-</p>
+      
+      <h3 className="font-bold mt-4 mb-2">1. Eligibility:</h3>
+      <p className="mb-4 pl-6">
+        The Roof-top Solar PV System meets the applicable norms for being integrated into the Distribution Network, and that the Eligible Consumer shall maintain the System accordingly for the duration of this Agreement.
+      </p>
+
+      <h3 className="font-bold mt-4 mb-2">2. Technical and Inter-connection Requirements:</h3>
+      <p className="mb-2 pl-6">
+        The metering arrangement and the inter-connection of the Roof-top Solar PV System with the Network of the Licensee shall be as per the provisions of the Net Metering Regulations and the technical standards and norms specified by the Central Electricity Authority for connectivity of distributed generation resources and for the installation and operation of meters.
+      </p>
+      <p className="mb-2 pl-6">
+        The Eligible Consumer agrees, that he shall install, prior to connection of the Roof-top Solar PV System to the Network of the Licensee, an isolation device (both automatic and in built within inverter and external manual relays); and the Licensee shall have access to it if required for the repair and maintenance of the Distribution Network.
+      </p>
+      <p className="mb-2 pl-6">
+        The Licensee shall specify the interface/inter-connection point and metering point.
+      </p>
+      <p className="mb-4 pl-6">
+        The Eligible Consumer shall furnish all relevant data, such as voltage, frequency, circuit breaker, isolator position in his System, as and when required by the Licensee.
+      </p>
+
+      <h3 className="font-bold mt-4 mb-2">3. Safety:</h3>
+      <p className="mb-2 pl-6">
+        The equipment connected to the Licensee's Distribution System shall be compliant with relevant International (IEEE/IEC) or Indian Standards (BIS), as the case may be, and the installation of electrical equipment shall comply with the requirements specified by the Central Electricity Authority regarding safety and electricity supply.
+      </p>
+    </PdfPage>
+
+    <PdfPage className="text-[13px] leading-relaxed text-justify">
+      <p className="mb-2 pl-6">
+        The design, installation, maintenance and operation of the Roof-top Solar PV System shall be undertaken in a manner conducive to the safety of the Roof-top Solar PV System as well as the Licensee's Network.
+      </p>
+      <p className="mb-2 pl-6">
+        If, at any time, the Licensee determines that the Eligible Consumer's Roof-top Solar PV System is causing or may cause damage to and/or results in the Licensee's other consumers or its assets, the Eligible Consumer shall disconnect the Roof-top Solar PV System from the distribution Network upon direction from the Licensee, and Shall undertake corrective measures at his own expense prior to re-connection.
+      </p>
+      <p className="mb-6 pl-6">
+        The Licensee shall not be responsible for any accident resulting in injury to human beings or animals or damage to property that may occur due to back-feeding from the Roof-top Solar PV System when the grid supply is off. The Licensee may disconnect the installation at any time in the event of such exigencies to prevent such accident.
+      </p>
+
+      <h3 className="font-bold mt-4 mb-2">4. Other Clearances and Approvals:</h3>
+      <p className="mb-6 pl-6">
+        The Eligible Consumer shall obtain any statutory approvals and clearances that maybe required, such as from the Electrical Inspector or the municipal or other authorities, before connecting the Roof-top Solar PV System to the distribution Network.
+      </p>
+
+      <h3 className="font-bold mt-4 mb-2">5. Period of Agreement, and Termination:</h3>
+      <p className="mb-2 pl-6">
+        This Agreement shall be for a period for 20 years, but may be terminated prematurely:
+      </p>
+      <p className="mb-1 pl-10">(a) By mutual consent; or</p>
+      <p className="mb-1 pl-10">(b) By the Eligible Consumer, by giving 30 days' notice to the Licensee;</p>
+      <p className="mb-6 pl-10">(c) By the Licensee, by giving 30 days' notice, if the Eligible Consumer breaches any terms of this Agreement or the provisions of the Net Metering Regulations and does not remedy such breach within 30 days, or such other reasonable period as may be provided, of receiving notice of such breach, or for any other valid reason communicated by the Licensee in writing.</p>
+
+      <h3 className="font-bold mt-4 mb-2">6. Access and Disconnection:</h3>
+      <p className="mb-2 pl-6">
+        The Eligible Consumer shall provide access to the Licensee to the metering equipment and disconnecting devices of Roof-top Solar PV System, both automatic and manual, by the Eligible Consumer.
+      </p>
+      <p className="mb-2 pl-6">
+        If, in an emergent or outage situation, the Licensee cannot access the disconnecting devices of the Roof-top Solar PV System, both automatic and manual, it may disconnect power supply to the premises.
+      </p>
+      <p className="mb-6 pl-6">
+        6.3 Upon termination of this Agreement under Clause 5, the Eligible Consumer shall disconnect the Roof-top Solar PV System forthwith from the Network of the Licensee.
+      </p>
+
+      <h3 className="font-bold mt-4 mb-2">7. Liabilities:</h3>
+      <p className="mb-2 pl-6">
+        The Parties shall indemnify each other for damages or adverse effects of either Party's negligence or misconduct during the installation of the Roof-top Solar PV System, connectivity with the distribution Network and operation of the System.
+      </p>
+    </PdfPage>
+
+    <PdfPage className="text-[13px] leading-relaxed text-justify">
+      <p className="mb-6 pl-6">
+        The Parties shall not be liable to each other for any loss of profits or revenues, business interruption losses, loss of contract or goodwill, or for indirect, consequential, incidental or special damages including, but not limited to, punitive or exemplary damages, whether any of these liabilities, losses or damages arise in contract, or otherwise.
+      </p>
+
+      <h3 className="font-bold mt-4 mb-2">8. Commercial Settlement:</h3>
+      <p className="mb-2 pl-6">
+        The commercial settlements under this Agreement shall be in accordance with the Net Metering Regulations.
+      </p>
+      <p className="mb-2 pl-6">
+        The Licensee shall not be liable to compensate the Eligible Consumer if his Rooftop Solar PV System is unable to inject surplus power generated into the Licensee's Network on account of failure of power supply in the grid/Network.
+      </p>
+      <p className="mb-2 pl-6">
+        The existing metering System, if not in accordance with the Net Metering Regulations, shall be replaced by a bi-directional meter (whole current/CT operated) or a pair of meters (as per the definition of 'Net Meter' in the Regulations), and a separate generation meter may be provided to measure Solar power generation. The bi-directional meter (whole current/CT operated) or pair of meters shall be installed at the inter-connection point to the Licensee's Network for recording export and import of energy.
+      </p>
+      <p className="mb-2 pl-6">
+        The uni-directional and bi-directional or pair of meters shall be fixed in separate meter boxes in the same proximity.
+      </p>
+      <p className="mb-6 pl-6">
+        The Licensee shall issue monthly electricity bill for the net metered energy on the scheduled date of meter reading. If the exported energy exceeds the imported energy, the Licensee shall show the net energy exported as credited Units of electricity as specified in the Net Metering Regulations, 2015. If the exported energy is less than the imported energy, the Eligible Consumer shall pay the Distribution Licensee for the net energy imported at the prevailing tariff approved by the Commission for the consumer category to which he belongs.
+      </p>
+
+      <h3 className="font-bold mt-4 mb-2">9. Connection Costs:</h3>
+      <p className="mb-6 pl-6">
+        The Eligible Consumer shall bear all costs related to the setting up of the Roof-top Solar PV System, excluding the Net Metering Arrangement costs.
+      </p>
+
+      <h3 className="font-bold mt-4 mb-2">10. Dispute Resolution:</h3>
+      <p className="mb-2 pl-6">
+        Any dispute arising under this Agreement shall be resolved promptly, in good faith and in an equitable manner by both the Parties.
+      </p>
+      <p className="mb-12 pl-6">
+        The Eligible Consumer shall have recourse to the concerned Consumer Grievance Redressal Forum constituted under the relevant Regulations in respect of any grievance regarding billing which has not been redressed by the Licensee.
+      </p>
+
+      <p className="mb-12">
+        In the witness where of <strong>{data.vendorName}</strong> for and on behalf of Eligible Consumer and Shri. __________________________________ for and on behalf of MSEDCL agree to this agreement.
+      </p>
+
+      <div className="grid grid-cols-2 gap-y-12">
+        <div>
+          <p className="font-bold mb-10">{data.customerName}</p>
+          <p className="border-t border-black pt-2 w-64">For Eligible Consumer</p>
+        </div>
+        <div>
+          <p className="font-bold mb-10">Shri. ____________________</p>
+          <p className="border-t border-black pt-2 w-64">for and on behalf of MSEDCL</p>
+        </div>
+        <div>
+          <p className="font-bold mb-8"></p>
+          <p className="border-t border-black pt-2 w-64">Witness 1 (VENDOR)</p>
+        </div>
+        <div>
+          <p className="font-bold mb-8"></p>
+          <p className="border-t border-black pt-2 w-64">Witness 2</p>
+        </div>
+      </div>
+    </PdfPage>
+  </div>
+);

@@ -8,7 +8,7 @@ import {
   CheckSquare, Flag, Box, History, DollarSign, Activity, Settings, Plus,
   CheckCircle2, Clock, AlertTriangle, MessageSquare, Trash2, FileText, Download
 } from 'lucide-react';
-import { WorkCompletionReport, GuaranteeCertificate, DcrDeclaration, AnnexureProforma } from '@/components/pdf/MsedclFormsPDF';
+import { WorkCompletionReport, GuaranteeCertificate, DcrDeclaration, AnnexureProforma, NetMeteringAgreement } from '@/components/pdf/MsedclFormsPDF';
 
 export default function ProjectDetails() {
   const params = useParams();
@@ -531,6 +531,7 @@ export default function ProjectDetails() {
                     { id: 'AnnexureI', name: 'Annexure-I & Proforma-A', desc: 'Provisional Commissioning Report' },
                     { id: 'DCR', name: 'DCR Declaration', desc: 'Domestic Content Requirement fulfillment' },
                     { id: 'Guarantee', name: 'Guarantee Certificate', desc: '5-year comprehensive maintenance contract' },
+                    { id: 'NetMetering', name: 'Net Metering Agreement', desc: 'MSEDCL Net Metering Connection Agreement' },
                   ].map(form => (
                     <div key={form.id} className="border border-slate-200 rounded-xl p-5 hover:shadow-md transition-shadow bg-white flex flex-col justify-between group">
                       <div>
@@ -705,6 +706,14 @@ export default function ProjectDetails() {
               moduleMake: project.materialReqs?.find((r:any) => r.description?.toLowerCase()?.includes('panel'))?.description?.split(' ')[0] || "Waaree",
               moduleQuantity: Math.ceil((project.capacity * 1000) / 540),
               inverterMake: project.materialReqs?.find((r:any) => r.description?.toLowerCase()?.includes('inverter'))?.description?.split(' ')[0] || "Growatt",
+            }} />}
+            {selectedForm === 'NetMetering' && <NetMeteringAgreement data={{
+              vendorName: "Apex Solar Solutions",
+              customerName: project.customer?.name || "Consumer",
+              address: project.installationAddress || "Installation Address",
+              city: project.city || "Solapur",
+              capacity: project.capacity,
+              consumerNumber: "1234567890",
             }} />}
           </div>
         </div>
