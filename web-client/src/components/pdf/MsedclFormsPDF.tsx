@@ -26,7 +26,7 @@ export const generateDiscomPDF = async (elementId: string, filename: string) => 
   };
 
   const opt: any = {
-    margin: 10, // Added margin for official forms
+    margin: 15,
     filename: filename,
     image: { type: "jpeg" as const, quality: 0.98 },
     html2canvas: { scale: 2, useCORS: true, logging: false },
@@ -47,7 +47,7 @@ export const generateDiscomPDF = async (elementId: string, filename: string) => 
 };
 
 const PdfPage = ({ children, className = "" }: { children: React.ReactNode, className?: string }) => (
-  <div className={`w-[210mm] min-h-[297mm] relative overflow-hidden flex flex-col bg-white text-black p-8 page-break-after-always ${className}`}>
+  <div className={`w-[180mm] bg-white text-black [&_p]:break-inside-avoid [&_tr]:break-inside-avoid [&_h3]:break-after-avoid [&_h2]:break-after-avoid ${className}`}>
     {children}
   </div>
 );
@@ -222,7 +222,7 @@ export const GuaranteeCertificate = ({ data }: { data: any }) => (
       <p>Aadhar Number: ___________________________________________</p>
     </div>
 
-    <div className="mt-16 border-2 border-dashed border-gray-400 p-24 text-center">
+    <div className="mt-16 border-2 border-dashed border-gray-400 p-24 text-center break-inside-avoid">
       <p className="text-gray-500 font-semibold mb-2">Upload Xerox of AADHAR CARD HERE</p>
       <p className="text-gray-400 text-sm">SHOULD BE SELF ATTESTED BY CONSUMER</p>
     </div>
@@ -392,9 +392,6 @@ export const NetMeteringAgreement = ({ data }: { data: any }) => (
       <p className="mb-2 pl-6">
         The equipment connected to the Licensee's Distribution System shall be compliant with relevant International (IEEE/IEC) or Indian Standards (BIS), as the case may be, and the installation of electrical equipment shall comply with the requirements specified by the Central Electricity Authority regarding safety and electricity supply.
       </p>
-    </PdfPage>
-
-    <PdfPage className="text-[13px] leading-relaxed text-justify">
       <p className="mb-2 pl-6">
         The design, installation, maintenance and operation of the Roof-top Solar PV System shall be undertaken in a manner conducive to the safety of the Roof-top Solar PV System as well as the Licensee's Network.
       </p>
@@ -433,9 +430,6 @@ export const NetMeteringAgreement = ({ data }: { data: any }) => (
       <p className="mb-2 pl-6">
         The Parties shall indemnify each other for damages or adverse effects of either Party's negligence or misconduct during the installation of the Roof-top Solar PV System, connectivity with the distribution Network and operation of the System.
       </p>
-    </PdfPage>
-
-    <PdfPage className="text-[13px] leading-relaxed text-justify">
       <p className="mb-6 pl-6">
         The Parties shall not be liable to each other for any loss of profits or revenues, business interruption losses, loss of contract or goodwill, or for indirect, consequential, incidental or special damages including, but not limited to, punitive or exemplary damages, whether any of these liabilities, losses or damages arise in contract, or otherwise.
       </p>
@@ -470,11 +464,11 @@ export const NetMeteringAgreement = ({ data }: { data: any }) => (
         The Eligible Consumer shall have recourse to the concerned Consumer Grievance Redressal Forum constituted under the relevant Regulations in respect of any grievance regarding billing which has not been redressed by the Licensee.
       </p>
 
-      <p className="mb-12">
+      <p className="mb-12 break-inside-avoid">
         In the witness where of <strong>{data.vendorName}</strong> for and on behalf of Eligible Consumer and Shri. __________________________________ for and on behalf of MSEDCL agree to this agreement.
       </p>
 
-      <div className="grid grid-cols-2 gap-y-12">
+      <div className="grid grid-cols-2 gap-y-12 break-inside-avoid">
         <div>
           <p className="font-bold mb-10">{data.customerName}</p>
           <p className="border-t border-black pt-2 w-64">For Eligible Consumer</p>
