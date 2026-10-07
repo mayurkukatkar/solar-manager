@@ -11,22 +11,22 @@ import {
 export default function Customer360View() {
   const params = useParams();
   const router = useRouter();
-  const [customer, setCustomer] = useState<any>(null);
+  const [lead, setLead] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [activeStage, setActiveStage] = useState('LEAD');
 
   useEffect(() => {
-    const fetchCustomer = async () => {
+    const fetchLeadData = async () => {
       try {
-        const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/customers/${params.id}`, { withCredentials: true });
-        setCustomer(res.data.customer);
+        const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/leads/${params.id}`, { withCredentials: true });
+        setLead(res.data.lead);
       } catch (err) {
         console.error(err);
       } finally {
         setLoading(false);
       }
     };
-    fetchCustomer();
+    fetchLeadData();
   }, [params.id]);
 
   // Stages of the Pipeline
@@ -48,11 +48,11 @@ export default function Customer360View() {
     );
   }
 
-  if (!customer) {
-    return <div className="text-red-500 p-8 text-center">Customer not found</div>;
+  if (!lead) {
+    return <div className="text-red-500 p-8 text-center">Lead/Customer not found</div>;
   }
 
-  const { lead, surveys, quotations, projects, invoices } = customer;
+  const { customer, surveys, quotations, projects, invoices } = lead;
   const activeProject = projects && projects.length > 0 ? projects[0] : null;
 
   return (
@@ -69,20 +69,20 @@ export default function Customer360View() {
       <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 flex items-start justify-between">
          <div className="flex items-center gap-6">
             <div className="w-16 h-16 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center font-bold text-xl shadow-inner border-2 border-white">
-              {customer.name?.charAt(0).toUpperCase()}
+              {lead.name?.charAt(0).toUpperCase()}
             </div>
             <div>
-              <h1 className="text-2xl font-black text-slate-800 tracking-tight">{customer.name}</h1>
+              <h1 className="text-2xl font-black text-slate-800 tracking-tight">{lead.name}</h1>
               <div className="flex items-center gap-4 mt-2 text-sm font-semibold text-slate-500">
-                <span className="flex items-center gap-1.5"><Phone size={14} className="text-slate-400" /> {customer.mobile}</span>
-                {customer.email && <span className="flex items-center gap-1.5"><Mail size={14} className="text-slate-400" /> {customer.email}</span>}
-                {customer.city && <span className="flex items-center gap-1.5"><MapPin size={14} className="text-slate-400" /> {customer.city}</span>}
+                <span className="flex items-center gap-1.5"><Phone size={14} className="text-slate-400" /> {lead.mobile}</span>
+                {lead.email && <span className="flex items-center gap-1.5"><Mail size={14} className="text-slate-400" /> {lead.email}</span>}
+                {lead.city && <span className="flex items-center gap-1.5"><MapPin size={14} className="text-slate-400" /> {lead.city}</span>}
               </div>
             </div>
          </div>
          <div className="text-right">
-           <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-xs font-bold border border-emerald-100">
-             <CheckCircle2 size={12} /> Active Customer
+           <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${lead.status === 'WON' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-blue-50 text-blue-600 border-blue-100'}`}>
+             <CheckCircle2 size={12} /> {lead.status === 'WON' ? 'Active Customer' : 'Active Lead'}
            </span>
          </div>
       </div>
@@ -146,12 +146,27 @@ export default function Customer360View() {
                  <div className="bg-slate-50/50 border border-slate-100 rounded-xl p-5">
                    <InfoRow label="Requirement" value={lead?.estimatedCap ? `${lead.estimatedCap} kW` : 'Not Specified'} />
                    <InfoRow label="Source" value={lead?.source || 'Direct Entry'} />
-                   <InfoRow label="Company" value={customer.company || 'Individual'} />
-                   <InfoRow label="Conversion Date" value={new Date(customer.createdAt).toLocaleDateString()} />
+                   <InfoRow label="Company" value={lead.company || 'Individual'} />
+                   <InfoRow label="Creation Date" value={new Date(lead.createdAt).toLocaleDateString()} />
                  </div>
                  
+                 {lead.status !== 'WON' && (
+                   <div className="pt-4 border-t border-slate-100 mt-4 flex gap-3">
+                     <button onClick={async () => {
+                        if (!window.confirm("Convert this Lead into a Customer and create a Project?")) return;
+                        try {
+                          await axios.post(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/leads/${lead.id}/convert`, {}, { withCredentials: true });
+                          window.location.reload();
+                        } catch (err) {
+                          alert("Failed to convert lead.");
+                        }
+                     }} className="px-6 py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-bold shadow-md shadow-emerald-600/20 hover:bg-emerald-700 transition-colors w-full">
+                       Convert to Customer & Project
+                     </button>
+                   </div>
+                 )}
                  <div className="pt-4 border-t border-slate-100 mt-4 flex gap-3">
-                   <Link href="/tenant/surveys" className="px-6 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-bold shadow-md shadow-slate-900/20 hover:bg-slate-800 transition-colors">
+                   <Link href="/tenant/surveys" className="px-6 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-bold shadow-md shadow-slate-900/20 hover:bg-slate-800 transition-colors text-center w-full">
                      Schedule Site Survey
                    </Link>
                  </div>
