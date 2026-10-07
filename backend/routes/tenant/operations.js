@@ -251,6 +251,38 @@ router.post('/api/tenant/quotations/:id/convert', requireTenantAuth, async (req,
       }
     });
 
+    // Phase 2 Sync: Auto-initialize Site Survey Task
+    await prisma.projectTask.create({
+      data: {
+        tenantId,
+        projectId: project.id,
+        name: 'Initial Site Survey',
+        description: 'Perform site survey and measurements',
+        priority: 'High',
+        status: 'To Do',
+      }
+    });
+
+    // Phase 2 Sync: Auto-initialize Discom Tracking
+    await prisma.discomApplication.create({
+      data: {
+        tenantId,
+        projectId: project.id,
+        status: 'FEASIBILITY_PENDING'
+      }
+    });
+
+    // Phase 2 Sync: Log timeline event
+    await prisma.projectTimelineEvent.create({
+      data: {
+        tenantId,
+        projectId: project.id,
+        title: 'Project Created',
+        description: `Project auto-created from Quotation ${quotation.qNumber}`,
+        eventType: 'STATUS_UPDATE'
+      }
+    });
+
     res.json({ project });
   } catch (error) {
     console.error(error);

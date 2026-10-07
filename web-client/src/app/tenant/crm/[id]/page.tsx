@@ -165,6 +165,13 @@ export default function Customer360View() {
                      </button>
                    </div>
                  )}
+                 {lead.status === 'WON' && activeProject && (
+                   <div className="pt-4 border-t border-slate-100 mt-4 flex gap-3">
+                     <Link href={`/tenant/projects/${activeProject.id}`} className="px-6 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-bold shadow-md shadow-indigo-600/20 hover:bg-indigo-700 transition-colors w-full flex items-center justify-center gap-2">
+                       <Briefcase size={16} /> Open Converted Project
+                     </Link>
+                   </div>
+                 )}
                  <div className="pt-4 border-t border-slate-100 mt-4 flex gap-3">
                    <Link href="/tenant/surveys" className="px-6 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-bold shadow-md shadow-slate-900/20 hover:bg-slate-800 transition-colors text-center w-full">
                      Schedule Site Survey

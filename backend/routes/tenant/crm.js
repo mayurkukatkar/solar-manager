@@ -199,15 +199,84 @@ router.post('/api/tenant/leads/:id/convert', requireTenantAuth, async (req, res)
       });
     }
 
+    // Phase 9 Sync: Auto-Initialize Site Survey
+    const surveyDate = new Date();
+    surveyDate.setDate(surveyDate.getDate() + 3); // 3 days SLA
+
+    const survey = await prisma.siteSurvey.create({
+      data: {
+        tenantId,
+        customerId: customer.id,
+        leadId: id,
+        surveyDate,
+        status: 'SCHEDULED'
+      }
+    });
+
     const project = await prisma.project.create({
       data: {
         tenantId,
         customerId: customer.id,
         leadId: id,
+        surveyId: survey.id,
         name: req.body.projectName || `${lead.name} Project`,
         status: 'PLANNING'
       }
     });
+
+    // Phase 2 Sync: Auto-initialize Site Survey Task
+    await prisma.projectTask.create({
+      data: {
+        tenantId,
+        projectId: project.id,
+        name: 'Initial Site Survey',
+        description: 'Perform site survey and measurements',
+        priority: 'High',
+        status: 'To Do',
+      }
+    });
+
+    // Phase 2 Sync: Auto-initialize Discom Tracking
+    await prisma.discomApplication.create({
+      data: {
+        tenantId,
+        projectId: project.id,
+        status: 'FEASIBILITY_PENDING'
+      }
+    });
+
+    // Phase 2 Sync: Log timeline event
+    await prisma.projectTimelineEvent.create({
+      data: {
+        tenantId,
+        projectId: project.id,
+        title: 'Project Created',
+        description: `Project auto-created from direct Lead Conversion`,
+        eventType: 'STATUS_UPDATE'
+      }
+    });
+
+    // Phase 8 Sync: Auto-request Mandatory Documents
+    const requiredDocTypes = await prisma.documentType.findMany({
+      where: { tenantId, isRequired: true }
+    });
+
+    if (requiredDocTypes.length > 0) {
+      const dueDate = new Date();
+      dueDate.setDate(dueDate.getDate() + 7);
+
+      await prisma.documentRequest.createMany({
+        data: requiredDocTypes.map(docType => ({
+          tenantId,
+          documentTypeId: docType.id,
+          customerId: customer.id,
+          projectId: project.id,
+          status: 'PENDING',
+          dueDate,
+          message: 'Auto-requested upon project creation.'
+        }))
+      });
+    }
 
     await prisma.leadActivity.create({
       data: {
@@ -934,6 +1003,108 @@ router.patch('/api/tenant/projects/:id/stage', requireTenantAuth, async (req, re
         createdBy: req.user.id
       }
     });
+
+    // Phase 2 Sync: Material Procurement Sync
+    if (newStage === 'Procurement') {
+      await prisma.projectMaterialRequirement.updateMany({
+        where: { projectId: project.id, tenantId: req.user.tenantId },
+        data: { status: 'Required' }
+      });
+
+      // Phase 7 Sync: Auto-draft Purchase Order
+      const reqs = await prisma.projectMaterialRequirement.findMany({
+        where: { projectId: project.id, tenantId: req.user.tenantId, productId: { not: null } }
+      });
+
+      if (reqs.length > 0) {
+        await prisma.purchaseOrder.create({
+          data: {
+            tenantId: req.user.tenantId,
+            projectId: project.id,
+            poNumber: `PO-${Date.now()}`,
+            vendor: 'Pending Assignment',
+            status: 'DRAFT',
+            items: {
+              create: reqs.map(r => ({
+                productId: r.productId,
+                quantity: Math.ceil(r.quantity),
+                unitPrice: 0 // To be filled by purchasing manager
+              }))
+            }
+          }
+        });
+      }
+    }
+
+    // Phase 3 Sync: Auto-create AMC on Completion
+    if (newStage === 'Completed') {
+      const existingAmc = await prisma.aMC.findFirst({
+        where: { projectId: project.id, tenantId: req.user.tenantId }
+      });
+
+      if (!existingAmc && project.customerId) {
+        const startDate = new Date();
+        const endDate = new Date();
+        endDate.setFullYear(endDate.getFullYear() + 5); // Default 5 years
+
+        await prisma.aMC.create({
+          data: {
+            tenantId: req.user.tenantId,
+            projectId: project.id,
+            customerId: project.customerId,
+            contractNumber: `AMC-${project.name.replace(/\s+/g, '-').toUpperCase()}-${Date.now().toString().slice(-4)}`,
+            startDate,
+            endDate,
+            value: 0,
+            status: 'ACTIVE'
+          }
+        });
+      }
+
+      // Phase 6 Sync: Auto-create Invoice on Completion
+      const existingInvoice = await prisma.invoice.findFirst({
+        where: { projectId: project.id, tenantId: req.user.tenantId }
+      });
+
+      if (!existingInvoice && project.customerId) {
+        const dueDate = new Date();
+        dueDate.setDate(dueDate.getDate() + 7); // Due in 7 days
+
+        await prisma.invoice.create({
+          data: {
+            tenantId: req.user.tenantId,
+            customerId: project.customerId,
+            projectId: project.id,
+            invoiceNumber: `INV-${Date.now()}`,
+            amount: project.estimatedValue || 0,
+            dueDate,
+            status: 'UNPAID'
+          }
+        });
+      }
+
+      // Phase 10 Sync: Auto-create Completion Certificate
+      const existingCert = await prisma.completionCertificate.findFirst({
+        where: { projectId: project.id, tenantId: req.user.tenantId }
+      });
+
+      if (!existingCert && project.customerId) {
+        const customer = await prisma.customer.findUnique({ where: { id: project.customerId } });
+        const installation = await prisma.installationJob.findFirst({ where: { projectId: project.id } });
+        
+        await prisma.completionCertificate.create({
+          data: {
+            tenantId: req.user.tenantId,
+            projectId: project.id,
+            installationId: installation ? installation.id : 'N/A',
+            certificateNo: `CC-${project.name.replace(/\s+/g, '-').toUpperCase()}-${Date.now().toString().slice(-4)}`,
+            customerName: customer ? customer.name : 'Unknown',
+            systemCapacity: project.capacity ? `${project.capacity} ${project.capacityUnit || 'kW'}` : null,
+            issuedBy: req.user.id
+          }
+        });
+      }
+    }
 
     res.json({ project: updatedProject });
   } catch (error) {

@@ -74,21 +74,54 @@ router.post('/api/tenant/subsidies', requireTenantAuth, async (req, res) => {
   }
 });
 
-// Update subsidy
+// Update subsidy stage
 router.patch('/api/tenant/subsidies/:id', requireTenantAuth, async (req, res) => {
   try {
-    const { status, applicationNo, amount } = req.body;
+    const { status, applicationNo, amount, documentUrl, documentType } = req.body;
+    
+    const subsidy = await prisma.subsidyApplication.findUnique({ where: { id: req.params.id, tenantId: req.user.tenantId } });
+    if (!subsidy) return res.status(404).json({ error: 'Subsidy application not found' });
+
     const updateData = {};
     if (status) updateData.status = status;
     if (applicationNo) updateData.applicationNo = applicationNo;
     if (amount !== undefined) updateData.amount = parseFloat(amount);
 
-    const subsidy = await prisma.subsidyApplication.update({
+    if (status === 'CLAIM_APPROVED') {
+      if (documentType === 'CLAIM_DOCUMENT' && documentUrl) {
+        updateData.claimDocumentUrl = documentUrl;
+      } else if (!subsidy.claimDocumentUrl) {
+        return res.status(400).json({ error: 'Claim approval document is mandatory to proceed to CLAIM_APPROVED stage.' });
+      }
+    }
+
+    if (status === 'DISBURSED') {
+      if (documentType === 'DISBURSEMENT_PROOF' && documentUrl) {
+        updateData.disbursementProofUrl = documentUrl;
+      } else if (!subsidy.disbursementProofUrl) {
+        return res.status(400).json({ error: 'Disbursement proof is mandatory to finalize the subsidy.' });
+      }
+    }
+
+    const updated = await prisma.subsidyApplication.update({
       where: { id: req.params.id, tenantId: req.user.tenantId },
       data: updateData,
       include: { customer: true, project: true }
     });
-    res.json({ subsidy });
+
+    if (updated.projectId) {
+      await prisma.projectTimelineEvent.create({
+        data: {
+          tenantId: req.user.tenantId,
+          projectId: updated.projectId,
+          title: 'Subsidy Stage Updated',
+          description: `Subsidy application moved to ${status}`,
+          eventType: 'STAGE_CHANGE'
+        }
+      });
+    }
+
+    res.json({ subsidy: updated });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Failed to update subsidy application' });

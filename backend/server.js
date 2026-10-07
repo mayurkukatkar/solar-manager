@@ -39,12 +39,18 @@ app.use('/', workflowRoutes);
 // TENANT - Finance, Payments, Procurement, Service, Dashboard, Warehouses, Tasks
 const financeRoutes = require('./routes/tenant/finance');
 app.use('/', financeRoutes);
+const procurementRoutes = require('./routes/tenant/procurement');
+app.use('/', procurementRoutes);
 const documentsRoutes = require('./routes/tenant/documents');
 app.use('/', documentsRoutes);
 
 // TENANT - Subsidy Applications
 const subsidyRoutes = require('./routes/tenant/subsidy');
 app.use('/', subsidyRoutes);
+
+// TENANT - Discom Applications
+const discomRoutes = require('./routes/tenant/discom');
+app.use('/', discomRoutes);
 
 // TENANT - Loan Applications
 const loanRoutes = require('./routes/tenant/loans');
@@ -53,6 +59,10 @@ app.use('/', loanRoutes);
 // TENANT - AMC Contracts
 const amcRoutes = require('./routes/tenant/amc');
 app.use('/', amcRoutes);
+
+// TENANT - Support Tickets
+const supportRoutes = require('./routes/tenant/support');
+app.use('/', supportRoutes);
 
 // TENANT - Staff Management
 const staffRoutes = require('./routes/tenant/staff');

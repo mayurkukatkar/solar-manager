@@ -55,6 +55,7 @@ model Tenant {
   amcs               AMC[]
   invoices           Invoice[]
   subsidies          SubsidyApplication[]
+  discomApplications DiscomApplication[]
   loans              LoanApplication[]
 
   subscription Subscription?
@@ -662,6 +663,7 @@ model Project {
   invoices       Invoice[]
   tickets        SupportTicket[]
   subsidies      SubsidyApplication[]
+  discomApplication DiscomApplication?
   loans          LoanApplication[]
   amcs           AMC[]
 
@@ -908,11 +910,32 @@ model SubsidyApplication {
   project   Project? @relation(fields: [projectId], references: [id])
 
   applicationNo String?
-  status        String  @default("SUBMITTED") // SUBMITTED, PROCESSING, APPROVED, REJECTED
+  status        String  @default("APPLICATION_SUBMITTED") // APPLICATION_SUBMITTED, CLAIM_APPROVED, DISBURSED, REJECTED
   amount        Float?
+
+  applicationDocumentUrl String?
+  claimDocumentUrl       String?
+  disbursementProofUrl   String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model DiscomApplication {
+  id             String   @id @default(uuid())
+  tenantId       String
+  tenant         Tenant   @relation(fields: [tenantId], references: [id])
+  projectId      String   @unique
+  project        Project  @relation(fields: [projectId], references: [id])
+  status         String   @default("FEASIBILITY_PENDING") // FEASIBILITY_PENDING, FEASIBILITY_APPROVED, CEIG_INSPECTION, METER_TESTING, NET_METER_INSTALLED, GRID_SYNCHRONIZED
+  
+  feasibilityDocumentUrl String?
+  ceigDocumentUrl        String?
+  meterTestReportUrl     String?
+  netMeterCertificateUrl String?
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 }
 
 model LoanApplication {

@@ -206,6 +206,20 @@ router.put('/:id/status', async (req, res) => {
       updateData.actualEndAt = new Date();
     }
 
+    // Phase 4 Sync: Quality Control Enforcement
+    if (status === 'PENDING_REVIEW' || status === 'COMPLETED') {
+      const photos = await prisma.installationPhoto.findMany({
+        where: { installationId: id }
+      });
+      const categories = photos.map(p => p.category);
+      const required = ['ROOF', 'INVERTER', 'PANELS'];
+      const missing = required.filter(c => !categories.includes(c));
+      
+      if (missing.length > 0) {
+        return res.status(400).json({ error: `Missing required photos: ${missing.join(', ')}` });
+      }
+    }
+
     const updated = await prisma.installationJob.update({
       where: { id, tenantId: req.user.tenantId },
       data: updateData

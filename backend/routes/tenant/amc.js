@@ -53,6 +53,33 @@ router.get('/api/tenant/amcs/:id', requireTenantAuth, async (req, res) => {
   }
 });
 
+// Phase 3: Get Warranty Info for a Project
+router.get('/api/tenant/projects/:projectId/warranty', requireTenantAuth, async (req, res) => {
+  try {
+    const projectId = req.params.projectId;
+    const tenantId = req.user.tenantId;
+
+    // Get all consumed materials from installation jobs for this project
+    const installations = await prisma.installationJob.findMany({
+      where: { projectId, tenantId },
+      include: {
+        materials: {
+          include: { product: true }
+        }
+      }
+    });
+
+    const amcs = await prisma.aMC.findMany({
+      where: { projectId, tenantId }
+    });
+
+    res.json({ installations, amcs });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to fetch warranty info' });
+  }
+});
+
 // Create AMC
 router.post('/api/tenant/amcs', requireTenantAuth, async (req, res) => {
   try {

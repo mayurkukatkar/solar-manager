@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { 
   ArrowLeft, Briefcase, Calendar, MapPin, Zap, User, Users,
   CheckSquare, Flag, Box, History, DollarSign, Activity, Settings, Plus,
-  CheckCircle2, Clock, AlertTriangle, MessageSquare, Trash2, FileText, Download
+  CheckCircle2, Clock, AlertTriangle, MessageSquare, Trash2, FileText, Download, Wrench, ShieldCheck
 } from 'lucide-react';
 import { WorkCompletionReport, GuaranteeCertificate, DcrDeclaration, AnnexureProforma, NetMeteringAgreement } from '@/components/pdf/MsedclFormsPDF';
 
@@ -17,6 +17,15 @@ export default function ProjectDetails() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('OVERVIEW');
   const [products, setProducts] = useState<any[]>([]);
+  
+  const [discom, setDiscom] = useState<any>(null);
+  const [subsidy, setSubsidy] = useState<any>(null);
+  const [uploadingDoc, setUploadingDoc] = useState(false);
+  
+  const [warrantyData, setWarrantyData] = useState<{ installations: any[], amcs: any[] } | null>(null);
+  const [tickets, setTickets] = useState<any[]>([]);
+  const [showTicketModal, setShowTicketModal] = useState(false);
+  const [newTicket, setNewTicket] = useState({ subject: '', description: '', priority: 'MEDIUM' });
 
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [selectedForm, setSelectedForm] = useState<string | null>(null);
@@ -71,7 +80,90 @@ export default function ProjectDetails() {
   useEffect(() => {
     fetchProject();
     fetchProducts();
+    fetchRegulatoryData();
+    fetchWarrantyData();
+    fetchTickets();
   }, [params.id]);
+
+  const fetchTickets = async () => {
+    try {
+      const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/tickets?projectId=${params.id}`, { withCredentials: true });
+      setTickets(res.data.tickets);
+    } catch (err) {}
+  };
+
+  const fetchWarrantyData = async () => {
+    try {
+      const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/projects/${params.id}/warranty`, { withCredentials: true });
+      setWarrantyData(res.data);
+    } catch (err) {}
+  };
+
+  const fetchRegulatoryData = async () => {
+    try {
+      const dRes = await axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/projects/${params.id}/discom`, { withCredentials: true });
+      setDiscom(dRes.data.discom);
+    } catch(err) {}
+    try {
+      // Find subsidy linked to this project
+      const sRes = await axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/subsidies`, { withCredentials: true });
+      const projSubsidy = sRes.data.subsidies.find((s:any) => s.projectId === params.id);
+      setSubsidy(projSubsidy);
+    } catch(err) {}
+  };
+
+  const handleCreateDiscom = async () => {
+    try {
+      await axios.post(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/projects/${params.id}/discom`, {}, { withCredentials: true });
+      fetchRegulatoryData();
+    } catch (err) { alert('Failed to initialize DISCOM tracking'); }
+  };
+
+  const handleUpdateDiscomStage = async (status: string, documentType?: string, file?: File) => {
+    try {
+      setUploadingDoc(true);
+      let documentUrl = null;
+      if (file) {
+        const formData = new FormData();
+        formData.append('document', file);
+        const upRes = await axios.post(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/projects/${params.id}/discom/upload`, formData, { withCredentials: true });
+        documentUrl = upRes.data.documentUrl;
+      }
+      await axios.patch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/projects/${params.id}/discom/stage`, { status, documentType, documentUrl }, { withCredentials: true });
+      fetchRegulatoryData();
+    } catch (err: any) {
+      alert(err.response?.data?.error || 'Failed to update DISCOM stage');
+    } finally {
+      setUploadingDoc(false);
+    }
+  };
+
+  const handleCreateSubsidy = async () => {
+    try {
+      if(!project.customerId) return alert("Customer must be assigned to create a subsidy.");
+      await axios.post(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/subsidies`, { projectId: params.id, customerId: project.customerId }, { withCredentials: true });
+      fetchRegulatoryData();
+    } catch (err) { alert('Failed to initialize Subsidy tracking'); }
+  };
+
+  const handleUpdateSubsidyStage = async (status: string, documentType?: string, file?: File) => {
+    try {
+      setUploadingDoc(true);
+      let documentUrl = null;
+      if (file) {
+        const formData = new FormData();
+        formData.append('document', file);
+        const upRes = await axios.post(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/projects/${params.id}/discom/upload`, formData, { withCredentials: true }); // using same upload route for simplicity
+        documentUrl = upRes.data.documentUrl;
+      }
+      await axios.patch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/subsidies/${subsidy.id}`, { status, documentType, documentUrl }, { withCredentials: true });
+      fetchRegulatoryData();
+    } catch (err: any) {
+      alert(err.response?.data?.error || 'Failed to update Subsidy stage');
+    } finally {
+      setUploadingDoc(false);
+    }
+  };
 
   const handleStageChange = async (e: any) => {
     const newStage = e.target.value;
@@ -154,6 +246,22 @@ export default function ProjectDetails() {
       case 'Delayed': return 'bg-red-100 text-red-700 border-red-200';
       case 'Completed': return 'bg-emerald-100 text-emerald-700 border-emerald-200';
       default: return 'bg-slate-100 text-slate-700 border-slate-200';
+    }
+  };
+
+  const handleCreateTicket = async (e: any) => {
+    e.preventDefault();
+    try {
+      await axios.post(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/tickets`, {
+        ...newTicket,
+        projectId: params.id,
+        customerId: project.customerId
+      }, { withCredentials: true });
+      setShowTicketModal(false);
+      setNewTicket({ subject: '', description: '', priority: 'MEDIUM' });
+      fetchTickets();
+    } catch (err) {
+      alert("Failed to create ticket.");
     }
   };
 
@@ -250,8 +358,14 @@ export default function ProjectDetails() {
             <button onClick={() => setActiveTab('TIMELINE')} className={`w-full flex items-center gap-3 px-5 py-4 text-sm font-medium transition-colors border-b border-slate-100 ${activeTab === 'TIMELINE' ? 'bg-emerald-50 text-emerald-700 border-l-4 border-l-emerald-600' : 'text-slate-600 hover:bg-slate-50'}`}>
               <History size={18} /> Activity & Timeline
             </button>
-            <button onClick={() => setActiveTab('DISCOM')} className={`w-full flex items-center gap-3 px-5 py-4 text-sm font-medium transition-colors ${activeTab === 'DISCOM' ? 'bg-emerald-50 text-emerald-700 border-l-4 border-l-emerald-600' : 'text-slate-600 hover:bg-slate-50'}`}>
-              <FileText size={18} /> Discom Forms
+            <button onClick={() => setActiveTab('REGULATORY')} className={`w-full flex items-center gap-3 px-5 py-4 text-sm font-medium transition-colors border-b border-slate-100 ${activeTab === 'REGULATORY' ? 'bg-emerald-50 text-emerald-700 border-l-4 border-l-emerald-600' : 'text-slate-600 hover:bg-slate-50'}`}>
+              <CheckCircle2 size={18} /> Regulatory & Subsidies
+            </button>
+            <button onClick={() => setActiveTab('DISCOM')} className={`w-full flex items-center gap-3 px-5 py-4 text-sm font-medium transition-colors border-b border-slate-100 ${activeTab === 'DISCOM' ? 'bg-emerald-50 text-emerald-700 border-l-4 border-l-emerald-600' : 'text-slate-600 hover:bg-slate-50'}`}>
+              <FileText size={18} /> Generate Forms
+            </button>
+            <button onClick={() => setActiveTab('SERVICE')} className={`w-full flex items-center gap-3 px-5 py-4 text-sm font-medium transition-colors ${activeTab === 'SERVICE' ? 'bg-emerald-50 text-emerald-700 border-l-4 border-l-emerald-600' : 'text-slate-600 hover:bg-slate-50'}`}>
+              <Wrench size={18} /> Service & Warranty
             </button>
           </div>
         </div>
@@ -514,6 +628,171 @@ export default function ProjectDetails() {
               </div>
             </div>
           )}
+          {/* REGULATORY TAB */}
+          {activeTab === 'REGULATORY' && (
+            <div className="animate-in fade-in duration-300 h-full flex flex-col">
+              <div className="p-5 border-b border-slate-100 bg-slate-50/50">
+                <h2 className="font-bold text-slate-800">Regulatory & Subsidies Tracking</h2>
+                <p className="text-xs text-slate-500 mt-0.5">Track DISCOM approvals and National Portal Subsidies.</p>
+              </div>
+              <div className="p-6 flex-1 overflow-y-auto space-y-8">
+                
+                {/* DISCOM TRACKING */}
+                <div>
+                  <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2"><Zap size={18} className="text-blue-500"/> DISCOM / Net-Metering</h3>
+                  {!discom ? (
+                    <button onClick={handleCreateDiscom} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold shadow-md hover:bg-blue-700">
+                      Initialize DISCOM Tracking
+                    </button>
+                  ) : (
+                    <div className="border border-slate-200 rounded-xl overflow-hidden">
+                      <div className="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
+                        <span className="font-semibold text-slate-700 text-sm">Current Stage:</span>
+                        <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-bold">{discom.status}</span>
+                      </div>
+                      <div className="p-4 space-y-4">
+                         <div className="flex flex-col md:flex-row gap-4 items-center justify-between border-b border-slate-100 pb-4">
+                           <div className="flex-1">
+                             <h4 className="font-bold text-slate-800 text-sm">1. Feasibility Approval</h4>
+                             <p className="text-xs text-slate-500">Wait for DISCOM to approve feasibility.</p>
+                             {discom.status === 'FEASIBILITY_PENDING' && (
+                               <div className="mt-2 flex items-center gap-2">
+                                 <input type="file" id="feasibilityFile" className="text-xs text-slate-500" />
+                                 <button onClick={() => {
+                                   const f = (document.getElementById('feasibilityFile') as HTMLInputElement).files?.[0];
+                                   handleUpdateDiscomStage('CEIG_INSPECTION', 'FEASIBILITY_LETTER', f);
+                                 }} disabled={uploadingDoc} className="px-3 py-1.5 bg-emerald-600 text-white rounded text-xs font-bold hover:bg-emerald-700 disabled:opacity-50">Upload & Move Next</button>
+                               </div>
+                             )}
+                           </div>
+                           <div className="text-right">
+                             {discom.feasibilityDocumentUrl ? <span className="text-xs font-bold text-emerald-600 flex items-center gap-1"><CheckCircle2 size={14}/> Uploaded</span> : <span className="text-xs text-slate-400">Pending</span>}
+                           </div>
+                         </div>
+
+                         <div className="flex flex-col md:flex-row gap-4 items-center justify-between border-b border-slate-100 pb-4">
+                           <div className="flex-1">
+                             <h4 className="font-bold text-slate-800 text-sm">2. CEIG Inspection</h4>
+                             <p className="text-xs text-slate-500">Get Electrical Inspectorate approval.</p>
+                             {discom.status === 'CEIG_INSPECTION' && (
+                               <div className="mt-2 flex items-center gap-2">
+                                 <input type="file" id="ceigFile" className="text-xs text-slate-500" />
+                                 <button onClick={() => {
+                                   const f = (document.getElementById('ceigFile') as HTMLInputElement).files?.[0];
+                                   handleUpdateDiscomStage('METER_TESTING', 'CEIG_APPROVAL', f);
+                                 }} disabled={uploadingDoc} className="px-3 py-1.5 bg-emerald-600 text-white rounded text-xs font-bold hover:bg-emerald-700 disabled:opacity-50">Upload & Move Next</button>
+                               </div>
+                             )}
+                           </div>
+                           <div className="text-right">
+                             {discom.ceigDocumentUrl ? <span className="text-xs font-bold text-emerald-600 flex items-center gap-1"><CheckCircle2 size={14}/> Uploaded</span> : <span className="text-xs text-slate-400">Pending</span>}
+                           </div>
+                         </div>
+
+                         <div className="flex flex-col md:flex-row gap-4 items-center justify-between border-b border-slate-100 pb-4">
+                           <div className="flex-1">
+                             <h4 className="font-bold text-slate-800 text-sm">3. Meter Testing & Installation</h4>
+                             <p className="text-xs text-slate-500">Submit meter test report to DISCOM.</p>
+                             {discom.status === 'METER_TESTING' && (
+                               <div className="mt-2 flex items-center gap-2">
+                                 <input type="file" id="meterFile" className="text-xs text-slate-500" />
+                                 <button onClick={() => {
+                                   const f = (document.getElementById('meterFile') as HTMLInputElement).files?.[0];
+                                   handleUpdateDiscomStage('NET_METER_INSTALLED', 'METER_TEST_REPORT', f);
+                                 }} disabled={uploadingDoc} className="px-3 py-1.5 bg-emerald-600 text-white rounded text-xs font-bold hover:bg-emerald-700 disabled:opacity-50">Upload & Move Next</button>
+                               </div>
+                             )}
+                           </div>
+                           <div className="text-right">
+                             {discom.meterTestReportUrl ? <span className="text-xs font-bold text-emerald-600 flex items-center gap-1"><CheckCircle2 size={14}/> Uploaded</span> : <span className="text-xs text-slate-400">Pending</span>}
+                           </div>
+                         </div>
+
+                         <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
+                           <div className="flex-1">
+                             <h4 className="font-bold text-slate-800 text-sm">4. Grid Synchronized</h4>
+                             <p className="text-xs text-slate-500">System is active. Upload Net Meter Certificate.</p>
+                             {discom.status === 'NET_METER_INSTALLED' && (
+                               <div className="mt-2 flex items-center gap-2">
+                                 <input type="file" id="certFile" className="text-xs text-slate-500" />
+                                 <button onClick={() => {
+                                   const f = (document.getElementById('certFile') as HTMLInputElement).files?.[0];
+                                   handleUpdateDiscomStage('GRID_SYNCHRONIZED', 'NET_METER_CERTIFICATE', f);
+                                 }} disabled={uploadingDoc} className="px-3 py-1.5 bg-emerald-600 text-white rounded text-xs font-bold hover:bg-emerald-700 disabled:opacity-50">Complete Synchronization</button>
+                               </div>
+                             )}
+                           </div>
+                           <div className="text-right">
+                             {discom.netMeterCertificateUrl ? <span className="text-xs font-bold text-emerald-600 flex items-center gap-1"><CheckCircle2 size={14}/> Uploaded</span> : <span className="text-xs text-slate-400">Pending</span>}
+                           </div>
+                         </div>
+
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* SUBSIDY TRACKING */}
+                <div>
+                  <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2"><DollarSign size={18} className="text-emerald-500"/> National Portal Subsidy</h3>
+                  {!subsidy ? (
+                    <button onClick={handleCreateSubsidy} className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-bold shadow-md hover:bg-emerald-700">
+                      Initialize Subsidy Tracking
+                    </button>
+                  ) : (
+                    <div className="border border-slate-200 rounded-xl overflow-hidden">
+                      <div className="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
+                        <span className="font-semibold text-slate-700 text-sm">Current Stage:</span>
+                        <span className="px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-xs font-bold">{subsidy.status}</span>
+                      </div>
+                      <div className="p-4 space-y-4">
+                         
+                         <div className="flex flex-col md:flex-row gap-4 items-center justify-between border-b border-slate-100 pb-4">
+                           <div className="flex-1">
+                             <h4 className="font-bold text-slate-800 text-sm">1. Claim Approved</h4>
+                             <p className="text-xs text-slate-500">Wait for National Portal to approve the claim.</p>
+                             {subsidy.status === 'APPLICATION_SUBMITTED' && (
+                               <div className="mt-2 flex items-center gap-2">
+                                 <input type="file" id="claimFile" className="text-xs text-slate-500" />
+                                 <button onClick={() => {
+                                   const f = (document.getElementById('claimFile') as HTMLInputElement).files?.[0];
+                                   handleUpdateSubsidyStage('CLAIM_APPROVED', 'CLAIM_DOCUMENT', f);
+                                 }} disabled={uploadingDoc} className="px-3 py-1.5 bg-emerald-600 text-white rounded text-xs font-bold hover:bg-emerald-700 disabled:opacity-50">Upload & Move Next</button>
+                               </div>
+                             )}
+                           </div>
+                           <div className="text-right">
+                             {subsidy.claimDocumentUrl ? <span className="text-xs font-bold text-emerald-600 flex items-center gap-1"><CheckCircle2 size={14}/> Uploaded</span> : <span className="text-xs text-slate-400">Pending</span>}
+                           </div>
+                         </div>
+
+                         <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
+                           <div className="flex-1">
+                             <h4 className="font-bold text-slate-800 text-sm">2. Subsidy Disbursed</h4>
+                             <p className="text-xs text-slate-500">Upload proof of disbursement to customer bank account.</p>
+                             {subsidy.status === 'CLAIM_APPROVED' && (
+                               <div className="mt-2 flex items-center gap-2">
+                                 <input type="file" id="proofFile" className="text-xs text-slate-500" />
+                                 <button onClick={() => {
+                                   const f = (document.getElementById('proofFile') as HTMLInputElement).files?.[0];
+                                   handleUpdateSubsidyStage('DISBURSED', 'DISBURSEMENT_PROOF', f);
+                                 }} disabled={uploadingDoc} className="px-3 py-1.5 bg-emerald-600 text-white rounded text-xs font-bold hover:bg-emerald-700 disabled:opacity-50">Upload & Complete</button>
+                               </div>
+                             )}
+                           </div>
+                           <div className="text-right">
+                             {subsidy.disbursementProofUrl ? <span className="text-xs font-bold text-emerald-600 flex items-center gap-1"><CheckCircle2 size={14}/> Uploaded</span> : <span className="text-xs text-slate-400">Pending</span>}
+                           </div>
+                         </div>
+
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+              </div>
+            </div>
+          )}
 
           {/* DISCOM FORMS TAB */}
           {activeTab === 'DISCOM' && (
@@ -558,10 +837,152 @@ export default function ProjectDetails() {
               </div>
             </div>
           )}
+
+          {/* SERVICE & WARRANTY TAB */}
+          {activeTab === 'SERVICE' && (
+            <div className="p-6 space-y-8 animate-in fade-in duration-300">
+              <div className="flex items-center gap-3 border-b border-slate-100 pb-4">
+                <ShieldCheck size={24} className="text-emerald-600" />
+                <h2 className="text-lg font-bold text-slate-800">Warranty & AMC Details</h2>
+              </div>
+
+              {!warrantyData ? (
+                <div className="text-center py-10"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500 mx-auto"></div></div>
+              ) : (
+                <div className="space-y-8">
+                  {/* AMC Contracts */}
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4 flex items-center gap-2"><FileText size={16} className="text-slate-400" /> Active AMCs</h3>
+                    {warrantyData.amcs.length === 0 ? (
+                      <div className="text-center py-6 text-sm text-slate-500 bg-slate-50 rounded-xl border border-dashed border-slate-200">No AMC contracts generated yet. AMCs are auto-generated when Project Stage is marked as Completed.</div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {warrantyData.amcs.map((amc: any) => (
+                          <div key={amc.id} className="border border-slate-200 rounded-xl p-4 flex items-start gap-4 hover:border-emerald-200 transition-colors bg-white shadow-sm">
+                            <div className="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600 shrink-0"><ShieldCheck size={18} /></div>
+                            <div className="flex-1">
+                              <div className="flex justify-between items-start">
+                                <h4 className="font-bold text-slate-800 text-sm">{amc.contractNumber}</h4>
+                                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-700">{amc.status}</span>
+                              </div>
+                              <p className="text-xs text-slate-500 mt-1">Validity: {new Date(amc.startDate).toLocaleDateString()} - {new Date(amc.endDate).toLocaleDateString()}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Consumed Materials & Serial Numbers */}
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4 flex items-center gap-2"><Box size={16} className="text-slate-400" /> Warranty Serial Tracking</h3>
+                    {warrantyData.installations.length === 0 || warrantyData.installations.every((i:any) => i.materials.length === 0) ? (
+                      <div className="text-center py-6 text-sm text-slate-500 bg-slate-50 rounded-xl border border-dashed border-slate-200">No materials consumed from installations yet.</div>
+                    ) : (
+                      <div className="space-y-4">
+                        {warrantyData.installations.map((inst: any) => (
+                          inst.materials.map((mat: any) => (
+                            <div key={mat.id} className="bg-slate-50 border border-slate-100 rounded-xl p-4">
+                              <div className="flex justify-between items-center mb-3 pb-3 border-b border-slate-200">
+                                <div>
+                                  <h4 className="font-bold text-slate-800 text-sm">{mat.product?.name || 'Unknown Product'}</h4>
+                                  <p className="text-xs text-slate-500">Consumed Qty: {mat.consumedQty}</p>
+                                </div>
+                                <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-1 rounded">Warranty Active</span>
+                              </div>
+                              <div>
+                                <p className="text-xs font-semibold text-slate-700 mb-2">Logged Serial Numbers:</p>
+                                {mat.serialNumbers && mat.serialNumbers.length > 0 ? (
+                                  <div className="flex flex-wrap gap-2">
+                                    {mat.serialNumbers.map((sn: string, idx: number) => (
+                                      <span key={idx} className="bg-white border border-slate-200 px-2.5 py-1 rounded-md text-xs font-mono text-slate-600 shadow-sm">{sn}</span>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <span className="text-xs text-slate-400 italic">No serial numbers logged for this material.</span>
+                                )}
+                              </div>
+                            </div>
+                          ))
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Support Tickets */}
+                  <div className="pt-4 border-t border-slate-100">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2"><MessageSquare size={16} className="text-slate-400" /> Support Tickets</h3>
+                      <button onClick={() => setShowTicketModal(true)} className="text-sm font-medium bg-emerald-100 text-emerald-700 px-3 py-1.5 rounded-lg hover:bg-emerald-200 transition-colors flex items-center gap-1.5">
+                        <Plus size={14} /> New Ticket
+                      </button>
+                    </div>
+                    
+                    {tickets.length === 0 ? (
+                      <div className="text-center py-6 text-sm text-slate-500 bg-slate-50 rounded-xl border border-dashed border-slate-200">No support tickets have been created for this project.</div>
+                    ) : (
+                      <div className="space-y-3">
+                        {tickets.map((t: any) => (
+                          <div key={t.id} className="border border-slate-200 rounded-xl p-4 flex items-start justify-between gap-4 bg-white">
+                            <div>
+                              <div className="flex items-center gap-2 mb-1">
+                                <h4 className="font-bold text-slate-800 text-sm">{t.subject}</h4>
+                                {t.subject.includes('[WARRANTY]') && <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-700">WARRANTY</span>}
+                              </div>
+                              <p className="text-xs text-slate-500 whitespace-pre-wrap">{t.description}</p>
+                              <div className="flex items-center gap-3 mt-3 text-xs">
+                                <span className="px-2 py-1 rounded-md font-semibold bg-slate-100 text-slate-600">{t.status}</span>
+                                <span className="text-slate-400">{new Date(t.createdAt).toLocaleDateString()}</span>
+                              </div>
+                            </div>
+                            <span className={`px-2 py-1 rounded text-xs font-bold ${t.priority === 'HIGH' ? 'bg-red-50 text-red-600' : 'bg-amber-50 text-amber-600'}`}>{t.priority}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
       {/* MODALS */}
+      {showTicketModal && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
+            <div className="p-5 border-b border-slate-100 flex items-center justify-between">
+              <h2 className="font-bold text-slate-900">Create Support Ticket</h2>
+              <button onClick={() => setShowTicketModal(false)} className="text-slate-400 hover:text-slate-700">✕</button>
+            </div>
+            <form onSubmit={handleCreateTicket} className="p-5 space-y-4">
+              <div className="space-y-1">
+                <label className="text-sm font-semibold text-slate-700">Subject *</label>
+                <input required type="text" value={newTicket.subject} onChange={e => setNewTicket({...newTicket, subject: e.target.value})} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none text-sm" placeholder="e.g. Inverter not connecting to WiFi" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm font-semibold text-slate-700">Description *</label>
+                <textarea required rows={3} value={newTicket.description} onChange={e => setNewTicket({...newTicket, description: e.target.value})} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none text-sm resize-none" placeholder="Describe the issue..." />
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm font-semibold text-slate-700">Priority</label>
+                <select value={newTicket.priority} onChange={e => setNewTicket({...newTicket, priority: e.target.value})} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none text-sm bg-white">
+                  <option value="LOW">Low</option>
+                  <option value="MEDIUM">Medium</option>
+                  <option value="HIGH">High</option>
+                  <option value="URGENT">Urgent</option>
+                </select>
+              </div>
+              <div className="flex gap-3 pt-4 border-t border-slate-100">
+                <button type="button" onClick={() => setShowTicketModal(false)} className="flex-1 py-2.5 text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl font-medium transition-colors text-sm">Cancel</button>
+                <button type="submit" className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-medium shadow-sm transition-colors text-sm">Submit Ticket</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {showTaskModal && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
