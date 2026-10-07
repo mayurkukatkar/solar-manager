@@ -4,7 +4,7 @@ const prisma = require('../db');
 const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-solar-erp-jwt-key';
 
 const requireSuperAdmin = (req, res, next) => {
-  const token = req.cookies.super_admin_token;
+  const token = req.cookies.super_admin_token || (req.headers.authorization?.startsWith('Bearer ') ? req.headers.authorization.split(' ')[1] : null);
   if (!token) return res.status(401).json({ error: 'Unauthorized: Platform Access Required' });
   
   try {
@@ -18,7 +18,7 @@ const requireSuperAdmin = (req, res, next) => {
 };
 
 const requireTenantAuth = (req, res, next) => {
-  const token = req.cookies.tenant_token;
+  const token = req.cookies.tenant_token || (req.headers.authorization?.startsWith('Bearer ') ? req.headers.authorization.split(' ')[1] : null);
   if (!token) return res.status(401).json({ error: 'Unauthorized: Tenant Access Required' });
   
   try {

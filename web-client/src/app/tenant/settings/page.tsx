@@ -21,7 +21,11 @@ export default function SettingsPage() {
         setForm(res.data.tenant || {});
       }).catch(err => {
         console.error(err);
-        setError("Failed to load settings. Please check your connection or backend server.");
+        if (err.response?.status === 401) {
+          window.location.href = '/login';
+        } else {
+          setError("Failed to load settings. Please check your connection or backend server.");
+        }
       });
   }, []);
 

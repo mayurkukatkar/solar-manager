@@ -96,6 +96,7 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
   const handleLogout = async () => {
     setLoggingOut(true);
     try {
+      localStorage.removeItem('token');
       await axios.post(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/logout`, {}, { withCredentials: true });
       router.push('/login');
     } catch (error) {

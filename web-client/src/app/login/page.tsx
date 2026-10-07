@@ -26,10 +26,15 @@ export default function SuperAdminLogin() {
       
       if (res.data.requiresPasswordReset) {
         setRequiresReset(true);
-      } else if (res.data.role === 'SUPER_ADMIN') {
-        router.push('/super-admin/dashboard');
       } else {
-        router.push('/tenant/dashboard');
+        if (res.data.token) {
+          localStorage.setItem('token', res.data.token);
+        }
+        if (res.data.role === 'SUPER_ADMIN') {
+          router.push('/super-admin/dashboard');
+        } else {
+          router.push('/tenant/dashboard');
+        }
       }
     } catch (err: any) {
       const fullUrl = err.config?.url || 'unknown url';
