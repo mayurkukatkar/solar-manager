@@ -71,9 +71,9 @@ export default function Finance() {
       };
       
       await html2pdf().set(opt).from(element).save();
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert('Failed to generate PDF');
+      alert('Failed to generate PDF: ' + (err.message || 'Unknown error'));
     }
     setGeneratingPdf(null);
   };
@@ -165,7 +165,7 @@ export default function Finance() {
                   <tr key={inv.id} className="hover:bg-slate-50 transition-colors">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2 font-bold text-slate-900">
-                        <FileText size={16} className="text-slate-400" /> {inv.id}
+                        <FileText size={16} className="text-slate-400" /> {inv.invoiceNumber || inv.id}
                       </div>
                     </td>
                     <td className="px-6 py-4 font-bold text-slate-700">
@@ -265,49 +265,49 @@ export default function Finance() {
       {/* HIDDEN INVOICE TEMPLATES FOR PDF GENERATION */}
       <div style={{ position: 'absolute', left: '-9999px', top: 0 }}>
         {invoices.map(inv => (
-          <div key={`template-${inv.id}`} id={`invoice-template-${inv.id}`} className="bg-white p-10 w-[800px] text-slate-800" style={{ fontFamily: 'sans-serif' }}>
+          <div key={`template-${inv.id}`} id={`invoice-template-${inv.id}`} className="p-10 w-[800px]" style={{ fontFamily: 'sans-serif', backgroundColor: '#ffffff', color: '#1e293b' }}>
             
             {/* Header */}
-            <div className="flex justify-between items-start mb-10 border-b border-slate-200 pb-8">
+            <div className="flex justify-between items-start mb-10 pb-8 border-b" style={{ borderColor: '#e2e8f0' }}>
               <div>
                 {tenant?.logoUrl ? (
                   <img src={tenant.logoUrl} alt="Logo" className="h-16 object-contain mb-4" crossOrigin="anonymous" />
                 ) : (
-                  <h1 className="text-3xl font-black text-slate-900 mb-2">{tenant?.name || 'Company Name'}</h1>
+                  <h1 className="text-3xl font-black mb-2" style={{ color: '#0f172a' }}>{tenant?.name || 'Company Name'}</h1>
                 )}
-                <p className="text-sm text-slate-500 max-w-xs">{tenant?.address || 'Company Address'}</p>
-                <p className="text-sm text-slate-500">{tenant?.city}, {tenant?.state} {tenant?.pincode}</p>
-                {tenant?.gstin && <p className="text-sm font-semibold text-slate-600 mt-2">GSTIN: {tenant.gstin}</p>}
+                <p className="text-sm max-w-xs" style={{ color: '#64748b' }}>{tenant?.address || 'Company Address'}</p>
+                <p className="text-sm" style={{ color: '#64748b' }}>{tenant?.city}, {tenant?.state} {tenant?.pincode}</p>
+                {tenant?.gstin && <p className="text-sm font-semibold mt-2" style={{ color: '#475569' }}>GSTIN: {tenant.gstin}</p>}
               </div>
               <div className="text-right">
-                <h2 className="text-4xl font-black text-slate-200 uppercase tracking-widest mb-4">INVOICE</h2>
-                <p className="text-sm font-bold text-slate-800">Invoice No: <span className="text-slate-500 font-normal">{inv.id}</span></p>
-                <p className="text-sm font-bold text-slate-800 mt-1">Date: <span className="text-slate-500 font-normal">{new Date(inv.date).toLocaleDateString()}</span></p>
-                <p className="text-sm font-bold text-slate-800 mt-1">Status: <span className={`uppercase ${inv.status === 'PAID' ? 'text-emerald-600' : 'text-amber-600'}`}>{inv.status}</span></p>
+                <h2 className="text-4xl font-black uppercase tracking-widest mb-4" style={{ color: '#e2e8f0' }}>INVOICE</h2>
+                <p className="text-sm font-bold" style={{ color: '#1e293b' }}>Invoice No: <span className="font-normal" style={{ color: '#64748b' }}>{inv.invoiceNumber || inv.id}</span></p>
+                <p className="text-sm font-bold mt-1" style={{ color: '#1e293b' }}>Date: <span className="font-normal" style={{ color: '#64748b' }}>{new Date(inv.date).toLocaleDateString()}</span></p>
+                <p className="text-sm font-bold mt-1" style={{ color: '#1e293b' }}>Status: <span className="uppercase" style={{ color: inv.status === 'PAID' ? '#059669' : '#d97706' }}>{inv.status}</span></p>
               </div>
             </div>
 
             {/* Bill To */}
             <div className="mb-10">
-              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Billed To:</p>
-              <h3 className="text-lg font-bold text-slate-800">{inv.customer?.name}</h3>
-              <p className="text-sm text-slate-600">{inv.customer?.email}</p>
-              <p className="text-sm text-slate-600">{inv.customer?.phone}</p>
-              {inv.project && <p className="text-sm font-semibold text-emerald-600 mt-2">Project: {inv.project.name}</p>}
+              <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: '#94a3b8' }}>Billed To:</p>
+              <h3 className="text-lg font-bold" style={{ color: '#1e293b' }}>{inv.customer?.name}</h3>
+              <p className="text-sm" style={{ color: '#475569' }}>{inv.customer?.email}</p>
+              <p className="text-sm" style={{ color: '#475569' }}>{inv.customer?.mobile || inv.customer?.phone}</p>
+              {inv.project && <p className="text-sm font-semibold mt-2" style={{ color: '#059669' }}>Project: {inv.project.name}</p>}
             </div>
 
             {/* Line Items */}
             <table className="w-full text-left mb-10 border-collapse">
               <thead>
-                <tr className="border-b-2 border-slate-800">
-                  <th className="py-3 font-bold text-sm text-slate-800">Description</th>
-                  <th className="py-3 font-bold text-sm text-slate-800 text-right">Amount</th>
+                <tr className="border-b-2" style={{ borderColor: '#1e293b' }}>
+                  <th className="py-3 font-bold text-sm" style={{ color: '#1e293b' }}>Description</th>
+                  <th className="py-3 font-bold text-sm text-right" style={{ color: '#1e293b' }}>Amount</th>
                 </tr>
               </thead>
               <tbody>
-                <tr className="border-b border-slate-200">
-                  <td className="py-4 text-sm text-slate-700">{inv.project ? `Payment for Project: ${inv.project.name}` : 'Solar Installation Services'}</td>
-                  <td className="py-4 text-sm font-bold text-slate-900 text-right">₹ {inv.amount.toLocaleString()}</td>
+                <tr className="border-b" style={{ borderColor: '#e2e8f0' }}>
+                  <td className="py-4 text-sm" style={{ color: '#334155' }}>{inv.project ? `Payment for Project: ${inv.project.name}` : 'Solar Installation Services'}</td>
+                  <td className="py-4 text-sm font-bold text-right" style={{ color: '#0f172a' }}>₹ {inv.amount.toLocaleString()}</td>
                 </tr>
               </tbody>
             </table>
@@ -315,31 +315,31 @@ export default function Finance() {
             {/* Totals */}
             <div className="flex justify-end mb-16">
               <div className="w-64">
-                <div className="flex justify-between py-2 border-b border-slate-200">
-                  <span className="text-sm text-slate-500">Subtotal</span>
-                  <span className="text-sm font-bold text-slate-800">₹ {inv.amount.toLocaleString()}</span>
+                <div className="flex justify-between py-2 border-b" style={{ borderColor: '#e2e8f0' }}>
+                  <span className="text-sm" style={{ color: '#64748b' }}>Subtotal</span>
+                  <span className="text-sm font-bold" style={{ color: '#1e293b' }}>₹ {inv.amount.toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between py-3">
-                  <span className="text-base font-bold text-slate-900">Total Due</span>
-                  <span className="text-base font-black text-emerald-600">₹ {inv.amount.toLocaleString()}</span>
+                  <span className="text-base font-bold" style={{ color: '#0f172a' }}>Total Due</span>
+                  <span className="text-base font-black" style={{ color: '#059669' }}>₹ {inv.amount.toLocaleString()}</span>
                 </div>
               </div>
             </div>
 
             {/* Footer / Signature */}
-            <div className="mt-20 pt-8 border-t border-slate-200 flex justify-between items-end">
+            <div className="mt-20 pt-8 border-t flex justify-between items-end" style={{ borderColor: '#e2e8f0' }}>
               <div>
-                <p className="text-xs text-slate-400 font-medium">Thank you for your business!</p>
-                <p className="text-xs text-slate-400 font-medium mt-1">{tenant?.email} • {tenant?.phone}</p>
+                <p className="text-xs font-medium" style={{ color: '#94a3b8' }}>Thank you for your business!</p>
+                <p className="text-xs font-medium mt-1" style={{ color: '#94a3b8' }}>{tenant?.email} • {tenant?.phone}</p>
               </div>
               <div className="text-center">
                 {tenant?.signatureUrl ? (
                   <img src={tenant.signatureUrl} alt="Signature" className="h-16 mx-auto mb-2 object-contain" crossOrigin="anonymous" />
                 ) : (
-                  <div className="h-16 w-32 mx-auto border-b-2 border-slate-200 mb-2"></div>
+                  <div className="h-16 w-32 mx-auto border-b-2 mb-2" style={{ borderColor: '#e2e8f0' }}></div>
                 )}
-                <p className="text-xs font-bold text-slate-800 uppercase tracking-widest">Authorized Signatory</p>
-                <p className="text-xs text-slate-500 mt-1">{tenant?.name}</p>
+                <p className="text-xs font-bold uppercase tracking-widest" style={{ color: '#1e293b' }}>Authorized Signatory</p>
+                <p className="text-xs mt-1" style={{ color: '#64748b' }}>{tenant?.name}</p>
               </div>
             </div>
             

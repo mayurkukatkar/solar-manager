@@ -28,8 +28,8 @@ export default function SettingsPage() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      const { name, legalName, email, phone, address, city, state, country, pincode, gstin, pan } = form;
-      await axios.patch(`${API}/api/tenant/settings`, { name, legalName, email, phone, address, city, state, country, pincode, gstin, pan }, { withCredentials: true });
+      const { name, legalName, email, phone, address, city, state, country, pincode, gstin, pan, logoUrl, signatureUrl } = form;
+      await axios.patch(`${API}/api/tenant/settings`, { name, legalName, email, phone, address, city, state, country, pincode, gstin, pan, logoUrl, signatureUrl }, { withCredentials: true });
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
     } catch (err) { alert(err.response?.data?.error || "Failed to save"); }

@@ -73,12 +73,14 @@ router.post('/api/tenant/finance', requireTenantAuth, async (req, res) => {
   try {
     if (!req.body.customerId) return res.status(400).json({ error: 'customerId required' });
     
+    const count = await prisma.invoice.count({ where: { tenantId: req.user.tenantId } });
+    
     const invoice = await prisma.invoice.create({
       data: {
         tenantId: req.user.tenantId,
         customerId: req.body.customerId,
         projectId: req.body.projectId || null,
-        invoiceNumber: `INV-${Date.now()}`,
+        invoiceNumber: `INV-${(count + 1).toString().padStart(4, '0')}`,
         amount: parseFloat(req.body.amount) || 0,
         dueDate: req.body.dueDate ? new Date(req.body.dueDate) : null,
         status: 'UNPAID'
