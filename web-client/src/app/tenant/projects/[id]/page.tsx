@@ -316,7 +316,7 @@ export default function ProjectDetails() {
   const nextStage = activeIndex < STAGES.length - 1 ? STAGES[activeIndex + 1] : null;
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6 pb-16">
+    <div className="max-w-7xl mx-auto space-y-6 pb-16 w-full min-w-0">
       {/* Top Breadcrumb & Quick Actions */}
       <div className="flex items-center justify-between gap-4">
         <Link 

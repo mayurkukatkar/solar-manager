@@ -178,21 +178,21 @@ export default function ProjectsDashboard() {
   };
 
   return (
-    <div className="max-w-[1400px] mx-auto space-y-6 pb-16">
+    <div className="w-full space-y-6 pb-16 min-w-0">
       
       {/* HEADER SECTION */}
       <div className="bg-gradient-to-r from-[#071A2B] via-[#0D2847] to-[#0A3C36] p-6 sm:p-8 rounded-3xl text-white shadow-xl relative overflow-hidden">
         <div className="absolute top-0 right-0 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20"></div>
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="space-y-1.5">
-            <div className="flex items-center gap-2.5">
-              <span className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-500/30">
+          <div className="space-y-1.5 min-w-0">
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <span className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-500/30 shrink-0">
                 <Briefcase size={18} />
               </span>
               <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
                 Projects Studio
               </h1>
-              <span className="px-2.5 py-0.5 text-xs font-bold bg-white/10 rounded-full text-slate-300 border border-white/10">
+              <span className="px-2.5 py-0.5 text-xs font-bold bg-white/10 rounded-full text-slate-300 border border-white/10 shrink-0">
                 {projects.length} Total
               </span>
             </div>
@@ -201,7 +201,7 @@ export default function ProjectsDashboard() {
             </p>
           </div>
 
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2.5 shrink-0">
             <button
               onClick={handleRefresh}
               disabled={isRefreshing}
@@ -212,7 +212,7 @@ export default function ProjectsDashboard() {
             </button>
             <Link
               href="/tenant/projects/new"
-              className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-[#071A2B] font-black rounded-xl text-xs sm:text-sm transition-all shadow-lg shadow-emerald-500/20 flex items-center gap-2 cursor-pointer"
+              className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-[#071A2B] font-black rounded-xl text-xs sm:text-sm transition-all shadow-lg shadow-emerald-500/20 flex items-center gap-2 cursor-pointer shrink-0 whitespace-nowrap"
             >
               <Plus size={16} className="stroke-[3]" /> Create New Project
             </Link>
@@ -221,7 +221,7 @@ export default function ProjectsDashboard() {
       </div>
 
       {/* KPI METRIC CARDS */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3.5 sm:gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-3.5 sm:gap-4">
         {/* CARD 1: ACTIVE INSTALLATIONS */}
         <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col justify-between hover:border-blue-300 transition-colors">
           <div className="flex items-center justify-between">
@@ -279,7 +279,7 @@ export default function ProjectsDashboard() {
         </div>
 
         {/* CARD 5: DELAYED / REQUIRING ATTENTION */}
-        <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col justify-between hover:border-amber-300 transition-colors col-span-2 lg:col-span-1">
+        <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col justify-between hover:border-amber-300 transition-colors col-span-2 sm:col-span-1 xl:col-span-1">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500">Attention Needed</span>
             <span className="w-7 h-7 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center font-bold text-xs">
@@ -294,10 +294,10 @@ export default function ProjectsDashboard() {
       </div>
 
       {/* TOOLBAR: SEARCH & FILTERS */}
-      <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
+      <div className="bg-white rounded-2xl p-3.5 sm:p-4 shadow-sm border border-slate-200 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 sm:gap-4">
         
         {/* SEARCH BAR */}
-        <div className="relative flex-1 max-w-lg">
+        <div className="relative flex-1 min-w-[240px]">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
           <input
             type="text"
@@ -339,7 +339,7 @@ export default function ProjectsDashboard() {
           </div>
 
           {/* STATUS PILLS */}
-          <div className="flex bg-slate-100 p-1 rounded-xl text-xs font-bold text-slate-600">
+          <div className="flex bg-slate-100 p-1 rounded-xl text-xs font-bold text-slate-600 flex-wrap">
             <button
               onClick={() => setSelectedStatus('ALL')}
               className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
@@ -377,19 +377,19 @@ export default function ProjectsDashboard() {
       </div>
 
       {/* MASTER PROJECTS TABLE */}
-      <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs whitespace-nowrap">
+      <div className="bg-white rounded-2xl sm:rounded-3xl shadow-sm border border-slate-200 overflow-hidden w-full">
+        <div className="overflow-x-auto w-full custom-scrollbar">
+          <table className="w-full text-left text-xs whitespace-nowrap min-w-[960px]">
             <thead className="bg-slate-50 text-slate-500 uppercase tracking-wider text-[11px] font-extrabold border-b border-slate-200">
               <tr>
-                <th className="px-6 py-4">Project ID & Title</th>
-                <th className="px-6 py-4">Customer & Location</th>
-                <th className="px-6 py-4">Solar PV System</th>
-                <th className="px-6 py-4">Proposal / Quotation</th>
-                <th className="px-6 py-4">Execution Stage</th>
-                <th className="px-6 py-4">Discom & Subsidy</th>
-                <th className="px-6 py-4">Contract Value</th>
-                <th className="px-6 py-4 text-right">Actions</th>
+                <th className="px-4 sm:px-5 py-3.5">Project ID & Title</th>
+                <th className="px-4 sm:px-5 py-3.5">Customer & Location</th>
+                <th className="px-4 sm:px-5 py-3.5">Solar PV System</th>
+                <th className="px-4 sm:px-5 py-3.5">Proposal / Quotation</th>
+                <th className="px-4 sm:px-5 py-3.5">Execution Stage</th>
+                <th className="px-4 sm:px-5 py-3.5">Discom & Subsidy</th>
+                <th className="px-4 sm:px-5 py-3.5">Contract Value</th>
+                <th className="px-4 sm:px-5 py-3.5 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -430,9 +430,9 @@ export default function ProjectsDashboard() {
                       className="hover:bg-slate-50/80 transition-colors cursor-pointer group"
                     >
                       {/* PROJECT ID & TITLE */}
-                      <td className="px-6 py-4">
+                      <td className="px-4 sm:px-5 py-3.5">
                         <div className="flex items-center gap-2.5">
-                          <span className="w-8 h-8 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center font-bold text-xs group-hover:bg-emerald-50 group-hover:text-emerald-700 transition-colors">
+                          <span className="w-8 h-8 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center font-bold text-xs group-hover:bg-emerald-50 group-hover:text-emerald-700 transition-colors shrink-0">
                             <Briefcase size={15} />
                           </span>
                           <div>
@@ -450,7 +450,7 @@ export default function ProjectsDashboard() {
                       </td>
 
                       {/* CUSTOMER & LOCATION */}
-                      <td className="px-6 py-4">
+                      <td className="px-4 sm:px-5 py-3.5">
                         <div className="flex items-center gap-2">
                           <span className="w-6 h-6 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center text-[10px] font-bold uppercase shrink-0">
                             {(client?.name || 'C')[0]}
@@ -465,7 +465,7 @@ export default function ProjectsDashboard() {
                       </td>
 
                       {/* SOLAR SYSTEM SPECS */}
-                      <td className="px-6 py-4">
+                      <td className="px-4 sm:px-5 py-3.5">
                         <div className="space-y-0.5">
                           <div className="flex items-center gap-1.5">
                             <span className="font-black text-slate-900 text-xs">{project.capacity || 5} kWp</span>
@@ -480,7 +480,7 @@ export default function ProjectsDashboard() {
                       </td>
 
                       {/* ORIGINATING QUOTATION */}
-                      <td className="px-6 py-4" onClick={e => e.stopPropagation()}>
+                      <td className="px-4 sm:px-5 py-3.5" onClick={e => e.stopPropagation()}>
                         {project.quotation ? (
                           <Link
                             href={`/tenant/quotations?search=${project.quotation.qNumber}`}
@@ -498,7 +498,7 @@ export default function ProjectsDashboard() {
                       </td>
 
                       {/* STAGE & EXECUTION PROGRESS */}
-                      <td className="px-6 py-4">
+                      <td className="px-4 sm:px-5 py-3.5">
                         <div className="space-y-1.5 min-w-[140px]">
                           <div className="flex items-center justify-between">
                             {getStageBadge(project.currentStage)}
@@ -516,7 +516,7 @@ export default function ProjectsDashboard() {
                       </td>
 
                       {/* DISCOM & SUBSIDY STATUS */}
-                      <td className="px-6 py-4">
+                      <td className="px-4 sm:px-5 py-3.5">
                         <div className="space-y-1">
                           {discom ? (
                             <span className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200 block w-fit">
@@ -534,7 +534,7 @@ export default function ProjectsDashboard() {
                       </td>
 
                       {/* CONTRACT VALUE */}
-                      <td className="px-6 py-4">
+                      <td className="px-4 sm:px-5 py-3.5">
                         <div>
                           <p className="font-black text-slate-900 text-xs">
                             ₹{(project.estimatedValue || 0).toLocaleString()}
@@ -546,7 +546,7 @@ export default function ProjectsDashboard() {
                       </td>
 
                       {/* ACTIONS */}
-                      <td className="px-6 py-4 text-right" onClick={e => e.stopPropagation()}>
+                      <td className="px-4 sm:px-5 py-3.5 text-right" onClick={e => e.stopPropagation()}>
                         <div className="flex items-center justify-end gap-1.5">
                           
                           {/* QUICK STAGE ADVANCEMENT MODAL */}
