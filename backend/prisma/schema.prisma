@@ -960,13 +960,47 @@ model SubsidyApplication {
   projectId String?
   project   Project? @relation(fields: [projectId], references: [id])
 
-  applicationNo String?
-  status        String  @default("APPLICATION_SUBMITTED") // APPLICATION_SUBMITTED, CLAIM_APPROVED, DISBURSED, REJECTED
-  amount        Float?
+  applicationNo        String?
+  nationalPortalAppNo  String? // e.g. PMSG-MH-2026-00412
+  consumerNumber       String? // DISCOM CA / Consumer Number
+  discomName           String? // e.g. MSEDCL, TPDDL, BESCOM
+  division             String?
+  subDivision          String?
 
+  status               String   @default("APPLICATION_SUBMITTED")
+  portalStage          String   @default("CONSUMER_SELECTION") // CONSUMER_SELECTION, FEASIBILITY_PENDING, FEASIBILITY_APPROVED, WORK_COMPLETED, METER_INSPECTED, CLAIM_GENERATED, DBT_DISBURSED, REJECTED
+  
+  proposedCapacity     Float?   // in kWp
+  centralSubsidyAmount Float?   // 30000, 60000, 78000
+  stateSubsidyAmount   Float?   @default(0)
+  amount               Float?   // Total subsidy
+
+  // Technical Hardware for Portal
+  dcrModuleSerials     String?  // Comma-separated or JSON list of panel barcodes
+  inverterMakeModel    String?
+  inverterSerial       String?
+  latitude             Float?
+  longitude            Float?
+
+  // DBT Bank Verification
+  bankName             String?
+  accountNumber        String?
+  ifscCode             String?
+  accountHolderName    String?
+  nameMatchVerified    Boolean  @default(false)
+
+  // Document & Geo-photo URLs
   applicationDocumentUrl String?
   claimDocumentUrl       String?
   disbursementProofUrl   String?
+  geoPhotos              String? // JSON string: { arrayPhoto, inverterPhoto, meterPhoto, earthingPhoto, chequePhoto }
+
+  // SLA tracking
+  submittedDate        DateTime? @default(now())
+  feasibilityDate      DateTime?
+  workCompletedDate    DateTime?
+  commissionedDate     DateTime?
+  disbursedDate        DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

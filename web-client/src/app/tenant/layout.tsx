@@ -37,7 +37,7 @@ const MENU_GROUPS = [
     title: 'FINANCE',
     items: [
       { name: 'Finance & Billing', icon: Receipt, path: '/tenant/finance' },
-      { name: 'Subsidy', icon: Landmark, path: '/tenant/subsidy' },
+      { name: 'PM Surya Ghar Portal', icon: Landmark, path: '/tenant/subsidy' },
       { name: 'Loans', icon: Banknote, path: '/tenant/loans' },
     ]
   },
