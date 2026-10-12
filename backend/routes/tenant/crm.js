@@ -939,7 +939,7 @@ router.post('/api/tenant/projects', requireTenantAuth, async (req, res) => {
     
     // Auto-fill from Quotation if linked
     if (quotationId) {
-      const quote = await prisma.quotation.findUnique({
+      const quote = await prisma.quotation.findFirst({
         where: { id: quotationId, tenantId: req.user.tenantId },
         include: { customer: true, lead: true, items: true }
       });
@@ -960,12 +960,56 @@ router.post('/api/tenant/projects', requireTenantAuth, async (req, res) => {
           where: { id: quote.id },
           data: { status: 'ACCEPTED', isLocked: true }
         });
+      } else {
+        quotationId = null;
       }
+    } else {
+      quotationId = null;
+    }
+
+    // Defensive Foreign Key Validations to prevent P2003 constraint failures
+    if (customerId) {
+      const custExists = await prisma.customer.findFirst({ where: { id: customerId, tenantId: req.user.tenantId } });
+      if (!custExists) customerId = null;
+    } else {
+      customerId = null;
+    }
+
+    if (leadId) {
+      const leadExists = await prisma.lead.findFirst({ where: { id: leadId, tenantId: req.user.tenantId } });
+      if (!leadExists) leadId = null;
+    } else {
+      leadId = null;
+    }
+
+    if (surveyId) {
+      const surveyExists = await prisma.siteSurvey.findFirst({ where: { id: surveyId, tenantId: req.user.tenantId } });
+      if (!surveyExists) surveyId = null;
+    } else {
+      surveyId = null;
+    }
+
+    if (projectOwnerId) {
+      const ownerExists = await prisma.user.findFirst({ where: { id: projectOwnerId, tenantId: req.user.tenantId } });
+      if (!ownerExists) projectOwnerId = null;
+    } else {
+      projectOwnerId = null;
     }
 
     // Generate clean unique project number
     const count = await prisma.project.count({ where: { tenantId: req.user.tenantId } });
-    const projectNumber = `PRJ-${(count + 1).toString().padStart(5, '0')}`;
+    let projectNumber = `PRJ-${(count + 1).toString().padStart(5, '0')}`;
+    const existingNum = await prisma.project.findFirst({ where: { tenantId: req.user.tenantId, projectNumber } });
+    if (existingNum) {
+      projectNumber = `PRJ-${Date.now().toString().slice(-5)}`;
+    }
+
+    const validStartDate = startDate && !isNaN(new Date(startDate).getTime()) 
+      ? new Date(startDate) 
+      : new Date();
+    const validEndDate = expectedCompletionDate && !isNaN(new Date(expectedCompletionDate).getTime()) 
+      ? new Date(expectedCompletionDate) 
+      : null;
 
     const project = await prisma.project.create({
       data: {
@@ -976,7 +1020,7 @@ router.post('/api/tenant/projects', requireTenantAuth, async (req, res) => {
         leadId: leadId || null,
         quotationId: quotationId || null,
         surveyId: surveyId || null,
-        capacity: parseFloat(capacity) || 5.0,
+        capacity: parseFloat(capacity) > 0 ? parseFloat(capacity) : 5.0,
         capacityUnit: 'kWp',
         systemType: systemType || 'On-Grid',
         projectType: projectType || 'Residential',
@@ -985,11 +1029,11 @@ router.post('/api/tenant/projects', requireTenantAuth, async (req, res) => {
         city: city || 'Pune',
         state: state || 'Maharashtra',
         pincode: pincode || '411001',
-        startDate: startDate ? new Date(startDate) : new Date(),
-        expectedCompletionDate: expectedCompletionDate ? new Date(expectedCompletionDate) : null,
+        startDate: validStartDate,
+        expectedCompletionDate: validEndDate,
         priority: priority || 'Medium',
-        estimatedValue: parseFloat(estimatedValue) || 0,
-        estimatedCost: parseFloat(estimatedCost) || 0,
+        estimatedValue: parseFloat(estimatedValue) >= 0 ? parseFloat(estimatedValue) : 0,
+        estimatedCost: parseFloat(estimatedCost) >= 0 ? parseFloat(estimatedCost) : 0,
         progressPercent: 15,
         currentStage: 'Planning',
         status: 'In Progress',
@@ -1468,7 +1512,7 @@ router.patch('/api/tenant/materials/:id', requireTenantAuth, async (req, res) =>
 
 
 // CUSTOMERS
-router.get('/api/tenant/customers', requireTenantAuth, async (req, res) => {
+router.get(['/api/tenant/customers', '/api/tenant/crm/customers'], requireTenantAuth, async (req, res) => {
   try {
     const customers = await prisma.customer.findMany({
       where: { tenantId: req.user.tenantId },

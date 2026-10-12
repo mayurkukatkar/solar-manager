@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { 
   ArrowLeft, Save, Briefcase, Zap, MapPin, Calendar, 
   Users, DollarSign, FileText, CheckCircle2, Sun, Sparkles,
-  User, ShieldCheck, AlertCircle, Loader2, ArrowRight
+  User, ShieldCheck, AlertCircle, Loader2, ArrowRight, Plus
 } from 'lucide-react';
 
 function NewProjectContent() {
@@ -62,7 +62,7 @@ function NewProjectContent() {
         const [quotesRes, leadsRes, custRes, staffRes] = await Promise.all([
           axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/quotations`, { withCredentials: true }).catch(() => ({ data: { quotations: [] } })),
           axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/leads`, { withCredentials: true }).catch(() => ({ data: { leads: [] } })),
-          axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/crm/customers`, { withCredentials: true }).catch(() => ({ data: { customers: [] } })),
+          axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/customers`, { withCredentials: true }).catch(() => ({ data: { customers: [] } })),
           axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/staff`, { withCredentials: true }).catch(() => ({ data: { staff: [] } }))
         ]);
 
@@ -208,7 +208,7 @@ function NewProjectContent() {
   const estMarginPercent = estValNum > 0 ? Math.round((estProfit / estValNum) * 100) : 0;
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 pb-20">
+    <div className="max-w-4xl mx-auto space-y-6 pb-20 w-full min-w-0">
       
       {/* TOP BREADCRUMB */}
       <button 
