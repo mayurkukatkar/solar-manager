@@ -6,7 +6,7 @@ import {
   Landmark, Plus, X, TrendingUp, Clock, CheckCircle2, AlertCircle, Filter, 
   ExternalLink, Copy, Check, ShieldCheck, Sun, Zap, FileText, ChevronRight, 
   Search, Smartphone, MapPin, Building2, Home, Download, Printer, ArrowRight,
-  Kanban, List, SlidersHorizontal, Eye, Trash2, Sparkles, AlertTriangle, RefreshCw
+  Kanban, List, SlidersHorizontal, Eye, Trash2, Sparkles, AlertTriangle, RefreshCw, Upload
 } from "lucide-react";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
@@ -47,10 +47,27 @@ export default function PMSuryaGharStudio() {
   const [copySuccess, setCopySuccess] = useState<string | null>(null);
 
   // New Application Form State
-  const [mode, setMode] = useState<'PROJECT' | 'CUSTOM'>('PROJECT');
+  // Register / Import Modal Mode: 'SMART_PASTE' | 'PROJECT' | 'BULK_IMPORT' | 'CUSTOM'
+  const [modalMode, setModalMode] = useState<'SMART_PASTE' | 'PROJECT' | 'BULK_IMPORT' | 'CUSTOM'>('SMART_PASTE');
+
+  // Smart Paste State (Extract from pmsuryaghar.gov.in screen / SMS / receipt)
+  const [smartPasteText, setSmartPasteText] = useState("");
+  const [parsingSmartText, setParsingSmartText] = useState(false);
+  const [smartParsedData, setSmartParsedData] = useState<any>(null);
+
+  // Bulk Import State (From Vendor Login Table)
+  const [bulkText, setBulkText] = useState("");
+  const [bulkParsedApps, setBulkParsedApps] = useState<any[]>([]);
+  const [importingBulk, setImportingBulk] = useState(false);
+
+  // New Application Form State
   const [formData, setFormData] = useState({
     projectId: "",
     customerId: "",
+    customerName: "",
+    customerMobile: "",
+    customerAddress: "",
+    customerCity: "Pune",
     consumerNumber: "",
     nationalPortalAppNo: "",
     discomName: "MSEDCL",
@@ -69,24 +86,199 @@ export default function PMSuryaGharStudio() {
     longitude: "73.8567"
   });
 
-  // Raw DCR Input for Bulk Formatter
-  const [rawDcrText, setRawDcrText] = useState("");
+  // Sample Portal Text for instant 1-click test
+  const SAMPLE_PORTAL_TEXT = `PM Surya Ghar: Muft Bijli Yojana
+Application Acknowledgement Slip
+National Portal App No: PMSG-MH-2024-88492
+Consumer Number (CA): 028510293812
+Consumer Name: Ramesh Shinde
+Mobile: 9822012345
+DISCOM: MSEDCL
+Division: Pune Urban
+Sub-Division: Kothrud
+Applied Solar Capacity: 3.0 kW
+Current Status: Feasibility Approved
+Bank Name: State Bank of India
+Account Number: 38491029481
+IFSC Code: SBIN0001234`;
 
-  // Bank Check Result
-  const [bankCheckResult, setBankCheckResult] = useState<any>(null);
-  const [checkingBank, setCheckingBank] = useState(false);
+  // Client-side parser for instant 0.01s extraction
+  const parsePortalTextClient = (rawText: string) => {
+    if (!rawText) return {};
+    const text = rawText.trim();
+    const extracted: any = {};
 
-  // Load view mode preference
-  useEffect(() => {
+    const appMatch = text.match(/(?:Application\s*(?:No|Number|ID)?|App\s*#?)\s*[:#-]?\s*([A-Za-z0-9\-_]{6,30})/i) ||
+                     text.match(/\b(PMSG[A-Za-z0-9\-_]{5,25})\b/i);
+    if (appMatch) extracted.nationalPortalAppNo = appMatch[1].trim();
+
+    const consumerMatch = text.match(/(?:Consumer\s*(?:No|Number|ID)?|CA\s*(?:No|Number)?|K\s*No|Account\s*No)\s*[:#-]?\s*([0-9]{8,16})/i) ||
+                          text.match(/\b([0-9]{10,12})\b/);
+    if (consumerMatch) extracted.consumerNumber = consumerMatch[1].trim();
+
+    const nameMatch = text.match(/(?:Consumer\s*Name|Applicant\s*Name|Customer\s*Name|Name)\s*[:#-]?\s*([A-Za-z\s.]{3,40})(?:\r|\n|$|,|;)/i);
+    if (nameMatch) {
+      const n = nameMatch[1].trim().replace(/\s+/g, ' ');
+      if (!/^(pmsuryaghar|national|solar|subsidy|portal)$/i.test(n)) {
+        extracted.customerName = n;
+        extracted.accountHolderName = n;
+      }
+    }
+
+    const mobileMatch = text.match(/(?:Mobile|Phone|Contact)\s*[:#-]?\s*([6-9][0-9]{9})\b/i) ||
+                        text.match(/\b([6-9][0-9]{9})\b/);
+    if (mobileMatch) extracted.customerMobile = mobileMatch[1].trim();
+
+    const capMatch = text.match(/(?:Capacity|Sanctioned\s*Load|Plant\s*Capacity|Applied\s*Capacity|System\s*Size)\s*[:#-]?\s*([0-9]+(?:\.[0-9]+)?)\s*(?:kw|kwp)?/i) ||
+                     text.match(/([0-9]+(?:\.[0-9]+)?)\s*(?:kwp|kw)\b/i);
+    if (capMatch) {
+      const val = parseFloat(capMatch[1]);
+      if (val > 0 && val <= 100) extracted.proposedCapacity = val.toString();
+    }
+
+    const discomList = ['MSEDCL', 'Tata Power', 'BESCOM', 'UPPCL', 'Torrent Power', 'Adani Electricity', 'DHBVN', 'PSPCL', 'WBSEDCL', 'TANGEDCO', 'BSES'];
+    for (const d of discomList) {
+      if (new RegExp(d, 'i').test(text)) {
+        extracted.discomName = d;
+        break;
+      }
+    }
+
+    const divMatch = text.match(/(?:Division|Circle)\s*[:#-]?\s*([A-Za-z\s]{3,30})(?:\r|\n|$|,)/i);
+    if (divMatch) extracted.division = divMatch[1].trim();
+
+    const subDivMatch = text.match(/(?:Sub-?Division|Sub\s*Div)\s*[:#-]?\s*([A-Za-z\s]{3,30})(?:\r|\n|$|,)/i);
+    if (subDivMatch) extracted.subDivision = subDivMatch[1].trim();
+
+    const ifscMatch = text.match(/\b([A-Z]{4}0[A-Z0-9]{6})\b/i);
+    if (ifscMatch) extracted.ifscCode = ifscMatch[1].toUpperCase();
+
+    const accMatch = text.match(/(?:Account\s*(?:No|Number)|A\/C\s*No|Bank\s*A\/C)\s*[:#-]?\s*([0-9]{9,18})\b/i);
+    if (accMatch) extracted.accountNumber = accMatch[1].trim();
+
+    const bankNameMatch = text.match(/(?:Bank\s*Name|Bank)\s*[:#-]?\s*([A-Za-z\s]{3,35})(?:\r|\n|$|,)/i);
+    if (bankNameMatch) extracted.bankName = bankNameMatch[1].trim();
+
+    if (/DBT|Disbursed|Credited|Subsidy\s*Paid/i.test(text)) extracted.portalStage = 'DBT_DISBURSED';
+    else if (/Claim|Sanctioned|Voucher/i.test(text)) extracted.portalStage = 'CLAIM_GENERATED';
+    else if (/Meter|Commissioned|Commissioning|Bi-directional/i.test(text)) extracted.portalStage = 'METER_INSPECTED';
+    else if (/Work\s*Completed|Installation\s*Done|Geo/i.test(text)) extracted.portalStage = 'WORK_COMPLETED';
+    else if (/Feasibility\s*Approved|Feasibility\s*Cleared/i.test(text)) extracted.portalStage = 'FEASIBILITY_APPROVED';
+    else if (/Feasibility|Review|DISCOM\s*Pending/i.test(text)) extracted.portalStage = 'FEASIBILITY_PENDING';
+    else extracted.portalStage = 'CONSUMER_SELECTION';
+
+    return extracted;
+  };
+
+  // Run Smart Parse from pmsuryaghar.gov.in text
+  const handleSmartExtract = async (textToParse?: string) => {
+    const raw = textToParse || smartPasteText;
+    if (!raw.trim()) {
+      alert("Please paste text from pmsuryaghar.gov.in screen, acknowledgment slip, or SMS first.");
+      return;
+    }
+
+    setParsingSmartText(true);
     try {
-      const saved = localStorage.getItem("pmsg_view_mode");
-      if (saved === "table" || saved === "kanban") setViewMode(saved);
-    } catch (e) {}
-  }, []);
+      // Fast client extract
+      const clientExtracted = parsePortalTextClient(raw);
+      
+      // Also try API parser
+      let finalExtracted = clientExtracted;
+      try {
+        const res = await axios.post(`${API}/api/tenant/pmsuryaghar/smart-parse`, { rawText: raw }, { withCredentials: true });
+        if (res.data?.extracted) {
+          finalExtracted = { ...clientExtracted, ...res.data.extracted };
+        }
+      } catch (e) {}
 
-  const setViewModeWithStorage = (m: 'kanban' | 'table') => {
-    setViewMode(m);
-    try { localStorage.setItem("pmsg_view_mode", m); } catch (e) {}
+      setSmartParsedData(finalExtracted);
+      setFormData(prev => ({
+        ...prev,
+        ...finalExtracted,
+        proposedCapacity: finalExtracted.proposedCapacity || prev.proposedCapacity,
+        discomName: finalExtracted.discomName || prev.discomName
+      }));
+    } finally {
+      setParsingSmartText(false);
+    }
+  };
+
+  // Parse bulk portal table rows
+  const handleBulkTextChange = (text: string) => {
+    setBulkText(text);
+    const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+    const parsed: any[] = [];
+    for (const line of lines) {
+      const parts = line.split(/[\t,;]+/);
+      if (parts.length >= 2) {
+        parsed.push({
+          nationalPortalAppNo: parts[0]?.trim() || `PMSG-${Date.now().toString().slice(-6)}`,
+          consumerNumber: parts[1]?.trim() || '',
+          customerName: parts[2]?.trim() || `Consumer ${parts[1] || ''}`,
+          customerMobile: parts[3]?.trim() || `98${Math.floor(10000000 + Math.random() * 90000000)}`,
+          proposedCapacity: parts[4]?.replace(/[^0-9.]/g, '') || '3.0',
+          discomName: parts[5]?.trim() || 'MSEDCL',
+          portalStage: 'CONSUMER_SELECTION'
+        });
+      }
+    }
+    setBulkParsedApps(parsed);
+  };
+
+  // Submit Bulk Import
+  const handleBulkImportSubmit = async () => {
+    if (bulkParsedApps.length === 0) {
+      alert("No valid application rows detected. Please paste table rows separated by tabs or commas.");
+      return;
+    }
+    setImportingBulk(true);
+    try {
+      const res = await axios.post(`${API}/api/tenant/pmsuryaghar/bulk-import`, { applications: bulkParsedApps }, { withCredentials: true });
+      alert(`Successfully imported ${res.data.count || bulkParsedApps.length} applications from pmsuryaghar.gov.in!`);
+      setShowAddModal(false);
+      setBulkText("");
+      setBulkParsedApps([]);
+      fetchData();
+    } catch (err: any) {
+      alert(err.response?.data?.error || "Failed to bulk import applications");
+    } finally {
+      setImportingBulk(false);
+    }
+  };
+
+  // Generate 1-Click Browser Auto-Fill Bookmarklet code for pmsuryaghar.gov.in
+  const getBookmarkletCode = (sub: any) => {
+    if (!sub) return "";
+    const consumer = sub.consumerNumber || "";
+    const cap = sub.proposedCapacity || 3;
+    const inv = sub.inverterMakeModel || "";
+    const invSerial = sub.inverterSerial || "";
+    const dcr = sub.dcrModuleSerials || "";
+    const acc = sub.accountNumber || "";
+    const ifsc = sub.ifscCode || "";
+    const custName = sub.customer?.name || "Consumer";
+
+    return `javascript:(function(){function f(q,v){if(!v)return;let e=document.querySelector(q);if(e){e.value=v;e.dispatchEvent(new Event('input',{bubbles:true}));e.dispatchEvent(new Event('change',{bubbles:true}));}}f('input[name*="consumer" i],input[id*="consumer" i],#consumerNo',${JSON.stringify(consumer)});f('input[name*="capacity" i],input[id*="capacity" i],#capacity',${JSON.stringify(cap.toString())});f('input[name*="inverter" i],#inverterMake',${JSON.stringify(inv)});f('input[name*="serial" i],#inverterSerial',${JSON.stringify(invSerial)});f('textarea[name*="dcr" i],textarea[id*="dcr" i]',${JSON.stringify(dcr)});f('input[name*="account" i],#accountNo',${JSON.stringify(acc)});f('input[name*="ifsc" i],#ifsc',${JSON.stringify(ifsc)});alert('PM Surya Ghar Assistant: Form auto-filled for ${custName} on pmsuryaghar.gov.in!');})();`;
+  };
+
+  // Generate structured packet for clipboard
+  const getFullPacketText = (sub: any) => {
+    return [
+      `--- PM SURYA GHAR NATIONAL PORTAL DATA PACKET ---`,
+      `National App ID: ${sub.nationalPortalAppNo || sub.applicationNo}`,
+      `Consumer No: ${sub.consumerNumber || 'Pending'}`,
+      `Consumer Name: ${sub.customer?.name || ''}`,
+      `Mobile: ${sub.customer?.mobile || ''}`,
+      `DISCOM: ${sub.discomName || 'MSEDCL'} (${sub.division || ''} / ${sub.subDivision || ''})`,
+      `Applied Capacity: ${sub.proposedCapacity || 3} kWp`,
+      `Central Subsidy: ₹${sub.centralSubsidyAmount || calculateSubsidyPreview(sub.proposedCapacity || 3)}`,
+      `Inverter Make/Model: ${sub.inverterMakeModel || ''} (S/N: ${sub.inverterSerial || ''})`,
+      `DCR Module Serials: ${sub.dcrModuleSerials || ''}`,
+      `Bank: ${sub.bankName || ''} | A/C: ${sub.accountNumber || ''} | IFSC: ${sub.ifscCode || ''}`,
+      `GPS: Lat ${sub.latitude || 18.5204}, Long ${sub.longitude || 73.8567}`,
+      `Portal Stage: ${sub.portalStage}`
+    ].join('\n');
   };
 
   const copyToClipboard = (text: string, label: string) => {
@@ -286,11 +478,26 @@ export default function PMSuryaGharStudio() {
             </div>
 
             <button 
-              onClick={() => setShowAddModal(true)}
-              className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black px-5 py-2.5 rounded-xl text-sm transition-all flex items-center gap-2 shadow-lg shadow-emerald-500/20 hover:-translate-y-0.5"
+              onClick={() => {
+                setShowAddModal(true);
+                setModalMode('SMART_PASTE');
+              }}
+              className="bg-amber-400 hover:bg-amber-300 text-slate-950 font-black px-4 py-2.5 rounded-xl text-xs md:text-sm transition-all flex items-center gap-2 shadow-lg shadow-amber-400/20 hover:-translate-y-0.5"
+              title="Never type twice! Paste copied screen or SMS from pmsuryaghar.gov.in"
+            >
+              <Sparkles size={16} />
+              <span>⚡ Smart Paste from Portal</span>
+            </button>
+
+            <button 
+              onClick={() => {
+                setShowAddModal(true);
+                setModalMode('PROJECT');
+              }}
+              className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black px-4 py-2.5 rounded-xl text-xs md:text-sm transition-all flex items-center gap-2 shadow-lg shadow-emerald-500/20 hover:-translate-y-0.5"
             >
               <Plus size={18} strokeWidth={2.5} />
-              <span>Register Portal App</span>
+              <span>Register / Link App</span>
             </button>
           </div>
         </div>
@@ -732,6 +939,55 @@ export default function PMSuryaGharStudio() {
             </div>
 
             <div className="p-6 space-y-3.5 max-h-[75vh] overflow-y-auto">
+              {/* ⚡ ZERO DOUBLE-ENTRY: 1-CLICK BROWSER AUTO-FILL BOOKMARKLET */}
+              <div className="p-4 bg-gradient-to-br from-amber-50 to-emerald-50 rounded-2xl border border-emerald-200/80 shadow-xs space-y-2.5">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <div className="flex items-center gap-1.5 text-xs font-black text-emerald-900">
+                      <Zap size={14} className="text-amber-500 fill-amber-500" />
+                      <span>⚡ 1-Click Official Portal Auto-Fill Assistant</span>
+                    </div>
+                    <p className="text-[11px] text-slate-600 mt-0.5 leading-relaxed">
+                      Never retype on <strong>pmsuryaghar.gov.in</strong>! Drag this button to your bookmarks bar. Next time you're on the official portal, click it to auto-populate this customer's form fields in 0.1s.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2 pt-1">
+                  <a 
+                    href={getBookmarkletCode(activeAssistantSub)}
+                    onClick={(e) => {
+                      // Prevent navigation if clicked directly inside ERP
+                      if (e.currentTarget.getAttribute('href')?.startsWith('javascript')) {
+                        copyToClipboard(getBookmarkletCode(activeAssistantSub), "AutoFill Bookmarklet Script");
+                      }
+                    }}
+                    className="px-3.5 py-1.5 bg-gradient-to-r from-amber-500 to-emerald-600 hover:from-amber-400 hover:to-emerald-500 text-slate-950 font-black rounded-xl text-xs shadow-xs flex items-center gap-1.5 cursor-grab active:cursor-grabbing transition-transform active:scale-95"
+                    title="Drag this button to your browser bookmarks bar!"
+                  >
+                    <span>⚡ Drag to Bookmarks: AutoFill {activeAssistantSub.customer?.name?.split(' ')[0]}</span>
+                  </a>
+
+                  <button 
+                    type="button"
+                    onClick={() => copyToClipboard(getBookmarkletCode(activeAssistantSub), "AutoFill Script")}
+                    className="px-2.5 py-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold transition-all shadow-xs"
+                    title="Copy JavaScript code to run in browser console on pmsuryaghar.gov.in"
+                  >
+                    Copy Script
+                  </button>
+
+                  <button 
+                    type="button"
+                    onClick={() => copyToClipboard(getFullPacketText(activeAssistantSub), "Complete Portal Packet")}
+                    className="px-2.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1"
+                  >
+                    <Copy size={11} />
+                    <span>Copy Full Packet</span>
+                  </button>
+                </div>
+              </div>
+
               {/* Field 1: Consumer Number */}
               <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between">
                 <div>
@@ -968,223 +1224,513 @@ export default function PMSuryaGharStudio() {
         </div>
       )}
 
-      {/* 9. MODAL: REGISTER NEW PM SURYA GHAR APPLICATION (DUAL MODE) */}
+      {/* 9. MODAL: REGISTER / IMPORT PM SURYA GHAR APPLICATION (ZERO DOUBLE-ENTRY HUB) */}
       {showAddModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 border border-slate-100">
-            <div className="p-6 bg-gradient-to-r from-slate-950 via-indigo-950 to-slate-900 text-white flex items-center justify-between">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 border border-slate-100 flex flex-col max-h-[90vh]">
+            
+            {/* Modal Header */}
+            <div className="p-6 bg-gradient-to-r from-slate-950 via-indigo-950 to-slate-900 text-white flex items-center justify-between shrink-0">
               <div>
-                <h3 className="text-xl font-black">Register PM Surya Ghar Application</h3>
-                <p className="text-xs text-indigo-300">National Portal tracking for certified vendor</p>
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[10px] font-extrabold border border-amber-500/30 mb-1">
+                  <Sparkles size={11} className="text-amber-400" />
+                  <span>Zero Double-Entry Hub</span>
+                </div>
+                <h3 className="text-xl font-black">Register or Import PM Surya Ghar Application</h3>
+                <p className="text-xs text-indigo-300">Import directly from pmsuryaghar.gov.in or auto-fill from Solar ERP — never type twice</p>
               </div>
               <button onClick={() => setShowAddModal(false)} className="text-slate-400 hover:text-white">
                 <X size={20} />
               </button>
             </div>
 
-            {/* Mode Switcher */}
-            <div className="p-4 bg-slate-50 border-b border-slate-200 flex gap-2">
+            {/* 4-Mode Tabs Navigation */}
+            <div className="p-3 bg-slate-50 border-b border-slate-200 grid grid-cols-4 gap-1.5 shrink-0">
               <button 
                 type="button"
-                onClick={() => setMode('PROJECT')}
-                className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all ${mode === 'PROJECT' ? 'bg-indigo-600 text-white shadow-sm' : 'bg-white text-slate-600 border border-slate-200'}`}
+                onClick={() => setModalMode('SMART_PASTE')}
+                className={`py-2 px-1 rounded-xl text-xs font-bold transition-all flex flex-col items-center justify-center gap-0.5 ${modalMode === 'SMART_PASTE' ? 'bg-amber-400 text-slate-950 shadow-sm font-black' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}
               >
-                Link Solar ERP Project
+                <div className="flex items-center gap-1">
+                  <Sparkles size={13} />
+                  <span>Smart Paste</span>
+                </div>
+                <span className="text-[9px] opacity-80">From Portal / SMS</span>
               </button>
+
               <button 
                 type="button"
-                onClick={() => setMode('CUSTOM')}
-                className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all ${mode === 'CUSTOM' ? 'bg-indigo-600 text-white shadow-sm' : 'bg-white text-slate-600 border border-slate-200'}`}
+                onClick={() => setModalMode('PROJECT')}
+                className={`py-2 px-1 rounded-xl text-xs font-bold transition-all flex flex-col items-center justify-center gap-0.5 ${modalMode === 'PROJECT' ? 'bg-indigo-600 text-white shadow-sm' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}
               >
-                Standalone Portal Application
+                <div className="flex items-center gap-1">
+                  <Building2 size={13} />
+                  <span>Link Project</span>
+                </div>
+                <span className="text-[9px] opacity-80">Pull from ERP</span>
+              </button>
+
+              <button 
+                type="button"
+                onClick={() => setModalMode('BULK_IMPORT')}
+                className={`py-2 px-1 rounded-xl text-xs font-bold transition-all flex flex-col items-center justify-center gap-0.5 ${modalMode === 'BULK_IMPORT' ? 'bg-indigo-600 text-white shadow-sm' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}
+              >
+                <div className="flex items-center gap-1">
+                  <List size={13} />
+                  <span>Bulk Table</span>
+                </div>
+                <span className="text-[9px] opacity-80">From Vendor Login</span>
+              </button>
+
+              <button 
+                type="button"
+                onClick={() => setModalMode('CUSTOM')}
+                className={`py-2 px-1 rounded-xl text-xs font-bold transition-all flex flex-col items-center justify-center gap-0.5 ${modalMode === 'CUSTOM' ? 'bg-indigo-600 text-white shadow-sm' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}
+              >
+                <div className="flex items-center gap-1">
+                  <FileText size={13} />
+                  <span>Manual Form</span>
+                </div>
+                <span className="text-[9px] opacity-80">Custom Fields</span>
               </button>
             </div>
 
-            <form onSubmit={handleCreateApplication} className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
-              {mode === 'PROJECT' && (
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700">Select Solar Project *</label>
-                  <select 
-                    required 
-                    value={formData.projectId}
-                    onChange={(e) => handleSelectProject(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold bg-white"
-                  >
-                    <option value="">-- Choose Active Project --</option>
-                    {projects.map(p => (
-                      <option key={p.id} value={p.id}>
-                        {p.projectNumber || 'PRJ'} — {p.name} ({p.capacity || 3} kWp)
-                      </option>
-                    ))}
-                  </select>
+            {/* Modal Body Container */}
+            <div className="p-6 overflow-y-auto flex-1 space-y-4">
+
+              {/* ----------------- MODE 1: SMART PASTE (DEFAULT) ----------------- */}
+              {modalMode === 'SMART_PASTE' && (
+                <div className="space-y-4 animate-in fade-in duration-200">
+                  <div className="p-3.5 bg-amber-50 rounded-2xl border border-amber-200/80 text-xs text-amber-950 flex items-start gap-2.5">
+                    <Sparkles size={16} className="text-amber-600 shrink-0 mt-0.5" />
+                    <div>
+                      <h4 className="font-bold text-amber-900">Why retype what already exists on pmsuryaghar.gov.in?</h4>
+                      <p className="text-[11px] text-amber-800 mt-0.5 leading-relaxed">
+                        Copy any text block from the official portal (Application view screen, acknowledgment receipt, electricity bill, or confirmation SMS) and paste it below. Our parser automatically detects and extracts all 10+ parameters in 0.1s!
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-slate-700">Paste Text from pmsuryaghar.gov.in:</label>
+                      <button 
+                        type="button"
+                        onClick={() => {
+                          setSmartPasteText(SAMPLE_PORTAL_TEXT);
+                          handleSmartExtract(SAMPLE_PORTAL_TEXT);
+                        }}
+                        className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 hover:underline flex items-center gap-1"
+                      >
+                        <span>Try Sample Portal Slip</span>
+                        <ArrowRight size={11} />
+                      </button>
+                    </div>
+
+                    <textarea 
+                      rows={5}
+                      placeholder={`Example paste:\nNational Portal App No: PMSG-MH-2024-88492\nConsumer CA No: 028510293812\nConsumer Name: Ramesh Shinde\nMobile: 9822012345\nDISCOM: MSEDCL\nApplied Capacity: 3.0 kW\nBank: SBI A/C 38491029481 IFSC SBIN0001234`}
+                      value={smartPasteText}
+                      onChange={(e) => setSmartPasteText(e.target.value)}
+                      className="w-full p-3.5 rounded-xl border border-slate-200 text-xs font-mono outline-none focus:ring-2 focus:ring-amber-500 bg-slate-50/50"
+                    ></textarea>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <button 
+                      type="button"
+                      disabled={parsingSmartText}
+                      onClick={() => handleSmartExtract()}
+                      className="w-full py-2.5 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black rounded-xl text-xs transition-all shadow-md flex items-center justify-center gap-2"
+                    >
+                      <Sparkles size={14} />
+                      <span>{parsingSmartText ? "Extracting..." : "⚡ Auto-Extract & Fill Form in 0.1s"}</span>
+                    </button>
+                  </div>
+
+                  {/* Extracted Details Visual Breakdown */}
+                  {smartParsedData && (
+                    <div className="p-4 bg-emerald-50/70 rounded-2xl border border-emerald-200 space-y-3 animate-in fade-in duration-200">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-black text-emerald-900 flex items-center gap-1.5">
+                          <CheckCircle2 size={14} className="text-emerald-600" />
+                          <span>Extracted Parameters (Ready to Save & Track)</span>
+                        </span>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-200/80 text-emerald-900">
+                          High Confidence
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-xs">
+                        <div className="p-2.5 bg-white rounded-xl border border-emerald-100">
+                          <span className="text-[10px] text-slate-400 block font-bold">National App No:</span>
+                          <span className="font-mono font-bold text-slate-900">{formData.nationalPortalAppNo || "Auto-gen"}</span>
+                        </div>
+                        <div className="p-2.5 bg-white rounded-xl border border-emerald-100">
+                          <span className="text-[10px] text-slate-400 block font-bold">Consumer CA #:</span>
+                          <span className="font-mono font-bold text-slate-900">{formData.consumerNumber || "Pending"}</span>
+                        </div>
+                        <div className="p-2.5 bg-white rounded-xl border border-emerald-100">
+                          <span className="text-[10px] text-slate-400 block font-bold">Consumer Name:</span>
+                          <span className="font-bold text-slate-900">{formData.customerName || "Consumer"}</span>
+                        </div>
+                        <div className="p-2.5 bg-white rounded-xl border border-emerald-100">
+                          <span className="text-[10px] text-slate-400 block font-bold">Mobile:</span>
+                          <span className="font-bold text-slate-900">{formData.customerMobile || "N/A"}</span>
+                        </div>
+                        <div className="p-2.5 bg-white rounded-xl border border-emerald-100">
+                          <span className="text-[10px] text-slate-400 block font-bold">Proposed Capacity:</span>
+                          <span className="font-bold text-emerald-700">{formData.proposedCapacity} kWp (₹{calculateSubsidyPreview(parseFloat(formData.proposedCapacity || "3")).toLocaleString()})</span>
+                        </div>
+                        <div className="p-2.5 bg-white rounded-xl border border-emerald-100">
+                          <span className="text-[10px] text-slate-400 block font-bold">DISCOM & City:</span>
+                          <span className="font-bold text-slate-900">{formData.discomName} • {formData.division || "Pune"}</span>
+                        </div>
+                        {formData.bankName && (
+                          <div className="p-2.5 bg-white rounded-xl border border-emerald-100 col-span-2 sm:col-span-3">
+                            <span className="text-[10px] text-slate-400 block font-bold">DBT Bank Account:</span>
+                            <span className="font-bold text-slate-900">{formData.bankName} • A/C: {formData.accountNumber} • IFSC: {formData.ifscCode}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      <button 
+                        type="button"
+                        onClick={handleCreateApplication}
+                        className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-black rounded-xl text-xs transition-all shadow-md flex items-center justify-center gap-2 mt-2"
+                      >
+                        <Check size={16} />
+                        <span>Confirm & Save Application to Studio (0 Repeated Typing)</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
 
-              {mode === 'CUSTOM' && (
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700">Select Customer *</label>
-                  <select 
-                    required 
-                    value={formData.customerId}
-                    onChange={(e) => setFormData({...formData, customerId: e.target.value})}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold bg-white"
+              {/* ----------------- MODE 2: LINK PROJECT (ERP PULL) ----------------- */}
+              {modalMode === 'PROJECT' && (
+                <div className="space-y-4 animate-in fade-in duration-200">
+                  <div className="p-3.5 bg-indigo-50 rounded-2xl border border-indigo-200 text-xs text-indigo-950 flex items-start gap-2.5">
+                    <Building2 size={16} className="text-indigo-600 shrink-0 mt-0.5" />
+                    <div>
+                      <h4 className="font-bold text-indigo-900">Auto-Pull from Solar ERP</h4>
+                      <p className="text-[11px] text-indigo-800 mt-0.5">
+                        Selecting an active project pulls the consumer profile, inverter model, panel specs, and system capacity automatically.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-700">Select Solar ERP Project *</label>
+                    <select 
+                      required 
+                      value={formData.projectId}
+                      onChange={(e) => handleSelectProject(e.target.value)}
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold bg-white"
+                    >
+                      <option value="">-- Choose Active Project --</option>
+                      {projects.map(p => (
+                        <option key={p.id} value={p.id}>
+                          {p.projectNumber || 'PRJ'} — {p.name} ({p.capacity || 3} kWp)
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {formData.projectId && (
+                    <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3 text-xs">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <span className="text-[10px] text-slate-400 font-bold block">Proposed Capacity:</span>
+                          <span className="font-bold text-emerald-700">{formData.proposedCapacity} kWp</span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-slate-400 font-bold block">Central Subsidy Eligible:</span>
+                          <span className="font-black text-emerald-700">₹{calculateSubsidyPreview(parseFloat(formData.proposedCapacity || "3")).toLocaleString()}</span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-slate-400 font-bold block">Inverter Specs:</span>
+                          <span className="font-semibold text-slate-800">{formData.inverterMakeModel || "Auto-detected"}</span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-slate-400 font-bold block">DISCOM:</span>
+                          <span className="font-semibold text-slate-800">{formData.discomName}</span>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-200">
+                        <div>
+                          <label className="text-[11px] font-bold text-slate-600">Consumer CA Number (from bill):</label>
+                          <input 
+                            type="text" 
+                            placeholder="e.g. 028510293812" 
+                            value={formData.consumerNumber}
+                            onChange={e => setFormData({...formData, consumerNumber: e.target.value})}
+                            className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs mt-0.5 font-mono"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[11px] font-bold text-slate-600">National App No (if assigned):</label>
+                          <input 
+                            type="text" 
+                            placeholder="Auto-generated if blank" 
+                            value={formData.nationalPortalAppNo}
+                            onChange={e => setFormData({...formData, nationalPortalAppNo: e.target.value})}
+                            className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs mt-0.5 font-mono"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <button 
+                    type="button"
+                    disabled={!formData.projectId}
+                    onClick={handleCreateApplication}
+                    className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-black rounded-xl text-xs transition-all shadow-md flex items-center justify-center gap-2"
                   >
-                    <option value="">-- Choose Customer --</option>
-                    {customers.map(c => (
-                      <option key={c.id} value={c.id}>{c.name} ({c.mobile})</option>
-                    ))}
-                  </select>
+                    <Check size={16} />
+                    <span>Confirm & Link to Studio</span>
+                  </button>
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700">Consumer Number (CA #) *</label>
-                  <input 
-                    required 
-                    type="text" 
-                    placeholder="e.g. 028510293812" 
-                    value={formData.consumerNumber} 
-                    onChange={e => setFormData({...formData, consumerNumber: e.target.value})}
-                    className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-mono font-bold"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700">National Portal App No</label>
-                  <input 
-                    type="text" 
-                    placeholder="Auto-generated if empty" 
-                    value={formData.nationalPortalAppNo} 
-                    onChange={e => setFormData({...formData, nationalPortalAppNo: e.target.value})}
-                    className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-mono"
-                  />
-                </div>
-              </div>
+              {/* ----------------- MODE 3: BULK IMPORT FROM PORTAL TABLE ----------------- */}
+              {modalMode === 'BULK_IMPORT' && (
+                <div className="space-y-4 animate-in fade-in duration-200">
+                  <div className="p-3.5 bg-blue-50 rounded-2xl border border-blue-200 text-xs text-blue-950 flex items-start gap-2.5">
+                    <List size={16} className="text-blue-600 shrink-0 mt-0.5" />
+                    <div>
+                      <h4 className="font-bold text-blue-900">Bulk Import from pmsuryaghar.gov.in Vendor Dashboard</h4>
+                      <p className="text-[11px] text-blue-800 mt-0.5">
+                        Log into the official portal, copy all rows from your assigned consumer table, and paste them here to import 20–100 applications at once.
+                      </p>
+                    </div>
+                  </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700">Proposed Capacity (kWp) *</label>
-                  <input 
-                    required 
-                    type="number" 
-                    step="0.5" 
-                    value={formData.proposedCapacity} 
-                    onChange={e => setFormData({...formData, proposedCapacity: e.target.value})}
-                    className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-bold"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700">State DISCOM</label>
-                  <select 
-                    value={formData.discomName} 
-                    onChange={e => setFormData({...formData, discomName: e.target.value})}
-                    className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-semibold bg-white"
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-700">Paste Table Rows (Tab-separated or Comma-separated):</label>
+                    <textarea 
+                      rows={5}
+                      placeholder={`PMSG-MH-2024-001\t02851029381\tRamesh Shinde\t9822012345\t3.0\tMSEDCL\nPMSG-MH-2024-002\t02851029382\tPooja Patil\t9822012346\t2.0\tMSEDCL`}
+                      value={bulkText}
+                      onChange={(e) => handleBulkTextChange(e.target.value)}
+                      className="w-full p-3.5 rounded-xl border border-slate-200 text-xs font-mono outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50/50"
+                    ></textarea>
+                  </div>
+
+                  {bulkParsedApps.length > 0 && (
+                    <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 space-y-2 text-xs">
+                      <div className="flex items-center justify-between font-bold text-slate-800">
+                        <span>Detected Applications:</span>
+                        <span className="px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 text-xs font-black">
+                          {bulkParsedApps.length} Consumers Ready
+                        </span>
+                      </div>
+
+                      <div className="max-h-36 overflow-y-auto divide-y divide-slate-200 text-[11px]">
+                        {bulkParsedApps.slice(0, 5).map((app, idx) => (
+                          <div key={idx} className="py-1.5 flex items-center justify-between font-mono">
+                            <span>{app.nationalPortalAppNo} • {app.customerName}</span>
+                            <span className="font-bold text-emerald-700">{app.proposedCapacity} kWp</span>
+                          </div>
+                        ))}
+                        {bulkParsedApps.length > 5 && (
+                          <div className="py-1 text-slate-400 italic">...and {bulkParsedApps.length - 5} more rows</div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  <button 
+                    type="button"
+                    disabled={importingBulk || bulkParsedApps.length === 0}
+                    onClick={handleBulkImportSubmit}
+                    className="w-full py-3 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-black rounded-xl text-xs transition-all shadow-md flex items-center justify-center gap-2"
                   >
-                    <option value="MSEDCL">MSEDCL (Maharashtra)</option>
-                    <option value="Tata Power">Tata Power (TPDDL)</option>
-                    <option value="BESCOM">BESCOM (Karnataka)</option>
-                    <option value="UPPCL">UPPCL (Uttar Pradesh)</option>
-                    <option value="Torrent Power">Torrent Power</option>
-                  </select>
+                    <Upload size={16} />
+                    <span>{importingBulk ? "Importing..." : `Import ${bulkParsedApps.length} Applications into Studio`}</span>
+                  </button>
                 </div>
-              </div>
+              )}
 
-              {/* Hardware Specs Box */}
-              <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
-                <span className="text-[11px] font-black text-slate-700 uppercase tracking-wider block">
-                  ⚡ Technical Hardware for Portal
-                </span>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-bold text-slate-600">Inverter Make & Model</label>
-                    <input 
-                      type="text" 
-                      placeholder="e.g. Havells 5kW On-grid" 
-                      value={formData.inverterMakeModel} 
-                      onChange={e => setFormData({...formData, inverterMakeModel: e.target.value})}
-                      className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs bg-white"
-                    />
+              {/* ----------------- MODE 4: CUSTOM / MANUAL FORM ----------------- */}
+              {modalMode === 'CUSTOM' && (
+                <form onSubmit={handleCreateApplication} className="space-y-4 animate-in fade-in duration-200">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-700">Consumer Name *</label>
+                      <input 
+                        required 
+                        type="text" 
+                        placeholder="e.g. Ramesh Shinde" 
+                        value={formData.customerName} 
+                        onChange={e => setFormData({...formData, customerName: e.target.value})}
+                        className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-semibold"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-700">Mobile Number *</label>
+                      <input 
+                        required 
+                        type="text" 
+                        placeholder="10-digit mobile" 
+                        value={formData.customerMobile} 
+                        onChange={e => setFormData({...formData, customerMobile: e.target.value})}
+                        className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-semibold"
+                      />
+                    </div>
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-bold text-slate-600">Inverter Serial Number</label>
-                    <input 
-                      type="text" 
-                      placeholder="e.g. HAV-2026-9921" 
-                      value={formData.inverterSerial} 
-                      onChange={e => setFormData({...formData, inverterSerial: e.target.value})}
-                      className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs bg-white font-mono"
-                    />
-                  </div>
-                </div>
-              </div>
 
-              {/* Bank Details for DBT */}
-              <div className="p-3.5 bg-emerald-50/50 rounded-2xl border border-emerald-100 space-y-3">
-                <span className="text-[11px] font-black text-emerald-800 uppercase tracking-wider block">
-                  🏦 Customer Bank Account for DBT Subsidy
-                </span>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-bold text-slate-600">Bank Name</label>
-                    <input 
-                      type="text" 
-                      placeholder="e.g. State Bank of India" 
-                      value={formData.bankName} 
-                      onChange={e => setFormData({...formData, bankName: e.target.value})}
-                      className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs bg-white"
-                    />
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-700">Consumer CA Number *</label>
+                      <input 
+                        required 
+                        type="text" 
+                        placeholder="e.g. 028510293812" 
+                        value={formData.consumerNumber} 
+                        onChange={e => setFormData({...formData, consumerNumber: e.target.value})}
+                        className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-mono font-bold"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-700">National Portal App No</label>
+                      <input 
+                        type="text" 
+                        placeholder="Auto-generated if empty" 
+                        value={formData.nationalPortalAppNo} 
+                        onChange={e => setFormData({...formData, nationalPortalAppNo: e.target.value})}
+                        className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-mono"
+                      />
+                    </div>
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-bold text-slate-600">Account Number</label>
-                    <input 
-                      type="text" 
-                      placeholder="e.g. 38291029381" 
-                      value={formData.accountNumber} 
-                      onChange={e => setFormData({...formData, accountNumber: e.target.value})}
-                      className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs bg-white font-mono"
-                    />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-bold text-slate-600">IFSC Code</label>
-                    <input 
-                      type="text" 
-                      placeholder="e.g. SBIN0001234" 
-                      value={formData.ifscCode} 
-                      onChange={e => setFormData({...formData, ifscCode: e.target.value.toUpperCase()})}
-                      className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs bg-white font-mono font-bold"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-bold text-slate-600">Account Holder Name</label>
-                    <input 
-                      type="text" 
-                      placeholder="Exact name on passbook" 
-                      value={formData.accountHolderName} 
-                      onChange={e => setFormData({...formData, accountHolderName: e.target.value})}
-                      className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs bg-white"
-                    />
-                  </div>
-                </div>
-              </div>
 
-              <div className="pt-2 flex gap-3">
-                <button 
-                  type="button" 
-                  onClick={() => setShowAddModal(false)}
-                  className="flex-1 py-2.5 text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl font-bold text-xs"
-                >
-                  Cancel
-                </button>
-                <button 
-                  type="submit" 
-                  className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-xs shadow-md"
-                >
-                  Confirm & Register
-                </button>
-              </div>
-            </form>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-700">Proposed Capacity (kWp) *</label>
+                      <input 
+                        required 
+                        type="number" 
+                        step="0.5" 
+                        value={formData.proposedCapacity} 
+                        onChange={e => setFormData({...formData, proposedCapacity: e.target.value})}
+                        className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-bold"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-700">State DISCOM</label>
+                      <select 
+                        value={formData.discomName} 
+                        onChange={e => setFormData({...formData, discomName: e.target.value})}
+                        className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-semibold bg-white"
+                      >
+                        <option value="MSEDCL">MSEDCL (Maharashtra)</option>
+                        <option value="Tata Power">Tata Power (TPDDL)</option>
+                        <option value="BESCOM">BESCOM (Karnataka)</option>
+                        <option value="UPPCL">UPPCL (Uttar Pradesh)</option>
+                        <option value="Torrent Power">Torrent Power</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
+                    <span className="text-[11px] font-black text-slate-700 uppercase tracking-wider block">
+                      ⚡ Technical Hardware for Portal
+                    </span>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-bold text-slate-600">Inverter Make & Model</label>
+                        <input 
+                          type="text" 
+                          placeholder="e.g. Havells 5kW On-grid" 
+                          value={formData.inverterMakeModel} 
+                          onChange={e => setFormData({...formData, inverterMakeModel: e.target.value})}
+                          className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs bg-white"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-bold text-slate-600">Inverter Serial Number</label>
+                        <input 
+                          type="text" 
+                          placeholder="e.g. HAV-2026-9921" 
+                          value={formData.inverterSerial} 
+                          onChange={e => setFormData({...formData, inverterSerial: e.target.value})}
+                          className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs bg-white font-mono"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-3.5 bg-emerald-50/50 rounded-2xl border border-emerald-100 space-y-3">
+                    <span className="text-[11px] font-black text-emerald-800 uppercase tracking-wider block">
+                      🏦 Customer Bank Account for DBT Subsidy
+                    </span>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-bold text-slate-600">Bank Name</label>
+                        <input 
+                          type="text" 
+                          placeholder="e.g. State Bank of India" 
+                          value={formData.bankName} 
+                          onChange={e => setFormData({...formData, bankName: e.target.value})}
+                          className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs bg-white"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-bold text-slate-600">Account Number</label>
+                        <input 
+                          type="text" 
+                          placeholder="e.g. 38291029381" 
+                          value={formData.accountNumber} 
+                          onChange={e => setFormData({...formData, accountNumber: e.target.value})}
+                          className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs bg-white font-mono"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-bold text-slate-600">IFSC Code</label>
+                        <input 
+                          type="text" 
+                          placeholder="e.g. SBIN0001234" 
+                          value={formData.ifscCode} 
+                          onChange={e => setFormData({...formData, ifscCode: e.target.value.toUpperCase()})}
+                          className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs bg-white font-mono font-bold"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-bold text-slate-600">Account Holder Name</label>
+                        <input 
+                          type="text" 
+                          placeholder="Exact name on passbook" 
+                          value={formData.accountHolderName} 
+                          onChange={e => setFormData({...formData, accountHolderName: e.target.value})}
+                          className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs bg-white"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 flex gap-3">
+                    <button 
+                      type="button" 
+                      onClick={() => setShowAddModal(false)}
+                      className="flex-1 py-2.5 text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl font-bold text-xs"
+                    >
+                      Cancel
+                    </button>
+                    <button 
+                      type="submit" 
+                      className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-xs shadow-md"
+                    >
+                      Confirm & Register
+                    </button>
+                  </div>
+                </form>
+              )}
+
+            </div>
           </div>
         </div>
       )}

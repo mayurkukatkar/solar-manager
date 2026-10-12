@@ -125,19 +125,184 @@ router.get(['/api/tenant/subsidies/:id', '/api/tenant/pmsuryaghar/:id'], require
   }
 });
 
-// 3. Register / Link New PM Surya Ghar Application (Dual Mode)
+// Helper: Parse Unstructured PM Surya Ghar Portal Text / Receipt / SMS
+const parsePortalText = (rawText) => {
+  if (!rawText || typeof rawText !== 'string') return {};
+  const text = rawText.trim();
+  const extracted = {};
+
+  // 1. National Portal Application Number (e.g. PMSG-MH-2024-12345, MH123456789, PMSG2024..., APP...)
+  const appMatch = text.match(/(?:Application\s*(?:No|Number|ID)?|App\s*#?)\s*[:#-]?\s*([A-Za-z0-9\-_]{6,30})/i) ||
+                   text.match(/\b(PMSG[A-Za-z0-9\-_]{5,25})\b/i);
+  if (appMatch) extracted.nationalPortalAppNo = appMatch[1].trim();
+
+  // 2. Consumer Number / CA Number / Account ID (e.g. 028510293812)
+  const consumerMatch = text.match(/(?:Consumer\s*(?:No|Number|ID)?|CA\s*(?:No|Number)?|K\s*No|Account\s*No)\s*[:#-]?\s*([0-9]{8,16})/i) ||
+                        text.match(/\b([0-9]{10,12})\b/);
+  if (consumerMatch) extracted.consumerNumber = consumerMatch[1].trim();
+
+  // 3. Consumer Name
+  const nameMatch = text.match(/(?:Consumer\s*Name|Applicant\s*Name|Customer\s*Name|Name)\s*[:#-]?\s*([A-Za-z\s.]{3,40})(?:\r|\n|$|,|;)/i);
+  if (nameMatch) {
+    const n = nameMatch[1].trim().replace(/\s+/g, ' ');
+    if (!/^(pmsuryaghar|national|solar|subsidy|portal)$/i.test(n)) {
+      extracted.customerName = n;
+      extracted.accountHolderName = n;
+    }
+  }
+
+  // 4. Mobile Number (Indian 10-digit starting with 6,7,8,9)
+  const mobileMatch = text.match(/(?:Mobile|Phone|Contact)\s*[:#-]?\s*([6-9][0-9]{9})\b/i) ||
+                      text.match(/\b([6-9][0-9]{9})\b/);
+  if (mobileMatch) extracted.customerMobile = mobileMatch[1].trim();
+
+  // 5. Proposed / Applied Capacity (kW / kWp)
+  const capMatch = text.match(/(?:Capacity|Sanctioned\s*Load|Plant\s*Capacity|Applied\s*Capacity|System\s*Size)\s*[:#-]?\s*([0-9]+(?:\.[0-9]+)?)\s*(?:kw|kwp)?/i) ||
+                   text.match(/([0-9]+(?:\.[0-9]+)?)\s*(?:kwp|kw)\b/i);
+  if (capMatch) {
+    const val = parseFloat(capMatch[1]);
+    if (val > 0 && val <= 100) extracted.proposedCapacity = val.toString();
+  }
+
+  // 6. DISCOM
+  const discomList = ['MSEDCL', 'Tata Power', 'BESCOM', 'UPPCL', 'Torrent Power', 'Adani Electricity', 'DHBVN', 'PSPCL', 'WBSEDCL', 'TANGEDCO', 'BSES'];
+  for (const d of discomList) {
+    if (new RegExp(d, 'i').test(text)) {
+      extracted.discomName = d;
+      break;
+    }
+  }
+
+  // 7. Division / Sub-division / City
+  const divMatch = text.match(/(?:Division|Circle)\s*[:#-]?\s*([A-Za-z\s]{3,30})(?:\r|\n|$|,)/i);
+  if (divMatch) extracted.division = divMatch[1].trim();
+
+  const subDivMatch = text.match(/(?:Sub-?Division|Sub\s*Div)\s*[:#-]?\s*([A-Za-z\s]{3,30})(?:\r|\n|$|,)/i);
+  if (subDivMatch) extracted.subDivision = subDivMatch[1].trim();
+
+  // 8. Bank Details
+  const ifscMatch = text.match(/\b([A-Z]{4}0[A-Z0-9]{6})\b/i);
+  if (ifscMatch) extracted.ifscCode = ifscMatch[1].toUpperCase();
+
+  const accMatch = text.match(/(?:Account\s*(?:No|Number)|A\/C\s*No|Bank\s*A\/C)\s*[:#-]?\s*([0-9]{9,18})\b/i);
+  if (accMatch) extracted.accountNumber = accMatch[1].trim();
+
+  const bankNameMatch = text.match(/(?:Bank\s*Name|Bank)\s*[:#-]?\s*([A-Za-z\s]{3,35})(?:\r|\n|$|,)/i);
+  if (bankNameMatch) extracted.bankName = bankNameMatch[1].trim();
+
+  // 9. Portal Stage Detection
+  if (/DBT|Disbursed|Credited|Subsidy\s*Paid/i.test(text)) extracted.portalStage = 'DBT_DISBURSED';
+  else if (/Claim|Sanctioned|Voucher/i.test(text)) extracted.portalStage = 'CLAIM_GENERATED';
+  else if (/Meter|Commissioned|Commissioning|Bi-directional/i.test(text)) extracted.portalStage = 'METER_INSPECTED';
+  else if (/Work\s*Completed|Installation\s*Done|Geo/i.test(text)) extracted.portalStage = 'WORK_COMPLETED';
+  else if (/Feasibility\s*Approved|Feasibility\s*Cleared/i.test(text)) extracted.portalStage = 'FEASIBILITY_APPROVED';
+  else if (/Feasibility|Review|DISCOM\s*Pending/i.test(text)) extracted.portalStage = 'FEASIBILITY_PENDING';
+  else extracted.portalStage = 'CONSUMER_SELECTION';
+
+  return extracted;
+};
+
+// 2a. Smart Parse Text from pmsuryaghar.gov.in (Receipt / Screen / SMS)
+router.post('/api/tenant/pmsuryaghar/smart-parse', requireTenantAuth, async (req, res) => {
+  try {
+    const { rawText } = req.body;
+    if (!rawText) return res.status(400).json({ error: 'Text content is required' });
+
+    const extracted = parsePortalText(rawText);
+    res.json({ success: true, extracted });
+  } catch (error) {
+    console.error('Smart parse error:', error);
+    res.status(500).json({ error: 'Failed to parse text' });
+  }
+});
+
+// 2b. Bulk Import Applications (From National Portal Vendor Table / CSV)
+router.post('/api/tenant/pmsuryaghar/bulk-import', requireTenantAuth, async (req, res) => {
+  try {
+    const { applications } = req.body;
+    if (!Array.isArray(applications) || applications.length === 0) {
+      return res.status(400).json({ error: 'Array of applications required' });
+    }
+
+    const created = [];
+    for (const app of applications) {
+      let resolvedCustomerId = app.customerId;
+
+      // Find or create customer by mobile / name if not provided
+      if (!resolvedCustomerId && (app.customerMobile || app.customerName)) {
+        let cust = null;
+        if (app.customerMobile) {
+          cust = await prisma.customer.findFirst({
+            where: { tenantId: req.user.tenantId, mobile: app.customerMobile }
+          });
+        }
+        if (!cust) {
+          cust = await prisma.customer.create({
+            data: {
+              tenantId: req.user.tenantId,
+              name: app.customerName || `Consumer ${app.consumerNumber || 'PMSG'}`,
+              mobile: app.customerMobile || `98${Math.floor(10000000 + Math.random() * 90000000)}`,
+              city: app.city || 'Pune',
+              customerType: 'RESIDENTIAL'
+            }
+          });
+        }
+        resolvedCustomerId = cust.id;
+      }
+
+      if (!resolvedCustomerId) continue;
+
+      const cap = parseFloat(app.proposedCapacity || 3.0);
+      const centralSubsidy = calculatePmSuryaGharSubsidy(cap);
+      const stateSub = app.stateSubsidyAmount ? parseFloat(app.stateSubsidyAmount) : 0;
+
+      const newApp = await prisma.subsidyApplication.create({
+        data: {
+          tenantId: req.user.tenantId,
+          customerId: resolvedCustomerId,
+          projectId: app.projectId || null,
+          applicationNo: app.applicationNo || `PMSG-${Date.now().toString().slice(-6)}`,
+          nationalPortalAppNo: app.nationalPortalAppNo || `PMSG-MH-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`,
+          consumerNumber: app.consumerNumber || null,
+          discomName: app.discomName || 'MSEDCL',
+          division: app.division || 'Pune Urban',
+          subDivision: app.subDivision || 'Shivajinagar',
+          proposedCapacity: cap,
+          centralSubsidyAmount: centralSubsidy,
+          stateSubsidyAmount: stateSub,
+          amount: centralSubsidy + stateSub,
+          status: 'APPLICATION_SUBMITTED',
+          portalStage: app.portalStage || 'CONSUMER_SELECTION',
+          inverterMakeModel: app.inverterMakeModel || null,
+          inverterSerial: app.inverterSerial || null,
+          dcrModuleSerials: app.dcrModuleSerials || null,
+          bankName: app.bankName || null,
+          accountNumber: app.accountNumber || null,
+          ifscCode: app.ifscCode || null,
+          accountHolderName: app.accountHolderName || app.customerName || null,
+          submittedDate: new Date()
+        }
+      });
+      created.push(newApp);
+    }
+
+    res.json({ success: true, count: created.length, created });
+  } catch (error) {
+    console.error('Bulk import error:', error);
+    res.status(500).json({ error: 'Failed to bulk import applications' });
+  }
+});
+
+// 3. Register / Link New PM Surya Ghar Application (Dual Mode & Auto-Customer Creation)
 router.post(['/api/tenant/subsidies', '/api/tenant/pmsuryaghar'], requireTenantAuth, async (req, res) => {
   try {
     const { 
-      customerId, projectId, applicationNo, nationalPortalAppNo, consumerNumber,
+      customerId, projectId, customerName, customerMobile, customerAddress, customerCity,
+      applicationNo, nationalPortalAppNo, consumerNumber,
       discomName, division, subDivision, proposedCapacity, portalStage,
       dcrModuleSerials, inverterMakeModel, inverterSerial, latitude, longitude,
       bankName, accountNumber, ifscCode, accountHolderName, stateSubsidyAmount
     } = req.body;
-
-    if (!customerId && !projectId) {
-      return res.status(400).json({ error: 'Either customerId or projectId is required' });
-    }
 
     let resolvedCustomerId = customerId;
     let resolvedCapacity = proposedCapacity ? parseFloat(proposedCapacity) : null;
@@ -160,8 +325,33 @@ router.post(['/api/tenant/subsidies', '/api/tenant/pmsuryaghar'], requireTenantA
       }
     }
 
+    // Auto-create customer if customerName / mobile passed directly (from Smart Paste / Portal Import)
+    if (!resolvedCustomerId && (customerName || consumerNumber)) {
+      const name = customerName || `Consumer ${consumerNumber}`;
+      const mob = customerMobile || `98${Math.floor(10000000 + Math.random() * 90000000)}`;
+
+      // Check if existing customer matches
+      let existingCust = await prisma.customer.findFirst({
+        where: { tenantId: req.user.tenantId, mobile: mob }
+      });
+
+      if (!existingCust) {
+        existingCust = await prisma.customer.create({
+          data: {
+            tenantId: req.user.tenantId,
+            name,
+            mobile: mob,
+            address: customerAddress || null,
+            city: customerCity || 'Pune',
+            customerType: 'RESIDENTIAL'
+          }
+        });
+      }
+      resolvedCustomerId = existingCust.id;
+    }
+
     if (!resolvedCustomerId) {
-      return res.status(400).json({ error: 'Valid Customer could not be determined' });
+      return res.status(400).json({ error: 'Valid Customer could not be determined. Please provide a Customer, Project, or Consumer details.' });
     }
 
     const capacityVal = resolvedCapacity || 3.0;
@@ -197,7 +387,7 @@ router.post(['/api/tenant/subsidies', '/api/tenant/pmsuryaghar'], requireTenantA
         bankName: bankName || null,
         accountNumber: accountNumber || null,
         ifscCode: ifscCode || null,
-        accountHolderName: accountHolderName || null,
+        accountHolderName: accountHolderName || customerName || null,
         submittedDate: new Date()
       },
       include: { customer: true, project: true }
