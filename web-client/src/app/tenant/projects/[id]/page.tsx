@@ -6,7 +6,9 @@ import Link from 'next/link';
 import { 
   ArrowLeft, Briefcase, Calendar, MapPin, Zap, User, Users,
   CheckSquare, Flag, Box, History, DollarSign, Activity, Settings, Plus,
-  CheckCircle2, Clock, AlertTriangle, MessageSquare, Trash2, FileText, Download, Wrench, ShieldCheck
+  CheckCircle2, Clock, AlertTriangle, MessageSquare, Trash2, FileText, Download, Wrench, ShieldCheck,
+  ChevronRight, ExternalLink, Phone, MessageCircle, Sun, Award, TrendingUp, Sparkles, Check, ArrowRight,
+  RefreshCw, Layers
 } from 'lucide-react';
 import { WorkCompletionReport, GuaranteeCertificate, DcrDeclaration, AnnexureProforma, NetMeteringAgreement } from '@/components/pdf/MsedclFormsPDF';
 
@@ -21,6 +23,7 @@ export default function ProjectDetails() {
   const [discom, setDiscom] = useState<any>(null);
   const [subsidy, setSubsidy] = useState<any>(null);
   const [uploadingDoc, setUploadingDoc] = useState(false);
+  const [advancingStage, setAdvancingStage] = useState(false);
   
   const [warrantyData, setWarrantyData] = useState<{ installations: any[], amcs: any[] } | null>(null);
   const [tickets, setTickets] = useState<any[]>([]);
@@ -29,6 +32,16 @@ export default function ProjectDetails() {
 
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [selectedForm, setSelectedForm] = useState<string | null>(null);
+
+  const STAGES = [
+    { id: 'Planning', label: 'Planning', percent: 15, desc: 'Roof survey & permits' },
+    { id: 'Design', label: 'Design', percent: 30, desc: 'SLD & 3D layout' },
+    { id: 'Procurement', label: 'Procurement', percent: 50, desc: 'BOM & Purchase Orders' },
+    { id: 'Installation', label: 'Installation', percent: 75, desc: 'Mounting & DC/AC wiring' },
+    { id: 'Testing', label: 'Testing & QA', percent: 90, desc: 'Inverter check & test report' },
+    { id: 'Handover', label: 'Handover', percent: 95, desc: 'MSEDCL synchronization' },
+    { id: 'Completed', label: 'Completed', percent: 100, desc: 'Commissioned & AMC active' }
+  ];
 
   const handleDownloadForm = (formType: string) => {
     setSelectedForm(formType);
@@ -105,7 +118,6 @@ export default function ProjectDetails() {
       setDiscom(dRes.data.discom);
     } catch(err) {}
     try {
-      // Find subsidy linked to this project
       const sRes = await axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/subsidies`, { withCredentials: true });
       const projSubsidy = sRes.data.subsidies.find((s:any) => s.projectId === params.id);
       setSubsidy(projSubsidy);
@@ -153,7 +165,7 @@ export default function ProjectDetails() {
       if (file) {
         const formData = new FormData();
         formData.append('document', file);
-        const upRes = await axios.post(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/projects/${params.id}/discom/upload`, formData, { withCredentials: true }); // using same upload route for simplicity
+        const upRes = await axios.post(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/projects/${params.id}/discom/upload`, formData, { withCredentials: true });
         documentUrl = upRes.data.documentUrl;
       }
       await axios.patch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/subsidies/${subsidy.id}`, { status, documentType, documentUrl }, { withCredentials: true });
@@ -172,6 +184,23 @@ export default function ProjectDetails() {
       fetchProject();
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const handleStageClick = async (targetStage: string) => {
+    if (!project || project.currentStage === targetStage) return;
+    try {
+      setAdvancingStage(true);
+      await axios.patch(
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/projects/${params.id}/stage`,
+        { newStage: targetStage, comment: `Transitioned stage from ${project.currentStage} to ${targetStage}` },
+        { withCredentials: true }
+      );
+      await fetchProject();
+    } catch (err: any) {
+      alert(err.response?.data?.error || 'Failed to update project stage');
+    } finally {
+      setAdvancingStage(false);
     }
   };
 
@@ -265,107 +294,403 @@ export default function ProjectDetails() {
     }
   };
 
-  if (loading) return <div className="flex justify-center py-20"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500"></div></div>;
-  if (!project) return <div className="text-center py-20 text-slate-500">Project not found.</div>;
+  if (loading) return (
+    <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+      <div className="animate-spin rounded-full h-12 w-12 border-4 border-slate-200 border-t-emerald-600"></div>
+      <p className="text-slate-500 font-medium text-sm">Loading Project 360° Studio...</p>
+    </div>
+  );
+  if (!project) return (
+    <div className="text-center py-24 bg-white rounded-2xl border border-slate-200 max-w-xl mx-auto my-12 p-8 shadow-sm">
+      <Briefcase className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+      <h2 className="text-xl font-bold text-slate-800 mb-2">Project Not Found</h2>
+      <p className="text-slate-500 text-sm mb-6">The requested solar installation project does not exist or has been removed.</p>
+      <Link href="/tenant/projects" className="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white font-semibold text-sm rounded-xl hover:bg-emerald-700 transition">
+        <ArrowLeft size={16} /> Return to Projects Directory
+      </Link>
+    </div>
+  );
+
+  const currentStageIndex = STAGES.findIndex(s => s.id === project.currentStage);
+  const activeIndex = currentStageIndex === -1 ? 0 : currentStageIndex;
+  const nextStage = activeIndex < STAGES.length - 1 ? STAGES[activeIndex + 1] : null;
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6 pb-12">
-      <button onClick={() => router.back()} className="flex items-center gap-2 text-sm text-slate-500 hover:text-slate-800 transition-colors">
-        <ArrowLeft size={16} /> Back to Projects
-      </button>
-
-      {/* Header */}
-      <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col lg:flex-row lg:items-start justify-between gap-6">
-        <div className="flex items-start gap-4">
-          <div className="w-16 h-16 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600 shrink-0">
-            <Briefcase size={32} />
-          </div>
-          <div>
-            <div className="flex items-center gap-3 flex-wrap">
-              <h1 className="text-2xl font-bold text-slate-900">{project.projectNumber}: {project.name}</h1>
-              <span className={`px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider border ${getStatusColor(project.status)}`}>
-                {project.status}
-              </span>
-            </div>
-            <p className="text-slate-500 mt-2 flex flex-wrap items-center gap-4 text-sm font-medium">
-              <span className="flex items-center gap-1.5 text-slate-700"><User size={14}/> {project.customer?.name || 'No Customer'}</span>
-              <span className="flex items-center gap-1.5"><Settings size={14}/> {project.capacity} {project.capacityUnit} {project.systemType}</span>
-              <span className="flex items-center gap-1.5"><Users size={14}/> Owner: {project.projectOwner?.name || 'Unassigned'}</span>
-            </p>
-          </div>
+    <div className="max-w-7xl mx-auto space-y-6 pb-16">
+      {/* Top Breadcrumb & Quick Actions */}
+      <div className="flex items-center justify-between gap-4">
+        <Link 
+          href="/tenant/projects" 
+          className="inline-flex items-center gap-2 text-sm font-semibold text-slate-600 hover:text-emerald-700 transition-colors"
+        >
+          <ArrowLeft size={16} /> Back to Projects Directory
+        </Link>
+        <div className="flex items-center gap-2">
+          {project.quotation && (
+            <Link 
+              href={`/tenant/quotations/${project.quotation.id}`}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 text-xs font-semibold border border-emerald-200 transition"
+              title="Open originating Solar Proposal Studio"
+            >
+              <FileText size={14} /> Proposal #{project.quotation.qNumber} <ExternalLink size={12} />
+            </Link>
+          )}
+          <button 
+            onClick={() => setActiveTab('DISCOM')}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 text-xs font-semibold border border-slate-200 transition"
+          >
+            <Download size={14} /> MSEDCL Forms
+          </button>
         </div>
+      </div>
 
-        <div className="flex flex-col gap-3 min-w-[250px]">
-          <div className="flex items-center justify-between gap-3">
-            <select 
-              value={project.currentStage}
-              onChange={handleStageChange}
-              className="flex-1 px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none text-sm font-semibold bg-slate-50 text-slate-700"
-            >
-              <option value="Planning">Stage: Planning</option>
-              <option value="Design">Stage: Design</option>
-              <option value="Procurement">Stage: Procurement</option>
-              <option value="Installation">Stage: Installation</option>
-              <option value="Testing">Stage: Testing & QA</option>
-              <option value="Handover">Stage: Handover</option>
-              <option value="Completed">Stage: Completed</option>
-            </select>
-            
-            <select 
-              value={project.status}
-              onChange={handleStatusChange}
-              className="flex-1 px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none text-sm font-semibold bg-slate-50 text-slate-700"
-            >
-              <option value="Not Started">Status: Not Started</option>
-              <option value="In Progress">Status: In Progress</option>
-              <option value="On Hold">Status: On Hold</option>
-              <option value="Delayed">Status: Delayed</option>
-              <option value="Completed">Status: Completed</option>
-              <option value="Cancelled">Status: Cancelled</option>
-            </select>
-          </div>
-          <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
-            <div className="flex justify-between items-center text-xs font-semibold text-slate-500 mb-1.5">
-              <span>Overall Progress</span>
-              <span className="text-emerald-600">{project.progressPercent || 0}%</span>
+      {/* Hero Header Card */}
+      <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-emerald-950 p-6 md:p-8 rounded-2xl shadow-xl text-white relative overflow-hidden">
+        <div className="absolute -right-16 -top-16 w-80 h-80 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+        
+        <div className="relative z-10 flex flex-col lg:flex-row lg:items-start justify-between gap-6">
+          <div className="flex items-start gap-4 md:gap-5">
+            <div className="w-16 h-16 md:w-20 md:h-20 rounded-2xl bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center text-emerald-400 shrink-0 shadow-inner">
+              <Sun size={36} className="text-yellow-400" />
             </div>
-            <div className="w-full bg-slate-200 rounded-full h-2">
-              <div className="bg-emerald-500 h-2 rounded-full transition-all duration-500" style={{ width: `${project.progressPercent || 0}%` }}></div>
+            <div>
+              <div className="flex items-center gap-3 flex-wrap">
+                <span className="font-mono text-xs font-bold px-2.5 py-1 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                  {project.projectNumber}
+                </span>
+                <span className={`px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider border ${getStatusColor(project.status)}`}>
+                  {project.status}
+                </span>
+                {project.quotation && (
+                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-300 bg-emerald-950/60 border border-emerald-700/50 px-2.5 py-0.5 rounded-full">
+                    <Sparkles size={11} className="text-yellow-400" /> Accepted Proposal Linked
+                  </span>
+                )}
+              </div>
+              
+              <h1 className="text-2xl md:text-3xl font-extrabold text-white mt-2 tracking-tight">
+                {project.name}
+              </h1>
+
+              {/* Quick Metadata Bar */}
+              <div className="text-slate-300 mt-3 flex flex-wrap items-center gap-4 text-xs md:text-sm font-medium">
+                {project.customer && (
+                  <div className="flex items-center gap-2 bg-white/10 px-3 py-1 rounded-lg backdrop-blur-sm">
+                    <User size={14} className="text-emerald-400" />
+                    <span className="text-white font-semibold">{project.customer.name}</span>
+                    {project.customer.mobile && (
+                      <span className="flex items-center gap-1.5 pl-1.5 border-l border-white/20">
+                        <a 
+                          href={`tel:${project.customer.mobile}`} 
+                          title="Call customer"
+                          className="text-slate-300 hover:text-white transition"
+                        >
+                          <Phone size={12} />
+                        </a>
+                        <a 
+                          href={`https://wa.me/91${project.customer.mobile.replace(/\D/g, '').slice(-10)}`} 
+                          target="_blank" 
+                          rel="noreferrer"
+                          title="WhatsApp customer"
+                          className="text-emerald-400 hover:text-emerald-300 transition"
+                        >
+                          <MessageCircle size={12} />
+                        </a>
+                      </span>
+                    )}
+                  </div>
+                )}
+                
+                <span className="flex items-center gap-1.5 bg-white/10 px-3 py-1 rounded-lg backdrop-blur-sm">
+                  <Zap size={14} className="text-yellow-400" />
+                  <span className="font-bold text-white">{project.capacity} {project.capacityUnit || 'kWp'}</span>
+                  <span className="text-slate-400">•</span>
+                  <span>{project.systemType}</span>
+                </span>
+
+                <span className="flex items-center gap-1.5 text-slate-300">
+                  <Users size={14} className="text-slate-400" /> Owner: <span className="text-white">{project.projectOwner?.name || 'Unassigned'}</span>
+                </span>
+                
+                {project.city && (
+                  <span className="flex items-center gap-1.5 text-slate-300">
+                    <MapPin size={14} className="text-slate-400" /> {project.city}, {project.state || 'MH'}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Quick Stage Controls */}
+          <div className="flex flex-col gap-3 min-w-[260px] bg-white/5 p-4 rounded-xl border border-white/10 backdrop-blur-sm">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex-1">
+                <label className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block mb-1">Current Stage</label>
+                <select 
+                  value={project.currentStage}
+                  onChange={handleStageChange}
+                  disabled={advancingStage}
+                  className="w-full px-3 py-1.5 rounded-lg border border-white/20 focus:ring-2 focus:ring-emerald-400 outline-none text-xs font-bold bg-slate-900/80 text-white"
+                >
+                  {STAGES.map(s => (
+                    <option key={s.id} value={s.id}>{s.label}</option>
+                  ))}
+                </select>
+              </div>
+              
+              <div className="flex-1">
+                <label className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block mb-1">Status</label>
+                <select 
+                  value={project.status}
+                  onChange={handleStatusChange}
+                  className="w-full px-3 py-1.5 rounded-lg border border-white/20 focus:ring-2 focus:ring-emerald-400 outline-none text-xs font-bold bg-slate-900/80 text-white"
+                >
+                  <option value="Not Started">Not Started</option>
+                  <option value="In Progress">In Progress</option>
+                  <option value="On Hold">On Hold</option>
+                  <option value="Delayed">Delayed</option>
+                  <option value="Completed">Completed</option>
+                  <option value="Cancelled">Cancelled</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Quick Next Stage Action Button */}
+            {nextStage && project.status !== 'Completed' && (
+              <button
+                onClick={() => handleStageClick(nextStage.id)}
+                disabled={advancingStage}
+                className="w-full py-2 px-3 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-slate-950 font-bold text-xs rounded-lg transition flex items-center justify-center gap-1.5 shadow-md"
+              >
+                {advancingStage ? (
+                  <RefreshCw size={13} className="animate-spin" />
+                ) : (
+                  <>Advance to {nextStage.label} <ArrowRight size={13} /></>
+                )}
+              </button>
+            )}
+
+            <div>
+              <div className="flex justify-between items-center text-[11px] font-semibold text-slate-300 mb-1">
+                <span>Execution Completion</span>
+                <span className="text-emerald-400 font-bold">{project.progressPercent || 0}%</span>
+              </div>
+              <div className="w-full bg-slate-950/60 rounded-full h-2 overflow-hidden border border-white/10">
+                <div 
+                  className="bg-gradient-to-r from-emerald-500 to-yellow-400 h-2 rounded-full transition-all duration-500" 
+                  style={{ width: `${project.progressPercent || 0}%` }}
+                />
+              </div>
             </div>
           </div>
         </div>
       </div>
 
+      {/* Interactive 7-Stage Visual Pipeline Stepper */}
+      <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Layers size={18} className="text-emerald-600" />
+            <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
+              Project Execution Lifecycle (7 Stages)
+            </h3>
+          </div>
+          <span className="text-xs text-slate-500">
+            Click any stage node to jump or record progression
+          </span>
+        </div>
+
+        {/* Desktop Pipeline Stepper */}
+        <div className="hidden md:block relative pt-4 pb-2 px-6">
+          {/* Progress bar background line */}
+          <div className="absolute top-[32px] left-10 right-10 h-1.5 bg-slate-100 rounded-full -translate-y-1/2 z-0" />
+          <div 
+            className="absolute top-[32px] left-10 h-1.5 bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-full -translate-y-1/2 z-0 transition-all duration-500"
+            style={{ width: `${(activeIndex / (STAGES.length - 1)) * 92}%` }}
+          />
+
+          <div className="relative z-10 flex items-start justify-between">
+            {STAGES.map((s, idx) => {
+              const isDone = idx < activeIndex;
+              const isCurrent = idx === activeIndex;
+              const isUpcoming = idx > activeIndex;
+
+              return (
+                <button
+                  key={s.id}
+                  onClick={() => handleStageClick(s.id)}
+                  disabled={advancingStage}
+                  className="flex flex-col items-center group text-center focus:outline-none max-w-[120px]"
+                >
+                  <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs transition-all duration-300 shadow-sm ${
+                    isDone 
+                      ? 'bg-emerald-600 text-white hover:bg-emerald-700' 
+                      : isCurrent 
+                        ? 'bg-emerald-500 text-white ring-4 ring-emerald-100 shadow-md scale-110' 
+                        : 'bg-white border-2 border-slate-200 text-slate-400 hover:border-slate-400 hover:text-slate-600'
+                  }`}>
+                    {isDone ? (
+                      <Check size={16} strokeWidth={3} />
+                    ) : isCurrent ? (
+                      <Activity size={16} className="animate-pulse" />
+                    ) : (
+                      <span>{idx + 1}</span>
+                    )}
+                  </div>
+
+                  <span className={`mt-2.5 text-xs font-bold transition-colors ${
+                    isCurrent 
+                      ? 'text-emerald-700' 
+                      : isDone 
+                        ? 'text-slate-800' 
+                        : 'text-slate-400 group-hover:text-slate-600'
+                  }`}>
+                    {s.label}
+                  </span>
+
+                  <span className="text-[10px] text-slate-400 leading-tight mt-0.5 line-clamp-1">
+                    {s.percent}% • {s.desc.split('&')[0]}
+                  </span>
+
+                  {isCurrent && (
+                    <span className="mt-1 px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wider bg-emerald-100 text-emerald-800 animate-pulse">
+                      Active
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Mobile Horizontal Scrollable Pipeline */}
+        <div className="md:hidden flex items-center gap-2 overflow-x-auto pb-2 pt-1 no-scrollbar">
+          {STAGES.map((s, idx) => {
+            const isDone = idx < activeIndex;
+            const isCurrent = idx === activeIndex;
+
+            return (
+              <button
+                key={s.id}
+                onClick={() => handleStageClick(s.id)}
+                disabled={advancingStage}
+                className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold shrink-0 transition border ${
+                  isCurrent 
+                    ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm' 
+                    : isDone 
+                      ? 'bg-emerald-50 text-emerald-800 border-emerald-200' 
+                      : 'bg-slate-50 text-slate-600 border-slate-200'
+                }`}
+              >
+                <span className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center text-[10px]">
+                  {isDone ? <Check size={12} /> : idx + 1}
+                </span>
+                <span>{s.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Main Tabbed Studio Navigation */}
       <div className="flex flex-col lg:flex-row gap-6">
-        {/* Sidebar Navigation */}
+        {/* Sidebar Navigation Tabs */}
         <div className="lg:w-64 shrink-0">
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden sticky top-6">
-            <button onClick={() => setActiveTab('OVERVIEW')} className={`w-full flex items-center gap-3 px-5 py-4 text-sm font-medium transition-colors border-b border-slate-100 ${activeTab === 'OVERVIEW' ? 'bg-emerald-50 text-emerald-700 border-l-4 border-l-emerald-600' : 'text-slate-600 hover:bg-slate-50'}`}>
-              <Activity size={18} /> Overview
+            <div className="p-4 bg-slate-50 border-b border-slate-100">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">Workspace Modules</span>
+              <span className="text-xs font-semibold text-slate-700">{project.projectNumber} Studio</span>
+            </div>
+            
+            <button 
+              onClick={() => setActiveTab('OVERVIEW')} 
+              className={`w-full flex items-center gap-3 px-5 py-3.5 text-sm font-semibold transition-colors border-b border-slate-100 ${
+                activeTab === 'OVERVIEW' 
+                  ? 'bg-emerald-50 text-emerald-700 border-l-4 border-l-emerald-600' 
+                  : 'text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              <Activity size={18} /> Overview & Specs
             </button>
-            <button onClick={() => setActiveTab('TASKS')} className={`w-full flex items-center justify-between px-5 py-4 text-sm font-medium transition-colors border-b border-slate-100 ${activeTab === 'TASKS' ? 'bg-emerald-50 text-emerald-700 border-l-4 border-l-emerald-600' : 'text-slate-600 hover:bg-slate-50'}`}>
+            
+            <button 
+              onClick={() => setActiveTab('TASKS')} 
+              className={`w-full flex items-center justify-between px-5 py-3.5 text-sm font-semibold transition-colors border-b border-slate-100 ${
+                activeTab === 'TASKS' 
+                  ? 'bg-emerald-50 text-emerald-700 border-l-4 border-l-emerald-600' 
+                  : 'text-slate-600 hover:bg-slate-50'
+              }`}
+            >
               <div className="flex items-center gap-3"><CheckSquare size={18} /> Tasks</div>
-              <span className="bg-slate-100 text-slate-500 py-0.5 px-2 rounded-full text-xs">{project.tasks?.length || 0}</span>
+              <span className="bg-slate-100 text-slate-600 py-0.5 px-2 rounded-full text-xs font-bold">{project.tasks?.length || 0}</span>
             </button>
-            <button onClick={() => setActiveTab('MILESTONES')} className={`w-full flex items-center justify-between px-5 py-4 text-sm font-medium transition-colors border-b border-slate-100 ${activeTab === 'MILESTONES' ? 'bg-emerald-50 text-emerald-700 border-l-4 border-l-emerald-600' : 'text-slate-600 hover:bg-slate-50'}`}>
+            
+            <button 
+              onClick={() => setActiveTab('MILESTONES')} 
+              className={`w-full flex items-center justify-between px-5 py-3.5 text-sm font-semibold transition-colors border-b border-slate-100 ${
+                activeTab === 'MILESTONES' 
+                  ? 'bg-emerald-50 text-emerald-700 border-l-4 border-l-emerald-600' 
+                  : 'text-slate-600 hover:bg-slate-50'
+              }`}
+            >
               <div className="flex items-center gap-3"><Flag size={18} /> Milestones</div>
-              <span className="bg-slate-100 text-slate-500 py-0.5 px-2 rounded-full text-xs">{project.milestones?.length || 0}</span>
+              <span className="bg-slate-100 text-slate-600 py-0.5 px-2 rounded-full text-xs font-bold">{project.milestones?.length || 0}</span>
             </button>
-            <button onClick={() => setActiveTab('MATERIALS')} className={`w-full flex items-center justify-between px-5 py-4 text-sm font-medium transition-colors border-b border-slate-100 ${activeTab === 'MATERIALS' ? 'bg-emerald-50 text-emerald-700 border-l-4 border-l-emerald-600' : 'text-slate-600 hover:bg-slate-50'}`}>
-              <div className="flex items-center gap-3"><Box size={18} /> Material Reqs</div>
-              <span className="bg-slate-100 text-slate-500 py-0.5 px-2 rounded-full text-xs">{project.materialReqs?.length || 0}</span>
+            
+            <button 
+              onClick={() => setActiveTab('MATERIALS')} 
+              className={`w-full flex items-center justify-between px-5 py-3.5 text-sm font-semibold transition-colors border-b border-slate-100 ${
+                activeTab === 'MATERIALS' 
+                  ? 'bg-emerald-50 text-emerald-700 border-l-4 border-l-emerald-600' 
+                  : 'text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              <div className="flex items-center gap-3"><Box size={18} /> Material Requirements</div>
+              <span className="bg-slate-100 text-slate-600 py-0.5 px-2 rounded-full text-xs font-bold">{project.materialReqs?.length || 0}</span>
             </button>
-            <button onClick={() => setActiveTab('TIMELINE')} className={`w-full flex items-center gap-3 px-5 py-4 text-sm font-medium transition-colors border-b border-slate-100 ${activeTab === 'TIMELINE' ? 'bg-emerald-50 text-emerald-700 border-l-4 border-l-emerald-600' : 'text-slate-600 hover:bg-slate-50'}`}>
-              <History size={18} /> Activity & Timeline
+            
+            <button 
+              onClick={() => setActiveTab('TIMELINE')} 
+              className={`w-full flex items-center gap-3 px-5 py-3.5 text-sm font-semibold transition-colors border-b border-slate-100 ${
+                activeTab === 'TIMELINE' 
+                  ? 'bg-emerald-50 text-emerald-700 border-l-4 border-l-emerald-600' 
+                  : 'text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              <History size={18} /> Activity & Audit Log
             </button>
-            <button onClick={() => setActiveTab('REGULATORY')} className={`w-full flex items-center gap-3 px-5 py-4 text-sm font-medium transition-colors border-b border-slate-100 ${activeTab === 'REGULATORY' ? 'bg-emerald-50 text-emerald-700 border-l-4 border-l-emerald-600' : 'text-slate-600 hover:bg-slate-50'}`}>
-              <CheckCircle2 size={18} /> Regulatory & Subsidies
+            
+            <button 
+              onClick={() => setActiveTab('REGULATORY')} 
+              className={`w-full flex items-center gap-3 px-5 py-3.5 text-sm font-semibold transition-colors border-b border-slate-100 ${
+                activeTab === 'REGULATORY' 
+                  ? 'bg-emerald-50 text-emerald-700 border-l-4 border-l-emerald-600' 
+                  : 'text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              <CheckCircle2 size={18} /> DISCOM & Subsidies
             </button>
-            <button onClick={() => setActiveTab('DISCOM')} className={`w-full flex items-center gap-3 px-5 py-4 text-sm font-medium transition-colors border-b border-slate-100 ${activeTab === 'DISCOM' ? 'bg-emerald-50 text-emerald-700 border-l-4 border-l-emerald-600' : 'text-slate-600 hover:bg-slate-50'}`}>
-              <FileText size={18} /> Generate Forms
+            
+            <button 
+              onClick={() => setActiveTab('DISCOM')} 
+              className={`w-full flex items-center gap-3 px-5 py-3.5 text-sm font-semibold transition-colors border-b border-slate-100 ${
+                activeTab === 'DISCOM' 
+                  ? 'bg-emerald-50 text-emerald-700 border-l-4 border-l-emerald-600' 
+                  : 'text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              <FileText size={18} /> Generate MSEDCL Forms
             </button>
-            <button onClick={() => setActiveTab('SERVICE')} className={`w-full flex items-center gap-3 px-5 py-4 text-sm font-medium transition-colors ${activeTab === 'SERVICE' ? 'bg-emerald-50 text-emerald-700 border-l-4 border-l-emerald-600' : 'text-slate-600 hover:bg-slate-50'}`}>
-              <Wrench size={18} /> Service & Warranty
+            
+            <button 
+              onClick={() => setActiveTab('SERVICE')} 
+              className={`w-full flex items-center gap-3 px-5 py-3.5 text-sm font-semibold transition-colors ${
+                activeTab === 'SERVICE' 
+                  ? 'bg-emerald-50 text-emerald-700 border-l-4 border-l-emerald-600' 
+                  : 'text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              <Wrench size={18} /> Warranty & Support
             </button>
           </div>
         </div>
@@ -375,15 +700,158 @@ export default function ProjectDetails() {
           
           {/* OVERVIEW TAB */}
           {activeTab === 'OVERVIEW' && (
-            <div className="p-6 space-y-8 animate-in fade-in duration-300">
+            <div className="p-6 md:p-8 space-y-8 animate-in fade-in duration-300">
+              
+              {/* Originating Quotation & Agreed Technical Specifications Hero Widget */}
+              {project.quotation ? (
+                <div className="rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50/50 via-white to-slate-50 p-6 shadow-sm">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-emerald-100 gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-sm">
+                        <Award size={20} />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-extrabold text-slate-900 text-base">Agreed Solar Proposal Specifications</h3>
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 uppercase">
+                            Locked & Accepted
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          Originating Proposal <span className="font-bold text-slate-700">#{project.quotation.qNumber}</span> • Customer agreed configuration
+                        </p>
+                      </div>
+                    </div>
+
+                    <Link 
+                      href={`/tenant/quotations/${project.quotation.id}`}
+                      className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition shadow-sm self-start sm:self-auto"
+                    >
+                      Open Quotation Studio <ExternalLink size={13} />
+                    </Link>
+                  </div>
+
+                  {/* 4-Column Technical Hardware Spec Grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 pt-5">
+                    {/* Solar PV Modules */}
+                    <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
+                      <div className="flex items-center gap-2 text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
+                        <Sun size={14} className="text-yellow-500" /> PV Solar Modules
+                      </div>
+                      <div className="text-sm font-bold text-slate-900">
+                        {project.quotation.panelBrand || 'Tier-1 Mono PERC'}
+                      </div>
+                      <div className="text-xs text-slate-600 mt-1">
+                        Model: <span className="font-medium text-slate-800">{project.quotation.panelModel || 'DCR Compliant Bi-facial'}</span>
+                      </div>
+                      <div className="text-xs text-slate-600 mt-0.5">
+                        Rating: <span className="font-bold text-emerald-700">{project.quotation.panelWattage || 540} Wp</span>
+                      </div>
+                      <div className="text-xs text-slate-600 mt-0.5">
+                        Quantity: <span className="font-bold text-slate-900">{project.quotation.panelQuantity || Math.ceil((project.capacity * 1000) / (project.quotation.panelWattage || 540))} Panels</span>
+                      </div>
+                      <div className="text-[11px] text-emerald-600 font-semibold mt-2 pt-2 border-t border-slate-100 flex items-center gap-1">
+                        <ShieldCheck size={12} /> {project.quotation.panelWarranty || '25-Year Performance'}
+                      </div>
+                    </div>
+
+                    {/* Solar Inverter */}
+                    <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
+                      <div className="flex items-center gap-2 text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
+                        <Zap size={14} className="text-blue-500" /> Grid-Tie Inverter
+                      </div>
+                      <div className="text-sm font-bold text-slate-900">
+                        {project.quotation.inverterBrand || 'Growatt / Solis'}
+                      </div>
+                      <div className="text-xs text-slate-600 mt-1">
+                        Capacity: <span className="font-bold text-slate-900">{project.quotation.inverterCapacity || project.capacity} kW</span>
+                      </div>
+                      <div className="text-xs text-slate-600 mt-0.5">
+                        Phase: <span className="font-medium text-slate-800">{project.quotation.phase || 'Three Phase'}</span>
+                      </div>
+                      <div className="text-xs text-slate-600 mt-0.5">
+                        Quantity: <span className="font-bold text-slate-900">{project.quotation.inverterQuantity || 1} Units</span>
+                      </div>
+                      <div className="text-[11px] text-emerald-600 font-semibold mt-2 pt-2 border-t border-slate-100 flex items-center gap-1">
+                        <ShieldCheck size={12} /> {project.quotation.inverterWarranty || '5-Year Replacement'}
+                      </div>
+                    </div>
+
+                    {/* Structure & Mounting */}
+                    <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
+                      <div className="flex items-center gap-2 text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
+                        <Settings size={14} className="text-indigo-500" /> Structure & Civil
+                      </div>
+                      <div className="text-sm font-bold text-slate-900">
+                        {project.quotation.structureBrand || 'Hot-Dip Galvanized (GI)'}
+                      </div>
+                      <div className="text-xs text-slate-600 mt-1">
+                        Roof Type: <span className="font-medium text-slate-800">{project.quotation.roofType || project.roofType || 'RCC Flat Roof'}</span>
+                      </div>
+                      <div className="text-xs text-slate-600 mt-0.5">
+                        Elevation: <span className="font-medium text-slate-800">High-Rise (Wind 150 km/h)</span>
+                      </div>
+                      <div className="text-xs text-slate-600 mt-0.5">
+                        Net Metering: <span className="font-semibold text-emerald-700">Bi-directional MSEDCL</span>
+                      </div>
+                      <div className="text-[11px] text-emerald-600 font-semibold mt-2 pt-2 border-t border-slate-100 flex items-center gap-1">
+                        <ShieldCheck size={12} /> {project.quotation.structureWarranty || '10-Year Anti-Corrosion'}
+                      </div>
+                    </div>
+
+                    {/* Solar Yield & Economics */}
+                    <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
+                      <div className="flex items-center gap-2 text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
+                        <TrendingUp size={14} className="text-emerald-500" /> Yield & ROI
+                      </div>
+                      <div className="text-xs text-slate-600">
+                        Annual Generation: <span className="font-bold text-slate-900">{project.quotation.annualGeneration ? `${project.quotation.annualGeneration.toLocaleString()} kWh` : `${Math.round(project.capacity * 1450).toLocaleString()} kWh/yr`}</span>
+                      </div>
+                      <div className="text-xs text-slate-600 mt-1">
+                        Annual Savings: <span className="font-bold text-emerald-700">{project.quotation.annualSavings ? `₹${project.quotation.annualSavings.toLocaleString()}/yr` : `₹${Math.round(project.capacity * 1450 * 7).toLocaleString()}/yr`}</span>
+                      </div>
+                      <div className="text-xs text-slate-600 mt-1">
+                        Payback Period: <span className="font-bold text-slate-900">{project.quotation.paybackYears ? `${project.quotation.paybackYears} Years` : '3.8 - 4.2 Years'}</span>
+                      </div>
+                      <div className="text-xs text-slate-600 mt-1">
+                        Lifetime CO₂ Offset: <span className="font-bold text-emerald-600">{project.quotation.co2ReductionKg ? `${(project.quotation.co2ReductionKg / 1000).toFixed(1)} Tons` : `${(project.capacity * 29).toFixed(1)} Tons`}</span>
+                      </div>
+                      <div className="text-[11px] text-slate-500 font-semibold mt-2 pt-2 border-t border-slate-100 flex items-center justify-between">
+                        <span>Central Subsidy:</span>
+                        <span className="font-bold text-emerald-700">₹{(project.quotation.subsidyAmount || 78000).toLocaleString()}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-slate-50 border border-dashed border-slate-300 p-5 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <Briefcase className="w-8 h-8 text-slate-400" />
+                    <div>
+                      <h4 className="font-bold text-slate-800 text-sm">Direct Custom Project (No Quotation Linked)</h4>
+                      <p className="text-xs text-slate-500">This project was initiated directly without linking to an approved solar proposal.</p>
+                    </div>
+                  </div>
+                  <Link 
+                    href="/tenant/quotations/new" 
+                    className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs rounded-xl transition shrink-0"
+                  >
+                    Create Quotation for Customer
+                  </Link>
+                </div>
+              )}
+
+              {/* Standard Configuration, Location, Schedule & Financial Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div className="space-y-6">
                   <div>
-                    <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4 flex items-center gap-2"><Settings size={16} className="text-slate-400" /> Configuration</h3>
+                    <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4 flex items-center gap-2">
+                      <Settings size={16} className="text-slate-400" /> System Specifications
+                    </h3>
                     <div className="bg-slate-50 rounded-xl p-4 border border-slate-100 space-y-3">
                       <div className="flex justify-between items-center text-sm">
                         <span className="text-slate-500">System Capacity</span>
-                        <span className="font-semibold text-slate-800">{project.capacity} {project.capacityUnit}</span>
+                        <span className="font-bold text-emerald-700">{project.capacity} {project.capacityUnit || 'kWp'}</span>
                       </div>
                       <div className="flex justify-between items-center text-sm">
                         <span className="text-slate-500">System Type</span>
@@ -393,49 +861,86 @@ export default function ProjectDetails() {
                         <span className="text-slate-500">Project Type</span>
                         <span className="font-semibold text-slate-800">{project.projectType}</span>
                       </div>
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-slate-500">Assigned Project Manager</span>
+                        <span className="font-semibold text-slate-800">{project.projectOwner?.name || 'Unassigned'}</span>
+                      </div>
                     </div>
                   </div>
 
                   <div>
-                    <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4 flex items-center gap-2"><MapPin size={16} className="text-slate-400" /> Location</h3>
-                    <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
+                    <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4 flex items-center gap-2">
+                      <MapPin size={16} className="text-slate-400" /> Installation Site & Address
+                    </h3>
+                    <div className="bg-slate-50 rounded-xl p-4 border border-slate-100 space-y-2">
                       <p className="text-sm text-slate-700 leading-relaxed font-medium">
-                        {project.installationAddress}<br/>
-                        {project.city}, {project.state} {project.pincode}
+                        {project.installationAddress || 'Site address not provided'}<br/>
+                        {project.city || ''} {project.state ? `, ${project.state}` : ''} {project.pincode ? `— ${project.pincode}` : ''}
                       </p>
+                      {project.city && (
+                        <a 
+                          href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${project.installationAddress || ''} ${project.city || ''} ${project.pincode || ''}`)}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-600 hover:text-emerald-700 pt-2"
+                        >
+                          <MapPin size={12} /> View on Google Maps <ExternalLink size={11} />
+                        </a>
+                      )}
                     </div>
                   </div>
                 </div>
 
                 <div className="space-y-6">
                   <div>
-                    <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4 flex items-center gap-2"><Calendar size={16} className="text-slate-400" /> Schedule</h3>
+                    <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4 flex items-center gap-2">
+                      <Calendar size={16} className="text-slate-400" /> Execution Milestones & Dates
+                    </h3>
                     <div className="bg-slate-50 rounded-xl p-4 border border-slate-100 space-y-3">
                       <div className="flex justify-between items-center text-sm">
                         <span className="text-slate-500">Start Date</span>
                         <span className="font-semibold text-slate-800">{project.startDate ? new Date(project.startDate).toLocaleDateString() : 'TBD'}</span>
                       </div>
                       <div className="flex justify-between items-center text-sm">
-                        <span className="text-slate-500">Expected End</span>
+                        <span className="text-slate-500">Expected Commissioning</span>
                         <span className="font-semibold text-slate-800">{project.expectedCompletionDate ? new Date(project.expectedCompletionDate).toLocaleDateString() : 'TBD'}</span>
+                      </div>
+                      {project.actualCompletionDate && (
+                        <div className="flex justify-between items-center text-sm">
+                          <span className="text-slate-500">Actual Handover</span>
+                          <span className="font-bold text-emerald-600">{new Date(project.actualCompletionDate).toLocaleDateString()}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between items-center text-sm pt-2 border-t border-slate-200">
+                        <span className="text-slate-500">Created At</span>
+                        <span className="text-slate-600 font-medium">{new Date(project.createdAt).toLocaleDateString()}</span>
                       </div>
                     </div>
                   </div>
 
                   <div>
-                    <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4 flex items-center gap-2"><DollarSign size={16} className="text-slate-400" /> Financials</h3>
+                    <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4 flex items-center gap-2">
+                      <DollarSign size={16} className="text-slate-400" /> Contract Value & Economics
+                    </h3>
                     <div className="bg-slate-50 rounded-xl p-4 border border-slate-100 space-y-3">
                       <div className="flex justify-between items-center text-sm">
-                        <span className="text-slate-500">Est. Revenue</span>
-                        <span className="font-bold text-slate-900">₹{(project.estimatedValue || 0).toLocaleString()}</span>
+                        <span className="text-slate-500">Contract Revenue</span>
+                        <span className="font-extrabold text-slate-900">₹{(project.estimatedValue || 0).toLocaleString()}</span>
                       </div>
                       <div className="flex justify-between items-center text-sm">
-                        <span className="text-slate-500">Est. Cost</span>
+                        <span className="text-slate-500">Budgeted Cost</span>
                         <span className="font-bold text-slate-900">₹{(project.estimatedCost || 0).toLocaleString()}</span>
                       </div>
                       <div className="flex justify-between items-center text-sm pt-2 border-t border-slate-200">
-                        <span className="text-slate-500 font-semibold">Expected Profit</span>
-                        <span className="font-bold text-emerald-600">₹{((project.estimatedValue || 0) - (project.estimatedCost || 0)).toLocaleString()}</span>
+                        <span className="text-slate-600 font-semibold">Expected Gross Margin</span>
+                        <span className="font-extrabold text-emerald-600 text-base">
+                          ₹{((project.estimatedValue || 0) - (project.estimatedCost || 0)).toLocaleString()}
+                          {project.estimatedValue > 0 && (
+                            <span className="text-xs text-emerald-600/80 font-bold ml-1.5">
+                              ({(((project.estimatedValue - (project.estimatedCost || 0)) / project.estimatedValue) * 100).toFixed(1)}%)
+                            </span>
+                          )}
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -1099,10 +1604,10 @@ export default function ProjectDetails() {
               address: project.installationAddress || "Installation Address",
               city: project.city,
               capacity: project.capacity,
-              moduleMake: project.materialReqs?.find((r:any) => r.description?.toLowerCase()?.includes('panel'))?.description?.split(' ')[0] || "Waaree",
-              moduleWattage: 540,
-              moduleQuantity: Math.ceil((project.capacity * 1000) / 540),
-              inverterMake: project.materialReqs?.find((r:any) => r.description?.toLowerCase()?.includes('inverter'))?.description?.split(' ')[0] || "Growatt",
+              moduleMake: project.quotation?.panelBrand || project.materialReqs?.find((r:any) => r.description?.toLowerCase()?.includes('panel'))?.description?.split(' ')[0] || "Waaree",
+              moduleWattage: project.quotation?.panelWattage || 540,
+              moduleQuantity: project.quotation?.panelQuantity || Math.ceil((project.capacity * 1000) / (project.quotation?.panelWattage || 540)),
+              inverterMake: project.quotation?.inverterBrand || project.materialReqs?.find((r:any) => r.description?.toLowerCase()?.includes('inverter'))?.description?.split(' ')[0] || "Growatt",
             }} />}
             {selectedForm === 'Guarantee' && <GuaranteeCertificate data={{
               customerName: project.customer?.name || "Consumer",
@@ -1112,21 +1617,21 @@ export default function ProjectDetails() {
               customerName: project.customer?.name || "Consumer",
               address: project.installationAddress || "Installation Address",
               capacity: project.capacity,
-              moduleMake: project.materialReqs?.find((r:any) => r.description?.toLowerCase()?.includes('panel'))?.description?.split(' ')[0] || "Waaree",
-              moduleWattage: 540,
-              moduleQuantity: Math.ceil((project.capacity * 1000) / 540),
+              moduleMake: project.quotation?.panelBrand || project.materialReqs?.find((r:any) => r.description?.toLowerCase()?.includes('panel'))?.description?.split(' ')[0] || "Waaree",
+              moduleWattage: project.quotation?.panelWattage || 540,
+              moduleQuantity: project.quotation?.panelQuantity || Math.ceil((project.capacity * 1000) / (project.quotation?.panelWattage || 540)),
             }} />}
             {selectedForm === 'AnnexureI' && <AnnexureProforma data={{
               vendorName: "Apex Solar Solutions",
               customerName: project.customer?.name || "Consumer",
-              customerPhone: project.customer?.phone || "+91 9999999999",
+              customerPhone: project.customer?.mobile || project.customer?.phone || "+91 9999999999",
               customerEmail: project.customer?.email || "customer@example.com",
               address: project.installationAddress || "Installation Address",
               city: project.city,
               capacity: project.capacity,
-              moduleMake: project.materialReqs?.find((r:any) => r.description?.toLowerCase()?.includes('panel'))?.description?.split(' ')[0] || "Waaree",
-              moduleQuantity: Math.ceil((project.capacity * 1000) / 540),
-              inverterMake: project.materialReqs?.find((r:any) => r.description?.toLowerCase()?.includes('inverter'))?.description?.split(' ')[0] || "Growatt",
+              moduleMake: project.quotation?.panelBrand || project.materialReqs?.find((r:any) => r.description?.toLowerCase()?.includes('panel'))?.description?.split(' ')[0] || "Waaree",
+              moduleQuantity: project.quotation?.panelQuantity || Math.ceil((project.capacity * 1000) / (project.quotation?.panelWattage || 540)),
+              inverterMake: project.quotation?.inverterBrand || project.materialReqs?.find((r:any) => r.description?.toLowerCase()?.includes('inverter'))?.description?.split(' ')[0] || "Growatt",
             }} />}
             {selectedForm === 'NetMetering' && <NetMeteringAgreement data={{
               vendorName: "Apex Solar Solutions",

@@ -1,11 +1,15 @@
 "use client";
-import { useState, useEffect } from 'react';
+
+import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { 
-  Briefcase, Plus, Search, Filter, 
-  ArrowRight, Activity, DollarSign, Clock, AlertTriangle, CheckCircle2, TrendingUp
+  Briefcase, Plus, Search, Filter, ArrowRight, Activity, 
+  DollarSign, Clock, AlertTriangle, CheckCircle2, TrendingUp,
+  Sun, Zap, Trash2, ExternalLink, RefreshCw, X, ChevronRight,
+  User, MapPin, FileText, Loader2, ArrowUpRight, ShieldCheck, 
+  Layers, CheckCheck, Phone, CheckSquare
 } from 'lucide-react';
 
 export default function ProjectsDashboard() {
@@ -13,17 +17,33 @@ export default function ProjectsDashboard() {
   const [projects, setProjects] = useState<any[]>([]);
   const [metrics, setMetrics] = useState<any>({});
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState('ALL'); // ALL, IN_PROGRESS, DELAYED, COMPLETED
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
+
+  // FILTERS & SEARCH
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedStatus, setSelectedStatus] = useState('ALL'); // ALL, IN_PROGRESS, DELAYED, COMPLETED
+  const [selectedStage, setSelectedStage] = useState('ALL'); // ALL, Planning, Design, Procurement, Installation, Testing, Handover, Completed
+
+  // QUICK STAGE ADVANCE MODAL
+  const [stageModalProject, setStageModalProject] = useState<any | null>(null);
+  const [advancingStage, setAdvancingStage] = useState(false);
+  const [targetStage, setTargetStage] = useState('Planning');
+  const [stageNote, setStageNote] = useState('');
 
   const fetchProjects = async () => {
     try {
-      const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/projects`, { withCredentials: true });
+      const res = await axios.get(
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/projects`, 
+        { withCredentials: true }
+      );
       setProjects(res.data.projects || []);
       setMetrics(res.data.metrics || {});
     } catch (err) {
-      console.error(err);
+      console.error('Failed to fetch projects:', err);
     } finally {
       setLoading(false);
+      setIsRefreshing(false);
     }
   };
 
@@ -31,187 +51,630 @@ export default function ProjectsDashboard() {
     fetchProjects();
   }, []);
 
-  const filteredProjects = projects.filter(p => {
-    if (filter === 'ALL') return true;
-    if (filter === 'IN_PROGRESS') return ['Planning', 'Design', 'Procurement', 'Installation', 'Testing'].includes(p.currentStage) && p.status !== 'Delayed';
-    if (filter === 'DELAYED') return p.status === 'Delayed';
-    if (filter === 'COMPLETED') return p.currentStage === 'Completed';
-    return true;
-  });
+  const handleRefresh = () => {
+    setIsRefreshing(true);
+    fetchProjects();
+  };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'Not Started': return 'bg-slate-100 text-slate-700 border-slate-200';
-      case 'In Progress': return 'bg-blue-50 text-blue-700 border-blue-200';
-      case 'On Hold': return 'bg-amber-50 text-amber-700 border-amber-200';
-      case 'Delayed': return 'bg-red-50 text-red-700 border-red-200';
-      case 'Completed': return 'bg-emerald-50 text-emerald-700 border-emerald-200';
-      case 'Cancelled': return 'bg-slate-100 text-slate-500 border-slate-200';
-      default: return 'bg-slate-50 text-slate-700 border-slate-200';
+  // Filtered project list
+  const filteredProjects = useMemo(() => {
+    return projects.filter(p => {
+      // 1. Status Filter
+      if (selectedStatus === 'IN_PROGRESS') {
+        const inProgressStages = ['Design', 'Procurement', 'Installation', 'Testing'];
+        if (!inProgressStages.includes(p.currentStage) || p.status === 'Delayed') return false;
+      } else if (selectedStatus === 'DELAYED') {
+        if (p.status !== 'Delayed') return false;
+      } else if (selectedStatus === 'COMPLETED') {
+        if (p.currentStage !== 'Completed') return false;
+      }
+
+      // 2. Stage Filter
+      if (selectedStage !== 'ALL') {
+        if (p.currentStage !== selectedStage) return false;
+      }
+
+      // 3. Search Query
+      if (searchTerm.trim()) {
+        const q = searchTerm.toLowerCase().trim();
+        const client = p.customer || p.lead;
+        const matchNumber = (p.projectNumber || '').toLowerCase().includes(q);
+        const matchName = (p.name || '').toLowerCase().includes(q);
+        const matchCustomer = (client?.name || '').toLowerCase().includes(q);
+        const matchPhone = (client?.mobile || client?.phone || '').includes(q);
+        const matchCity = (p.city || '').toLowerCase().includes(q);
+        const matchQuote = (p.quotation?.qNumber || '').toLowerCase().includes(q);
+        if (!matchNumber && !matchName && !matchCustomer && !matchPhone && !matchCity && !matchQuote) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [projects, selectedStatus, selectedStage, searchTerm]);
+
+  // Handle stage change from quick modal
+  const handleQuickStageAdvance = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!stageModalProject) return;
+
+    setAdvancingStage(true);
+    try {
+      await axios.patch(
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/projects/${stageModalProject.id}/stage`,
+        { 
+          newStage: targetStage, 
+          comment: stageNote || `Stage advanced to ${targetStage} from project dashboard` 
+        },
+        { withCredentials: true }
+      );
+      setStageModalProject(null);
+      setStageNote('');
+      fetchProjects();
+    } catch (err: any) {
+      alert('Failed to update stage: ' + (err.response?.data?.error || err.message));
+    } finally {
+      setAdvancingStage(false);
     }
   };
 
-  if (loading) return <div className="flex justify-center py-20"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500"></div></div>;
+  // Handle delete project
+  const handleDeleteProject = async (project: any, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!confirm(`Are you sure you want to permanently delete project ${project.projectNumber} (${project.name})? This will delete associated tasks and milestones.`)) {
+      return;
+    }
+
+    setDeletingProjectId(project.id);
+    try {
+      setProjects(prev => prev.filter(p => p.id !== project.id));
+      await axios.delete(
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/projects/${project.id}`,
+        { withCredentials: true }
+      );
+      fetchProjects();
+    } catch (err: any) {
+      alert('Failed to delete project: ' + (err.response?.data?.error || err.message));
+      fetchProjects();
+    } finally {
+      setDeletingProjectId(null);
+    }
+  };
+
+  const getStageBadge = (stage: string) => {
+    switch (stage) {
+      case 'Planning':
+        return <span className="px-2.5 py-1 text-[11px] font-extrabold rounded-full bg-slate-100 text-slate-700 border border-slate-200">Planning</span>;
+      case 'Design':
+        return <span className="px-2.5 py-1 text-[11px] font-extrabold rounded-full bg-blue-50 text-blue-700 border border-blue-200">Engineering Design</span>;
+      case 'Procurement':
+        return <span className="px-2.5 py-1 text-[11px] font-extrabold rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">Procurement & BOM</span>;
+      case 'Installation':
+        return <span className="px-2.5 py-1 text-[11px] font-extrabold rounded-full bg-amber-50 text-amber-800 border border-amber-200">Site Installation</span>;
+      case 'Testing':
+        return <span className="px-2.5 py-1 text-[11px] font-extrabold rounded-full bg-purple-50 text-purple-700 border border-purple-200">Testing & QA</span>;
+      case 'Handover':
+        return <span className="px-2.5 py-1 text-[11px] font-extrabold rounded-full bg-teal-50 text-teal-700 border border-teal-200">Client Handover</span>;
+      case 'Completed':
+        return <span className="px-2.5 py-1 text-[11px] font-extrabold rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1"><CheckCircle2 size={12} /> Commissioned</span>;
+      default:
+        return <span className="px-2.5 py-1 text-[11px] font-extrabold rounded-full bg-slate-100 text-slate-700">{stage}</span>;
+    }
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'In Progress':
+        return <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-blue-50 text-blue-700 border border-blue-200">In Progress</span>;
+      case 'Delayed':
+        return <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-red-50 text-red-700 border border-red-200 flex items-center gap-0.5"><AlertTriangle size={10} /> Delayed</span>;
+      case 'On Hold':
+        return <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-amber-50 text-amber-800 border border-amber-200">On Hold</span>;
+      case 'Completed':
+        return <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">Completed</span>;
+      default:
+        return <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-slate-100 text-slate-600">{status}</span>;
+    }
+  };
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6 pb-12">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
-            <Briefcase className="text-emerald-600" /> Projects Dashboard
-          </h1>
-          <p className="text-slate-500 mt-1 text-sm">Manage all solar installations and operational workflows</p>
-        </div>
-        <button 
-          onClick={() => router.push('/tenant/projects/new')}
-          className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-medium text-sm transition-colors shadow-sm flex items-center gap-2"
-        >
-          <Plus size={16} /> Create Project
-        </button>
-      </div>
-
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex items-start justify-between group hover:border-emerald-200 transition-colors">
-          <div>
-            <p className="text-sm font-medium text-slate-500 mb-1">Total Projects</p>
-            <h3 className="text-3xl font-bold text-slate-900">{metrics?.total || 0}</h3>
-            <p className="text-xs font-medium text-emerald-600 mt-2 flex items-center gap-1">
-              <Activity size={12} /> {metrics?.inProgress || 0} In Progress
-            </p>
-          </div>
-          <div className="w-12 h-12 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-emerald-50 group-hover:text-emerald-600 transition-colors">
-            <Briefcase size={24} />
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex items-start justify-between group hover:border-blue-200 transition-colors">
-          <div>
-            <p className="text-sm font-medium text-slate-500 mb-1">Project Value</p>
-            <h3 className="text-3xl font-bold text-slate-900">₹{((metrics?.totalValue || 0) / 100000).toFixed(2)}L</h3>
-            <p className="text-xs font-medium text-blue-600 mt-2 flex items-center gap-1">
-              <DollarSign size={12} /> Estimated Revenue
-            </p>
-          </div>
-          <div className="w-12 h-12 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">
-            <TrendingUp size={24} />
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex items-start justify-between group hover:border-red-200 transition-colors">
-          <div>
-            <p className="text-sm font-medium text-slate-500 mb-1">Delayed</p>
-            <h3 className="text-3xl font-bold text-slate-900">{metrics?.delayed || 0}</h3>
-            <p className="text-xs font-medium text-red-600 mt-2 flex items-center gap-1">
-              <AlertTriangle size={12} /> Requires Attention
-            </p>
-          </div>
-          <div className="w-12 h-12 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-red-50 group-hover:text-red-600 transition-colors">
-            <Clock size={24} />
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex items-start justify-between group hover:border-purple-200 transition-colors">
-          <div>
-            <p className="text-sm font-medium text-slate-500 mb-1">Expected Profit</p>
-            <h3 className="text-3xl font-bold text-slate-900">₹{((metrics?.expectedProfit || 0) / 100000).toFixed(2)}L</h3>
-            <p className="text-xs font-medium text-purple-600 mt-2 flex items-center gap-1">
-              <CheckCircle2 size={12} /> Based on estimates
-            </p>
-          </div>
-          <div className="w-12 h-12 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-purple-50 group-hover:text-purple-600 transition-colors">
-            <DollarSign size={24} />
-          </div>
-        </div>
-      </div>
-
-      {/* Projects List */}
-      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-        {/* Toolbar */}
-        <div className="p-4 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-50/50">
-          <div className="flex items-center gap-2">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-              <input type="text" placeholder="Search projects..." className="pl-9 pr-4 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none w-64" />
+    <div className="max-w-[1400px] mx-auto space-y-6 pb-16">
+      
+      {/* HEADER SECTION */}
+      <div className="bg-gradient-to-r from-[#071A2B] via-[#0D2847] to-[#0A3C36] p-6 sm:p-8 rounded-3xl text-white shadow-xl relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20"></div>
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-2.5">
+              <span className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-500/30">
+                <Briefcase size={18} />
+              </span>
+              <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
+                Projects Studio
+              </h1>
+              <span className="px-2.5 py-0.5 text-xs font-bold bg-white/10 rounded-full text-slate-300 border border-white/10">
+                {projects.length} Total
+              </span>
             </div>
-            <button className="p-2 border border-slate-200 rounded-lg text-slate-500 hover:bg-slate-50 transition-colors">
-              <Filter size={16} />
+            <p className="text-xs sm:text-sm text-slate-300 max-w-2xl leading-relaxed">
+              Orchestrate rooftop solar PV execution: engineering design, procurement BOMs, site installations, MSEDCL net metering liasoning, and completion handovers.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2.5">
+            <button
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              className="p-2.5 bg-white/10 hover:bg-white/20 text-white rounded-xl transition-all border border-white/10 cursor-pointer disabled:opacity-50"
+              title="Refresh project list"
+            >
+              <RefreshCw size={16} className={isRefreshing ? "animate-spin text-emerald-400" : ""} />
+            </button>
+            <Link
+              href="/tenant/projects/new"
+              className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-[#071A2B] font-black rounded-xl text-xs sm:text-sm transition-all shadow-lg shadow-emerald-500/20 flex items-center gap-2 cursor-pointer"
+            >
+              <Plus size={16} className="stroke-[3]" /> Create New Project
+            </Link>
+          </div>
+        </div>
+      </div>
+
+      {/* KPI METRIC CARDS */}
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3.5 sm:gap-4">
+        {/* CARD 1: ACTIVE INSTALLATIONS */}
+        <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col justify-between hover:border-blue-300 transition-colors">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500">Active Pipeline</span>
+            <span className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-xs">
+              <Activity size={15} />
+            </span>
+          </div>
+          <div className="mt-3">
+            <h3 className="text-2xl font-black text-slate-900 tracking-tight">{metrics?.inProgress || 0}</h3>
+            <p className="text-[11px] text-blue-600 font-semibold mt-0.5">Execution in Flight</p>
+          </div>
+        </div>
+
+        {/* CARD 2: TOTAL CAPACITY */}
+        <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col justify-between hover:border-emerald-300 transition-colors">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500">Committed Capacity</span>
+            <span className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold text-xs">
+              <Sun size={15} />
+            </span>
+          </div>
+          <div className="mt-3">
+            <h3 className="text-2xl font-black text-slate-900 tracking-tight">{metrics?.totalCapacity || 0} <span className="text-xs font-bold text-slate-500">kWp</span></h3>
+            <p className="text-[11px] text-emerald-600 font-semibold mt-0.5">PV Plant Generation</p>
+          </div>
+        </div>
+
+        {/* CARD 3: CONTRACT REVENUE */}
+        <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col justify-between hover:border-indigo-300 transition-colors">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500">Contract Value</span>
+            <span className="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-xs">
+              <DollarSign size={15} />
+            </span>
+          </div>
+          <div className="mt-3">
+            <h3 className="text-2xl font-black text-slate-900 tracking-tight">₹{((metrics?.totalValue || 0) / 100000).toFixed(2)}L</h3>
+            <p className="text-[11px] text-indigo-600 font-semibold mt-0.5">Est. Profit: ₹{((metrics?.expectedProfit || 0) / 100000).toFixed(2)}L</p>
+          </div>
+        </div>
+
+        {/* CARD 4: COMPLETED PROJECTS */}
+        <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col justify-between hover:border-teal-300 transition-colors">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500">Commissioned</span>
+            <span className="w-7 h-7 rounded-lg bg-teal-50 text-teal-600 flex items-center justify-center font-bold text-xs">
+              <CheckCircle2 size={15} />
+            </span>
+          </div>
+          <div className="mt-3">
+            <h3 className="text-2xl font-black text-slate-900 tracking-tight">{metrics?.completed || 0}</h3>
+            <p className="text-[11px] text-teal-600 font-semibold mt-0.5">Handover & AMC Active</p>
+          </div>
+        </div>
+
+        {/* CARD 5: DELAYED / REQUIRING ATTENTION */}
+        <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col justify-between hover:border-amber-300 transition-colors col-span-2 lg:col-span-1">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500">Attention Needed</span>
+            <span className="w-7 h-7 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center font-bold text-xs">
+              <Clock size={15} />
+            </span>
+          </div>
+          <div className="mt-3">
+            <h3 className="text-2xl font-black text-amber-600 tracking-tight">{metrics?.delayed || 0}</h3>
+            <p className="text-[11px] text-slate-500 font-medium mt-0.5">Delayed Milestones</p>
+          </div>
+        </div>
+      </div>
+
+      {/* TOOLBAR: SEARCH & FILTERS */}
+      <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
+        
+        {/* SEARCH BAR */}
+        <div className="relative flex-1 max-w-lg">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+            placeholder="Search by project #, name, customer, city, or quotation..."
+            className="w-full pl-10 pr-9 py-2 bg-slate-50 hover:bg-slate-100/80 focus:bg-white rounded-xl border border-slate-200 text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+          />
+          {searchTerm && (
+            <button
+              onClick={() => setSearchTerm('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+            >
+              <X size={14} />
+            </button>
+          )}
+        </div>
+
+        {/* STATUS TABS & STAGE DROPDOWN */}
+        <div className="flex flex-wrap items-center gap-2">
+          
+          {/* STAGE SELECTOR */}
+          <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1 text-xs">
+            <span className="text-slate-400 font-semibold text-[11px]">Stage:</span>
+            <select
+              value={selectedStage}
+              onChange={e => setSelectedStage(e.target.value)}
+              className="bg-transparent text-slate-800 font-bold outline-none cursor-pointer text-xs"
+            >
+              <option value="ALL">All Stages</option>
+              <option value="Planning">Planning ({metrics?.planning || 0})</option>
+              <option value="Design">Design ({metrics?.design || 0})</option>
+              <option value="Procurement">Procurement ({metrics?.procurement || 0})</option>
+              <option value="Installation">Installation ({metrics?.installation || 0})</option>
+              <option value="Testing">Testing ({metrics?.testing || 0})</option>
+              <option value="Handover">Handover ({metrics?.handover || 0})</option>
+              <option value="Completed">Completed ({metrics?.completed || 0})</option>
+            </select>
+          </div>
+
+          {/* STATUS PILLS */}
+          <div className="flex bg-slate-100 p-1 rounded-xl text-xs font-bold text-slate-600">
+            <button
+              onClick={() => setSelectedStatus('ALL')}
+              className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                selectedStatus === 'ALL' ? 'bg-white text-slate-900 shadow-sm' : 'hover:text-slate-900'
+              }`}
+            >
+              All ({projects.length})
+            </button>
+            <button
+              onClick={() => setSelectedStatus('IN_PROGRESS')}
+              className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                selectedStatus === 'IN_PROGRESS' ? 'bg-white text-slate-900 shadow-sm' : 'hover:text-slate-900'
+              }`}
+            >
+              In Progress ({metrics?.inProgress || 0})
+            </button>
+            <button
+              onClick={() => setSelectedStatus('DELAYED')}
+              className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                selectedStatus === 'DELAYED' ? 'bg-white text-slate-900 shadow-sm' : 'hover:text-slate-900'
+              }`}
+            >
+              Delayed ({metrics?.delayed || 0})
+            </button>
+            <button
+              onClick={() => setSelectedStatus('COMPLETED')}
+              className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                selectedStatus === 'COMPLETED' ? 'bg-white text-slate-900 shadow-sm' : 'hover:text-slate-900'
+              }`}
+            >
+              Completed ({metrics?.completed || 0})
             </button>
           </div>
-          
-          <div className="flex bg-slate-100 p-1 rounded-lg">
-            <button onClick={() => setFilter('ALL')} className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${filter === 'ALL' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>All</button>
-            <button onClick={() => setFilter('IN_PROGRESS')} className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${filter === 'IN_PROGRESS' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>In Progress</button>
-            <button onClick={() => setFilter('DELAYED')} className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${filter === 'DELAYED' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Delayed</button>
-            <button onClick={() => setFilter('COMPLETED')} className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${filter === 'COMPLETED' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Completed</button>
-          </div>
         </div>
+      </div>
 
-        {/* Table */}
+      {/* MASTER PROJECTS TABLE */}
+      <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider border-b border-slate-200">
-                <th className="p-4 font-semibold">Project</th>
-                <th className="p-4 font-semibold">Customer & Specs</th>
-                <th className="p-4 font-semibold">Stage & Progress</th>
-                <th className="p-4 font-semibold text-center">Status</th>
-                <th className="p-4 font-semibold text-right">Value</th>
-                <th className="p-4 font-semibold"></th>
+          <table className="w-full text-left text-xs whitespace-nowrap">
+            <thead className="bg-slate-50 text-slate-500 uppercase tracking-wider text-[11px] font-extrabold border-b border-slate-200">
+              <tr>
+                <th className="px-6 py-4">Project ID & Title</th>
+                <th className="px-6 py-4">Customer & Location</th>
+                <th className="px-6 py-4">Solar PV System</th>
+                <th className="px-6 py-4">Proposal / Quotation</th>
+                <th className="px-6 py-4">Execution Stage</th>
+                <th className="px-6 py-4">Discom & Subsidy</th>
+                <th className="px-6 py-4">Contract Value</th>
+                <th className="px-6 py-4 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 text-sm">
-              {filteredProjects.map((project) => (
-                <tr key={project.id} className="hover:bg-slate-50/80 transition-colors group">
-                  <td className="p-4">
-                    <div className="font-bold text-slate-900">{project.projectNumber}</div>
-                    <div className="text-slate-500 text-xs mt-0.5">{project.name}</div>
-                    <div className="text-slate-400 text-xs mt-1 flex items-center gap-1">
-                      <Briefcase size={10} /> Owner: {project.projectOwner?.name || 'Unassigned'}
-                    </div>
+            <tbody className="divide-y divide-slate-100">
+              {loading ? (
+                <tr>
+                  <td colSpan={8} className="px-6 py-16 text-center">
+                    <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
+                    <p className="text-xs text-slate-400 mt-2 font-medium">Loading solar installations...</p>
                   </td>
-                  <td className="p-4">
-                    <div className="font-medium text-slate-800">{project.customer?.name || 'Unknown'}</div>
-                    <div className="text-slate-500 text-xs mt-0.5">{project.capacity} {project.capacityUnit} • {project.systemType || 'Solar'}</div>
-                    <div className="text-slate-400 text-xs mt-1">Due: {project.expectedCompletionDate ? new Date(project.expectedCompletionDate).toLocaleDateString() : 'N/A'}</div>
-                  </td>
-                  <td className="p-4">
-                    <div className="font-medium text-slate-800 text-sm mb-1">{project.currentStage}</div>
-                    <div className="w-full bg-slate-100 rounded-full h-1.5 max-w-[150px]">
-                      <div className="bg-emerald-500 h-1.5 rounded-full" style={{ width: `${project.progressPercent || 0}%` }}></div>
-                    </div>
-                    <div className="text-[10px] text-slate-400 mt-1">{project.progressPercent || 0}% Completed</div>
-                  </td>
-                  <td className="p-4 text-center">
-                    <span className={`px-2.5 py-1 text-xs font-semibold rounded-full border ${getStatusColor(project.status)}`}>
-                      {project.status}
-                    </span>
-                  </td>
-                  <td className="p-4 text-right">
-                    <div className="font-medium text-slate-900">₹{(project.estimatedValue || 0).toLocaleString()}</div>
-                    <div className="text-xs text-slate-500 mt-0.5">Est. Cost: ₹{(project.estimatedCost || 0).toLocaleString()}</div>
-                  </td>
-                  <td className="p-4 text-right">
-                    <Link href={`/tenant/projects/${project.id}`} className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-400 hover:text-emerald-600 hover:border-emerald-200 hover:bg-emerald-50 transition-all">
-                      <ArrowRight size={16} />
+                </tr>
+              ) : filteredProjects.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="px-6 py-16 text-center">
+                    <Briefcase size={36} className="text-slate-300 mx-auto mb-2" />
+                    <p className="text-sm font-bold text-slate-700">No projects found</p>
+                    <p className="text-xs text-slate-400 mt-1">
+                      {searchTerm ? 'Try adjusting your search filters.' : 'Create your first project or convert an accepted quotation.'}
+                    </p>
+                    <Link
+                      href="/tenant/projects/new"
+                      className="mt-4 px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 transition-colors inline-flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Plus size={14} /> Create Project
                     </Link>
                   </td>
                 </tr>
-              ))}
-              {filteredProjects.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="p-8 text-center text-slate-500">
-                    <div className="flex flex-col items-center justify-center">
-                      <Briefcase size={32} className="text-slate-300 mb-2" />
-                      <p>No projects found matching the selected filters.</p>
-                    </div>
-                  </td>
-                </tr>
+              ) : (
+                filteredProjects.map((project) => {
+                  const client = project.customer || project.lead;
+                  const isDeleting = deletingProjectId === project.id;
+                  const discom = project.discomApplication;
+                  const subsidy = project.subsidies && project.subsidies.length > 0 ? project.subsidies[0] : null;
+
+                  return (
+                    <tr
+                      key={project.id}
+                      onClick={() => router.push(`/tenant/projects/${project.id}`)}
+                      className="hover:bg-slate-50/80 transition-colors cursor-pointer group"
+                    >
+                      {/* PROJECT ID & TITLE */}
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2.5">
+                          <span className="w-8 h-8 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center font-bold text-xs group-hover:bg-emerald-50 group-hover:text-emerald-700 transition-colors">
+                            <Briefcase size={15} />
+                          </span>
+                          <div>
+                            <span className="font-extrabold text-slate-900 block group-hover:text-emerald-700 transition-colors text-xs">
+                              {project.projectNumber || 'PRJ-NEW'}
+                            </span>
+                            <span className="text-[11px] text-slate-500 font-medium block truncate max-w-[200px]">
+                              {project.name}
+                            </span>
+                            <span className="text-[10px] text-slate-400 block mt-0.5">
+                              Created {new Date(project.createdAt).toLocaleDateString()}
+                            </span>
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* CUSTOMER & LOCATION */}
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2">
+                          <span className="w-6 h-6 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center text-[10px] font-bold uppercase shrink-0">
+                            {(client?.name || 'C')[0]}
+                          </span>
+                          <div>
+                            <p className="font-bold text-slate-800 text-xs">{client?.name || 'Solar Client'}</p>
+                            <p className="text-[10px] text-slate-400 flex items-center gap-1 mt-0.5">
+                              <MapPin size={10} /> {project.city || client?.city || 'Pune'}, {project.state || 'Maharashtra'}
+                            </p>
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* SOLAR SYSTEM SPECS */}
+                      <td className="px-6 py-4">
+                        <div className="space-y-0.5">
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-black text-slate-900 text-xs">{project.capacity || 5} kWp</span>
+                            <span className="text-[10px] font-bold px-1.5 py-0.2 bg-slate-100 text-slate-700 rounded border border-slate-200">
+                              {project.systemType || 'On-Grid'}
+                            </span>
+                          </div>
+                          <span className="text-[10px] text-slate-400 block">
+                            {project.projectType || 'Residential'} Solar PV
+                          </span>
+                        </div>
+                      </td>
+
+                      {/* ORIGINATING QUOTATION */}
+                      <td className="px-6 py-4" onClick={e => e.stopPropagation()}>
+                        {project.quotation ? (
+                          <Link
+                            href={`/tenant/quotations?search=${project.quotation.qNumber}`}
+                            title={`View linked accepted quotation: ${project.quotation.qNumber}`}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-lg border border-emerald-200 font-mono font-bold text-[11px] transition-colors"
+                          >
+                            <FileText size={12} className="text-emerald-700" />
+                            {project.quotation.qNumber}
+                          </Link>
+                        ) : (
+                          <span className="text-[10px] font-semibold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-md">
+                            Direct Project
+                          </span>
+                        )}
+                      </td>
+
+                      {/* STAGE & EXECUTION PROGRESS */}
+                      <td className="px-6 py-4">
+                        <div className="space-y-1.5 min-w-[140px]">
+                          <div className="flex items-center justify-between">
+                            {getStageBadge(project.currentStage)}
+                            <span className="text-[10px] font-bold text-slate-500">
+                              {Math.round(project.progressPercent || 0)}%
+                            </span>
+                          </div>
+                          <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                            <div 
+                              className="bg-emerald-500 h-1.5 rounded-full transition-all duration-300"
+                              style={{ width: `${project.progressPercent || 0}%` }}
+                            />
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* DISCOM & SUBSIDY STATUS */}
+                      <td className="px-6 py-4">
+                        <div className="space-y-1">
+                          {discom ? (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200 block w-fit">
+                              <Zap size={10} /> MSEDCL: {discom.stage || 'In Progress'}
+                            </span>
+                          ) : (
+                            <span className="text-[10px] text-slate-400 block">DISCOM: Pending filing</span>
+                          )}
+                          {subsidy ? (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 block w-fit">
+                              <ShieldCheck size={10} /> Subsidy: {subsidy.currentStage || 'Initiated'}
+                            </span>
+                          ) : null}
+                        </div>
+                      </td>
+
+                      {/* CONTRACT VALUE */}
+                      <td className="px-6 py-4">
+                        <div>
+                          <p className="font-black text-slate-900 text-xs">
+                            ₹{(project.estimatedValue || 0).toLocaleString()}
+                          </p>
+                          <span className="text-[10px] text-slate-400 block mt-0.5">
+                            Cost: ₹{(project.estimatedCost || 0).toLocaleString()}
+                          </span>
+                        </div>
+                      </td>
+
+                      {/* ACTIONS */}
+                      <td className="px-6 py-4 text-right" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center justify-end gap-1.5">
+                          
+                          {/* QUICK STAGE ADVANCEMENT MODAL */}
+                          <button
+                            type="button"
+                            title="Quick Advance Project Stage"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setStageModalProject(project);
+                              setTargetStage(project.currentStage);
+                              setStageNote('');
+                            }}
+                            className="p-2 text-slate-400 hover:text-indigo-600 rounded-xl hover:bg-indigo-50 transition-colors cursor-pointer"
+                          >
+                            <Layers size={15} />
+                          </button>
+
+                          {/* DELETE PROJECT */}
+                          <button
+                            type="button"
+                            title="Delete Project"
+                            disabled={isDeleting}
+                            onClick={(e) => handleDeleteProject(project, e)}
+                            className="p-2 text-slate-400 hover:text-red-600 rounded-xl hover:bg-red-50 transition-colors cursor-pointer disabled:opacity-50"
+                          >
+                            {isDeleting ? <Loader2 size={15} className="animate-spin text-red-500" /> : <Trash2 size={15} />}
+                          </button>
+
+                          {/* 360 HUB */}
+                          <Link
+                            href={`/tenant/projects/${project.id}`}
+                            title="Open Project 360° Studio Hub"
+                            className="p-2 text-slate-400 hover:text-emerald-700 rounded-xl hover:bg-emerald-50 transition-colors"
+                          >
+                            <ChevronRight size={16} />
+                          </Link>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
         </div>
       </div>
+
+      {/* QUICK STAGE ADVANCEMENT MODAL */}
+      {stageModalProject && (
+        <div className="fixed inset-0 z-50 bg-[#071A2B]/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-md w-full p-6 space-y-4 animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <span className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
+                  <Layers size={16} />
+                </span>
+                <div>
+                  <h3 className="font-extrabold text-sm text-slate-900">Update Project Stage</h3>
+                  <p className="text-[11px] text-slate-400">{stageModalProject.projectNumber} · {stageModalProject.name}</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setStageModalProject(null)} 
+                className="text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <form onSubmit={handleQuickStageAdvance} className="space-y-4">
+              <div className="space-y-1">
+                <label className="text-[11px] font-extrabold text-slate-700 uppercase">Current Stage</label>
+                <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-800 flex items-center justify-between">
+                  <span>{stageModalProject.currentStage}</span>
+                  <span className="text-slate-400 font-medium">Progress: {stageModalProject.progressPercent}%</span>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[11px] font-extrabold text-slate-700 uppercase">Target Stage *</label>
+                <select
+                  value={targetStage}
+                  onChange={e => setTargetStage(e.target.value)}
+                  className="w-full p-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
+                >
+                  <option value="Planning">01. Planning (15% Progress)</option>
+                  <option value="Design">02. Engineering Design (30% Progress)</option>
+                  <option value="Procurement">03. Procurement & BOM Sync (50% Progress)</option>
+                  <option value="Installation">04. Site Installation (75% Progress)</option>
+                  <option value="Testing">05. Testing & QA (90% Progress)</option>
+                  <option value="Handover">06. Client Handover (95% Progress)</option>
+                  <option value="Completed">07. Commissioned & Completed (100% Progress)</option>
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[11px] font-extrabold text-slate-700 uppercase">Transition Note / Activity Log</label>
+                <textarea
+                  rows={3}
+                  value={stageNote}
+                  onChange={e => setStageNote(e.target.value)}
+                  placeholder="e.g. Structure erection finished, solar inverter delivery verified on site..."
+                  className="w-full p-3 rounded-xl border border-slate-200 text-xs font-medium text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500 resize-none"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setStageModalProject(null)}
+                  className="px-4 py-2 bg-slate-100 text-slate-700 font-bold rounded-xl text-xs hover:bg-slate-200 transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={advancingStage || targetStage === stageModalProject.currentStage}
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-sm transition-all cursor-pointer disabled:opacity-50"
+                >
+                  {advancingStage ? <Loader2 size={14} className="animate-spin" /> : <CheckCheck size={14} />}
+                  {advancingStage ? 'Advancing Stage...' : 'Confirm Stage Advance'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

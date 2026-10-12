@@ -838,24 +838,75 @@ router.post('/api/tenant/inventory/receipt', requireTenantAuth, async (req, res)
 // PROJECTS
 router.get('/api/tenant/projects', requireTenantAuth, async (req, res) => {
   try {
+    const { stage, status, search } = req.query;
+    const where = { tenantId: req.user.tenantId };
+
+    if (stage && stage !== 'ALL') where.currentStage = stage;
+    if (status && status !== 'ALL') where.status = status;
+
+    if (search) {
+      where.OR = [
+        { projectNumber: { contains: search, mode: 'insensitive' } },
+        { name: { contains: search, mode: 'insensitive' } },
+        { city: { contains: search, mode: 'insensitive' } },
+        { customer: { name: { contains: search, mode: 'insensitive' } } },
+        { quotation: { qNumber: { contains: search, mode: 'insensitive' } } }
+      ];
+    }
+
     const projects = await prisma.project.findMany({
-      where: { tenantId: req.user.tenantId },
+      where,
       orderBy: { createdAt: 'desc' },
       include: {
-        customer: true,
-        projectOwner: true
+        customer: {
+          select: { id: true, name: true, mobile: true, email: true, city: true, state: true }
+        },
+        lead: {
+          select: { id: true, name: true, mobile: true, email: true, city: true }
+        },
+        quotation: {
+          select: { id: true, qNumber: true, total: true, systemCapacity: true, status: true, version: true }
+        },
+        projectOwner: {
+          select: { id: true, name: true, email: true }
+        },
+        discomApplication: {
+          select: { id: true, stage: true, status: true, consumerNumber: true, applicationNumber: true }
+        },
+        subsidies: {
+          select: { id: true, currentStage: true, status: true, subsidyAmount: true, tokenNumber: true }
+        },
+        _count: {
+          select: {
+            tasks: true,
+            milestones: true,
+            materialReqs: true
+          }
+        }
       }
     });
 
+    // Compute comprehensive operational metrics
+    const allTenantProjects = await prisma.project.findMany({
+      where: { tenantId: req.user.tenantId },
+      select: { currentStage: true, status: true, capacity: true, estimatedValue: true, estimatedCost: true, actualCost: true }
+    });
+
     const metrics = {
-      total: projects.length,
-      planning: projects.filter(p => p.currentStage === 'Planning').length,
-      inProgress: projects.filter(p => ['Design', 'Procurement', 'Installation', 'Testing'].includes(p.currentStage) && p.status !== 'Delayed').length,
-      delayed: projects.filter(p => p.status === 'Delayed').length,
-      completed: projects.filter(p => p.currentStage === 'Completed').length,
-      totalValue: projects.reduce((acc, p) => acc + (p.estimatedValue || 0), 0),
-      totalCost: projects.reduce((acc, p) => acc + (p.actualCost || 0), 0),
-      expectedProfit: projects.reduce((acc, p) => acc + ((p.estimatedValue || 0) - (p.estimatedCost || 0)), 0),
+      total: allTenantProjects.length,
+      planning: allTenantProjects.filter(p => p.currentStage === 'Planning').length,
+      design: allTenantProjects.filter(p => p.currentStage === 'Design').length,
+      procurement: allTenantProjects.filter(p => p.currentStage === 'Procurement').length,
+      installation: allTenantProjects.filter(p => p.currentStage === 'Installation').length,
+      testing: allTenantProjects.filter(p => p.currentStage === 'Testing').length,
+      handover: allTenantProjects.filter(p => p.currentStage === 'Handover').length,
+      completed: allTenantProjects.filter(p => p.currentStage === 'Completed').length,
+      inProgress: allTenantProjects.filter(p => ['Design', 'Procurement', 'Installation', 'Testing'].includes(p.currentStage) && p.status !== 'Delayed').length,
+      delayed: allTenantProjects.filter(p => p.status === 'Delayed').length,
+      totalCapacity: Math.round(allTenantProjects.reduce((acc, p) => acc + (p.capacity || 0), 0) * 10) / 10,
+      totalValue: allTenantProjects.reduce((acc, p) => acc + (p.estimatedValue || 0), 0),
+      totalCost: allTenantProjects.reduce((acc, p) => acc + (p.actualCost || 0), 0),
+      expectedProfit: allTenantProjects.reduce((acc, p) => acc + ((p.estimatedValue || 0) - (p.estimatedCost || 0)), 0),
     };
 
     res.json({ projects, metrics });
@@ -867,9 +918,40 @@ router.get('/api/tenant/projects', requireTenantAuth, async (req, res) => {
 
 router.post('/api/tenant/projects', requireTenantAuth, async (req, res) => {
   try {
-    const { name, customerId, leadId, quotationId, surveyId, capacity, systemType, projectType, projectOwnerId, installationAddress, city, state, pincode, startDate, expectedCompletionDate, priority, estimatedValue, estimatedCost } = req.body;
+    let { 
+      name, customerId, leadId, quotationId, surveyId, capacity, 
+      systemType, projectType, projectOwnerId, installationAddress, 
+      city, state, pincode, startDate, expectedCompletionDate, 
+      priority, estimatedValue, estimatedCost 
+    } = req.body;
     
-    // Generate simple project number
+    // Auto-fill from Quotation if linked
+    if (quotationId) {
+      const quote = await prisma.quotation.findUnique({
+        where: { id: quotationId, tenantId: req.user.tenantId },
+        include: { customer: true, lead: true, items: true }
+      });
+      if (quote) {
+        if (!customerId && quote.customerId) customerId = quote.customerId;
+        if (!leadId && quote.leadId) leadId = quote.leadId;
+        if (!capacity && quote.systemCapacity) capacity = quote.systemCapacity;
+        if (!systemType && quote.systemType) systemType = quote.systemType;
+        if (!estimatedValue && quote.total) estimatedValue = quote.total;
+        if (!estimatedCost && quote.subtotal) estimatedCost = Math.round(quote.subtotal * 0.75); // Standard 25% margin estimate
+        if (!name) {
+          const clientName = quote.customer?.name || quote.lead?.name || 'Solar Customer';
+          name = `${clientName} - ${quote.systemCapacity || 5} kWp ${quote.systemType || 'On-Grid'} Solar`;
+        }
+        
+        // Auto-lock and accept quotation
+        await prisma.quotation.update({
+          where: { id: quote.id },
+          data: { status: 'ACCEPTED', isLocked: true }
+        });
+      }
+    }
+
+    // Generate clean unique project number
     const count = await prisma.project.count({ where: { tenantId: req.user.tenantId } });
     const projectNumber = `PRJ-${(count + 1).toString().padStart(5, '0')}`;
 
@@ -877,42 +959,88 @@ router.post('/api/tenant/projects', requireTenantAuth, async (req, res) => {
       data: {
         tenantId: req.user.tenantId,
         projectNumber,
-        name,
-        customerId,
-        leadId,
-        quotationId,
-        surveyId,
-        capacity: parseFloat(capacity) || null,
-        systemType,
-        projectType,
-        projectOwnerId,
-        installationAddress,
-        city,
-        state,
-        pincode,
-        startDate: startDate ? new Date(startDate) : null,
+        name: name || `Solar Project ${projectNumber}`,
+        customerId: customerId || null,
+        leadId: leadId || null,
+        quotationId: quotationId || null,
+        surveyId: surveyId || null,
+        capacity: parseFloat(capacity) || 5.0,
+        capacityUnit: 'kWp',
+        systemType: systemType || 'On-Grid',
+        projectType: projectType || 'Residential',
+        projectOwnerId: projectOwnerId || null,
+        installationAddress: installationAddress || '',
+        city: city || 'Pune',
+        state: state || 'Maharashtra',
+        pincode: pincode || '411001',
+        startDate: startDate ? new Date(startDate) : new Date(),
         expectedCompletionDate: expectedCompletionDate ? new Date(expectedCompletionDate) : null,
         priority: priority || 'Medium',
         estimatedValue: parseFloat(estimatedValue) || 0,
         estimatedCost: parseFloat(estimatedCost) || 0,
+        progressPercent: 15,
+        currentStage: 'Planning',
+        status: 'In Progress',
         createdBy: req.user.id
       }
     });
 
-    // Initial Stage History
+    // Initial Stage History & Timeline Events
     await prisma.projectStageHistory.create({
       data: {
         projectId: project.id,
         newStage: 'Planning',
         changedBy: req.user.id,
-        comment: 'Project Created'
+        comment: quotationId ? 'Project provisioned from accepted quotation' : 'Project Created'
       }
     });
+
+    await prisma.projectTimelineEvent.create({
+      data: {
+        projectId: project.id,
+        title: 'Project Initialized',
+        description: `Project ${projectNumber} created with capacity ${project.capacity} kWp`,
+        eventType: 'CREATION',
+        createdBy: req.user.id
+      }
+    });
+
+    // Auto-create initial Site Survey Task
+    await prisma.projectTask.create({
+      data: {
+        tenantId: req.user.tenantId,
+        projectId: project.id,
+        name: 'Conduct Detailed Engineering Roof Survey',
+        description: 'Verify roof shadow patterns, azimuth angle, structure anchor points, and net metering cable runs.',
+        priority: 'High',
+        status: 'Pending',
+        dueDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000) // +3 days
+      }
+    });
+
+    // Auto-initialize DISCOM Tracking if customer assigned
+    if (project.customerId) {
+      const existingDiscom = await prisma.discomApplication.findUnique({
+        where: { projectId: project.id }
+      });
+      if (!existingDiscom) {
+        await prisma.discomApplication.create({
+          data: {
+            tenantId: req.user.tenantId,
+            projectId: project.id,
+            customerId: project.customerId,
+            discomName: 'MSEDCL',
+            stage: 'Application Submission',
+            status: 'IN_PROGRESS'
+          }
+        });
+      }
+    }
 
     res.status(201).json({ project });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: 'Failed to create project' });
+    res.status(500).json({ error: 'Failed to create project: ' + error.message });
   }
 });
 
@@ -923,7 +1051,11 @@ router.get('/api/tenant/projects/:id', requireTenantAuth, async (req, res) => {
       include: {
         customer: true,
         lead: true,
-        quotation: { include: { items: { include: { product: true } } } },
+        quotation: { 
+          include: { 
+            items: { include: { product: true } }
+          } 
+        },
         projectOwner: true,
         tasks: { include: { assignee: true }, orderBy: { createdAt: 'asc' } },
         milestones: { orderBy: { targetDate: 'asc' } },
@@ -931,7 +1063,11 @@ router.get('/api/tenant/projects/:id', requireTenantAuth, async (req, res) => {
         costs: true,
         stageHistory: { orderBy: { createdAt: 'desc' } },
         timelineEvents: { orderBy: { createdAt: 'desc' } },
-        statusUpdates: { orderBy: { createdAt: 'desc' } }
+        statusUpdates: { orderBy: { createdAt: 'desc' } },
+        discomApplication: true,
+        subsidies: true,
+        amcs: true,
+        InstallationJob: true
       }
     });
     if (!project) return res.status(404).json({ error: 'Project not found' });
@@ -979,9 +1115,29 @@ router.patch('/api/tenant/projects/:id/stage', requireTenantAuth, async (req, re
     if (!project) return res.status(404).json({ error: 'Project not found' });
     if (project.currentStage === newStage) return res.status(400).json({ error: 'Already in this stage' });
 
+    const STAGE_PROGRESS = {
+      'Planning': 15,
+      'Design': 30,
+      'Procurement': 50,
+      'Installation': 75,
+      'Testing': 90,
+      'Handover': 95,
+      'Completed': 100
+    };
+    const progressPercent = STAGE_PROGRESS[newStage] !== undefined ? STAGE_PROGRESS[newStage] : (project.progressPercent || 0);
+
+    const updateData = {
+      currentStage: newStage,
+      progressPercent
+    };
+    if (newStage === 'Completed') {
+      updateData.status = 'Completed';
+      updateData.actualCompletionDate = new Date();
+    }
+
     const updatedProject = await prisma.project.update({
       where: { id: req.params.id },
-      data: { currentStage: newStage }
+      data: updateData
     });
 
     await prisma.projectStageHistory.create({
@@ -1150,6 +1306,32 @@ router.patch('/api/tenant/projects/:id/status', requireTenantAuth, async (req, r
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Failed to update status' });
+  }
+});
+
+router.delete('/api/tenant/projects/:id', requireTenantAuth, async (req, res) => {
+  try {
+    const project = await prisma.project.findUnique({
+      where: { id: req.params.id, tenantId: req.user.tenantId }
+    });
+    if (!project) return res.status(404).json({ error: 'Project not found' });
+
+    // Safe transactional cleanup of children
+    await prisma.$transaction([
+      prisma.projectStageHistory.deleteMany({ where: { projectId: project.id } }),
+      prisma.projectTimelineEvent.deleteMany({ where: { projectId: project.id } }),
+      prisma.projectStatusUpdate.deleteMany({ where: { projectId: project.id } }),
+      prisma.projectTask.deleteMany({ where: { projectId: project.id } }),
+      prisma.projectMilestone.deleteMany({ where: { projectId: project.id } }),
+      prisma.projectMaterialRequirement.deleteMany({ where: { projectId: project.id } }),
+      prisma.projectCost.deleteMany({ where: { projectId: project.id } }),
+      prisma.project.delete({ where: { id: project.id } })
+    ]);
+
+    res.json({ success: true, message: 'Project deleted successfully' });
+  } catch (error) {
+    console.error('Delete project error:', error);
+    res.status(500).json({ error: 'Failed to delete project: ' + error.message });
   }
 });
 
