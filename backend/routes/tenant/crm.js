@@ -28,12 +28,12 @@ router.get('/api/tenant/leads/dashboard', requireTenantAuth, async (req, res) =>
 });
 router.get('/api/tenant/leads', requireTenantAuth, async (req, res) => {
   try {
-    const { source, status, assigneeId, search } = req.query;
+    const { source, status, assigneeId, search, all } = req.query;
     let where = { tenantId: req.user.tenantId };
     if (source) where.source = source;
-    if (status) {
+    if (status && status !== 'ALL') {
       where.status = status;
-    } else {
+    } else if (!status && all !== 'true') {
       where.status = { notIn: ['WON', 'LOST'] }; // Default to active leads only
     }
     if (assigneeId) where.assigneeId = assigneeId;
@@ -48,12 +48,46 @@ router.get('/api/tenant/leads', requireTenantAuth, async (req, res) => {
     
     const leads = await prisma.lead.findMany({
       where,
-      include: { assignee: true },
+      include: {
+        assignee: true,
+        customer: true,
+        projects: { select: { id: true, name: true, status: true, systemCapacity: true } },
+        quotations: { select: { id: true, quoteNumber: true, totalAmount: true, status: true } }
+      },
       orderBy: { createdAt: 'desc' }
     });
     res.json({ leads });
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch leads' });
+  }
+});
+
+router.delete('/api/tenant/leads/:id', requireTenantAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const tenantId = req.user.tenantId;
+
+    const lead = await prisma.lead.findUnique({
+      where: { id, tenantId },
+      include: { customer: true, projects: true }
+    });
+    if (!lead) return res.status(404).json({ error: 'Lead not found' });
+
+    // Clean up dependent records safely
+    await prisma.leadNote.deleteMany({ where: { leadId: id } });
+    await prisma.leadFollowUp.deleteMany({ where: { leadId: id } });
+    await prisma.leadActivity.deleteMany({ where: { leadId: id } });
+    await prisma.quotation.deleteMany({ where: { leadId: id, tenantId } });
+    await prisma.siteSurvey.deleteMany({ where: { leadId: id, tenantId } });
+
+    await prisma.lead.delete({
+      where: { id, tenantId }
+    });
+
+    res.json({ success: true, message: 'Lead deleted successfully' });
+  } catch (error) {
+    console.error('Delete lead error:', error);
+    res.status(500).json({ error: 'Failed to delete lead' });
   }
 });
 
@@ -1517,7 +1551,14 @@ router.get(['/api/tenant/customers', '/api/tenant/crm/customers'], requireTenant
     const customers = await prisma.customer.findMany({
       where: { tenantId: req.user.tenantId },
       orderBy: { createdAt: 'desc' },
-      include: { lead: true }
+      include: {
+        lead: true,
+        projects: { select: { id: true, name: true, status: true, systemCapacity: true, contractPrice: true, executionStage: true } },
+        quotations: { select: { id: true, quoteNumber: true, totalAmount: true, status: true } },
+        invoices: { select: { id: true, invoiceNumber: true, totalAmount: true, status: true } },
+        amcs: { select: { id: true, contractNumber: true, status: true } },
+        tickets: { select: { id: true, ticketNumber: true, status: true } }
+      }
     });
     res.json({ customers });
   } catch (error) {

@@ -254,10 +254,15 @@ export default function LeadDetails() {
             <option value="ON_HOLD">On Hold</option>
           </select>
 
-          {lead.status !== 'WON' && (
+          {lead.status !== 'WON' ? (
             <button onClick={() => setShowConvertModal(true)} className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-medium text-sm transition-colors shadow-sm flex items-center gap-2">
               <CheckCircle2 size={16} /> Convert to Customer
             </button>
+          ) : (
+            <Link href={`/tenant/crm/${lead.id}`} className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-medium text-sm transition-colors shadow-sm flex items-center gap-2">
+              <span>Customer 360° Hub</span>
+              <ArrowRight size={16} />
+            </Link>
           )}
         </div>
       </div>
@@ -271,12 +276,34 @@ export default function LeadDetails() {
               <button className="text-slate-400 hover:text-emerald-600"><Edit size={16} /></button>
             </div>
             <div className="space-y-4">
-              <div className="flex items-start gap-3">
-                <Phone size={16} className="text-slate-400 mt-0.5" />
-                <div>
-                  <p className="text-sm font-medium text-slate-900">{lead.mobile}</p>
-                  <p className="text-xs text-slate-500">Primary Phone</p>
+              <div className="flex items-start justify-between">
+                <div className="flex items-start gap-3">
+                  <Phone size={16} className="text-slate-400 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-medium text-slate-900 font-mono">{lead.mobile}</p>
+                    <p className="text-xs text-slate-500">Primary Phone</p>
+                  </div>
                 </div>
+                {lead.mobile && (
+                  <div className="flex items-center gap-1.5">
+                    <a 
+                      href={`tel:${lead.mobile.replace(/[^0-9]/g, '')}`} 
+                      className="p-1.5 rounded-lg bg-slate-100 hover:bg-emerald-50 text-slate-600 hover:text-emerald-700 transition-colors"
+                      title="Call"
+                    >
+                      <Phone size={14} />
+                    </a>
+                    <a 
+                      href={`https://wa.me/${lead.mobile.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(`Hello ${lead.name}, regarding your solar inquiry with Solar ERP...`)}`} 
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 transition-colors"
+                      title="WhatsApp"
+                    >
+                      <MessageSquare size={14} />
+                    </a>
+                  </div>
+                )}
               </div>
               {lead.email && (
                 <div className="flex items-start gap-3">

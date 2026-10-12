@@ -21,7 +21,28 @@ export default function Customer360View() {
         const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/leads/${params.id}`, { withCredentials: true });
         setLead(res.data.lead);
       } catch (err) {
-        console.error(err);
+        try {
+          const custRes = await axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/customers/${params.id}`, { withCredentials: true });
+          if (custRes.data.customer) {
+            const c = custRes.data.customer;
+            setLead({
+              ...c,
+              ...(c.lead || {}),
+              name: c.name,
+              mobile: c.mobile,
+              email: c.email,
+              city: c.city,
+              customer: c,
+              surveys: c.surveys || [],
+              quotations: c.quotations || [],
+              projects: c.projects || [],
+              invoices: c.invoices || [],
+              tickets: c.tickets || []
+            });
+          }
+        } catch (e) {
+          console.error('Customer fetch error:', e);
+        }
       } finally {
         setLoading(false);
       }
