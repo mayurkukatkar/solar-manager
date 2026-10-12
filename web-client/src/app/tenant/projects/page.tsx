@@ -9,7 +9,7 @@ import {
   DollarSign, Clock, AlertTriangle, CheckCircle2, TrendingUp,
   Sun, Zap, Trash2, ExternalLink, RefreshCw, X, ChevronRight,
   User, MapPin, FileText, Loader2, ArrowUpRight, ShieldCheck, 
-  Layers, CheckCheck, Phone, CheckSquare
+  Layers, CheckCheck, Phone, CheckSquare, LayoutGrid, List
 } from 'lucide-react';
 
 export default function ProjectsDashboard() {
@@ -19,6 +19,24 @@ export default function ProjectsDashboard() {
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
+
+  // VIEW MODE: 'TABLE' | 'CARDS'
+  const [viewMode, setViewMode] = useState<'TABLE' | 'CARDS'>('TABLE');
+
+  // Load saved view mode
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('solar_projects_view_mode');
+      if (saved === 'TABLE' || saved === 'CARDS') setViewMode(saved);
+    } catch (e) {}
+  }, []);
+
+  const handleViewModeChange = (mode: 'TABLE' | 'CARDS') => {
+    setViewMode(mode);
+    try {
+      localStorage.setItem('solar_projects_view_mode', mode);
+    } catch (e) {}
+  };
 
   // FILTERS & SEARCH
   const [searchTerm, setSearchTerm] = useState('');
@@ -293,11 +311,11 @@ export default function ProjectsDashboard() {
         </div>
       </div>
 
-      {/* TOOLBAR: SEARCH & FILTERS */}
+      {/* TOOLBAR: SEARCH & FILTERS & VIEW MODE */}
       <div className="bg-white rounded-2xl p-3.5 sm:p-4 shadow-sm border border-slate-200 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 sm:gap-4">
         
         {/* SEARCH BAR */}
-        <div className="relative flex-1 min-w-[240px]">
+        <div className="relative flex-1 min-w-[220px]">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
           <input
             type="text"
@@ -316,9 +334,35 @@ export default function ProjectsDashboard() {
           )}
         </div>
 
-        {/* STATUS TABS & STAGE DROPDOWN */}
+        {/* STATUS TABS, STAGE DROPDOWN & VIEW MODE */}
         <div className="flex flex-wrap items-center gap-2">
           
+          {/* VIEW MODE TOGGLE */}
+          <div className="flex items-center bg-slate-100 p-1 rounded-xl text-xs font-bold text-slate-600">
+            <button
+              type="button"
+              onClick={() => handleViewModeChange('TABLE')}
+              className={`px-2.5 py-1.5 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                viewMode === 'TABLE' ? 'bg-white text-slate-900 shadow-xs' : 'hover:text-slate-900'
+              }`}
+              title="Compact Table View (Fits completely on screen)"
+            >
+              <List size={13} />
+              <span>Table</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleViewModeChange('CARDS')}
+              className={`px-2.5 py-1.5 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                viewMode === 'CARDS' ? 'bg-white text-slate-900 shadow-xs' : 'hover:text-slate-900'
+              }`}
+              title="Cards Studio View"
+            >
+              <LayoutGrid size={13} />
+              <span>Cards</span>
+            </button>
+          </div>
+
           {/* STAGE SELECTOR */}
           <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1 text-xs">
             <span className="text-slate-400 font-semibold text-[11px]">Stage:</span>
@@ -342,7 +386,7 @@ export default function ProjectsDashboard() {
           <div className="flex bg-slate-100 p-1 rounded-xl text-xs font-bold text-slate-600 flex-wrap">
             <button
               onClick={() => setSelectedStatus('ALL')}
-              className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+              className={`px-2.5 py-1.5 rounded-lg transition-all cursor-pointer ${
                 selectedStatus === 'ALL' ? 'bg-white text-slate-900 shadow-sm' : 'hover:text-slate-900'
               }`}
             >
@@ -350,15 +394,15 @@ export default function ProjectsDashboard() {
             </button>
             <button
               onClick={() => setSelectedStatus('IN_PROGRESS')}
-              className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+              className={`px-2.5 py-1.5 rounded-lg transition-all cursor-pointer ${
                 selectedStatus === 'IN_PROGRESS' ? 'bg-white text-slate-900 shadow-sm' : 'hover:text-slate-900'
               }`}
             >
-              In Progress ({metrics?.inProgress || 0})
+              Active ({metrics?.inProgress || 0})
             </button>
             <button
               onClick={() => setSelectedStatus('DELAYED')}
-              className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+              className={`px-2.5 py-1.5 rounded-lg transition-all cursor-pointer ${
                 selectedStatus === 'DELAYED' ? 'bg-white text-slate-900 shadow-sm' : 'hover:text-slate-900'
               }`}
             >
@@ -366,233 +410,351 @@ export default function ProjectsDashboard() {
             </button>
             <button
               onClick={() => setSelectedStatus('COMPLETED')}
-              className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+              className={`px-2.5 py-1.5 rounded-lg transition-all cursor-pointer ${
                 selectedStatus === 'COMPLETED' ? 'bg-white text-slate-900 shadow-sm' : 'hover:text-slate-900'
               }`}
             >
-              Completed ({metrics?.completed || 0})
+              Done ({metrics?.completed || 0})
             </button>
           </div>
         </div>
       </div>
 
-      {/* MASTER PROJECTS TABLE */}
-      <div className="bg-white rounded-2xl sm:rounded-3xl shadow-sm border border-slate-200 overflow-hidden w-full">
-        <div className="overflow-x-auto w-full custom-scrollbar">
-          <table className="w-full text-left text-xs whitespace-nowrap min-w-[960px]">
-            <thead className="bg-slate-50 text-slate-500 uppercase tracking-wider text-[11px] font-extrabold border-b border-slate-200">
-              <tr>
-                <th className="px-4 sm:px-5 py-3.5">Project ID & Title</th>
-                <th className="px-4 sm:px-5 py-3.5">Customer & Location</th>
-                <th className="px-4 sm:px-5 py-3.5">Solar PV System</th>
-                <th className="px-4 sm:px-5 py-3.5">Proposal / Quotation</th>
-                <th className="px-4 sm:px-5 py-3.5">Execution Stage</th>
-                <th className="px-4 sm:px-5 py-3.5">Discom & Subsidy</th>
-                <th className="px-4 sm:px-5 py-3.5">Contract Value</th>
-                <th className="px-4 sm:px-5 py-3.5 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {loading ? (
-                <tr>
-                  <td colSpan={8} className="px-6 py-16 text-center">
-                    <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
-                    <p className="text-xs text-slate-400 mt-2 font-medium">Loading solar installations...</p>
-                  </td>
-                </tr>
-              ) : filteredProjects.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="px-6 py-16 text-center">
-                    <Briefcase size={36} className="text-slate-300 mx-auto mb-2" />
-                    <p className="text-sm font-bold text-slate-700">No projects found</p>
-                    <p className="text-xs text-slate-400 mt-1">
-                      {searchTerm ? 'Try adjusting your search filters.' : 'Create your first project or convert an accepted quotation.'}
-                    </p>
-                    <Link
-                      href="/tenant/projects/new"
-                      className="mt-4 px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 transition-colors inline-flex items-center gap-1.5 cursor-pointer"
-                    >
-                      <Plus size={14} /> Create Project
-                    </Link>
-                  </td>
-                </tr>
-              ) : (
-                filteredProjects.map((project) => {
-                  const client = project.customer || project.lead;
-                  const isDeleting = deletingProjectId === project.id;
-                  const discom = project.discomApplication;
-                  const subsidy = project.subsidies && project.subsidies.length > 0 ? project.subsidies[0] : null;
+      {/* VIEW RENDER: CARDS OR DENSE 5-COLUMN TABLE */}
+      {viewMode === 'CARDS' ? (
+        /* CARDS STUDIO VIEW - 100% RESPONSIVE, ZERO SLIDING */
+        <div className="space-y-4">
+          {loading ? (
+            <div className="bg-white rounded-3xl p-16 text-center border border-slate-200">
+              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
+              <p className="text-xs text-slate-400 mt-2 font-medium">Loading solar installations...</p>
+            </div>
+          ) : filteredProjects.length === 0 ? (
+            <div className="bg-white rounded-3xl p-16 text-center border border-slate-200">
+              <Briefcase size={36} className="text-slate-300 mx-auto mb-2" />
+              <p className="text-sm font-bold text-slate-700">No projects found</p>
+              <p className="text-xs text-slate-400 mt-1">Try adjusting your filters or create a new project.</p>
+              <Link
+                href="/tenant/projects/new"
+                className="mt-4 px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 transition-colors inline-flex items-center gap-1.5 cursor-pointer"
+              >
+                <Plus size={14} /> Create Project
+              </Link>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              {filteredProjects.map((project) => {
+                const client = project.customer || project.lead;
+                const isDeleting = deletingProjectId === project.id;
+                const discom = project.discomApplication;
+                const subsidy = project.subsidies && project.subsidies.length > 0 ? project.subsidies[0] : null;
 
-                  return (
-                    <tr
-                      key={project.id}
-                      onClick={() => router.push(`/tenant/projects/${project.id}`)}
-                      className="hover:bg-slate-50/80 transition-colors cursor-pointer group"
-                    >
-                      {/* PROJECT ID & TITLE */}
-                      <td className="px-4 sm:px-5 py-3.5">
-                        <div className="flex items-center gap-2.5">
-                          <span className="w-8 h-8 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center font-bold text-xs group-hover:bg-emerald-50 group-hover:text-emerald-700 transition-colors shrink-0">
-                            <Briefcase size={15} />
+                return (
+                  <div
+                    key={project.id}
+                    onClick={() => router.push(`/tenant/projects/${project.id}`)}
+                    className="bg-white rounded-2xl p-5 border border-slate-200 hover:border-emerald-300 hover:shadow-md transition-all cursor-pointer flex flex-col justify-between group space-y-4 relative"
+                  >
+                    {/* Top: Project ID & Stage */}
+                    <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                      <div className="flex items-center gap-2">
+                        <span className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold text-xs shrink-0">
+                          <Briefcase size={15} />
+                        </span>
+                        <div>
+                          <span className="font-extrabold text-slate-900 text-xs block group-hover:text-emerald-700 transition-colors">
+                            {project.projectNumber || 'PRJ-NEW'}
                           </span>
-                          <div>
-                            <span className="font-extrabold text-slate-900 block group-hover:text-emerald-700 transition-colors text-xs">
-                              {project.projectNumber || 'PRJ-NEW'}
-                            </span>
-                            <span className="text-[11px] text-slate-500 font-medium block truncate max-w-[200px]">
-                              {project.name}
-                            </span>
-                            <span className="text-[10px] text-slate-400 block mt-0.5">
-                              Created {new Date(project.createdAt).toLocaleDateString()}
-                            </span>
-                          </div>
+                          <span className="text-[10px] text-slate-400 block">{new Date(project.createdAt).toLocaleDateString()}</span>
                         </div>
-                      </td>
+                      </div>
+                      <div>{getStageBadge(project.currentStage)}</div>
+                    </div>
 
-                      {/* CUSTOMER & LOCATION */}
-                      <td className="px-4 sm:px-5 py-3.5">
-                        <div className="flex items-center gap-2">
-                          <span className="w-6 h-6 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center text-[10px] font-bold uppercase shrink-0">
-                            {(client?.name || 'C')[0]}
-                          </span>
-                          <div>
-                            <p className="font-bold text-slate-800 text-xs">{client?.name || 'Solar Client'}</p>
-                            <p className="text-[10px] text-slate-400 flex items-center gap-1 mt-0.5">
-                              <MapPin size={10} /> {project.city || client?.city || 'Pune'}, {project.state || 'Maharashtra'}
-                            </p>
-                          </div>
-                        </div>
-                      </td>
+                    {/* Middle: Name, Client & Specs */}
+                    <div className="space-y-2">
+                      <h4 className="font-bold text-slate-800 text-sm line-clamp-1 group-hover:text-emerald-800 transition-colors">
+                        {project.name}
+                      </h4>
 
-                      {/* SOLAR SYSTEM SPECS */}
-                      <td className="px-4 sm:px-5 py-3.5">
-                        <div className="space-y-0.5">
-                          <div className="flex items-center gap-1.5">
-                            <span className="font-black text-slate-900 text-xs">{project.capacity || 5} kWp</span>
-                            <span className="text-[10px] font-bold px-1.5 py-0.2 bg-slate-100 text-slate-700 rounded border border-slate-200">
-                              {project.systemType || 'On-Grid'}
-                            </span>
-                          </div>
-                          <span className="text-[10px] text-slate-400 block">
-                            {project.projectType || 'Residential'} Solar PV
-                          </span>
-                        </div>
-                      </td>
+                      <div className="flex items-center gap-2 text-xs text-slate-600">
+                        <span className="w-5 h-5 rounded-full bg-slate-100 flex items-center justify-center text-[10px] font-bold uppercase text-slate-600 shrink-0">
+                          {(client?.name || 'C')[0]}
+                        </span>
+                        <span className="font-semibold truncate">{client?.name || 'Solar Client'}</span>
+                        <span className="text-slate-400 text-[11px] flex items-center gap-0.5 ml-auto shrink-0">
+                          <MapPin size={11} /> {project.city || client?.city || 'Pune'}
+                        </span>
+                      </div>
 
-                      {/* ORIGINATING QUOTATION */}
-                      <td className="px-4 sm:px-5 py-3.5" onClick={e => e.stopPropagation()}>
-                        {project.quotation ? (
-                          <Link
-                            href={`/tenant/quotations?search=${project.quotation.qNumber}`}
-                            title={`View linked accepted quotation: ${project.quotation.qNumber}`}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-lg border border-emerald-200 font-mono font-bold text-[11px] transition-colors"
-                          >
-                            <FileText size={12} className="text-emerald-700" />
-                            {project.quotation.qNumber}
-                          </Link>
-                        ) : (
-                          <span className="text-[10px] font-semibold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-md">
-                            Direct Project
+                      <div className="flex items-center gap-1.5 flex-wrap pt-1">
+                        <span className="text-[11px] font-extrabold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200">
+                          {project.capacity || 5} kWp · {project.systemType || 'On-Grid'}
+                        </span>
+                        {project.quotation && (
+                          <span className="text-[10px] font-mono font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                            #{project.quotation.qNumber}
                           </span>
                         )}
-                      </td>
-
-                      {/* STAGE & EXECUTION PROGRESS */}
-                      <td className="px-4 sm:px-5 py-3.5">
-                        <div className="space-y-1.5 min-w-[140px]">
-                          <div className="flex items-center justify-between">
-                            {getStageBadge(project.currentStage)}
-                            <span className="text-[10px] font-bold text-slate-500">
-                              {Math.round(project.progressPercent || 0)}%
-                            </span>
-                          </div>
-                          <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
-                            <div 
-                              className="bg-emerald-500 h-1.5 rounded-full transition-all duration-300"
-                              style={{ width: `${project.progressPercent || 0}%` }}
-                            />
-                          </div>
-                        </div>
-                      </td>
-
-                      {/* DISCOM & SUBSIDY STATUS */}
-                      <td className="px-4 sm:px-5 py-3.5">
-                        <div className="space-y-1">
-                          {discom ? (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200 block w-fit">
-                              <Zap size={10} /> MSEDCL: {discom.status || 'In Progress'}
-                            </span>
-                          ) : (
-                            <span className="text-[10px] text-slate-400 block">DISCOM: Pending filing</span>
-                          )}
-                          {subsidy ? (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 block w-fit">
-                              <ShieldCheck size={10} /> Subsidy: {subsidy.status || 'Initiated'}
-                            </span>
-                          ) : null}
-                        </div>
-                      </td>
-
-                      {/* CONTRACT VALUE */}
-                      <td className="px-4 sm:px-5 py-3.5">
-                        <div>
-                          <p className="font-black text-slate-900 text-xs">
-                            ₹{(project.estimatedValue || 0).toLocaleString()}
-                          </p>
-                          <span className="text-[10px] text-slate-400 block mt-0.5">
-                            Cost: ₹{(project.estimatedCost || 0).toLocaleString()}
+                        {discom && (
+                          <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200 flex items-center gap-0.5">
+                            <Zap size={10} /> {discom.status || 'MSEDCL'}
                           </span>
-                        </div>
-                      </td>
+                        )}
+                      </div>
+                    </div>
 
-                      {/* ACTIONS */}
-                      <td className="px-4 sm:px-5 py-3.5 text-right" onClick={e => e.stopPropagation()}>
-                        <div className="flex items-center justify-end gap-1.5">
-                          
-                          {/* QUICK STAGE ADVANCEMENT MODAL */}
+                    {/* Bottom: Financials, Progress Bar, Actions */}
+                    <div className="border-t border-slate-100 pt-3 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <span className="text-[10px] text-slate-400 uppercase font-bold block">Contract Value</span>
+                          <strong className="text-base font-black text-slate-900">₹{(project.estimatedValue || 0).toLocaleString()}</strong>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-[10px] text-slate-400 font-bold block">Stage Progress</span>
+                          <span className="text-xs font-black text-emerald-700">{Math.round(project.progressPercent || 0)}%</span>
+                        </div>
+                      </div>
+
+                      <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                        <div className="bg-emerald-500 h-1.5 rounded-full" style={{ width: `${project.progressPercent || 0}%` }} />
+                      </div>
+
+                      <div className="flex items-center justify-between gap-2 pt-1" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center gap-1">
                           <button
                             type="button"
-                            title="Quick Advance Project Stage"
+                            title="Quick Stage Advance"
                             onClick={(e) => {
                               e.stopPropagation();
                               setStageModalProject(project);
                               setTargetStage(project.currentStage);
                               setStageNote('');
                             }}
-                            className="p-2 text-slate-400 hover:text-indigo-600 rounded-xl hover:bg-indigo-50 transition-colors cursor-pointer"
+                            className="p-2 text-slate-500 hover:text-indigo-600 rounded-xl hover:bg-indigo-50 border border-slate-200 transition-colors cursor-pointer"
                           >
-                            <Layers size={15} />
+                            <Layers size={14} />
                           </button>
-
-                          {/* DELETE PROJECT */}
                           <button
                             type="button"
                             title="Delete Project"
                             disabled={isDeleting}
                             onClick={(e) => handleDeleteProject(project, e)}
-                            className="p-2 text-slate-400 hover:text-red-600 rounded-xl hover:bg-red-50 transition-colors cursor-pointer disabled:opacity-50"
+                            className="p-2 text-slate-400 hover:text-red-600 rounded-xl hover:bg-red-50 border border-slate-200 transition-colors cursor-pointer disabled:opacity-50"
                           >
-                            {isDeleting ? <Loader2 size={15} className="animate-spin text-red-500" /> : <Trash2 size={15} />}
+                            {isDeleting ? <Loader2 size={14} className="animate-spin text-red-500" /> : <Trash2 size={14} />}
                           </button>
-
-                          {/* 360 HUB */}
-                          <Link
-                            href={`/tenant/projects/${project.id}`}
-                            title="Open Project 360° Studio Hub"
-                            className="p-2 text-slate-400 hover:text-emerald-700 rounded-xl hover:bg-emerald-50 transition-colors"
-                          >
-                            <ChevronRight size={16} />
-                          </Link>
                         </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+
+                        <Link
+                          href={`/tenant/projects/${project.id}`}
+                          className="flex-1 py-2 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
+                        >
+                          <span>Open 360° Studio</span>
+                          <ChevronRight size={14} />
+                        </Link>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
-      </div>
+      ) : (
+        /* DENSE 5-COLUMN TABLE VIEW - ZERO HORIZONTAL SCROLL REQUIRED */
+        <div className="bg-white rounded-2xl sm:rounded-3xl shadow-sm border border-slate-200 overflow-hidden w-full">
+          <div className="overflow-x-auto w-full custom-scrollbar">
+            <table className="w-full text-left text-xs whitespace-nowrap">
+              <thead className="bg-slate-50 text-slate-500 uppercase tracking-wider text-[11px] font-extrabold border-b border-slate-200">
+                <tr>
+                  <th className="px-4 py-3.5">Project ID & Plant Specs</th>
+                  <th className="px-4 py-3.5">Customer & Location</th>
+                  <th className="px-4 py-3.5">Contract & Proposal</th>
+                  <th className="px-4 py-3.5">Stage & Grid Liasoning</th>
+                  <th className="px-4 py-3.5 text-right sticky right-0 bg-slate-50 border-l border-slate-200 z-10 shadow-[-4px_0_8px_rgba(0,0,0,0.02)]">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {loading ? (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-16 text-center">
+                      <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
+                      <p className="text-xs text-slate-400 mt-2 font-medium">Loading solar installations...</p>
+                    </td>
+                  </tr>
+                ) : filteredProjects.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-16 text-center">
+                      <Briefcase size={36} className="text-slate-300 mx-auto mb-2" />
+                      <p className="text-sm font-bold text-slate-700">No projects found</p>
+                      <p className="text-xs text-slate-400 mt-1">
+                        {searchTerm ? 'Try adjusting your search filters.' : 'Create your first project or convert an accepted quotation.'}
+                      </p>
+                      <Link
+                        href="/tenant/projects/new"
+                        className="mt-4 px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 transition-colors inline-flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <Plus size={14} /> Create Project
+                      </Link>
+                    </td>
+                  </tr>
+                ) : (
+                  filteredProjects.map((project) => {
+                    const client = project.customer || project.lead;
+                    const isDeleting = deletingProjectId === project.id;
+                    const discom = project.discomApplication;
+                    const subsidy = project.subsidies && project.subsidies.length > 0 ? project.subsidies[0] : null;
+
+                    return (
+                      <tr
+                        key={project.id}
+                        onClick={() => router.push(`/tenant/projects/${project.id}`)}
+                        className="hover:bg-slate-50/80 transition-colors cursor-pointer group"
+                      >
+                        {/* 1. PROJECT & SPECS */}
+                        <td className="px-4 py-3.5">
+                          <div className="flex items-center gap-2.5">
+                            <span className="w-8 h-8 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center font-bold text-xs group-hover:bg-emerald-50 group-hover:text-emerald-700 transition-colors shrink-0">
+                              <Briefcase size={15} />
+                            </span>
+                            <div>
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="font-extrabold text-slate-900 group-hover:text-emerald-700 transition-colors text-xs">
+                                  {project.projectNumber || 'PRJ-NEW'}
+                                </span>
+                                <span className="text-[10px] font-bold px-1.5 py-0.2 bg-emerald-50 text-emerald-700 rounded border border-emerald-200">
+                                  {project.capacity || 5} kWp · {project.systemType || 'On-Grid'}
+                                </span>
+                              </div>
+                              <span className="text-[11px] text-slate-600 font-semibold block truncate max-w-[210px] mt-0.5">
+                                {project.name}
+                              </span>
+                              <span className="text-[10px] text-slate-400 block mt-0.5">
+                                Created {new Date(project.createdAt).toLocaleDateString()} · {project.projectType || 'Residential'}
+                              </span>
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* 2. CUSTOMER & SITE */}
+                        <td className="px-4 py-3.5">
+                          <div className="flex items-center gap-2">
+                            <span className="w-6 h-6 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center text-[10px] font-bold uppercase shrink-0">
+                              {(client?.name || 'C')[0]}
+                            </span>
+                            <div>
+                              <p className="font-bold text-slate-800 text-xs truncate max-w-[170px]">{client?.name || 'Solar Client'}</p>
+                              <p className="text-[10px] text-slate-400 flex items-center gap-1 mt-0.5">
+                                <MapPin size={10} /> {project.city || client?.city || 'Pune'}, {project.state || 'Maharashtra'}
+                              </p>
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* 3. CONTRACT & PROPOSAL */}
+                        <td className="px-4 py-3.5" onClick={e => e.stopPropagation()}>
+                          <div>
+                            <p className="font-black text-slate-900 text-xs">
+                              ₹{(project.estimatedValue || 0).toLocaleString()}
+                            </p>
+                            {project.quotation ? (
+                              <Link
+                                href={`/tenant/quotations?search=${project.quotation.qNumber}`}
+                                title={`View linked quotation: ${project.quotation.qNumber}`}
+                                className="inline-flex items-center gap-1 text-[10px] font-mono font-bold text-emerald-700 hover:text-emerald-900 mt-0.5 bg-emerald-50 hover:bg-emerald-100 px-1.5 py-0.5 rounded border border-emerald-200 transition"
+                              >
+                                <FileText size={10} /> {project.quotation.qNumber}
+                              </Link>
+                            ) : (
+                              <span className="text-[10px] text-slate-400 block mt-0.5">Direct Entry</span>
+                            )}
+                          </div>
+                        </td>
+
+                        {/* 4. STAGE & GRID LIASONING */}
+                        <td className="px-4 py-3.5">
+                          <div className="space-y-1.5 min-w-[150px]">
+                            <div className="flex items-center justify-between gap-1">
+                              {getStageBadge(project.currentStage)}
+                              <span className="text-[10px] font-bold text-slate-500">
+                                {Math.round(project.progressPercent || 0)}%
+                              </span>
+                            </div>
+                            <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                              <div 
+                                className="bg-emerald-500 h-1.5 rounded-full transition-all duration-300"
+                                style={{ width: `${project.progressPercent || 0}%` }}
+                              />
+                            </div>
+                            <div className="flex items-center gap-1 flex-wrap pt-0.5">
+                              {discom ? (
+                                <span className="text-[9px] font-bold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200 flex items-center gap-0.5">
+                                  <Zap size={9} /> {discom.status || 'MSEDCL'}
+                                </span>
+                              ) : (
+                                <span className="text-[9px] text-slate-400">DISCOM: Pending</span>
+                              )}
+                              {subsidy && (
+                                <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                                  Subsidy
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* 5. ACTIONS - STICKY PINNED RIGHT */}
+                        <td className="px-4 py-3.5 text-right sticky right-0 bg-white group-hover:bg-slate-50/95 transition-colors border-l border-slate-100 z-10 shadow-[-6px_0_12px_rgba(0,0,0,0.03)]" onClick={e => e.stopPropagation()}>
+                          <div className="flex items-center justify-end gap-1.5">
+                            
+                            {/* QUICK STAGE ADVANCEMENT MODAL */}
+                            <button
+                              type="button"
+                              title="Quick Advance Project Stage"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setStageModalProject(project);
+                                setTargetStage(project.currentStage);
+                                setStageNote('');
+                              }}
+                              className="p-1.5 text-slate-500 hover:text-indigo-600 rounded-lg hover:bg-indigo-50 border border-slate-200 hover:border-indigo-200 transition-colors cursor-pointer"
+                            >
+                              <Layers size={14} />
+                            </button>
+
+                            {/* 360 HUB */}
+                            <Link
+                              href={`/tenant/projects/${project.id}`}
+                              title="Open Project 360° Studio Hub"
+                              className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-bold transition-all shadow-xs flex items-center gap-1 cursor-pointer whitespace-nowrap"
+                            >
+                              <span>360° Hub</span>
+                              <ChevronRight size={13} />
+                            </Link>
+
+                            {/* DELETE PROJECT */}
+                            <button
+                              type="button"
+                              title="Delete Project"
+                              disabled={isDeleting}
+                              onClick={(e) => handleDeleteProject(project, e)}
+                              className="p-1.5 text-slate-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors cursor-pointer disabled:opacity-50"
+                            >
+                              {isDeleting ? <Loader2 size={14} className="animate-spin text-red-500" /> : <Trash2 size={14} />}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* QUICK STAGE ADVANCEMENT MODAL */}
       {stageModalProject && (
