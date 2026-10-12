@@ -113,9 +113,146 @@ export interface QuotationData {
   };
 }
 
+export function mapQuotationToPdfData(quotation: any, tenantInfo?: any): QuotationData {
+  if (!quotation) return null as any;
+  const client = quotation.customer || quotation.lead;
+  const tenantName = tenantInfo?.legalName || tenantInfo?.name || "WhereReady Solar OS";
+  const tenantPhone = tenantInfo?.phone || "+91 98220 12345";
+  const tenantEmail = tenantInfo?.email || "contact@apexsolar.in";
+  const tenantAddress = [tenantInfo?.address, tenantInfo?.city, tenantInfo?.state, tenantInfo?.pincode].filter(Boolean).join(", ") || "MIDC Tech Hub, Pune, Maharashtra 411019";
+  const clientName = client?.name || "Customer Proposal";
+  const clientPhone = client?.mobile || client?.phone || "+91 98XXX XXXXX";
+  const clientEmail = client?.email || "customer@example.com";
+  const clientAddress = client?.address || "Site Roof, Maharashtra";
+
+  const cap = quotation.systemCapacity || 5;
+  const annGen = quotation.annualGeneration || Math.round(cap * 1460);
+  const annSav = quotation.annualSavings || Math.round(annGen * 8.5);
+
+  const rawItems = Array.isArray(quotation.items) && quotation.items.length > 0 ? quotation.items : [];
+  const pricingRows = rawItems.length > 0 
+    ? rawItems.map((it: any) => ({
+        description: it.description,
+        qty: it.quantity || 1,
+        unit_price: it.unitPrice || 0,
+        amount: it.total || (it.quantity * it.unitPrice)
+      }))
+    : [
+        { description: `${cap} kWp Solar PV Power Plant Equipment`, qty: 1, unit_price: Math.round((quotation.subtotal || quotation.total || 275000) * 0.8), amount: Math.round((quotation.subtotal || quotation.total || 275000) * 0.8) },
+        { description: "Installation, Engineering, Liasoning & Commissioning", qty: 1, unit_price: Math.round((quotation.subtotal || quotation.total || 275000) * 0.2), amount: Math.round((quotation.subtotal || quotation.total || 275000) * 0.2) }
+      ];
+
+  return {
+    quotation_number: quotation.qNumber || "QT-2026",
+    quotation_date: quotation.date ? new Date(quotation.date).toLocaleDateString() : new Date().toLocaleDateString(),
+    valid_until: `${quotation.validityDays || 15} Days`,
+    company_name: tenantName,
+    company_logo: tenantInfo?.logoUrl || "",
+    company_address: tenantAddress,
+    company_phone: tenantPhone,
+    company_email: tenantEmail,
+    company_website: "www.whereready.com",
+    customer_name: clientName,
+    customer_phone: clientPhone,
+    customer_email: clientEmail,
+    project_address: clientAddress,
+    system_capacity: cap,
+    annual_generation: annGen,
+    system_type: quotation.systemType || "On-grid Rooftop PV",
+    connection_type: quotation.connectionType || "Residential Net Metering",
+    phase: quotation.phase || "Single Phase",
+    roof_type: quotation.roofType || "RCC Flat Roof",
+    installation_type: quotation.structureBrand || "Galvanized High Rise Structure",
+    expected_timeline: "15 to 20 Working Days",
+    panel_brand: quotation.panelBrand || "Waaree",
+    panel_model: quotation.panelModel || "550Wp Mono PERC Bifacial",
+    panel_wattage: quotation.panelWattage || 550,
+    panel_quantity: quotation.panelQuantity || 9,
+    panel_warranty: quotation.panelWarranty || "25 Years OEM Performance",
+    inverter_brand: quotation.inverterBrand || "Growatt",
+    inverter_model: quotation.inverterModel || "5kW On-Grid Inverter",
+    inverter_capacity: quotation.inverterCapacity || cap,
+    inverter_quantity: quotation.inverterQuantity || 1,
+    inverter_warranty: quotation.inverterWarranty || "10 Years Replacement",
+    structure_brand: quotation.structureBrand || "Galvanized HDG High Rise",
+    structure_warranty: quotation.structureWarranty || "10 Years Structural",
+    components: [
+      { category: "Solar PV Modules", brand: quotation.panelBrand || "Waaree", model: "550Wp Bifacial", specification: "ALMM Approved Tier-1", quantity: quotation.panelQuantity || 9, warranty: "25 Yrs" },
+      { category: "Solar Inverter", brand: quotation.inverterBrand || "Growatt", model: "Grid-Tied IP65", specification: "Dual MPPT High Efficiency", quantity: 1, warranty: "10 Yrs" },
+      { category: "Mounting Structure", brand: quotation.structureBrand || "Galvanized HDG", model: "High Rise", specification: "80+ Micron Galvanized", quantity: "1 Set", warranty: "10 Yrs" },
+      { category: "Electrical Balance", brand: "Polycab / LAPP", model: "Solar DC 4sq.mm", specification: "ACDB/DCDB with Type-II SPD", quantity: "Complete", warranty: "5 Yrs" }
+    ],
+    scope_of_supply: quotation.scopeOfSupply || [
+      "Tier-1 Solar PV Modules with ALMM Approval",
+      "Grid-Tied String Inverter with Wi-Fi Remote Monitoring",
+      "Hot-Dip Galvanized Module Mounting Structure",
+      "AC Distribution Box & DC Distribution Box with SPDs",
+      "Dual Dedicated Chemical Earthing & Lightning Protection",
+      "MSEDCL Net Metering Liasoning, Inspection & Activation"
+    ],
+    pricing: pricingRows,
+    subtotal: quotation.subtotal || quotation.total || 0,
+    discount: quotation.discount || 0,
+    tax: quotation.tax || 0,
+    other_charges: 0,
+    grand_total: quotation.total || 0,
+    indicative_subsidy: quotation.indicativeSubsidy || 0,
+    net_customer_cost: Math.max(0, (quotation.total || 0) - (quotation.indicativeSubsidy || 0)),
+    amount_in_words: "Total project investment payable",
+    current_monthly_bill: 8000,
+    estimated_monthly_bill: 1200,
+    annual_savings: annSav,
+    monthly_savings: Math.round(annSav / 12),
+    payback_period: quotation.paybackYears || 4.4,
+    lifetime_savings: annSav * 25,
+    lifetime_generation: annGen * 25 * 0.92,
+    co2_reduction: Math.round(annGen * 0.82),
+    tree_equivalent: Math.round((annGen * 0.82) / 20),
+    peak_month: "May",
+    payment_terms: quotation.paymentMilestones || [
+      { percentage: 20, amount: Math.round((quotation.total || 0) * 0.2), description: "Advance along with work order confirmation" },
+      { percentage: 60, amount: Math.round((quotation.total || 0) * 0.6), description: "Upon delivery of panels, inverter & structure at site" },
+      { percentage: 15, amount: Math.round((quotation.total || 0) * 0.15), description: "Upon installation & testing completion" },
+      { percentage: 5, amount: Math.round((quotation.total || 0) * 0.05), description: "Upon MSEDCL Net Metering activation" }
+    ],
+    warranties: quotation.warranties || {
+      modules: "25 Years OEM Performance",
+      inverter: "10 Years Replacement Warranty",
+      structure: "10 Years Structural Integrity",
+      installation: "5 Years Workmanship Guarantee",
+      other: "OEM Standard Terms"
+    },
+    included_terms: [
+      "Complete installation and turnkey commissioning",
+      "Net metering application filing with MSEDCL",
+      "Site shadow assessment and engineering drawings"
+    ],
+    exclusions: quotation.exclusions || [
+      "Statutory MSEDCL processing and meter testing fees",
+      "Major civil foundation or structural roof repairs",
+      "AC cabling exceeding standard 25 meters"
+    ],
+    terms_and_conditions: quotation.termsAndConditions || [
+      `Proposal valid for ${quotation.validityDays || 15} days from issue date.`,
+      "Central government subsidy is credited directly by MNRE/DISCOM to the consumer account upon approval.",
+      "Single/Three-phase power and roof access to be provided by the customer during execution."
+    ],
+    bank_details: quotation.bankDetails || {
+      account_name: tenantName,
+      bank_name: "HDFC Bank Ltd",
+      account_number: "50200088991234",
+      ifsc: "HDFC0001234",
+      upi_id: "solar@upi"
+    }
+  };
+}
+
 export const generatePDF = async (elementId: string, filename: string) => {
   const element = document.getElementById(elementId);
-  if (!element) return;
+  if (!element) {
+    console.error(`generatePDF: Element #${elementId} not found in DOM.`);
+    return;
+  }
   
   // Patch window.getComputedStyle to strip lab/oklch colors for html2canvas
   // Tailwind v4 uses modern CSS colors which crash older html2canvas versions
@@ -149,8 +286,14 @@ export const generatePDF = async (elementId: string, filename: string) => {
   };
 
   try {
-    const _html2pdf = require("html2pdf.js");
-    const html2pdf = _html2pdf.default || _html2pdf;
+    let html2pdf: any;
+    try {
+      const mod = await import("html2pdf.js");
+      html2pdf = mod.default || mod;
+    } catch {
+      const _html2pdf = require("html2pdf.js");
+      html2pdf = _html2pdf.default || _html2pdf;
+    }
     return await html2pdf().set(opt).from(element).save();
   } catch (err: any) {
     console.error("Inner PDF generation error:", err);

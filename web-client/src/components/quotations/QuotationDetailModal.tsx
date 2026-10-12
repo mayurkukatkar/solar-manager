@@ -8,9 +8,9 @@ import {
   Calendar, User, FileText, Check, Phone, MessageSquare, 
   RotateCcw, History, ArrowUpRight, Edit3, Trash2, Eye,
   Copy, CheckCheck, Printer, Plus, Save, ExternalLink,
-  Package, Layers, Sparkles
+  Package, Layers, Sparkles, Loader2
 } from 'lucide-react';
-import { QuotationPDF, QuotationData } from '@/components/pdf/QuotationPDF';
+import { QuotationPDF, QuotationData, mapQuotationToPdfData, generatePDF } from '@/components/pdf/QuotationPDF';
 
 interface DetailProps {
   isOpen: boolean;
@@ -48,6 +48,7 @@ export function QuotationDetailModal({
   const [whatsAppPhone, setWhatsAppPhone] = useState('');
   const [whatsAppText, setWhatsAppText] = useState('');
   const [copiedPitch, setCopiedPitch] = useState(false);
+  const [isDownloadingWhatsAppPdf, setIsDownloadingWhatsAppPdf] = useState(false);
 
   // Sync initial tab and quotation changes
   useEffect(() => {
@@ -67,7 +68,8 @@ export function QuotationDetailModal({
       setWhatsAppPhone(normalizedPhone || phone);
 
       const tenantName = tenantInfo?.legalName || tenantInfo?.name || 'WhereReady Solar';
-      const msg = `Dear ${client?.name || 'Valued Customer'},\n\nGreetings from *${tenantName}*!\n\nWe have prepared your personalized Solar Project Proposal for *${quotation.systemCapacity || 5} kWp Rooftop System*.\n\n*Proposal Highlights:*\n• System Capacity: ${quotation.systemCapacity || 5} kWp (${quotation.systemType || 'On-grid'})\n• Total Investment: ₹${(quotation.total || 0).toLocaleString()}\n• Est. Annual Savings: ₹${(quotation.annualSavings || Math.round((quotation.systemCapacity || 5) * 1460 * 8.5)).toLocaleString()}\n${quotation.indicativeSubsidy > 0 ? `• Indicative Central Subsidy: ₹${quotation.indicativeSubsidy.toLocaleString()}\n• Net Outflow: ₹${Math.max(0, (quotation.total || 0) - quotation.indicativeSubsidy).toLocaleString()}\n` : ''}• Proposal No: ${quotation.qNumber}\n• Valid Until: ${quotation.validityDays || 15} Days\n\nPlease review your complete proposal. Feel free to contact us for any technical or commercial queries!\n\nBest Regards,\n*${tenantName}*\nPhone: ${tenantInfo?.phone || '+91 98220 12345'}`;
+      const webProposalUrl = typeof window !== 'undefined' ? `${window.location.origin}/tenant/quotations/pdf-demo` : '';
+      const msg = `Dear ${client?.name || 'Valued Customer'},\n\nGreetings from *${tenantName}*!\n\nWe have prepared your personalized Solar Project Proposal for *${quotation.systemCapacity || 5} kWp Rooftop System*.\n\n*Proposal Highlights:*\n• System Capacity: ${quotation.systemCapacity || 5} kWp (${quotation.systemType || 'On-grid'})\n• Total Investment: ₹${(quotation.total || 0).toLocaleString()}\n• Est. Annual Savings: ₹${(quotation.annualSavings || Math.round((quotation.systemCapacity || 5) * 1460 * 8.5)).toLocaleString()}\n${quotation.indicativeSubsidy > 0 ? `• Indicative Central Subsidy: ₹${quotation.indicativeSubsidy.toLocaleString()}\n• Net Outflow: ₹${Math.max(0, (quotation.total || 0) - quotation.indicativeSubsidy).toLocaleString()}\n` : ''}• Proposal No: ${quotation.qNumber}\n• Valid Until: ${quotation.validityDays || 15} Days\n• 📄 Attached PDF: Proposal_${quotation.qNumber}.pdf\n• 🌐 View Online Proposal: ${webProposalUrl}\n\nPlease review your complete proposal. Feel free to contact us for any technical or commercial queries!\n\nBest Regards,\n*${tenantName}*\nPhone: ${tenantInfo?.phone || '+91 98220 12345'}`;
       setWhatsAppText(msg);
 
       setEditFormData({
@@ -122,12 +124,17 @@ export function QuotationDetailModal({
     }
   }, [quotation, tenantInfo]);
 
-  if (!isOpen || !quotation) return null;
-
-  const isLocked = quotation.isLocked || quotation.status === 'ACCEPTED';
-  const client = quotation.customer || quotation.lead;
-  const linkedProjects = quotation.projects || [];
+  // Derived state (evaluated unconditionally for strict Hook Rules compliance)
+  const isLocked = quotation ? (quotation.isLocked || quotation.status === 'ACCEPTED') : false;
+  const client = quotation ? (quotation.customer || quotation.lead) : null;
+  const linkedProjects = quotation?.projects || [];
   const hasLinkedProject = linkedProjects.length > 0;
+
+  // Build PDF Data Object for In-App Live Preview & Direct Download (Unconditional useMemo)
+  const pdfProposalData: QuotationData | null = useMemo(() => {
+    if (!quotation) return null;
+    return mapQuotationToPdfData(quotation, tenantInfo);
+  }, [quotation, tenantInfo]);
 
   // Handle status update
   const handleStatusChange = async (status: string) => {
@@ -296,138 +303,8 @@ export function QuotationDetailModal({
     }
   };
 
-  // Build PDF Data Object for In-App Live Preview
-  const pdfProposalData: QuotationData = useMemo(() => {
-    const tenantName = tenantInfo?.legalName || tenantInfo?.name || "WhereReady Solar OS";
-    const tenantPhone = tenantInfo?.phone || "+91 98220 12345";
-    const tenantEmail = tenantInfo?.email || "contact@apexsolar.in";
-    const tenantAddress = [tenantInfo?.address, tenantInfo?.city, tenantInfo?.state, tenantInfo?.pincode].filter(Boolean).join(", ") || "MIDC Tech Hub, Pune, Maharashtra 411019";
-    const clientName = client?.name || "Customer Proposal";
-    const clientPhone = client?.mobile || client?.phone || "+91 98XXX XXXXX";
-    const clientEmail = client?.email || "customer@example.com";
-    const clientAddress = client?.address || "Site Roof, Maharashtra";
-
-    const cap = quotation.systemCapacity || 5;
-    const annGen = quotation.annualGeneration || Math.round(cap * 1460);
-    const annSav = quotation.annualSavings || Math.round(annGen * 8.5);
-
-    const rawItems = Array.isArray(quotation.items) && quotation.items.length > 0 ? quotation.items : [];
-    const pricingRows = rawItems.length > 0 
-      ? rawItems.map((it: any) => ({
-          description: it.description,
-          qty: it.quantity || 1,
-          unit_price: it.unitPrice || 0,
-          amount: it.total || (it.quantity * it.unitPrice)
-        }))
-      : [
-          { description: `${cap} kWp Solar PV Power Plant Equipment`, qty: 1, unit_price: Math.round((quotation.subtotal || quotation.total) * 0.8), amount: Math.round((quotation.subtotal || quotation.total) * 0.8) },
-          { description: "Installation, Engineering, Liasoning & Commissioning", qty: 1, unit_price: Math.round((quotation.subtotal || quotation.total) * 0.2), amount: Math.round((quotation.subtotal || quotation.total) * 0.2) }
-        ];
-
-    return {
-      quotation_number: quotation.qNumber || "QT-2026",
-      quotation_date: new Date(quotation.date).toLocaleDateString(),
-      valid_until: `${quotation.validityDays || 15} Days`,
-      company_name: tenantName,
-      company_logo: tenantInfo?.logoUrl || "",
-      company_address: tenantAddress,
-      company_phone: tenantPhone,
-      company_email: tenantEmail,
-      company_website: "www.whereready.com",
-      customer_name: clientName,
-      customer_phone: clientPhone,
-      customer_email: clientEmail,
-      project_address: clientAddress,
-      system_capacity: cap,
-      annual_generation: annGen,
-      system_type: quotation.systemType || "On-grid Rooftop PV",
-      connection_type: quotation.connectionType || "Residential Net Metering",
-      phase: quotation.phase || "Single Phase",
-      roof_type: quotation.roofType || "RCC Flat Roof",
-      installation_type: quotation.structureBrand || "Galvanized High Rise Structure",
-      expected_timeline: "15 to 20 Working Days",
-      panel_brand: quotation.panelBrand || "Waaree",
-      panel_model: quotation.panelModel || "550Wp Mono PERC Bifacial",
-      panel_wattage: quotation.panelWattage || 550,
-      panel_quantity: quotation.panelQuantity || 9,
-      panel_warranty: quotation.panelWarranty || "25 Years OEM Performance",
-      inverter_brand: quotation.inverterBrand || "Growatt",
-      inverter_model: quotation.inverterModel || "5kW On-Grid Inverter",
-      inverter_capacity: quotation.inverterCapacity || cap,
-      inverter_quantity: quotation.inverterQuantity || 1,
-      inverter_warranty: quotation.inverterWarranty || "10 Years Replacement",
-      structure_brand: quotation.structureBrand || "Galvanized HDG High Rise",
-      structure_warranty: quotation.structureWarranty || "10 Years Structural",
-      components: [
-        { category: "Solar PV Modules", brand: quotation.panelBrand || "Waaree", model: "550Wp Bifacial", specification: "ALMM Approved Tier-1", quantity: quotation.panelQuantity || 9, warranty: "25 Yrs" },
-        { category: "Solar Inverter", brand: quotation.inverterBrand || "Growatt", model: "Grid-Tied IP65", specification: "Dual MPPT High Efficiency", quantity: 1, warranty: "10 Yrs" },
-        { category: "Mounting Structure", brand: quotation.structureBrand || "Galvanized HDG", model: "High Rise", specification: "80+ Micron Galvanized", quantity: "1 Set", warranty: "10 Yrs" },
-        { category: "Electrical Balance", brand: "Polycab / LAPP", model: "Solar DC 4sq.mm", specification: "ACDB/DCDB with Type-II SPD", quantity: "Complete", warranty: "5 Yrs" }
-      ],
-      scope_of_supply: quotation.scopeOfSupply || [
-        "Tier-1 Solar PV Modules with ALMM Approval",
-        "Grid-Tied String Inverter with Wi-Fi Remote Monitoring",
-        "Hot-Dip Galvanized Module Mounting Structure",
-        "AC Distribution Box & DC Distribution Box with SPDs",
-        "Dual Dedicated Chemical Earthing & Lightning Protection",
-        "MSEDCL Net Metering Liasoning, Inspection & Activation"
-      ],
-      pricing: pricingRows,
-      subtotal: quotation.subtotal || quotation.total,
-      discount: quotation.discount || 0,
-      tax: quotation.tax || 0,
-      other_charges: 0,
-      grand_total: quotation.total,
-      indicative_subsidy: quotation.indicativeSubsidy || 0,
-      net_customer_cost: Math.max(0, (quotation.total || 0) - (quotation.indicativeSubsidy || 0)),
-      amount_in_words: "Total project investment payable",
-      current_monthly_bill: 8000,
-      estimated_monthly_bill: 1200,
-      annual_savings: annSav,
-      monthly_savings: Math.round(annSav / 12),
-      payback_period: quotation.paybackYears || 4.4,
-      lifetime_savings: annSav * 25,
-      lifetime_generation: annGen * 25 * 0.92,
-      co2_reduction: Math.round(annGen * 0.82),
-      tree_equivalent: Math.round((annGen * 0.82) / 20),
-      peak_month: "May",
-      payment_terms: quotation.paymentMilestones || [
-        { percentage: 20, amount: Math.round(quotation.total * 0.2), description: "Advance along with work order confirmation" },
-        { percentage: 60, amount: Math.round(quotation.total * 0.6), description: "Upon delivery of panels, inverter & structure at site" },
-        { percentage: 15, amount: Math.round(quotation.total * 0.15), description: "Upon installation & testing completion" },
-        { percentage: 5, amount: Math.round(quotation.total * 0.05), description: "Upon MSEDCL Net Metering activation" }
-      ],
-      warranties: quotation.warranties || {
-        modules: "25 Years OEM Performance",
-        inverter: "10 Years Replacement Warranty",
-        structure: "10 Years Structural Integrity",
-        installation: "5 Years Workmanship Guarantee",
-        other: "OEM Standard Terms"
-      },
-      included_terms: [
-        "Complete installation and turnkey commissioning",
-        "Net metering application filing with MSEDCL",
-        "Site shadow assessment and engineering drawings"
-      ],
-      exclusions: quotation.exclusions || [
-        "Statutory MSEDCL processing and meter testing fees",
-        "Major civil foundation or structural roof repairs",
-        "AC cabling exceeding standard 25 meters"
-      ],
-      terms_and_conditions: quotation.termsAndConditions || [
-        `Proposal valid for ${quotation.validityDays || 15} days from issue date.`,
-        "Central government subsidy is credited directly by MNRE/DISCOM to the consumer account upon approval.",
-        "Single/Three-phase power and roof access to be provided by the customer during execution."
-      ],
-      bank_details: quotation.bankDetails || {
-        account_name: tenantName,
-        bank_name: "HDFC Bank Ltd",
-        account_number: "50200088991234",
-        ifsc: "HDFC0001234",
-        upi_id: "solar@upi"
-      }
-    };
-  }, [quotation, tenantInfo, client]);
+  // Guard return immediately before JSX rendering (after all React hooks have run unconditionally)
+  if (!isOpen || !quotation) return null;
 
   return (
     <div className="fixed inset-0 z-50 bg-[#071A2B]/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5 overflow-y-auto">
@@ -1142,9 +1019,49 @@ export function QuotationDetailModal({
               <textarea
                 value={whatsAppText}
                 onChange={e => setWhatsAppText(e.target.value)}
-                rows={8}
+                rows={7}
                 className="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs font-mono leading-relaxed outline-none focus:ring-2 focus:ring-emerald-500"
               />
+            </div>
+
+            {/* 1-CLICK ATTACHMENT ACTION */}
+            <div className="p-3 bg-emerald-50/80 rounded-xl border border-emerald-200/80 space-y-2">
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-extrabold text-emerald-900 flex items-center gap-1.5">
+                  <FileText size={14} className="text-emerald-700" />
+                  PDF Proposal Attachment
+                </span>
+                <span className="text-[11px] font-bold text-emerald-700 bg-white px-2 py-0.5 rounded-full border border-emerald-200">
+                  Proposal_{quotation.qNumber}.pdf
+                </span>
+              </div>
+              <p className="text-[11px] text-emerald-800 leading-tight">
+                Tip: 1. Click below to download the PDF. 2. Click "Open WhatsApp" and drag & drop or attach the downloaded PDF into your chat!
+              </p>
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    setIsDownloadingWhatsAppPdf(true);
+                    const filename = `Proposal_${quotation.qNumber || 'QT'}.pdf`;
+                    await generatePDF('detail-modal-pdf-content', filename);
+                  } catch (err) {
+                    console.error('WhatsApp PDF download error:', err);
+                    window.print();
+                  } finally {
+                    setIsDownloadingWhatsAppPdf(false);
+                  }
+                }}
+                disabled={isDownloadingWhatsAppPdf}
+                className="w-full py-2 px-3 bg-white hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-lg text-xs font-bold flex items-center justify-center gap-2 transition-colors cursor-pointer disabled:opacity-50"
+              >
+                {isDownloadingWhatsAppPdf ? (
+                  <Loader2 size={14} className="animate-spin text-emerald-700" />
+                ) : (
+                  <Download size={14} className="text-emerald-700" />
+                )}
+                {isDownloadingWhatsAppPdf ? 'Preparing PDF...' : 'Download PDF to Attach (1-Click)'}
+              </button>
             </div>
 
             <div className="flex items-center justify-between pt-2">

@@ -13,6 +13,7 @@ import {
 import Link from 'next/link';
 import { QuotationWizardModal } from '@/components/quotations/QuotationWizardModal';
 import { QuotationDetailModal } from '@/components/quotations/QuotationDetailModal';
+import { QuotationPDF, QuotationData, mapQuotationToPdfData, generatePDF } from '@/components/pdf/QuotationPDF';
 
 export default function QuotationsPage() {
   const [quotations, setQuotations] = useState<any[]>([]);
@@ -26,6 +27,10 @@ export default function QuotationsPage() {
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [deletingQuoteId, setDeletingQuoteId] = useState<string | null>(null);
+
+  // DIRECT PDF DOWNLOAD STATE
+  const [downloadingQuoteId, setDownloadingQuoteId] = useState<string | null>(null);
+  const [downloadingQuoteData, setDownloadingQuoteData] = useState<QuotationData | null>(null);
 
   // FILTERS & SEARCH
   const [searchTerm, setSearchTerm] = useState('');
@@ -52,6 +57,7 @@ export default function QuotationsPage() {
   const [whatsAppText, setWhatsAppText] = useState('');
   const [copiedPitch, setCopiedPitch] = useState(false);
   const [isSendingWhatsApp, setIsSendingWhatsApp] = useState(false);
+  const [isDownloadingWhatsAppPdf, setIsDownloadingWhatsAppPdf] = useState(false);
 
   // Parse URL parameters for cross-module interconnectivity (CRM/Surveys -> Quotations)
   useEffect(() => {
@@ -167,12 +173,57 @@ export default function QuotationsPage() {
     const sub = quote.indicativeSubsidy || 0;
     const net = Math.max(0, (quote.total || 0) - sub).toLocaleString();
     const annualSavings = (quote.annualSavings || Math.round(cap * 1460 * 8.5)).toLocaleString();
+    const webProposalUrl = typeof window !== 'undefined' ? `${window.location.origin}/tenant/quotations/pdf-demo` : '';
 
-    const msg = `Dear ${client?.name || 'Valued Customer'},\n\nGreetings from *${tenantName}*!\n\nWe have prepared your personalized Solar Rooftop Proposal for *${cap} kWp (${quote.systemType || 'On-grid'})*.\n\n*Proposal Highlights:*\n• Total Investment: ₹${total}\n${sub > 0 ? `• PM Surya Ghar Central Subsidy: ₹${sub.toLocaleString()}\n• Net Investment Outflow: ₹${net}\n` : ''}• Est. Annual Electricity Savings: ₹${annualSavings}/yr\n• Proposal No: ${quote.qNumber}\n• Proposal Validity: ${quote.validityDays || 15} Days\n\nPlease let us know if you have any questions or wish to schedule a roof technical inspection.\n\nBest Regards,\n*${tenantName}*\nPhone: ${tenantInfo?.phone || '+91 98220 12345'}`;
+    const msg = `Dear ${client?.name || 'Valued Customer'},\n\nGreetings from *${tenantName}*!\n\nWe have prepared your personalized Solar Rooftop Proposal for *${cap} kWp (${quote.systemType || 'On-grid'})*.\n\n*Proposal Highlights:*\n• Total Investment: ₹${total}\n${sub > 0 ? `• PM Surya Ghar Central Subsidy: ₹${sub.toLocaleString()}\n• Net Investment Outflow: ₹${net}\n` : ''}• Est. Annual Electricity Savings: ₹${annualSavings}/yr\n• Proposal No: ${quote.qNumber}\n• Proposal Validity: ${quote.validityDays || 15} Days\n• 📄 Attached PDF: Proposal_${quote.qNumber}.pdf\n• 🌐 View Live Proposal: ${webProposalUrl}\n\nPlease let us know if you have any questions or wish to schedule a roof technical inspection.\n\nBest Regards,\n*${tenantName}*\nPhone: ${tenantInfo?.phone || '+91 98220 12345'}`;
     
     setWhatsAppText(msg);
     setSelectedQuoteForWhatsApp(quote);
     setCopiedPitch(false);
+  };
+
+  // DIRECT 1-CLICK PDF DOWNLOAD FROM ACTION BAR
+  const handleDirectDownloadPdf = async (quote: any, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    try {
+      setDownloadingQuoteId(quote.id);
+      const pdfData = mapQuotationToPdfData(quote, tenantInfo);
+      setDownloadingQuoteData(pdfData);
+
+      // Wait 350ms for offscreen element rendering
+      await new Promise(r => setTimeout(r, 350));
+
+      const filename = `Proposal_${quote.qNumber || 'QT'}.pdf`;
+      await generatePDF('page-direct-pdf-generator', filename);
+    } catch (err) {
+      console.error('Direct PDF generation error:', err);
+      // Fallback: open in preview modal tab
+      handleOpenPreviewPdf(quote);
+    } finally {
+      setDownloadingQuoteId(null);
+      setDownloadingQuoteData(null);
+    }
+  };
+
+  // DOWNLOAD PDF DIRECTLY FROM WHATSAPP SHARE MODAL
+  const handleDownloadPdfFromWhatsApp = async () => {
+    if (!selectedQuoteForWhatsApp) return;
+    try {
+      setIsDownloadingWhatsAppPdf(true);
+      const pdfData = mapQuotationToPdfData(selectedQuoteForWhatsApp, tenantInfo);
+      setDownloadingQuoteData(pdfData);
+
+      await new Promise(r => setTimeout(r, 350));
+
+      const filename = `Proposal_${selectedQuoteForWhatsApp.qNumber || 'QT'}.pdf`;
+      await generatePDF('page-direct-pdf-generator', filename);
+    } catch (err) {
+      console.error('WhatsApp PDF generation error:', err);
+      handleOpenPreviewPdf(selectedQuoteForWhatsApp);
+    } finally {
+      setIsDownloadingWhatsAppPdf(false);
+      setDownloadingQuoteData(null);
+    }
   };
 
   // SEND ON WHATSAPP & UPDATE DRAFT STATUS
@@ -560,14 +611,19 @@ export default function QuotationsPage() {
                             </Link>
                           ) : null}
 
-                          {/* ACTION 1: PREVIEW & DOWNLOAD A4 PROPOSAL */}
+                          {/* ACTION 1: DIRECT DOWNLOAD A4 PROPOSAL PDF */}
                           <button
                             type="button"
-                            title="In-App Proposal Preview & Print / PDF Download"
-                            onClick={(e) => handleOpenPreviewPdf(quote, e)}
-                            className="p-2 text-slate-400 hover:text-emerald-600 rounded-xl hover:bg-emerald-50 transition-colors cursor-pointer"
+                            title="Download Proposal PDF (1-Click)"
+                            disabled={downloadingQuoteId === quote.id}
+                            onClick={(e) => handleDirectDownloadPdf(quote, e)}
+                            className="p-2 text-slate-400 hover:text-emerald-600 rounded-xl hover:bg-emerald-50 transition-colors cursor-pointer disabled:opacity-50"
                           >
-                            <Download size={16} />
+                            {downloadingQuoteId === quote.id ? (
+                              <Loader2 size={16} className="animate-spin text-emerald-600" />
+                            ) : (
+                              <Download size={16} />
+                            )}
                           </button>
 
                           {/* ACTION 2: WHATSAPP SHARE MODAL */}
@@ -701,11 +757,40 @@ export default function QuotationsPage() {
                   </button>
                 </div>
                 <textarea
-                  rows={8}
+                  rows={6}
                   value={whatsAppText}
                   onChange={e => setWhatsAppText(e.target.value)}
                   className="w-full p-3.5 bg-slate-50 rounded-2xl border border-slate-200 text-xs font-medium text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500 resize-none font-sans leading-relaxed"
                 />
+              </div>
+
+              {/* 1-CLICK PDF ATTACHMENT CARD */}
+              <div className="p-3.5 bg-emerald-50 rounded-2xl border border-emerald-200 space-y-2.5">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-extrabold text-emerald-950 flex items-center gap-1.5">
+                    <FileText size={15} className="text-emerald-700" />
+                    Quotation PDF Document
+                  </span>
+                  <span className="text-[11px] font-mono font-bold text-emerald-800 bg-white px-2 py-0.5 rounded-full border border-emerald-200">
+                    Proposal_{selectedQuoteForWhatsApp.qNumber}.pdf
+                  </span>
+                </div>
+                <p className="text-[11px] text-emerald-800 leading-relaxed">
+                  WhatsApp links cannot automatically attach local files. Click below to download the PDF, then attach it directly in your opened WhatsApp chat!
+                </p>
+                <button
+                  type="button"
+                  onClick={handleDownloadPdfFromWhatsApp}
+                  disabled={isDownloadingWhatsAppPdf}
+                  className="w-full py-2.5 px-3 bg-white hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-xl text-xs font-black flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer disabled:opacity-50"
+                >
+                  {isDownloadingWhatsAppPdf ? (
+                    <Loader2 size={15} className="animate-spin text-emerald-700" />
+                  ) : (
+                    <Download size={15} className="text-emerald-700" />
+                  )}
+                  {isDownloadingWhatsAppPdf ? 'Generating PDF Proposal...' : 'Download PDF to Attach (1-Click)'}
+                </button>
               </div>
 
               {/* QUICK STATS CHIPS */}
@@ -741,6 +826,24 @@ export default function QuotationsPage() {
                 <Send size={14} /> Open in WhatsApp
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* HIDDEN OFFSCREEN PDF RENDERER FOR DIRECT DOWNLOAD */}
+      {downloadingQuoteData && (
+        <div
+          style={{
+            position: 'absolute',
+            left: '-9999px',
+            top: 0,
+            width: '794px',
+            background: '#ffffff',
+            zIndex: -9999
+          }}
+        >
+          <div id="page-direct-pdf-generator" className="bg-white">
+            <QuotationPDF data={downloadingQuoteData} />
           </div>
         </div>
       )}
