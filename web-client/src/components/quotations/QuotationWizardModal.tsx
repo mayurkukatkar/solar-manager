@@ -9,7 +9,8 @@ import {
   Calendar, Phone, Mail, MapPin, Percent, HelpCircle,
   Package, Compass, ArrowRight, RefreshCw, CheckCheck,
   Trash2, Plus, Search, CheckCircle, Home, CheckSquare,
-  Award, Clock, ArrowDownRight, Layers2
+  Award, Clock, ArrowDownRight, Layers2, Maximize2,
+  Minimize2, FileCheck
 } from 'lucide-react';
 
 export interface WizardLineItem {
@@ -114,6 +115,7 @@ export function QuotationWizardModal({
 }: WizardProps) {
   const [currentStep, setCurrentStep] = useState<number>(1);
   const [loading, setLoading] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [customerMode, setCustomerMode] = useState<'leads' | 'customers' | 'new'>('leads');
   const [customerSearch, setCustomerSearch] = useState('');
 
@@ -566,11 +568,11 @@ export function QuotationWizardModal({
       : (leads.find(l => l.id === formData.leadId)?.name || 'Select Lead');
 
   return (
-    <div className="fixed inset-0 z-50 bg-[#071A2B]/80 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 lg:p-6 overflow-hidden">
-      <div className="bg-slate-50 w-full max-w-6xl h-full max-h-[94vh] rounded-2xl sm:rounded-3xl shadow-2xl flex flex-col overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
+    <div className={`fixed inset-0 z-50 bg-[#071A2B]/85 backdrop-blur-md flex items-center justify-center ${isFullscreen ? 'p-0' : 'p-1 sm:p-2 lg:p-3'} overflow-hidden`}>
+      <div className={`bg-slate-50 w-full h-full ${isFullscreen ? 'max-w-none max-h-none rounded-none border-0' : 'max-w-[99vw] 2xl:max-w-[1600px] max-h-[98vh] rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-200'} flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200`}>
         
-        {/* UNIFIED TOP BAR */}
-        <div className="bg-white border-b border-slate-200/80 px-6 sm:px-8 py-3.5 flex items-center justify-between gap-4 flex-shrink-0">
+        {/* UNIFIED EXPANSIVE TOP BAR */}
+        <div className="bg-white border-b border-slate-200/80 px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between gap-4 flex-shrink-0">
           
           {/* LEFT: TITLE & ACTIVE CONTEXT */}
           <div className="flex items-center gap-3">
@@ -622,14 +624,24 @@ export function QuotationWizardModal({
             })}
           </div>
 
-          {/* RIGHT: LIVE PRICE PILL & CLOSE */}
-          <div className="flex items-center gap-3 flex-shrink-0">
-            <div className="hidden sm:block text-right">
+          {/* RIGHT: LIVE PRICE PILL & CONTROLS */}
+          <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+            <div className="hidden sm:block text-right pr-1">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Estimated Total</span>
               <span className="text-sm font-black text-[#071A2B]">₹{calculations.total.toLocaleString()}</span>
             </div>
             <button 
+              type="button"
+              onClick={() => setIsFullscreen(prev => !prev)} 
+              title={isFullscreen ? "Restore window size" : "Maximize to full screen studio"}
+              className="w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900 flex items-center justify-center transition-colors"
+            >
+              {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+            </button>
+            <button 
+              type="button"
               onClick={onClose} 
+              title="Close wizard"
               className="w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900 flex items-center justify-center transition-colors"
             >
               <X size={18} />
@@ -644,8 +656,8 @@ export function QuotationWizardModal({
         </div>
 
         {/* MAIN FULL-WIDTH SCROLLABLE WORKSPACE */}
-        <div className="flex-1 overflow-y-auto px-4 sm:px-8 lg:px-12 py-6">
-          <div className="max-w-4xl mx-auto space-y-6">
+        <div className="flex-1 overflow-y-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-5">
+          <div className="w-full max-w-7xl mx-auto space-y-5">
 
             {/* ======================================================== */}
             {/* STEP 1: CUSTOMER & SITE SELECTION */}
@@ -716,7 +728,7 @@ export function QuotationWizardModal({
                       </div>
 
                       {/* LEADS CARDS GRID */}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 max-h-72 overflow-y-auto pr-1">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3.5 max-h-[440px] overflow-y-auto pr-1">
                         {leads
                           .filter(l => !customerSearch || l.name?.toLowerCase().includes(customerSearch.toLowerCase()) || l.mobile?.includes(customerSearch) || l.city?.toLowerCase().includes(customerSearch.toLowerCase()))
                           .map(l => {
@@ -777,7 +789,7 @@ export function QuotationWizardModal({
                         />
                       </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 max-h-72 overflow-y-auto pr-1">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3.5 max-h-[440px] overflow-y-auto pr-1">
                         {customers
                           .filter(c => !customerSearch || c.name?.toLowerCase().includes(customerSearch.toLowerCase()) || c.mobile?.includes(customerSearch))
                           .map(c => {
@@ -902,10 +914,10 @@ export function QuotationWizardModal({
             {/* STEP 2: SYSTEM CONFIGURATION & HARDWARE BOM */}
             {/* ======================================================== */}
             {currentStep === 2 && (
-              <div className="space-y-6 animate-in fade-in duration-200">
+              <div className="space-y-5 animate-in fade-in duration-200">
                 
                 {/* 1. QUICK SOLAR PACKAGES (MAHARASHTRA) */}
-                <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+                <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm space-y-3">
                   <div className="flex items-center justify-between">
                     <div>
                       <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
@@ -922,7 +934,7 @@ export function QuotationWizardModal({
                         <div
                           key={p.id}
                           onClick={() => applyPreset(p)}
-                          className={`p-4 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between ${
+                          className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between ${
                             isSelected
                               ? 'bg-emerald-50/70 border-emerald-500 shadow-md ring-2 ring-emerald-500/20'
                               : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/50'
@@ -939,7 +951,7 @@ export function QuotationWizardModal({
                             <p className="text-[11px] text-slate-500 mt-0.5">{p.panelBrand} · {p.inverterBrand}</p>
                           </div>
 
-                          <div className="mt-3 pt-2.5 border-t border-slate-100 space-y-0.5">
+                          <div className="mt-2.5 pt-2 border-t border-slate-100 space-y-0.5">
                             <div className="flex justify-between items-center text-xs">
                               <span className="text-slate-400">Total:</span>
                               <span className="font-extrabold text-slate-900">₹{(p.indicativePrice).toLocaleString()}</span>
@@ -957,188 +969,218 @@ export function QuotationWizardModal({
                   </div>
                 </div>
 
-                {/* 2. CUSTOM SYSTEM CAPACITY SLIDER */}
-                <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div>
-                      <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
-                        <Sliders size={18} className="text-emerald-600" /> Fine-Tune System Capacity
-                      </h3>
-                      <p className="text-xs text-slate-500 mt-0.5">Auto-calculates panel count, inverter size, and Maharashtra generation estimates.</p>
-                    </div>
+                {/* 2. SMART 2-COLUMN STUDIO GRID */}
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+                  
+                  {/* LEFT: SYSTEM CAPACITY & ELECTRICAL SPECS */}
+                  <div className="lg:col-span-6 space-y-5">
+                    
+                    {/* CAPACITY SLIDER CARD */}
+                    <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <h3 className="text-sm font-black text-slate-900 flex items-center gap-2">
+                            <Sliders size={16} className="text-emerald-600" /> Fine-Tune System Capacity
+                          </h3>
+                          <p className="text-[11px] text-slate-500 mt-0.5">Auto-calculates panel count and Maharashtra generation.</p>
+                        </div>
 
-                    <div className="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200">
+                        <div className="flex items-center gap-1.5 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200">
+                          <input
+                            type="number"
+                            step="0.5"
+                            min="1"
+                            max="100"
+                            value={formData.systemCapacity}
+                            onChange={e => handleCapacityChange(Number(e.target.value))}
+                            className="w-16 text-right font-black text-lg text-[#071A2B] bg-transparent outline-none"
+                          />
+                          <span className="font-bold text-slate-500 text-xs">kWp</span>
+                        </div>
+                      </div>
+
                       <input
-                        type="number"
-                        step="0.5"
+                        type="range"
                         min="1"
-                        max="100"
+                        max="50"
+                        step="0.5"
                         value={formData.systemCapacity}
                         onChange={e => handleCapacityChange(Number(e.target.value))}
-                        className="w-16 text-right font-black text-xl text-[#071A2B] bg-transparent outline-none"
+                        className="w-full accent-emerald-600 cursor-pointer h-2 bg-slate-200 rounded-lg"
                       />
-                      <span className="font-bold text-slate-500 text-sm">kWp</span>
+
+                      {/* QUICK CHIPS */}
+                      <div className="flex flex-wrap gap-1.5 pt-1">
+                        {[1, 2, 3, 4, 5, 6, 7.5, 10, 15, 20, 25].map(cap => (
+                          <button
+                            key={cap}
+                            type="button"
+                            onClick={() => handleCapacityChange(cap)}
+                            className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all ${
+                              formData.systemCapacity === cap
+                                ? 'bg-[#071A2B] text-white shadow-sm'
+                                : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                            }`}
+                          >
+                            {cap} kWp
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* GENERATION SUMMARY CHIP */}
+                      <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200/80 flex items-center justify-between text-xs">
+                        <span className="text-slate-500 font-medium">Est. Generation:</span>
+                        <strong className="text-slate-900">~{Math.round(formData.systemCapacity * 1460).toLocaleString()} kWh / year</strong>
+                      </div>
                     </div>
+
+                    {/* SITE & ELECTRICAL SPECS CARD */}
+                    <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm space-y-3.5">
+                      <h3 className="text-xs font-black uppercase tracking-wider text-slate-400">Site & Electrical Specs</h3>
+                      
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 text-xs">
+                        <div className="space-y-1">
+                          <label className="font-bold text-slate-700 uppercase text-[11px]">System Type</label>
+                          <select
+                            value={formData.systemType}
+                            onChange={e => setFormData({ ...formData, systemType: e.target.value })}
+                            className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 font-bold text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500"
+                          >
+                            <option value="On-grid">On-grid (Net Metering)</option>
+                            <option value="Hybrid">Hybrid (Battery Backup)</option>
+                            <option value="Off-grid">Off-grid (Independent)</option>
+                          </select>
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="font-bold text-slate-700 uppercase text-[11px]">Tariff Category</label>
+                          <select
+                            value={formData.connectionType}
+                            onChange={e => setFormData({ ...formData, connectionType: e.target.value })}
+                            className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 font-bold text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500"
+                          >
+                            <option value="Residential">Residential (LT-1)</option>
+                            <option value="Commercial">Commercial (LT-2)</option>
+                            <option value="Industrial">Industrial (HT/LT)</option>
+                          </select>
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="font-bold text-slate-700 uppercase text-[11px]">Grid Phase</label>
+                          <select
+                            value={formData.phase}
+                            onChange={e => setFormData({ ...formData, phase: e.target.value })}
+                            className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 font-bold text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500"
+                          >
+                            <option value="Single Phase">Single Phase (230V)</option>
+                            <option value="Three Phase">Three Phase (415V)</option>
+                          </select>
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="font-bold text-slate-700 uppercase text-[11px]">Roof Architecture</label>
+                          <select
+                            value={formData.roofType}
+                            onChange={e => setFormData({ ...formData, roofType: e.target.value })}
+                            className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 font-bold text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500"
+                          >
+                            <option value="RCC Flat Roof">RCC Flat Roof</option>
+                            <option value="Tin Shed / Metal Sheet">Industrial Metal Sheet</option>
+                            <option value="Elevated Super Structure">Elevated Terrace Structure</option>
+                            <option value="Mangalore Tile Sloped">Tile Sloped Roof</option>
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+
                   </div>
 
-                  <input
-                    type="range"
-                    min="1"
-                    max="50"
-                    step="0.5"
-                    value={formData.systemCapacity}
-                    onChange={e => handleCapacityChange(Number(e.target.value))}
-                    className="w-full accent-emerald-600 cursor-pointer h-2.5 bg-slate-200 rounded-lg"
-                  />
-
-                  {/* QUICK CHIPS */}
-                  <div className="flex flex-wrap gap-2 pt-1">
-                    {[1, 2, 3, 4, 5, 6, 7.5, 10, 15, 20, 25].map(cap => (
-                      <button
-                        key={cap}
-                        type="button"
-                        onClick={() => handleCapacityChange(cap)}
-                        className={`px-3 py-1 rounded-xl text-xs font-bold transition-all ${
-                          formData.systemCapacity === cap
-                            ? 'bg-[#071A2B] text-white shadow-sm'
-                            : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                        }`}
-                      >
-                        {cap} kWp
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* 3. GRID & ELECTRICAL SPECIFICATIONS */}
-                <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
-                  <h3 className="text-xs font-black uppercase tracking-wider text-slate-400">Site & Electrical Specs</h3>
-                  
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
-                    <div className="space-y-1">
-                      <label className="font-bold text-slate-700 uppercase">System Type</label>
-                      <select
-                        value={formData.systemType}
-                        onChange={e => setFormData({ ...formData, systemType: e.target.value })}
-                        className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 font-bold text-slate-800"
-                      >
-                        <option value="On-grid">On-grid (Net Metering)</option>
-                        <option value="Hybrid">Hybrid (Battery Backup)</option>
-                        <option value="Off-grid">Off-grid (Independent)</option>
-                      </select>
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className="font-bold text-slate-700 uppercase">Tariff Category</label>
-                      <select
-                        value={formData.connectionType}
-                        onChange={e => setFormData({ ...formData, connectionType: e.target.value })}
-                        className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 font-bold text-slate-800"
-                      >
-                        <option value="Residential">Residential (LT-1)</option>
-                        <option value="Commercial">Commercial (LT-2)</option>
-                        <option value="Industrial">Industrial (HT/LT)</option>
-                      </select>
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className="font-bold text-slate-700 uppercase">Grid Phase</label>
-                      <select
-                        value={formData.phase}
-                        onChange={e => setFormData({ ...formData, phase: e.target.value })}
-                        className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 font-bold text-slate-800"
-                      >
-                        <option value="Single Phase">Single Phase (230V)</option>
-                        <option value="Three Phase">Three Phase (415V)</option>
-                      </select>
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className="font-bold text-slate-700 uppercase">Roof Architecture</label>
-                      <select
-                        value={formData.roofType}
-                        onChange={e => setFormData({ ...formData, roofType: e.target.value })}
-                        className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 font-bold text-slate-800"
-                      >
-                        <option value="RCC Flat Roof">RCC Flat Roof</option>
-                        <option value="Tin Shed / Metal Sheet">Industrial Metal Sheet</option>
-                        <option value="Elevated Super Structure">Elevated Terrace Structure</option>
-                        <option value="Mangalore Tile Sloped">Tile Sloped Roof</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 4. HARDWARE BOM SPECIFICATIONS */}
-                <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
-                  <h3 className="text-xs font-black uppercase tracking-wider text-slate-400">Major Equipment Selections</h3>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
-                    {/* MODULE CARD */}
-                    <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
-                      <span className="font-bold text-slate-500 uppercase text-[10px]">Solar PV Modules</span>
-                      <input
-                        type="text"
-                        value={formData.panelBrand}
-                        onChange={e => setFormData({ ...formData, panelBrand: e.target.value })}
-                        placeholder="Make (Waaree / Vikram)"
-                        className="w-full px-3 py-2 bg-white rounded-xl border border-slate-200 font-bold"
-                      />
-                      <div className="grid grid-cols-2 gap-2">
-                        <select
-                          value={formData.panelWattage}
-                          onChange={e => handleWattageChange(Number(e.target.value))}
-                          className="px-2.5 py-1.5 bg-white rounded-lg border border-slate-200 font-bold text-[11px]"
-                        >
-                          <option value="540">540 Wp</option>
-                          <option value="550">550 Wp</option>
-                          <option value="570">570 Wp</option>
-                          <option value="600">600 Wp</option>
-                        </select>
-                        <span className="px-2.5 py-1.5 bg-white rounded-lg border border-slate-200 font-bold text-[11px] text-center text-slate-700">
-                          {formData.panelQuantity} Panels
+                  {/* RIGHT: MAJOR EQUIPMENT SELECTIONS */}
+                  <div className="lg:col-span-6 space-y-5">
+                    <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-xs font-black uppercase tracking-wider text-slate-400">Major Equipment & BOM Specs</h3>
+                        <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                          Tier-1 Hardware
                         </span>
                       </div>
-                    </div>
 
-                    {/* INVERTER CARD */}
-                    <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
-                      <span className="font-bold text-slate-500 uppercase text-[10px]">Solar Inverter</span>
-                      <input
-                        type="text"
-                        value={formData.inverterBrand}
-                        onChange={e => setFormData({ ...formData, inverterBrand: e.target.value })}
-                        placeholder="Make (Growatt / Solis)"
-                        className="w-full px-3 py-2 bg-white rounded-xl border border-slate-200 font-bold"
-                      />
-                      <div className="grid grid-cols-2 gap-2">
-                        <span className="px-2.5 py-1.5 bg-white rounded-lg border border-slate-200 font-bold text-[11px] text-center text-slate-700">
-                          {formData.inverterCapacity} kW
-                        </span>
-                        <input
-                          type="text"
-                          value={formData.inverterWarranty}
-                          onChange={e => setFormData({ ...formData, inverterWarranty: e.target.value })}
-                          className="px-2 py-1.5 bg-white rounded-lg border border-slate-200 font-bold text-[11px]"
-                        />
-                      </div>
-                    </div>
+                      <div className="space-y-3 text-xs">
+                        {/* MODULE CARD */}
+                        <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-slate-500 uppercase text-[10px]">Solar PV Modules</span>
+                            <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 font-black rounded text-[11px]">
+                              {formData.panelQuantity} Panels
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <input
+                              type="text"
+                              value={formData.panelBrand}
+                              onChange={e => setFormData({ ...formData, panelBrand: e.target.value })}
+                              placeholder="Make (Waaree / Vikram)"
+                              className="w-full px-3 py-2 bg-white rounded-xl border border-slate-200 font-bold outline-none focus:ring-2 focus:ring-emerald-500"
+                            />
+                            <select
+                              value={formData.panelWattage}
+                              onChange={e => handleWattageChange(Number(e.target.value))}
+                              className="w-full px-3 py-2 bg-white rounded-xl border border-slate-200 font-bold text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500"
+                            >
+                              <option value="540">540 Wp Monocrystalline</option>
+                              <option value="550">550 Wp Bifacial TOPCon</option>
+                              <option value="570">570 Wp Dual Glass</option>
+                              <option value="600">600 Wp High Power</option>
+                            </select>
+                          </div>
+                        </div>
 
-                    {/* STRUCTURE CARD */}
-                    <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
-                      <span className="font-bold text-slate-500 uppercase text-[10px]">Mounting Structure</span>
-                      <input
-                        type="text"
-                        value={formData.structureBrand}
-                        onChange={e => setFormData({ ...formData, structureBrand: e.target.value })}
-                        placeholder="Galvanized HDG High Rise"
-                        className="w-full px-3 py-2 bg-white rounded-xl border border-slate-200 font-bold"
-                      />
-                      <div className="p-2 bg-white rounded-lg border border-slate-200 text-[11px] text-slate-600 font-medium text-center">
-                        Hot-Dip Galvanized (80+ Micron)
+                        {/* INVERTER CARD */}
+                        <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-slate-500 uppercase text-[10px]">Solar Inverter</span>
+                            <span className="px-2 py-0.5 bg-slate-200 text-slate-800 font-black rounded text-[11px]">
+                              {formData.inverterCapacity} kW Rating
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <input
+                              type="text"
+                              value={formData.inverterBrand}
+                              onChange={e => setFormData({ ...formData, inverterBrand: e.target.value })}
+                              placeholder="Make (Growatt / Solis / Deye)"
+                              className="w-full px-3 py-2 bg-white rounded-xl border border-slate-200 font-bold outline-none focus:ring-2 focus:ring-emerald-500"
+                            />
+                            <input
+                              type="text"
+                              value={formData.inverterWarranty}
+                              onChange={e => setFormData({ ...formData, inverterWarranty: e.target.value })}
+                              placeholder="10 Years Replacement"
+                              className="w-full px-3 py-2 bg-white rounded-xl border border-slate-200 font-bold outline-none focus:ring-2 focus:ring-emerald-500"
+                            />
+                          </div>
+                        </div>
+
+                        {/* STRUCTURE CARD */}
+                        <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+                          <span className="font-bold text-slate-500 uppercase text-[10px]">Mounting Structure & Protection</span>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <input
+                              type="text"
+                              value={formData.structureBrand}
+                              onChange={e => setFormData({ ...formData, structureBrand: e.target.value })}
+                              placeholder="Galvanized HDG High Rise"
+                              className="w-full px-3 py-2 bg-white rounded-xl border border-slate-200 font-bold outline-none focus:ring-2 focus:ring-emerald-500"
+                            />
+                            <div className="p-2 bg-white rounded-xl border border-slate-200 text-[11px] text-slate-600 font-semibold text-center flex items-center justify-center">
+                              HDG (80+ Micron) + Dual Chemical Earthing
+                            </div>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
+
                 </div>
 
               </div>
