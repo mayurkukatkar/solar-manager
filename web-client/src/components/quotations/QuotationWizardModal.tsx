@@ -7,8 +7,86 @@ import {
   Zap, IndianRupee, Shield, FileText, CheckCircle2, 
   Sparkles, Layers, Sliders, AlertCircle, Building2,
   Calendar, Phone, Mail, MapPin, Percent, HelpCircle,
-  Package, Compass, ArrowRight, RefreshCw, CheckCheck
+  Package, Compass, ArrowRight, RefreshCw, CheckCheck,
+  Trash2, Plus, Search
 } from 'lucide-react';
+
+export interface WizardLineItem {
+  id: string;
+  productId?: string;
+  category: 'MODULE' | 'INVERTER' | 'STRUCTURE' | 'BOS' | 'SERVICES' | 'CUSTOM';
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  taxRate: number;
+  total: number;
+}
+
+export const generateDefaultLineItems = (
+  capacity: number,
+  panelBrand: string,
+  panelWattage: number,
+  panelQty: number,
+  inverterBrand: string,
+  structureBrand: string
+): WizardLineItem[] => {
+  const cap = Number(capacity) || 5;
+  const equipBudget = Math.round(cap * 43000);
+  const labourBudget = Math.round(cap * 13000);
+
+  const moduleTotal = Math.round(equipBudget * 0.58);
+  const invTotal = Math.round(equipBudget * 0.24);
+  const structTotal = Math.round(equipBudget * 0.10);
+  const bosTotal = Math.max(5000, equipBudget - moduleTotal - invTotal - structTotal);
+
+  return [
+    {
+      id: 'item-1',
+      category: 'MODULE',
+      description: `${panelBrand || 'Waaree'} ${panelWattage || 550}Wp Mono PERC Bifacial Solar PV Modules (ALMM Approved)`,
+      quantity: panelQty || 9,
+      unitPrice: Math.round(moduleTotal / (panelQty || 9)),
+      taxRate: 12,
+      total: moduleTotal
+    },
+    {
+      id: 'item-2',
+      category: 'INVERTER',
+      description: `${inverterBrand || 'Growatt'} ${cap}kW High-Efficiency On-Grid Solar String Inverter (IP65)`,
+      quantity: 1,
+      unitPrice: invTotal,
+      taxRate: 12,
+      total: invTotal
+    },
+    {
+      id: 'item-3',
+      category: 'STRUCTURE',
+      description: `${structureBrand || 'Galvanized HDG High Rise'} Solar Module Mounting Structure`,
+      quantity: 1,
+      unitPrice: structTotal,
+      taxRate: 18,
+      total: structTotal
+    },
+    {
+      id: 'item-4',
+      category: 'BOS',
+      description: `Balance of System: 4 sq.mm DC Solar Cables, ACDB/DCDB with Type-II SPDs, Dual Earthing & LA`,
+      quantity: 1,
+      unitPrice: bosTotal,
+      taxRate: 18,
+      total: bosTotal
+    },
+    {
+      id: 'item-5',
+      category: 'SERVICES',
+      description: `Turnkey Installation, Testing, MSEDCL Net Metering Liasoning & Commissioning`,
+      quantity: 1,
+      unitPrice: labourBudget,
+      taxRate: 18,
+      total: labourBudget
+    }
+  ];
+};
 
 interface WizardProps {
   isOpen: boolean;
@@ -80,6 +158,7 @@ export function QuotationWizardModal({
     discount: 5000,
     taxRate: 0, // Composite GST
     validityDays: 15,
+    items: generateDefaultLineItems(5.0, 'Waaree', 550, 9, 'Growatt', 'Galvanized HDG High Rise'),
 
     // Step 4: Terms & Milestones
     deliveryTimeline: '15 to 20 working days',
@@ -90,6 +169,10 @@ export function QuotationWizardModal({
       { percentage: 5, description: 'Upon MSEDCL Net Metering commissioning & project handover' }
     ]
   });
+
+  // State for inventory product selection in Step 3
+  const [showProductPicker, setShowProductPicker] = useState(false);
+  const [productSearch, setProductSearch] = useState('');
 
   // PRESETS CONFIGURATIONS (Maharashtra standard packages)
   const presets = [
@@ -173,6 +256,14 @@ export function QuotationWizardModal({
 
   // APPLY PRESET
   const applyPreset = (preset: typeof presets[0]) => {
+    const updatedItems = generateDefaultLineItems(
+      preset.capacity,
+      preset.panelBrand,
+      preset.panelWattage,
+      preset.panelQty,
+      preset.inverterBrand,
+      'Galvanized HDG High Rise'
+    );
     setFormData(prev => ({
       ...prev,
       systemCapacity: preset.capacity,
@@ -186,7 +277,8 @@ export function QuotationWizardModal({
       inverterCapacity: preset.capacity,
       equipmentSubtotal: preset.equipment,
       labourServices: preset.labour,
-      discount: preset.discount
+      discount: preset.discount,
+      items: updatedItems
     }));
   };
 
@@ -219,23 +311,116 @@ export function QuotationWizardModal({
   // APPLY SURVEY FINDINGS
   const handleApplySurvey = () => {
     if (!linkedSurvey) return;
+    const propCap = linkedSurvey.proposedCap ? Number(linkedSurvey.proposedCap) : formData.systemCapacity;
+    const qty = Math.ceil((propCap * 1000) / formData.panelWattage);
+    const updatedItems = generateDefaultLineItems(
+      propCap,
+      formData.panelBrand,
+      formData.panelWattage,
+      qty,
+      formData.inverterBrand,
+      formData.structureBrand
+    );
     setFormData(prev => ({
       ...prev,
-      systemCapacity: linkedSurvey.proposedCap ? Number(linkedSurvey.proposedCap) : prev.systemCapacity,
+      systemCapacity: propCap,
       roofType: linkedSurvey.roofType || prev.roofType,
-      inverterCapacity: linkedSurvey.proposedCap ? Number(linkedSurvey.proposedCap) : prev.inverterCapacity,
-      panelQuantity: linkedSurvey.proposedCap ? Math.ceil((Number(linkedSurvey.proposedCap) * 1000) / prev.panelWattage) : prev.panelQuantity
+      inverterCapacity: propCap,
+      panelQuantity: qty,
+      items: updatedItems
     }));
+  };
+
+  // LINE ITEM HANDLERS
+  const handleUpdateItem = (index: number, field: keyof WizardLineItem, value: any) => {
+    setFormData(prev => {
+      const updated = [...prev.items];
+      const item = { ...updated[index], [field]: value };
+      const q = Number(item.quantity) || 0;
+      const u = Number(item.unitPrice) || 0;
+      const t = Number(item.taxRate) || 0;
+      item.total = Math.round(q * u * (1 + t / 100));
+      updated[index] = item;
+      return { ...prev, items: updated };
+    });
+  };
+
+  const handleAddItem = () => {
+    const newItem: WizardLineItem = {
+      id: `custom-${Date.now()}`,
+      category: 'CUSTOM',
+      description: 'Custom Solar Equipment / Additional Service',
+      quantity: 1,
+      unitPrice: 10000,
+      taxRate: 18,
+      total: 11800
+    };
+    setFormData(prev => ({
+      ...prev,
+      items: [...prev.items, newItem]
+    }));
+  };
+
+  const handleDeleteItem = (index: number) => {
+    if (formData.items.length <= 1) {
+      alert('At least one item is required in the proposal.');
+      return;
+    }
+    setFormData(prev => ({
+      ...prev,
+      items: prev.items.filter((_, idx) => idx !== index)
+    }));
+  };
+
+  const handleSelectProduct = (product: any) => {
+    const unitPrice = Number(product.sellingPrice) || 5000;
+    const newItem: WizardLineItem = {
+      id: `prod-${product.id}-${Date.now()}`,
+      productId: product.id,
+      category: (product.category?.toUpperCase() || 'CUSTOM') as any,
+      description: `${product.name} ${product.brand ? `(${product.brand})` : ''}`,
+      quantity: 1,
+      unitPrice,
+      taxRate: 18,
+      total: Math.round(unitPrice * 1.18)
+    };
+    setFormData(prev => ({
+      ...prev,
+      items: [...prev.items, newItem]
+    }));
+    setShowProductPicker(false);
+  };
+
+  const handleResetBOM = () => {
+    const defaultItems = generateDefaultLineItems(
+      formData.systemCapacity,
+      formData.panelBrand,
+      formData.panelWattage,
+      formData.panelQuantity,
+      formData.inverterBrand,
+      formData.structureBrand
+    );
+    setFormData(prev => ({ ...prev, items: defaultItems }));
   };
 
   // SOLAR CALCULATIONS & METRICS ENGINE
   const calculations = useMemo(() => {
     const cap = Number(formData.systemCapacity) || 5;
-    const subtotal = Number(formData.equipmentSubtotal) + Number(formData.labourServices);
+    const itemsList = formData.items || [];
+    
+    // Subtotal before tax
+    const subtotal = itemsList.length > 0
+      ? itemsList.reduce((sum, item) => sum + (Number(item.quantity) * Number(item.unitPrice)), 0)
+      : (Number(formData.equipmentSubtotal) + Number(formData.labourServices));
+
     const discount = Number(formData.discount) || 0;
-    const taxableAmount = Math.max(0, subtotal - discount);
-    const tax = Math.round(taxableAmount * (Number(formData.taxRate) / 100));
-    const total = taxableAmount + tax;
+
+    // Line-item tax computation
+    const tax = itemsList.length > 0
+      ? itemsList.reduce((sum, item) => sum + Math.round((Number(item.quantity) * Number(item.unitPrice)) * ((Number(item.taxRate) || 0) / 100)), 0)
+      : Math.round(Math.max(0, subtotal - discount) * (Number(formData.taxRate) / 100));
+
+    const total = Math.max(0, subtotal + tax - discount);
 
     // Maharashtra Solar Generation (avg 4.0 - 4.1 kWh / kWp / day -> 1,460 kWh / kWp / yr)
     const annualGeneration = Math.round(cap * 1460);
@@ -266,7 +451,7 @@ export function QuotationWizardModal({
       indicativeSubsidy,
       netCustomerCost: Math.max(0, total - indicativeSubsidy)
     };
-  }, [formData.systemCapacity, formData.equipmentSubtotal, formData.labourServices, formData.discount, formData.taxRate, formData.connectionType]);
+  }, [formData.systemCapacity, formData.items, formData.equipmentSubtotal, formData.labourServices, formData.discount, formData.taxRate, formData.connectionType]);
 
   // AUTO RECALCULATE PANEL QUANTITY WHEN WATTAGE OR CAPACITY CHANGES
   const handleWattageChange = (wattage: number) => {
@@ -282,20 +467,29 @@ export function QuotationWizardModal({
     const qty = Math.ceil((cap * 1000) / formData.panelWattage);
     const estEquip = Math.round(cap * 43000);
     const estLabour = Math.round(cap * 13000);
+    const updatedItems = generateDefaultLineItems(
+      cap,
+      formData.panelBrand,
+      formData.panelWattage,
+      qty,
+      formData.inverterBrand,
+      formData.structureBrand
+    );
     setFormData(prev => ({
       ...prev,
       systemCapacity: cap,
       inverterCapacity: cap,
       panelQuantity: qty,
       equipmentSubtotal: estEquip,
-      labourServices: estLabour
+      labourServices: estLabour,
+      items: updatedItems
     }));
   };
 
   const steps = [
     { id: 1, name: 'Customer', desc: 'CRM Link & Address' },
     { id: 2, name: 'System', desc: 'Capacity & Hardware' },
-    { id: 3, name: 'Pricing', desc: 'Commercials & Taxes' },
+    { id: 3, name: 'Pricing', desc: 'Itemized BOM & Commercials' },
     { id: 4, name: 'Terms', desc: 'Warranties & Milestones' },
     { id: 5, name: 'Review', desc: 'Live Proposal Summary' }
   ];
@@ -329,6 +523,14 @@ export function QuotationWizardModal({
         tax: calculations.tax,
         discount: calculations.discount,
         validityDays: formData.validityDays,
+        items: formData.items.map(it => ({
+          productId: it.productId || null,
+          description: it.description,
+          quantity: Number(it.quantity) || 1,
+          unitPrice: Number(it.unitPrice) || 0,
+          taxRate: Number(it.taxRate) || 0,
+          total: Math.round(Number(it.quantity) * Number(it.unitPrice))
+        })),
         paymentMilestones: formData.paymentMilestones.map(m => ({
           percentage: m.percentage,
           amount: Math.round(calculations.total * (m.percentage / 100)),
@@ -798,61 +1000,191 @@ export function QuotationWizardModal({
               </div>
             )}
 
-            {/* STEP 3: PRICING & COMMERCIALS */}
+            {/* STEP 3: ITEMIZED BOM & PRICING */}
             {currentStep === 3 && (
-              <div className="space-y-6 animate-in fade-in duration-200">
-                <div>
-                  <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                    <IndianRupee size={18} className="text-emerald-600" /> 3. Commercial Pricing & Tax Treatment
-                  </h3>
-                  <p className="text-xs text-slate-500 mt-0.5">Itemize equipment costs, installation/liasoning charges, discounts, and GST tax treatment.</p>
+              <div className="space-y-5 animate-in fade-in duration-200">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                      <IndianRupee size={18} className="text-emerald-600" /> 3. Itemized Bill of Materials & Commercial Pricing
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-0.5">Customize line items, add inventory products, adjust unit rates, discounts and GST rates.</p>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowProductPicker(prev => !prev)}
+                      className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors"
+                    >
+                      <Package size={14} /> {showProductPicker ? 'Close Inventory' : 'Add from Inventory'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleAddItem}
+                      className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors"
+                    >
+                      <Plus size={14} /> Add Custom Line
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleResetBOM}
+                      title="Reset to standard package defaults"
+                      className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
+                    >
+                      <RefreshCw size={14} />
+                    </button>
+                  </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-700 uppercase">Equipment Subtotal (₹)</label>
+                {/* INVENTORY PRODUCT PICKER DRAWER */}
+                {showProductPicker && (
+                  <div className="p-4 bg-slate-50 border border-emerald-200 rounded-2xl space-y-3 animate-in fade-in duration-150">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-extrabold uppercase text-slate-700 tracking-wider flex items-center gap-1.5">
+                        <Search size={14} className="text-emerald-600" /> Select From Real Tenant Inventory
+                      </span>
+                      <button 
+                        type="button" 
+                        onClick={() => setShowProductPicker(false)}
+                        className="text-xs text-slate-400 hover:text-slate-600"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+
                     <input
-                      type="number"
-                      value={formData.equipmentSubtotal}
-                      onChange={e => setFormData({ ...formData, equipmentSubtotal: Number(e.target.value) })}
-                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-bold text-slate-900"
+                      type="text"
+                      placeholder="Search by brand, SKU, module wattage, inverter model..."
+                      value={productSearch}
+                      onChange={e => setProductSearch(e.target.value)}
+                      className="w-full px-3 py-2 bg-white rounded-xl border border-slate-200 text-xs font-medium outline-none focus:ring-2 focus:ring-emerald-500"
                     />
-                    <p className="text-[10px] text-slate-400">Panels, inverter, structure, ACDB/DCDB, cables</p>
+
+                    <div className="max-h-48 overflow-y-auto space-y-1.5 pr-1">
+                      {products
+                        .filter(p => !productSearch || p.name?.toLowerCase().includes(productSearch.toLowerCase()) || p.brand?.toLowerCase().includes(productSearch.toLowerCase()))
+                        .slice(0, 10)
+                        .map(p => (
+                          <div 
+                            key={p.id}
+                            onClick={() => handleSelectProduct(p)}
+                            className="p-2.5 bg-white hover:bg-emerald-50/70 border border-slate-200 hover:border-emerald-300 rounded-xl flex items-center justify-between cursor-pointer transition-colors text-xs"
+                          >
+                            <div>
+                              <p className="font-bold text-slate-800">{p.name}</p>
+                              <p className="text-[11px] text-slate-400">{p.brand || 'Generic'} · Category: {p.category || 'General'} · Stock: {p.currentStock ?? 'In Stock'}</p>
+                            </div>
+                            <div className="text-right">
+                              <span className="font-black text-[#071A2B]">₹{(p.sellingPrice || 0).toLocaleString()}</span>
+                              <span className="block text-[10px] text-emerald-600 font-bold">+ Select</span>
+                            </div>
+                          </div>
+                        ))}
+                      {products.length === 0 && (
+                        <p className="text-xs text-slate-400 py-3 text-center">No products found in inventory. You can use custom line items.</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* ITEMIZED TABLE */}
+                <div className="border border-slate-200 rounded-2xl overflow-hidden bg-white">
+                  <div className="max-h-80 overflow-y-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-50 text-slate-500 font-extrabold uppercase text-[10px] tracking-wider border-b border-slate-200 sticky top-0 z-10">
+                        <tr>
+                          <th className="py-2.5 px-3">Item Description</th>
+                          <th className="py-2.5 px-2 w-20">Qty</th>
+                          <th className="py-2.5 px-2 w-28">Unit Rate (₹)</th>
+                          <th className="py-2.5 px-2 w-20">GST %</th>
+                          <th className="py-2.5 px-3 text-right w-28">Amount (₹)</th>
+                          <th className="py-2.5 px-2 text-center w-10"></th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {formData.items.map((item, idx) => (
+                          <tr key={item.id || idx} className="hover:bg-slate-50/60 transition-colors">
+                            <td className="p-2.5">
+                              <input
+                                type="text"
+                                value={item.description}
+                                onChange={e => handleUpdateItem(idx, 'description', e.target.value)}
+                                className="w-full px-2 py-1.5 bg-slate-50/80 hover:bg-white focus:bg-white rounded-lg border border-transparent hover:border-slate-300 focus:border-emerald-500 font-semibold text-slate-800 text-xs outline-none"
+                              />
+                            </td>
+                            <td className="p-2">
+                              <input
+                                type="number"
+                                min="1"
+                                value={item.quantity}
+                                onChange={e => handleUpdateItem(idx, 'quantity', Number(e.target.value))}
+                                className="w-full px-2 py-1.5 bg-slate-50/80 hover:bg-white focus:bg-white rounded-lg border border-transparent hover:border-slate-300 focus:border-emerald-500 font-bold text-slate-900 text-xs text-center outline-none"
+                              />
+                            </td>
+                            <td className="p-2">
+                              <input
+                                type="number"
+                                min="0"
+                                value={item.unitPrice}
+                                onChange={e => handleUpdateItem(idx, 'unitPrice', Number(e.target.value))}
+                                className="w-full px-2 py-1.5 bg-slate-50/80 hover:bg-white focus:bg-white rounded-lg border border-transparent hover:border-slate-300 focus:border-emerald-500 font-bold text-slate-900 text-xs outline-none"
+                              />
+                            </td>
+                            <td className="p-2">
+                              <select
+                                value={item.taxRate}
+                                onChange={e => handleUpdateItem(idx, 'taxRate', Number(e.target.value))}
+                                className="w-full px-1.5 py-1.5 bg-slate-50/80 hover:bg-white focus:bg-white rounded-lg border border-transparent hover:border-slate-300 focus:border-emerald-500 font-bold text-slate-800 text-[11px] outline-none"
+                              >
+                                <option value="0">0%</option>
+                                <option value="5">5%</option>
+                                <option value="12">12%</option>
+                                <option value="18">18%</option>
+                              </select>
+                            </td>
+                            <td className="p-2.5 text-right font-black text-slate-900">
+                              ₹{(Math.round(item.quantity * item.unitPrice)).toLocaleString()}
+                            </td>
+                            <td className="p-2 text-center">
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteItem(idx)}
+                                title="Delete line item"
+                                className="p-1 text-slate-400 hover:text-red-600 rounded-lg transition-colors"
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
 
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-700 uppercase">Installation & Liasoning (₹)</label>
-                    <input
-                      type="number"
-                      value={formData.labourServices}
-                      onChange={e => setFormData({ ...formData, labourServices: Number(e.target.value) })}
-                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-bold text-slate-900"
-                    />
-                    <p className="text-[10px] text-slate-400">Civil mounting, wiring, earthing, MSEDCL net meter</p>
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-700 uppercase">Special Discount (₹)</label>
-                    <input
-                      type="number"
-                      value={formData.discount}
-                      onChange={e => setFormData({ ...formData, discount: Number(e.target.value) })}
-                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-bold text-emerald-600"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-700 uppercase">GST Tax Treatment</label>
-                    <select
-                      value={formData.taxRate}
-                      onChange={e => setFormData({ ...formData, taxRate: Number(e.target.value) })}
-                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-900 bg-white"
-                    >
-                      <option value="0">0% (Inclusive in line items)</option>
-                      <option value="13.8">13.8% (Composite Solar GST: 70% @ 12% + 30% @ 18%)</option>
-                      <option value="18">18% (Standard Services GST)</option>
-                      <option value="5">5% (Concessional)</option>
-                    </select>
+                  {/* COMMERCIAL TOTALS STRIP */}
+                  <div className="bg-slate-50 p-4 border-t border-slate-200 grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
+                    <div>
+                      <span className="text-[10px] font-bold text-slate-400 uppercase block">Subtotal</span>
+                      <span className="text-base font-extrabold text-slate-800">₹{calculations.subtotal.toLocaleString()}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-bold text-slate-400 uppercase block">Total GST</span>
+                      <span className="text-base font-extrabold text-slate-800">₹{calculations.tax.toLocaleString()}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-bold text-slate-400 uppercase block">Special Discount (₹)</span>
+                      <input
+                        type="number"
+                        value={formData.discount}
+                        onChange={e => setFormData({ ...formData, discount: Number(e.target.value) })}
+                        className="w-full px-2.5 py-1 bg-white rounded-lg border border-slate-200 font-bold text-emerald-600 text-xs mt-0.5 outline-none focus:ring-1 focus:ring-emerald-500"
+                      />
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase block">Total Investment</span>
+                      <span className="text-lg font-black text-[#071A2B]">₹{calculations.total.toLocaleString()}</span>
+                    </div>
                   </div>
                 </div>
 

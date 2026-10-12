@@ -6,8 +6,10 @@ import {
   FileText, Plus, User, Calendar, IndianRupee, Download, 
   Search, Filter, ArrowUpRight, CheckCircle2, Clock, 
   AlertCircle, MessageSquare, Sun, Shield, Lock, 
-  RotateCcw, Sparkles, Send, Eye, ChevronRight
+  RotateCcw, Sparkles, Send, Eye, ChevronRight, Trash2,
+  ExternalLink
 } from 'lucide-react';
+import Link from 'next/link';
 import { QuotationPDF } from '@/components/pdf/QuotationPDF';
 import { QuotationWizardModal } from '@/components/quotations/QuotationWizardModal';
 import { QuotationDetailModal } from '@/components/quotations/QuotationDetailModal';
@@ -66,7 +68,7 @@ export default function QuotationsPage() {
       if (searchTerm) params.search = searchTerm;
       if (selectedCustomerId) params.customerId = selectedCustomerId;
 
-      const [quoteRes, leadRes, customerRes, productRes, surveyRes] = await Promise.all([
+      const [quoteRes, leadRes, customerRes, productRes, surveyRes, settingsRes] = await Promise.all([
         axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/quotations`, { 
           params, 
           withCredentials: true 
@@ -85,7 +87,10 @@ export default function QuotationsPage() {
         }).catch(() => ({ data: { products: [] } })),
         axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/surveys`, { 
           withCredentials: true 
-        }).catch(() => ({ data: { surveys: [] } }))
+        }).catch(() => ({ data: { surveys: [] } })),
+        axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/settings`, { 
+          withCredentials: true 
+        }).catch(() => ({ data: { tenant: null } }))
       ]);
 
       const quotesData = quoteRes.data.quotations || [];
@@ -99,6 +104,10 @@ export default function QuotationsPage() {
           accepted: quotesData.length > 0 ? quoteRes.data.metrics.accepted : 46,
           totalQuotedValue: quotesData.length > 0 ? quoteRes.data.metrics.totalQuotedValue : 3850000
         });
+      }
+
+      if (settingsRes?.data?.tenant) {
+        setTenantInfo(settingsRes.data.tenant);
       }
 
       setFollowUpReminders(quoteRes.data.followUpReminders || []);
@@ -435,6 +444,15 @@ export default function QuotationsPage() {
                       {/* ACTIONS */}
                       <td className="px-6 py-4 text-right" onClick={e => e.stopPropagation()}>
                         <div className="flex items-center justify-end gap-1.5">
+                          {quote.projects && quote.projects.length > 0 ? (
+                            <Link
+                              href={`/tenant/projects/${quote.projects[0].id}`}
+                              title={`View linked project: ${quote.projects[0].name}`}
+                              className="p-2 text-emerald-600 hover:text-emerald-700 bg-emerald-50 rounded-xl hover:bg-emerald-100 transition-colors"
+                            >
+                              <ExternalLink size={15} />
+                            </Link>
+                          ) : null}
                           <button
                             title="Download A4 Proposal PDF"
                             onClick={() => handleDownloadPdf(quote)}
@@ -449,6 +467,24 @@ export default function QuotationsPage() {
                           >
                             <MessageSquare size={16} />
                           </button>
+                          {(!quote.projects || quote.projects.length === 0) && (
+                            <button
+                              title="Delete Quotation"
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                if (!confirm(`Delete proposal ${quote.qNumber}? This cannot be undone.`)) return;
+                                try {
+                                  await axios.delete(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/quotations/${quote.id}`, { withCredentials: true });
+                                  fetchData();
+                                } catch (err: any) {
+                                  alert('Failed to delete quotation: ' + (err.response?.data?.error || err.message));
+                                }
+                              }}
+                              className="p-2 text-slate-400 hover:text-red-600 rounded-xl hover:bg-red-50 transition-colors"
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          )}
                           <button
                             title="View Proposal Details"
                             onClick={() => setSelectedQuoteForDetail(quote)}
@@ -496,6 +532,7 @@ export default function QuotationsPage() {
           setSelectedQuoteForDetail(null);
         }}
         onDownloadPdf={quote => handleDownloadPdf(quote)}
+        tenantInfo={tenantInfo}
       />
 
       {/* HIDDEN PROPOSAL PDF CONTAINER (FOR CLIENT-SIDE MULTI-PAGE RENDER) */}
@@ -507,11 +544,11 @@ export default function QuotationsPage() {
                 quotation_number: selectedQuoteForPdf.qNumber || "QT-2026",
                 quotation_date: new Date(selectedQuoteForPdf.date).toLocaleDateString(),
                 valid_until: `${selectedQuoteForPdf.validityDays || 15} Days`,
-                company_name: "Apex Solar Energy Solutions",
-                company_logo: "",
-                company_address: "Tech Centre, MIDC, Pune, Maharashtra 411019",
-                company_phone: "+91 98220 12345",
-                company_email: "contact@apexsolar.in",
+                company_name: tenantInfo?.legalName || tenantInfo?.name || "Apex Solar Energy Solutions",
+                company_logo: tenantInfo?.logoUrl || "",
+                company_address: [tenantInfo?.address, tenantInfo?.city, tenantInfo?.state, tenantInfo?.pincode].filter(Boolean).join(", ") || "Tech Centre, MIDC, Pune, Maharashtra 411019",
+                company_phone: tenantInfo?.phone || "+91 98220 12345",
+                company_email: tenantInfo?.email || "contact@apexsolar.in",
                 company_website: "www.apexsolar.in",
                 customer_name: selectedQuoteForPdf.customer?.name || selectedQuoteForPdf.lead?.name || "Customer",
                 customer_phone: selectedQuoteForPdf.customer?.mobile || selectedQuoteForPdf.lead?.mobile || "+91 98XXX XXXXX",

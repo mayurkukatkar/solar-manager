@@ -102,7 +102,8 @@ router.get('/api/tenant/quotations', requireTenantAuth, async (req, res) => {
         include: {
           customer: true,
           lead: true,
-          items: { include: { product: true } }
+          items: { include: { product: true } },
+          projects: true
         },
         orderBy: { createdAt: 'desc' }
       }),
@@ -186,7 +187,8 @@ router.get('/api/tenant/quotations/:id', requireTenantAuth, async (req, res) => 
         include: {
           customer: true,
           lead: true,
-          items: { include: { product: true } }
+          items: { include: { product: true } },
+          projects: true
         }
       }),
       prisma.tenant.findUnique({
@@ -653,7 +655,12 @@ router.patch('/api/tenant/quotations/:id', requireTenantAuth, async (req, res) =
     const updatedQuotation = await prisma.quotation.update({
       where: { id, tenantId },
       data: updateData,
-      include: { customer: true, lead: true, items: true }
+      include: { 
+        customer: true, 
+        lead: true, 
+        items: { include: { product: true } },
+        projects: true 
+      }
     });
 
     res.json({ quotation: updatedQuotation });
@@ -919,6 +926,139 @@ router.post('/api/tenant/quotations/:id/convert', requireTenantAuth, async (req,
   } catch (error) {
     console.error('Error converting quotation to project:', error);
     res.status(500).json({ error: 'Failed to convert quotation to project', details: error.message });
+  }
+});
+
+// ----------------------------------------------------
+// 7. DELETE QUOTATION (WITH INTEGRITY CHECKS)
+// ----------------------------------------------------
+router.delete('/api/tenant/quotations/:id', requireTenantAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const tenantId = req.user.tenantId;
+
+    const quotation = await prisma.quotation.findFirst({
+      where: { id, tenantId },
+      include: { projects: true }
+    });
+
+    if (!quotation) {
+      return res.status(404).json({ error: 'Quotation not found' });
+    }
+
+    if (quotation.projects && quotation.projects.length > 0) {
+      return res.status(400).json({ 
+        error: 'Cannot delete quotation that is converted to an active project. Manage the project directly.' 
+      });
+    }
+
+    // Delete items first
+    await prisma.quotationItem.deleteMany({
+      where: { quotationId: id }
+    });
+
+    await prisma.quotation.delete({
+      where: { id }
+    });
+
+    if (quotation.leadId) {
+      await prisma.leadActivity.create({
+        data: {
+          leadId: quotation.leadId,
+          type: 'STATUS_CHANGE',
+          description: `Quotation ${quotation.qNumber} was deleted`,
+          performedBy: req.user.id
+        }
+      }).catch(() => {});
+    }
+
+    res.json({ success: true, message: `Quotation ${quotation.qNumber} deleted successfully` });
+  } catch (error) {
+    console.error('Error deleting quotation:', error);
+    res.status(500).json({ error: 'Failed to delete quotation', details: error.message });
+  }
+});
+
+// ----------------------------------------------------
+// 8. CREATE FORMAL REVISION (INCREMENT VERSION & ARCHIVE SNAPSHOT)
+// ----------------------------------------------------
+router.post('/api/tenant/quotations/:id/revision', requireTenantAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const tenantId = req.user.tenantId;
+    const { revisionReason = 'Quotation revised per client negotiation' } = req.body;
+
+    const quotation = await prisma.quotation.findFirst({
+      where: { id, tenantId },
+      include: { 
+        items: { include: { product: true } }, 
+        customer: true, 
+        lead: true,
+        projects: true
+      }
+    });
+
+    if (!quotation) {
+      return res.status(404).json({ error: 'Quotation not found' });
+    }
+
+    let revisionHistory = Array.isArray(quotation.revisionHistory) ? [...quotation.revisionHistory] : [];
+
+    // Save snapshot of current version
+    revisionHistory.push({
+      version: quotation.version || 1,
+      savedAt: new Date().toISOString(),
+      savedBy: req.user.id,
+      reason: revisionReason,
+      snapshot: {
+        qNumber: quotation.qNumber,
+        total: quotation.total,
+        subtotal: quotation.subtotal,
+        tax: quotation.tax,
+        discount: quotation.discount,
+        systemCapacity: quotation.systemCapacity,
+        status: quotation.status,
+        items: quotation.items
+      }
+    });
+
+    const nextVersion = (quotation.version || 1) + 1;
+
+    const updated = await prisma.quotation.update({
+      where: { id, tenantId },
+      data: {
+        version: nextVersion,
+        status: 'NEGOTIATION',
+        isLocked: false,
+        revisionHistory
+      },
+      include: { 
+        customer: true, 
+        lead: true, 
+        items: { include: { product: true } }, 
+        projects: true 
+      }
+    });
+
+    if (quotation.leadId) {
+      await prisma.leadActivity.create({
+        data: {
+          leadId: quotation.leadId,
+          type: 'STATUS_CHANGE',
+          description: `Created revision v${nextVersion} for quotation ${quotation.qNumber} (${revisionReason})`,
+          performedBy: req.user.id
+        }
+      }).catch(() => {});
+    }
+
+    res.json({
+      success: true,
+      message: `Quotation updated to revision v${nextVersion}`,
+      quotation: updated
+    });
+  } catch (error) {
+    console.error('Error creating revision:', error);
+    res.status(500).json({ error: 'Failed to create revision', details: error.message });
   }
 });
 
