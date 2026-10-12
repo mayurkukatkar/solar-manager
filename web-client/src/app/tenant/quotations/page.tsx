@@ -28,16 +28,35 @@ export default function QuotationsPage() {
   const [selectedStatus, setSelectedStatus] = useState('ALL');
   const [selectedCustomerId, setSelectedCustomerId] = useState('');
 
-  // DATA LISTS FOR CREATION
+  // DATA LISTS FOR CREATION & INTERCONNECTIVITY
   const [leads, setLeads] = useState<any[]>([]);
   const [customers, setCustomers] = useState<any[]>([]);
+  const [products, setProducts] = useState<any[]>([]);
+  const [surveys, setSurveys] = useState<any[]>([]);
   const [tenantInfo, setTenantInfo] = useState<any>(null);
+  const [preselectedLeadId, setPreselectedLeadId] = useState<string>('');
+  const [preselectedCustomerId, setPreselectedCustomerId] = useState<string>('');
 
   // MODALS
   const [showWizard, setShowWizard] = useState(false);
   const [selectedQuoteForDetail, setSelectedQuoteForDetail] = useState<any>(null);
   const [selectedQuoteForPdf, setSelectedQuoteForPdf] = useState<any>(null);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+
+  // Parse URL parameters for cross-module interconnectivity (CRM/Surveys -> Quotations)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      const leadId = urlParams.get('leadId');
+      const customerId = urlParams.get('customerId');
+      const isNew = urlParams.get('new');
+      if (leadId) setPreselectedLeadId(leadId);
+      if (customerId) setPreselectedCustomerId(customerId);
+      if (isNew === 'true' || leadId || customerId) {
+        setShowWizard(true);
+      }
+    }
+  }, []);
 
   const fetchData = async () => {
     try {
@@ -47,7 +66,7 @@ export default function QuotationsPage() {
       if (searchTerm) params.search = searchTerm;
       if (selectedCustomerId) params.customerId = selectedCustomerId;
 
-      const [quoteRes, leadRes, customerRes] = await Promise.all([
+      const [quoteRes, leadRes, customerRes, productRes, surveyRes] = await Promise.all([
         axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/quotations`, { 
           params, 
           withCredentials: true 
@@ -60,7 +79,13 @@ export default function QuotationsPage() {
         }).catch(() => ({ data: { leads: [] } })),
         axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/customers`, { 
           withCredentials: true 
-        }).catch(() => ({ data: { customers: [] } }))
+        }).catch(() => ({ data: { customers: [] } })),
+        axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/products`, { 
+          withCredentials: true 
+        }).catch(() => ({ data: { products: [] } })),
+        axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/surveys`, { 
+          withCredentials: true 
+        }).catch(() => ({ data: { surveys: [] } }))
       ]);
 
       const quotesData = quoteRes.data.quotations || [];
@@ -79,6 +104,8 @@ export default function QuotationsPage() {
       setFollowUpReminders(quoteRes.data.followUpReminders || []);
       setLeads(leadRes.data.leads || leadRes.data || []);
       setCustomers(customerRes.data.customers || customerRes.data || []);
+      setProducts(productRes.data.products || productRes.data || []);
+      setSurveys(surveyRes.data.surveys || surveyRes.data || []);
     } catch (err) {
       console.error('Failed to fetch quotations data:', err);
     } finally {
@@ -443,12 +470,20 @@ export default function QuotationsPage() {
       {/* 5-STEP GUIDED CREATION WIZARD */}
       <QuotationWizardModal
         isOpen={showWizard}
-        onClose={() => setShowWizard(false)}
+        onClose={() => {
+          setShowWizard(false);
+          setPreselectedLeadId('');
+          setPreselectedCustomerId('');
+        }}
         onSuccess={() => {
           fetchData();
         }}
         leads={leads}
         customers={customers}
+        products={products}
+        surveys={surveys}
+        preselectedLeadId={preselectedLeadId}
+        preselectedCustomerId={preselectedCustomerId}
       />
 
       {/* QUOTATION DETAIL & ACTION MODAL */}

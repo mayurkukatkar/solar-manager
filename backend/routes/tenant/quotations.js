@@ -431,13 +431,22 @@ router.post('/api/tenant/quotations', requireTenantAuth, async (req, res) => {
       }
     });
 
-    // Lead activity tracking
+    // Sync with CRM Lead pipeline: update Lead status to PROPOSAL_SENT, sync deal value & capacity
     if (targetLeadId) {
+      await prisma.lead.update({
+        where: { id: targetLeadId },
+        data: {
+          status: 'PROPOSAL_SENT',
+          estimatedValue: totalPayable,
+          estimatedCap: Number(systemCapacity)
+        }
+      }).catch(err => console.log('Lead update skipped:', err.message));
+
       await prisma.leadActivity.create({
         data: {
           leadId: targetLeadId,
           type: 'QUOTE_SENT',
-          description: `Created quotation ${quotation.qNumber} for ${systemCapacity} kWp (₹${totalPayable.toLocaleString()})`,
+          description: `Created proposal ${quotation.qNumber} for ${systemCapacity} kWp (₹${totalPayable.toLocaleString()})`,
           performedBy: req.user.id
         }
       });
@@ -793,16 +802,29 @@ router.post('/api/tenant/quotations/:id/convert', requireTenantAuth, async (req,
     });
 
     if (!project) {
+      // Find existing site survey for this lead or customer to link pipeline
+      const existingSurvey = await prisma.siteSurvey.findFirst({
+        where: {
+          tenantId,
+          OR: [
+            { leadId: quotation.leadId || undefined },
+            { customerId: customerId || undefined }
+          ]
+        }
+      });
+
       project = await prisma.project.create({
         data: {
           tenantId,
           quotationId: id,
           customerId,
           leadId: quotation.leadId,
+          surveyId: existingSurvey ? existingSurvey.id : null,
           name: `PRJ-${quotation.qNumber}`,
           capacity: quotation.systemCapacity || 5.0,
           systemType: quotation.systemType || 'On-grid',
-          status: 'PLANNING',
+          currentStage: 'Planning',
+          status: 'In Progress',
           estimatedValue: quotation.total,
           estimatedCost: Math.round(quotation.total * 0.75),
           city: quotation.customer?.city || quotation.lead?.city || 'Pune',
@@ -810,17 +832,34 @@ router.post('/api/tenant/quotations/:id/convert', requireTenantAuth, async (req,
         }
       });
 
-      // 1. Auto-create Site Survey Task
-      await prisma.projectTask.create({
-        data: {
-          tenantId,
-          projectId: project.id,
-          name: 'Site Feasibility & Shadow Analysis Survey',
-          description: `Detailed roof structural measurement and shadow analysis for ${quotation.systemCapacity} kWp`,
-          priority: 'High',
-          status: 'To Do'
+      // Auto-create BOM (ProjectMaterialRequirement) entries from quotation line items
+      if (quotation.items && quotation.items.length > 0) {
+        for (const item of quotation.items) {
+          await prisma.projectMaterialRequirement.create({
+            data: {
+              projectId: project.id,
+              productId: item.productId || null,
+              description: item.description,
+              quantity: item.quantity || 1,
+              status: 'Required'
+            }
+          }).catch(e => console.log('BOM item skipped:', e.message));
         }
-      });
+      }
+
+      // If no survey existed, auto-create Site Survey Task
+      if (!existingSurvey) {
+        await prisma.projectTask.create({
+          data: {
+            tenantId,
+            projectId: project.id,
+            name: 'Site Feasibility & Shadow Analysis Survey',
+            description: `Detailed roof structural measurement and shadow analysis for ${quotation.systemCapacity} kWp`,
+            priority: 'High',
+            status: 'To Do'
+          }
+        });
+      }
 
       // 2. Auto-create Discom Net Metering Application
       await prisma.discomApplication.create({
