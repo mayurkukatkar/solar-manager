@@ -8,7 +8,8 @@ import {
   Sparkles, Layers, Sliders, AlertCircle, Building2,
   Calendar, Phone, Mail, MapPin, Percent, HelpCircle,
   Package, Compass, ArrowRight, RefreshCw, CheckCheck,
-  Trash2, Plus, Search
+  Trash2, Plus, Search, CheckCircle, Home, CheckSquare,
+  Award, Clock, ArrowDownRight, Layers2
 } from 'lucide-react';
 
 export interface WizardLineItem {
@@ -113,7 +114,8 @@ export function QuotationWizardModal({
 }: WizardProps) {
   const [currentStep, setCurrentStep] = useState<number>(1);
   const [loading, setLoading] = useState(false);
-  const [customerMode, setCustomerMode] = useState<'existing' | 'new'>('existing');
+  const [customerMode, setCustomerMode] = useState<'leads' | 'customers' | 'new'>('leads');
+  const [customerSearch, setCustomerSearch] = useState('');
 
   // FORM STATE
   const [formData, setFormData] = useState({
@@ -178,8 +180,8 @@ export function QuotationWizardModal({
   const presets = [
     {
       id: '3kw_resi',
-      label: '3 kWp Surya Ghar Resi',
-      badge: 'Most Popular Resi',
+      label: '3 kWp Surya Ghar',
+      subtitle: 'Most Popular Resi',
       capacity: 3.0,
       panelWattage: 550,
       panelQty: 6,
@@ -197,8 +199,8 @@ export function QuotationWizardModal({
     },
     {
       id: '5kw_resi',
-      label: '5 kWp Premium 3BHK',
-      badge: 'High ROI Resi',
+      label: '5 kWp Standard 3BHK',
+      subtitle: 'High Yield Resi',
       capacity: 5.0,
       panelWattage: 550,
       panelQty: 9,
@@ -216,8 +218,8 @@ export function QuotationWizardModal({
     },
     {
       id: '10kw_villa',
-      label: '10 kWp 3-Phase Luxury Villa',
-      badge: '3-Phase High Yield',
+      label: '10 kWp 3-Phase Villa',
+      subtitle: 'Luxury High Yield',
       capacity: 10.0,
       panelWattage: 550,
       panelQty: 18,
@@ -236,7 +238,7 @@ export function QuotationWizardModal({
     {
       id: '25kw_comm',
       label: '25 kWp Commercial LT',
-      badge: 'C&I Tax Benefit',
+      subtitle: 'C&I Tax Benefit',
       capacity: 25.0,
       panelWattage: 580,
       panelQty: 44,
@@ -349,7 +351,7 @@ export function QuotationWizardModal({
     const newItem: WizardLineItem = {
       id: `custom-${Date.now()}`,
       category: 'CUSTOM',
-      description: 'Custom Solar Equipment / Additional Service',
+      description: 'Custom Solar Equipment / Additional Scope',
       quantity: 1,
       unitPrice: 10000,
       taxRate: 18,
@@ -363,7 +365,7 @@ export function QuotationWizardModal({
 
   const handleDeleteItem = (index: number) => {
     if (formData.items.length <= 1) {
-      alert('At least one item is required in the proposal.');
+      alert('At least one line item is required.');
       return;
     }
     setFormData(prev => ({
@@ -487,11 +489,11 @@ export function QuotationWizardModal({
   };
 
   const steps = [
-    { id: 1, name: 'Customer', desc: 'CRM Link & Address' },
-    { id: 2, name: 'System', desc: 'Capacity & Hardware' },
-    { id: 3, name: 'Pricing', desc: 'Itemized BOM & Commercials' },
-    { id: 4, name: 'Terms', desc: 'Warranties & Milestones' },
-    { id: 5, name: 'Review', desc: 'Live Proposal Summary' }
+    { id: 1, name: 'Customer & Site', short: 'Customer' },
+    { id: 2, name: 'System Hardware', short: 'System' },
+    { id: 3, name: 'Itemized Pricing', short: 'Pricing' },
+    { id: 4, name: 'Terms & Milestones', short: 'Terms' },
+    { id: 5, name: 'Proposal Summary', short: 'Review' }
   ];
 
   // SUBMIT HANDLER
@@ -499,8 +501,8 @@ export function QuotationWizardModal({
     setLoading(true);
     try {
       const payload = {
-        customerId: customerMode === 'existing' && formData.selectedType === 'customer' ? formData.customerId : null,
-        leadId: customerMode === 'existing' && formData.selectedType === 'lead' ? formData.leadId : null,
+        customerId: customerMode !== 'new' && formData.selectedType === 'customer' ? formData.customerId : null,
+        leadId: customerMode !== 'new' && formData.selectedType === 'lead' ? formData.leadId : null,
         newCustomer: customerMode === 'new' ? formData.newCustomer : null,
         systemCapacity: formData.systemCapacity,
         systemType: formData.systemType,
@@ -556,285 +558,416 @@ export function QuotationWizardModal({
 
   if (!isOpen) return null;
 
+  // Selected client preview name
+  const currentClientName = customerMode === 'new'
+    ? (formData.newCustomer.name || 'New Customer')
+    : formData.selectedType === 'customer'
+      ? (customers.find(c => c.id === formData.customerId)?.name || 'Select Customer')
+      : (leads.find(l => l.id === formData.leadId)?.name || 'Select Lead');
+
   return (
-    <div className="fixed inset-0 z-50 bg-[#071A2B]/75 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5 overflow-y-auto">
-      <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-5xl overflow-hidden my-6 animate-in fade-in zoom-in-95 duration-200 flex flex-col max-h-[92vh]">
+    <div className="fixed inset-0 z-50 bg-[#071A2B]/80 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 lg:p-6 overflow-hidden">
+      <div className="bg-slate-50 w-full max-w-6xl h-full max-h-[94vh] rounded-2xl sm:rounded-3xl shadow-2xl flex flex-col overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
         
-        {/* MODAL HEADER */}
-        <div className="bg-[#071A2B] text-white px-6 sm:px-8 py-5 flex items-center justify-between border-b border-white/10 flex-shrink-0">
-          <div>
-            <div className="flex items-center gap-3">
-              <span className="w-8 h-8 rounded-xl bg-emerald-500/20 text-[#19A974] flex items-center justify-center font-bold text-sm border border-emerald-500/30">
-                <Sun size={18} />
-              </span>
-              <div>
-                <h2 className="text-xl font-black tracking-tight">Create Solar Proposal & Quotation</h2>
-                <p className="text-xs text-slate-300 mt-0.5">
-                  WhereReady Solar OS Guided Configuration Engine · Aligned with CRM, Surveys & Inventory
-                </p>
+        {/* UNIFIED TOP BAR */}
+        <div className="bg-white border-b border-slate-200/80 px-6 sm:px-8 py-3.5 flex items-center justify-between gap-4 flex-shrink-0">
+          
+          {/* LEFT: TITLE & ACTIVE CONTEXT */}
+          <div className="flex items-center gap-3">
+            <span className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center font-bold text-sm border border-emerald-500/20 flex-shrink-0">
+              <Sun size={20} />
+            </span>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-base font-black text-slate-900 tracking-tight">New Solar Proposal</h2>
+                <span className="hidden sm:inline-block text-[11px] font-extrabold px-2 py-0.5 bg-slate-100 text-slate-700 rounded-md">
+                  {formData.systemCapacity} kWp · {formData.systemType}
+                </span>
               </div>
+              <p className="text-xs text-slate-500 font-medium truncate max-w-xs sm:max-w-md">
+                Client: <strong className="text-slate-800">{currentClientName}</strong>
+              </p>
             </div>
           </div>
-          <button 
-            onClick={onClose} 
-            className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white flex items-center justify-center transition-colors"
-          >
-            <X size={18} />
-          </button>
-        </div>
 
-        {/* 1-CLICK QUICK PRESET STRIP */}
-        <div className="bg-slate-900 text-white px-6 sm:px-8 py-2.5 border-b border-white/5 flex items-center gap-3 overflow-x-auto flex-shrink-0">
-          <span className="text-[11px] font-extrabold uppercase tracking-wider text-amber-400 flex items-center gap-1.5 whitespace-nowrap">
-            <Sparkles size={13} /> Quick Presets:
-          </span>
-          <div className="flex items-center gap-2">
-            {presets.map(p => (
-              <button
-                key={p.id}
-                type="button"
-                onClick={() => applyPreset(p)}
-                className={`px-3 py-1 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 border ${
-                  formData.systemCapacity === p.capacity && formData.connectionType === p.connectionType
-                    ? 'bg-emerald-600 text-white border-emerald-500 shadow-sm'
-                    : 'bg-white/5 hover:bg-white/10 text-slate-300 border-white/10'
-                }`}
-              >
-                <span>{p.label}</span>
-                <span className="text-[10px] opacity-80 font-normal">₹{(p.indicativePrice / 100000).toFixed(2)}L</span>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* STEP PROGRESS NAVIGATION */}
-        <div className="bg-slate-50 border-b border-slate-200 px-6 sm:px-8 py-3 flex-shrink-0">
-          <div className="flex items-center justify-between max-w-3xl mx-auto">
-            {steps.map((s, idx) => {
+          {/* CENTER: CLEAN MINIMAL STEPPER */}
+          <div className="hidden md:flex items-center gap-1.5 bg-slate-100/80 p-1 rounded-2xl border border-slate-200/60">
+            {steps.map((s) => {
               const isPassed = currentStep > s.id;
               const isCurrent = currentStep === s.id;
               return (
-                <React.Fragment key={s.id}>
-                  <button
-                    onClick={() => setCurrentStep(s.id)}
-                    className="flex items-center gap-2.5 focus:outline-none group text-left cursor-pointer"
-                  >
-                    <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
-                      isPassed 
-                        ? 'bg-emerald-600 text-white' 
-                        : isCurrent 
-                          ? 'bg-[#071A2B] text-white ring-4 ring-emerald-500/20' 
-                          : 'bg-slate-200 text-slate-500 group-hover:bg-slate-300'
-                    }`}>
-                      {isPassed ? <Check size={13} /> : s.id}
-                    </div>
-                    <div className="hidden sm:block">
-                      <p className={`text-xs font-bold leading-none ${isCurrent ? 'text-slate-900' : 'text-slate-500'}`}>{s.name}</p>
-                      <p className="text-[10px] text-slate-400 mt-0.5">{s.desc}</p>
-                    </div>
-                  </button>
-                  {idx < steps.length - 1 && (
-                    <div className={`flex-1 h-0.5 mx-2 sm:mx-3 ${currentStep > s.id ? 'bg-emerald-500' : 'bg-slate-200'}`} />
-                  )}
-                </React.Fragment>
+                <button
+                  key={s.id}
+                  onClick={() => setCurrentStep(s.id)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                    isCurrent
+                      ? 'bg-[#071A2B] text-white shadow-sm'
+                      : isPassed
+                        ? 'text-emerald-700 bg-emerald-50/70 hover:bg-emerald-100'
+                        : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  <span className={`w-4 h-4 rounded-full text-[10px] flex items-center justify-center font-black ${
+                    isCurrent
+                      ? 'bg-emerald-400 text-[#071A2B]'
+                      : isPassed
+                        ? 'bg-emerald-600 text-white'
+                        : 'bg-slate-300 text-slate-600'
+                  }`}>
+                    {isPassed ? <Check size={10} strokeWidth={3} /> : s.id}
+                  </span>
+                  <span>{s.short}</span>
+                </button>
               );
             })}
           </div>
+
+          {/* RIGHT: LIVE PRICE PILL & CLOSE */}
+          <div className="flex items-center gap-3 flex-shrink-0">
+            <div className="hidden sm:block text-right">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Estimated Total</span>
+              <span className="text-sm font-black text-[#071A2B]">₹{calculations.total.toLocaleString()}</span>
+            </div>
+            <button 
+              onClick={onClose} 
+              className="w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900 flex items-center justify-center transition-colors"
+            >
+              <X size={18} />
+            </button>
+          </div>
         </div>
 
-        {/* BODY: FORM INPUTS + LIVE STICKY PREVIEW */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 flex-1 overflow-hidden">
-          
-          {/* STEP FORM INPUTS (8 COLS) */}
-          <div className="lg:col-span-8 p-6 sm:p-8 overflow-y-auto">
-            
-            {/* STEP 1: CUSTOMER SELECTION */}
+        {/* STEPPER FOR MOBILE */}
+        <div className="md:hidden bg-slate-100 px-4 py-2 border-b border-slate-200 flex items-center justify-between text-xs font-bold text-slate-700">
+          <span>Step {currentStep} of 5: {steps[currentStep - 1].name}</span>
+          <span className="font-black text-[#071A2B]">₹{calculations.total.toLocaleString()}</span>
+        </div>
+
+        {/* MAIN FULL-WIDTH SCROLLABLE WORKSPACE */}
+        <div className="flex-1 overflow-y-auto px-4 sm:px-8 lg:px-12 py-6">
+          <div className="max-w-4xl mx-auto space-y-6">
+
+            {/* ======================================================== */}
+            {/* STEP 1: CUSTOMER & SITE SELECTION */}
+            {/* ======================================================== */}
             {currentStep === 1 && (
               <div className="space-y-6 animate-in fade-in duration-200">
-                <div>
-                  <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                    <User size={18} className="text-emerald-600" /> 1. Customer & Pipeline Linkage
-                  </h3>
-                  <p className="text-xs text-slate-500 mt-0.5">Connect proposal to a CRM Lead or Customer to auto-populate site address and survey specifications.</p>
-                </div>
+                <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-5">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+                    <div>
+                      <h3 className="text-lg font-black text-slate-900 flex items-center gap-2">
+                        <User size={20} className="text-emerald-600" /> Select Customer or CRM Lead
+                      </h3>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        Choose an existing opportunity from CRM or quickly register a new client for this quotation.
+                      </p>
+                    </div>
 
-                <div className="flex gap-3 p-1 bg-slate-100 rounded-2xl w-fit">
-                  <button
-                    type="button"
-                    onClick={() => setCustomerMode('existing')}
-                    className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-                      customerMode === 'existing' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'
-                    }`}
-                  >
-                    Existing CRM Pipeline
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setCustomerMode('new')}
-                    className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-                      customerMode === 'new' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'
-                    }`}
-                  >
-                    + New Customer
-                  </button>
-                </div>
-
-                {customerMode === 'existing' ? (
-                  <div className="space-y-4">
-                    <div className="flex gap-4">
-                      <label className="flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer">
-                        <input
-                          type="radio"
-                          name="contactType"
-                          checked={formData.selectedType === 'lead'}
-                          onChange={() => setFormData({ ...formData, selectedType: 'lead' })}
-                          className="text-emerald-600 focus:ring-emerald-500"
-                        />
+                    {/* SOURCE SELECTOR TABS */}
+                    <div className="flex gap-1.5 p-1 bg-slate-100 rounded-xl w-fit">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCustomerMode('leads');
+                          setFormData(prev => ({ ...prev, selectedType: 'lead' }));
+                        }}
+                        className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                          customerMode === 'leads' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-900'
+                        }`}
+                      >
                         CRM Leads ({leads.length})
-                      </label>
-                      <label className="flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer">
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCustomerMode('customers');
+                          setFormData(prev => ({ ...prev, selectedType: 'customer' }));
+                        }}
+                        className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                          customerMode === 'customers' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-900'
+                        }`}
+                      >
+                        Customers ({customers.length})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCustomerMode('new')}
+                        className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                          customerMode === 'new' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-900'
+                        }`}
+                      >
+                        + Create New
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* MODE 1: CRM LEADS SELECTION */}
+                  {customerMode === 'leads' && (
+                    <div className="space-y-4">
+                      <div className="relative">
+                        <Search size={16} className="absolute left-3.5 top-3 text-slate-400" />
                         <input
-                          type="radio"
-                          name="contactType"
-                          checked={formData.selectedType === 'customer'}
-                          onChange={() => setFormData({ ...formData, selectedType: 'customer' })}
-                          className="text-emerald-600 focus:ring-emerald-500"
+                          type="text"
+                          placeholder="Search leads by customer name, phone, city or status..."
+                          value={customerSearch}
+                          onChange={e => setCustomerSearch(e.target.value)}
+                          className="w-full pl-10 pr-4 py-2.5 bg-slate-50 rounded-2xl border border-slate-200 text-xs font-medium outline-none focus:ring-2 focus:ring-emerald-500"
                         />
-                        Customer Directory ({customers.length})
-                      </label>
-                    </div>
+                      </div>
 
-                    {formData.selectedType === 'lead' ? (
-                      <div className="space-y-1">
-                        <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Select CRM Lead</label>
-                        <select
-                          value={formData.leadId}
-                          onChange={e => setFormData({ ...formData, leadId: e.target.value })}
-                          className="w-full px-4 py-3 rounded-2xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none text-xs font-semibold bg-white"
-                        >
-                          <option value="">-- Choose Lead from CRM --</option>
-                          {leads.map(l => (
-                            <option key={l.id} value={l.id}>
-                              {l.name} {l.mobile ? `(${l.mobile})` : ''} - {l.city || 'MH'} {l.estimatedCap ? `[${l.estimatedCap} kWp]` : ''}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    ) : (
-                      <div className="space-y-1">
-                        <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Select Customer</label>
-                        <select
-                          value={formData.customerId}
-                          onChange={e => setFormData({ ...formData, customerId: e.target.value })}
-                          className="w-full px-4 py-3 rounded-2xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none text-xs font-semibold bg-white"
-                        >
-                          <option value="">-- Choose Customer --</option>
-                          {customers.map(c => (
-                            <option key={c.id} value={c.id}>
-                              {c.name} {c.mobile ? `(${c.mobile})` : ''} - {c.city || 'MH'}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    )}
+                      {/* LEADS CARDS GRID */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 max-h-72 overflow-y-auto pr-1">
+                        {leads
+                          .filter(l => !customerSearch || l.name?.toLowerCase().includes(customerSearch.toLowerCase()) || l.mobile?.includes(customerSearch) || l.city?.toLowerCase().includes(customerSearch.toLowerCase()))
+                          .map(l => {
+                            const isSelected = formData.selectedType === 'lead' && formData.leadId === l.id;
+                            return (
+                              <div
+                                key={l.id}
+                                onClick={() => setFormData(prev => ({ ...prev, selectedType: 'lead', leadId: l.id }))}
+                                className={`p-4 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between ${
+                                  isSelected 
+                                    ? 'bg-emerald-50/70 border-emerald-500 shadow-sm ring-2 ring-emerald-500/20' 
+                                    : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/50'
+                                }`}
+                              >
+                                <div className="space-y-1">
+                                  <div className="flex items-center justify-between">
+                                    <span className="font-extrabold text-sm text-slate-900 truncate">{l.name}</span>
+                                    {isSelected && <CheckCircle size={16} className="text-emerald-600 flex-shrink-0" />}
+                                  </div>
+                                  <p className="text-xs text-slate-500 flex items-center gap-1.5">
+                                    <Phone size={12} className="text-slate-400" /> {l.mobile || 'No Phone'}
+                                  </p>
+                                  <p className="text-xs text-slate-500 flex items-center gap-1.5">
+                                    <MapPin size={12} className="text-slate-400" /> {l.city || 'Maharashtra'}
+                                  </p>
+                                </div>
 
-                    {/* SMART LINKED SITE SURVEY BANNER */}
-                    {linkedSurvey && (
-                      <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-xs flex items-center justify-between animate-in fade-in">
-                        <div className="space-y-1">
-                          <p className="font-extrabold text-amber-900 flex items-center gap-1.5">
-                            <Compass size={14} className="text-amber-600" />
-                            Linked Site Survey Available
-                          </p>
-                          <p className="text-slate-600 text-[11px]">
-                            Proposed Capacity: <strong>{linkedSurvey.proposedCap || 5} kWp</strong> · Roof: <strong>{linkedSurvey.roofType || 'RCC Flat'}</strong>
-                          </p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={handleApplySurvey}
-                          className="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition-colors flex items-center gap-1 shadow-sm"
-                        >
-                          <CheckCheck size={14} /> Apply Survey Specs
-                        </button>
+                                <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
+                                  <span className="font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md">
+                                    {l.estimatedCap ? `${l.estimatedCap} kWp` : '5 kWp est.'}
+                                  </span>
+                                  <span className="text-emerald-700 font-bold">{l.status || 'NEW'}</span>
+                                </div>
+                              </div>
+                            );
+                          })}
+
+                        {leads.length === 0 && (
+                          <div className="col-span-full py-8 text-center text-xs text-slate-400">
+                            No CRM leads available. Click "+ Create New" above to enter client details.
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="col-span-2 sm:col-span-1 space-y-1">
-                      <label className="text-xs font-bold text-slate-700 uppercase">Customer Full Name *</label>
-                      <input
-                        type="text"
-                        placeholder="e.g. Ramesh Patil"
-                        value={formData.newCustomer.name}
-                        onChange={e => setFormData({ ...formData, newCustomer: { ...formData.newCustomer, name: e.target.value } })}
-                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-medium"
-                      />
                     </div>
-                    <div className="col-span-2 sm:col-span-1 space-y-1">
-                      <label className="text-xs font-bold text-slate-700 uppercase">Mobile Number *</label>
-                      <input
-                        type="tel"
-                        placeholder="+91 98220 XXXXX"
-                        value={formData.newCustomer.mobile}
-                        onChange={e => setFormData({ ...formData, newCustomer: { ...formData.newCustomer, mobile: e.target.value } })}
-                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-medium"
-                      />
+                  )}
+
+                  {/* MODE 2: EXISTING CUSTOMER DIRECTORY */}
+                  {customerMode === 'customers' && (
+                    <div className="space-y-4">
+                      <div className="relative">
+                        <Search size={16} className="absolute left-3.5 top-3 text-slate-400" />
+                        <input
+                          type="text"
+                          placeholder="Search customer directory by name or phone..."
+                          value={customerSearch}
+                          onChange={e => setCustomerSearch(e.target.value)}
+                          className="w-full pl-10 pr-4 py-2.5 bg-slate-50 rounded-2xl border border-slate-200 text-xs font-medium outline-none focus:ring-2 focus:ring-emerald-500"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 max-h-72 overflow-y-auto pr-1">
+                        {customers
+                          .filter(c => !customerSearch || c.name?.toLowerCase().includes(customerSearch.toLowerCase()) || c.mobile?.includes(customerSearch))
+                          .map(c => {
+                            const isSelected = formData.selectedType === 'customer' && formData.customerId === c.id;
+                            return (
+                              <div
+                                key={c.id}
+                                onClick={() => setFormData(prev => ({ ...prev, selectedType: 'customer', customerId: c.id }))}
+                                className={`p-4 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between ${
+                                  isSelected 
+                                    ? 'bg-emerald-50/70 border-emerald-500 shadow-sm ring-2 ring-emerald-500/20' 
+                                    : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/50'
+                                }`}
+                              >
+                                <div className="space-y-1">
+                                  <div className="flex items-center justify-between">
+                                    <span className="font-extrabold text-sm text-slate-900 truncate">{c.name}</span>
+                                    {isSelected && <CheckCircle size={16} className="text-emerald-600 flex-shrink-0" />}
+                                  </div>
+                                  <p className="text-xs text-slate-500 flex items-center gap-1.5">
+                                    <Phone size={12} className="text-slate-400" /> {c.mobile || 'No Phone'}
+                                  </p>
+                                  <p className="text-xs text-slate-500 flex items-center gap-1.5">
+                                    <MapPin size={12} className="text-slate-400" /> {c.city || 'Maharashtra'}
+                                  </p>
+                                </div>
+
+                                <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
+                                  <span className="font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md">Customer</span>
+                                  <span className="text-emerald-700 font-bold">Active</span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                      </div>
                     </div>
-                    <div className="col-span-2 sm:col-span-1 space-y-1">
-                      <label className="text-xs font-bold text-slate-700 uppercase">Email Address</label>
-                      <input
-                        type="email"
-                        placeholder="ramesh@example.com"
-                        value={formData.newCustomer.email}
-                        onChange={e => setFormData({ ...formData, newCustomer: { ...formData.newCustomer, email: e.target.value } })}
-                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-medium"
-                      />
+                  )}
+
+                  {/* MODE 3: CREATE NEW CUSTOMER FORM */}
+                  {customerMode === 'new' && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-slate-700 uppercase">Customer Full Name *</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Ramesh Patil"
+                          value={formData.newCustomer.name}
+                          onChange={e => setFormData({ ...formData, newCustomer: { ...formData.newCustomer, name: e.target.value } })}
+                          className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-medium outline-none focus:ring-2 focus:ring-emerald-500"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-slate-700 uppercase">Mobile Number (WhatsApp) *</label>
+                        <input
+                          type="tel"
+                          placeholder="+91 98220 12345"
+                          value={formData.newCustomer.mobile}
+                          onChange={e => setFormData({ ...formData, newCustomer: { ...formData.newCustomer, mobile: e.target.value } })}
+                          className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-medium outline-none focus:ring-2 focus:ring-emerald-500"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-slate-700 uppercase">Email Address</label>
+                        <input
+                          type="email"
+                          placeholder="ramesh@example.com"
+                          value={formData.newCustomer.email}
+                          onChange={e => setFormData({ ...formData, newCustomer: { ...formData.newCustomer, email: e.target.value } })}
+                          className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-medium outline-none focus:ring-2 focus:ring-emerald-500"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-slate-700 uppercase">City / District (Maharashtra)</label>
+                        <input
+                          type="text"
+                          placeholder="Pune / Mumbai / Nashik"
+                          value={formData.newCustomer.city}
+                          onChange={e => setFormData({ ...formData, newCustomer: { ...formData.newCustomer, city: e.target.value } })}
+                          className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-medium outline-none focus:ring-2 focus:ring-emerald-500"
+                        />
+                      </div>
+                      <div className="col-span-full space-y-1">
+                        <label className="text-xs font-bold text-slate-700 uppercase">Rooftop Installation Site Address</label>
+                        <input
+                          type="text"
+                          placeholder="Plot No, Society, Landmark, Pune - 411038"
+                          value={formData.newCustomer.address}
+                          onChange={e => setFormData({ ...formData, newCustomer: { ...formData.newCustomer, address: e.target.value } })}
+                          className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-medium outline-none focus:ring-2 focus:ring-emerald-500"
+                        />
+                      </div>
                     </div>
-                    <div className="col-span-2 sm:col-span-1 space-y-1">
-                      <label className="text-xs font-bold text-slate-700 uppercase">City / District (Maharashtra)</label>
-                      <input
-                        type="text"
-                        placeholder="Pune / Mumbai / Nashik"
-                        value={formData.newCustomer.city}
-                        onChange={e => setFormData({ ...formData, newCustomer: { ...formData.newCustomer, city: e.target.value } })}
-                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-medium"
-                      />
+                  )}
+
+                  {/* SMART LINKED SITE SURVEY BANNER */}
+                  {linkedSurvey && (
+                    <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-in fade-in">
+                      <div className="space-y-0.5">
+                        <p className="font-extrabold text-amber-900 flex items-center gap-1.5">
+                          <Compass size={15} className="text-amber-600" />
+                          Site Feasibility Survey Linked
+                        </p>
+                        <p className="text-slate-600 text-[11px]">
+                          Proposed Capacity: <strong>{linkedSurvey.proposedCap || 5} kWp</strong> · Roof Architecture: <strong>{linkedSurvey.roofType || 'RCC Flat Roof'}</strong>
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleApplySurvey}
+                        className="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 shadow-sm flex-shrink-0"
+                      >
+                        <CheckCheck size={14} /> Auto-Apply Survey Specs
+                      </button>
                     </div>
-                    <div className="col-span-2 space-y-1">
-                      <label className="text-xs font-bold text-slate-700 uppercase">Installation Site Roof Address</label>
-                      <input
-                        type="text"
-                        placeholder="House No, Society, Landmark, Pune - 411038"
-                        value={formData.newCustomer.address}
-                        onChange={e => setFormData({ ...formData, newCustomer: { ...formData.newCustomer, address: e.target.value } })}
-                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-medium"
-                      />
-                    </div>
-                  </div>
-                )}
+                  )}
+
+                </div>
               </div>
             )}
 
+            {/* ======================================================== */}
             {/* STEP 2: SYSTEM CONFIGURATION & HARDWARE BOM */}
+            {/* ======================================================== */}
             {currentStep === 2 && (
               <div className="space-y-6 animate-in fade-in duration-200">
-                <div>
-                  <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                    <Sun size={18} className="text-amber-500" /> 2. System Configuration & Hardware
-                  </h3>
-                  <p className="text-xs text-slate-500 mt-0.5">Specify capacity, module ratings, inverter technology, and mounting structure.</p>
-                </div>
-
-                {/* CAPACITY SLIDER & INPUT */}
-                <div className="p-5 rounded-2xl bg-amber-50/60 border border-amber-200/60 space-y-3">
+                
+                {/* 1. QUICK SOLAR PACKAGES (MAHARASHTRA) */}
+                <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <label className="text-xs font-black uppercase text-amber-900 tracking-wider">System Capacity (kWp)</label>
-                      <p className="text-[11px] text-amber-700">Slide to auto-recalculate panel quantity & equipment costs</p>
+                      <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
+                        <Sparkles size={18} className="text-amber-500" /> 1-Click Solar Packages (Maharashtra)
+                      </h3>
+                      <p className="text-xs text-slate-500 mt-0.5">Select a pre-engineered package to auto-fill capacity, modules, inverter, and costs.</p>
                     </div>
-                    <div className="flex items-center gap-2">
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                    {presets.map(p => {
+                      const isSelected = formData.systemCapacity === p.capacity && formData.connectionType === p.connectionType;
+                      return (
+                        <div
+                          key={p.id}
+                          onClick={() => applyPreset(p)}
+                          className={`p-4 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between ${
+                            isSelected
+                              ? 'bg-emerald-50/70 border-emerald-500 shadow-md ring-2 ring-emerald-500/20'
+                              : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/50'
+                          }`}
+                        >
+                          <div>
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 bg-slate-100 rounded-md text-slate-700">
+                                {p.subtitle}
+                              </span>
+                              {isSelected && <CheckCircle size={15} className="text-emerald-600" />}
+                            </div>
+                            <h4 className="font-black text-slate-900 text-sm mt-1">{p.label}</h4>
+                            <p className="text-[11px] text-slate-500 mt-0.5">{p.panelBrand} · {p.inverterBrand}</p>
+                          </div>
+
+                          <div className="mt-3 pt-2.5 border-t border-slate-100 space-y-0.5">
+                            <div className="flex justify-between items-center text-xs">
+                              <span className="text-slate-400">Total:</span>
+                              <span className="font-extrabold text-slate-900">₹{(p.indicativePrice).toLocaleString()}</span>
+                            </div>
+                            {p.subsidy > 0 && (
+                              <div className="flex justify-between items-center text-[11px] text-emerald-700 font-bold">
+                                <span>Net Outflow:</span>
+                                <span>₹{(p.netCost).toLocaleString()}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* 2. CUSTOM SYSTEM CAPACITY SLIDER */}
+                <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
+                        <Sliders size={18} className="text-emerald-600" /> Fine-Tune System Capacity
+                      </h3>
+                      <p className="text-xs text-slate-500 mt-0.5">Auto-calculates panel count, inverter size, and Maharashtra generation estimates.</p>
+                    </div>
+
+                    <div className="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200">
                       <input
                         type="number"
                         step="0.5"
@@ -842,11 +975,12 @@ export function QuotationWizardModal({
                         max="100"
                         value={formData.systemCapacity}
                         onChange={e => handleCapacityChange(Number(e.target.value))}
-                        className="w-20 px-2 py-1 text-right bg-white rounded-xl border border-amber-300 font-black text-lg text-[#071A2B]"
+                        className="w-16 text-right font-black text-xl text-[#071A2B] bg-transparent outline-none"
                       />
-                      <span className="font-bold text-slate-600 text-xs">kWp</span>
+                      <span className="font-bold text-slate-500 text-sm">kWp</span>
                     </div>
                   </div>
+
                   <input
                     type="range"
                     min="1"
@@ -854,252 +988,259 @@ export function QuotationWizardModal({
                     step="0.5"
                     value={formData.systemCapacity}
                     onChange={e => handleCapacityChange(Number(e.target.value))}
-                    className="w-full accent-emerald-600 cursor-pointer h-2 bg-amber-200 rounded-lg"
+                    className="w-full accent-emerald-600 cursor-pointer h-2.5 bg-slate-200 rounded-lg"
                   />
-                  <div className="flex justify-between text-[11px] font-bold text-amber-800">
-                    <span>1 kWp (Small)</span>
-                    <span>3 kWp (Surya Ghar)</span>
-                    <span>5 kWp (Standard 3BHK)</span>
-                    <span>10 kWp (Villa)</span>
-                    <span>50 kWp (C&I)</span>
+
+                  {/* QUICK CHIPS */}
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    {[1, 2, 3, 4, 5, 6, 7.5, 10, 15, 20, 25].map(cap => (
+                      <button
+                        key={cap}
+                        type="button"
+                        onClick={() => handleCapacityChange(cap)}
+                        className={`px-3 py-1 rounded-xl text-xs font-bold transition-all ${
+                          formData.systemCapacity === cap
+                            ? 'bg-[#071A2B] text-white shadow-sm'
+                            : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                        }`}
+                      >
+                        {cap} kWp
+                      </button>
+                    ))}
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-700 uppercase">System Type</label>
-                    <select
-                      value={formData.systemType}
-                      onChange={e => setFormData({ ...formData, systemType: e.target.value })}
-                      className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-xs font-bold bg-white"
-                    >
-                      <option value="On-grid">On-grid (Net Metering)</option>
-                      <option value="Hybrid">Hybrid (Battery Backup)</option>
-                      <option value="Off-grid">Off-grid (Independent)</option>
-                    </select>
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-700 uppercase">Tariff Category</label>
-                    <select
-                      value={formData.connectionType}
-                      onChange={e => setFormData({ ...formData, connectionType: e.target.value })}
-                      className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-xs font-bold bg-white"
-                    >
-                      <option value="Residential">Residential (LT-1)</option>
-                      <option value="Commercial">Commercial (LT-2)</option>
-                      <option value="Industrial">Industrial (HT/LT)</option>
-                    </select>
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-700 uppercase">Grid Phase</label>
-                    <select
-                      value={formData.phase}
-                      onChange={e => setFormData({ ...formData, phase: e.target.value })}
-                      className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-xs font-bold bg-white"
-                    >
-                      <option value="Single Phase">Single Phase (230V)</option>
-                      <option value="Three Phase">Three Phase (415V)</option>
-                    </select>
-                  </div>
-
-                  <div className="space-y-1 col-span-2 sm:col-span-3">
-                    <label className="text-xs font-bold text-slate-700 uppercase">Rooftop Architecture</label>
-                    <select
-                      value={formData.roofType}
-                      onChange={e => setFormData({ ...formData, roofType: e.target.value })}
-                      className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-xs font-bold bg-white"
-                    >
-                      <option value="RCC Flat Roof">RCC Flat Roof (Standard South Facing)</option>
-                      <option value="Tin Shed / Metal Sheet">Tin Shed / Industrial Metal Sheet</option>
-                      <option value="Elevated Super Structure">Elevated Super Structure (Terrace Gazebo / High Rise)</option>
-                      <option value="Mangalore Tile Sloped">Mangalore Tile Sloped Roof</option>
-                    </select>
-                  </div>
-                </div>
-
-                {/* HARDWARE BOM SELECTION */}
-                <div className="border-t border-slate-100 pt-4 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-xs font-extrabold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-                      <Package size={15} className="text-emerald-600" />
-                      Hardware BOM Specifications
-                    </h4>
-                    <span className="text-[11px] text-slate-400">Inventory Aligned</span>
-                  </div>
+                {/* 3. GRID & ELECTRICAL SPECIFICATIONS */}
+                <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+                  <h3 className="text-xs font-black uppercase tracking-wider text-slate-400">Site & Electrical Specs</h3>
                   
-                  {/* SOLAR MODULES */}
-                  <div className="grid grid-cols-3 gap-3 bg-slate-50 p-4 rounded-2xl border border-slate-200">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
                     <div className="space-y-1">
-                      <label className="text-[11px] font-bold text-slate-600 uppercase">Module Make</label>
+                      <label className="font-bold text-slate-700 uppercase">System Type</label>
+                      <select
+                        value={formData.systemType}
+                        onChange={e => setFormData({ ...formData, systemType: e.target.value })}
+                        className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 font-bold text-slate-800"
+                      >
+                        <option value="On-grid">On-grid (Net Metering)</option>
+                        <option value="Hybrid">Hybrid (Battery Backup)</option>
+                        <option value="Off-grid">Off-grid (Independent)</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="font-bold text-slate-700 uppercase">Tariff Category</label>
+                      <select
+                        value={formData.connectionType}
+                        onChange={e => setFormData({ ...formData, connectionType: e.target.value })}
+                        className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 font-bold text-slate-800"
+                      >
+                        <option value="Residential">Residential (LT-1)</option>
+                        <option value="Commercial">Commercial (LT-2)</option>
+                        <option value="Industrial">Industrial (HT/LT)</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="font-bold text-slate-700 uppercase">Grid Phase</label>
+                      <select
+                        value={formData.phase}
+                        onChange={e => setFormData({ ...formData, phase: e.target.value })}
+                        className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 font-bold text-slate-800"
+                      >
+                        <option value="Single Phase">Single Phase (230V)</option>
+                        <option value="Three Phase">Three Phase (415V)</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="font-bold text-slate-700 uppercase">Roof Architecture</label>
+                      <select
+                        value={formData.roofType}
+                        onChange={e => setFormData({ ...formData, roofType: e.target.value })}
+                        className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 font-bold text-slate-800"
+                      >
+                        <option value="RCC Flat Roof">RCC Flat Roof</option>
+                        <option value="Tin Shed / Metal Sheet">Industrial Metal Sheet</option>
+                        <option value="Elevated Super Structure">Elevated Terrace Structure</option>
+                        <option value="Mangalore Tile Sloped">Tile Sloped Roof</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 4. HARDWARE BOM SPECIFICATIONS */}
+                <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+                  <h3 className="text-xs font-black uppercase tracking-wider text-slate-400">Major Equipment Selections</h3>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+                    {/* MODULE CARD */}
+                    <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+                      <span className="font-bold text-slate-500 uppercase text-[10px]">Solar PV Modules</span>
                       <input
                         type="text"
                         value={formData.panelBrand}
                         onChange={e => setFormData({ ...formData, panelBrand: e.target.value })}
-                        className="w-full px-3 py-2 bg-white rounded-lg border border-slate-200 text-xs font-bold"
-                        placeholder="Waaree / Vikram"
+                        placeholder="Make (Waaree / Vikram)"
+                        className="w-full px-3 py-2 bg-white rounded-xl border border-slate-200 font-bold"
                       />
+                      <div className="grid grid-cols-2 gap-2">
+                        <select
+                          value={formData.panelWattage}
+                          onChange={e => handleWattageChange(Number(e.target.value))}
+                          className="px-2.5 py-1.5 bg-white rounded-lg border border-slate-200 font-bold text-[11px]"
+                        >
+                          <option value="540">540 Wp</option>
+                          <option value="550">550 Wp</option>
+                          <option value="570">570 Wp</option>
+                          <option value="600">600 Wp</option>
+                        </select>
+                        <span className="px-2.5 py-1.5 bg-white rounded-lg border border-slate-200 font-bold text-[11px] text-center text-slate-700">
+                          {formData.panelQuantity} Panels
+                        </span>
+                      </div>
                     </div>
-                    <div className="space-y-1">
-                      <label className="text-[11px] font-bold text-slate-600 uppercase">Wattage</label>
-                      <select
-                        value={formData.panelWattage}
-                        onChange={e => handleWattageChange(Number(e.target.value))}
-                        className="w-full px-3 py-2 bg-white rounded-lg border border-slate-200 text-xs font-bold"
-                      >
-                        <option value="540">540 Wp Mono</option>
-                        <option value="550">550 Wp Bifacial</option>
-                        <option value="570">570 Wp TOPCon</option>
-                        <option value="600">600 Wp TOPCon</option>
-                      </select>
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[11px] font-bold text-slate-600 uppercase">Module Count</label>
-                      <input
-                        type="number"
-                        value={formData.panelQuantity}
-                        onChange={e => setFormData({ ...formData, panelQuantity: Number(e.target.value) })}
-                        className="w-full px-3 py-2 bg-white rounded-lg border border-slate-200 text-xs font-bold"
-                      />
-                    </div>
-                  </div>
 
-                  {/* INVERTER */}
-                  <div className="grid grid-cols-3 gap-3 bg-slate-50 p-4 rounded-2xl border border-slate-200">
-                    <div className="space-y-1">
-                      <label className="text-[11px] font-bold text-slate-600 uppercase">Inverter Brand</label>
+                    {/* INVERTER CARD */}
+                    <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+                      <span className="font-bold text-slate-500 uppercase text-[10px]">Solar Inverter</span>
                       <input
                         type="text"
                         value={formData.inverterBrand}
                         onChange={e => setFormData({ ...formData, inverterBrand: e.target.value })}
-                        className="w-full px-3 py-2 bg-white rounded-lg border border-slate-200 text-xs font-bold"
-                        placeholder="Growatt / Solis"
+                        placeholder="Make (Growatt / Solis)"
+                        className="w-full px-3 py-2 bg-white rounded-xl border border-slate-200 font-bold"
                       />
+                      <div className="grid grid-cols-2 gap-2">
+                        <span className="px-2.5 py-1.5 bg-white rounded-lg border border-slate-200 font-bold text-[11px] text-center text-slate-700">
+                          {formData.inverterCapacity} kW
+                        </span>
+                        <input
+                          type="text"
+                          value={formData.inverterWarranty}
+                          onChange={e => setFormData({ ...formData, inverterWarranty: e.target.value })}
+                          className="px-2 py-1.5 bg-white rounded-lg border border-slate-200 font-bold text-[11px]"
+                        />
+                      </div>
                     </div>
-                    <div className="space-y-1">
-                      <label className="text-[11px] font-bold text-slate-600 uppercase">Capacity</label>
+
+                    {/* STRUCTURE CARD */}
+                    <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+                      <span className="font-bold text-slate-500 uppercase text-[10px]">Mounting Structure</span>
                       <input
                         type="text"
-                        value={`${formData.inverterCapacity} kW`}
-                        disabled
-                        className="w-full px-3 py-2 bg-slate-100 rounded-lg border border-slate-200 text-xs font-bold text-slate-600"
+                        value={formData.structureBrand}
+                        onChange={e => setFormData({ ...formData, structureBrand: e.target.value })}
+                        placeholder="Galvanized HDG High Rise"
+                        className="w-full px-3 py-2 bg-white rounded-xl border border-slate-200 font-bold"
                       />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[11px] font-bold text-slate-600 uppercase">Warranty</label>
-                      <input
-                        type="text"
-                        value={formData.inverterWarranty}
-                        onChange={e => setFormData({ ...formData, inverterWarranty: e.target.value })}
-                        className="w-full px-3 py-2 bg-white rounded-lg border border-slate-200 text-xs font-bold"
-                      />
+                      <div className="p-2 bg-white rounded-lg border border-slate-200 text-[11px] text-slate-600 font-medium text-center">
+                        Hot-Dip Galvanized (80+ Micron)
+                      </div>
                     </div>
                   </div>
                 </div>
+
               </div>
             )}
 
+            {/* ======================================================== */}
             {/* STEP 3: ITEMIZED BOM & PRICING */}
+            {/* ======================================================== */}
             {currentStep === 3 && (
-              <div className="space-y-5 animate-in fade-in duration-200">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div>
-                    <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                      <IndianRupee size={18} className="text-emerald-600" /> 3. Itemized Bill of Materials & Commercial Pricing
-                    </h3>
-                    <p className="text-xs text-slate-500 mt-0.5">Customize line items, add inventory products, adjust unit rates, discounts and GST rates.</p>
-                  </div>
+              <div className="space-y-6 animate-in fade-in duration-200">
+                <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-5">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+                    <div>
+                      <h3 className="text-lg font-black text-slate-900 flex items-center gap-2">
+                        <IndianRupee size={20} className="text-emerald-600" /> Commercial Bill of Materials (BOM)
+                      </h3>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        Itemized breakdown of modules, balance of system, installation services, and GST taxes.
+                      </p>
+                    </div>
 
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setShowProductPicker(prev => !prev)}
-                      className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors"
-                    >
-                      <Package size={14} /> {showProductPicker ? 'Close Inventory' : 'Add from Inventory'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleAddItem}
-                      className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors"
-                    >
-                      <Plus size={14} /> Add Custom Line
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleResetBOM}
-                      title="Reset to standard package defaults"
-                      className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
-                    >
-                      <RefreshCw size={14} />
-                    </button>
-                  </div>
-                </div>
-
-                {/* INVENTORY PRODUCT PICKER DRAWER */}
-                {showProductPicker && (
-                  <div className="p-4 bg-slate-50 border border-emerald-200 rounded-2xl space-y-3 animate-in fade-in duration-150">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-extrabold uppercase text-slate-700 tracking-wider flex items-center gap-1.5">
-                        <Search size={14} className="text-emerald-600" /> Select From Real Tenant Inventory
-                      </span>
-                      <button 
-                        type="button" 
-                        onClick={() => setShowProductPicker(false)}
-                        className="text-xs text-slate-400 hover:text-slate-600"
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowProductPicker(prev => !prev)}
+                        className="px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors"
                       >
-                        Cancel
+                        <Package size={14} /> {showProductPicker ? 'Close Catalog' : 'Add from Catalog'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleAddItem}
+                        className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors"
+                      >
+                        <Plus size={14} /> Custom Line
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleResetBOM}
+                        title="Reset to default package BOM"
+                        className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-colors"
+                      >
+                        <RefreshCw size={14} />
                       </button>
                     </div>
-
-                    <input
-                      type="text"
-                      placeholder="Search by brand, SKU, module wattage, inverter model..."
-                      value={productSearch}
-                      onChange={e => setProductSearch(e.target.value)}
-                      className="w-full px-3 py-2 bg-white rounded-xl border border-slate-200 text-xs font-medium outline-none focus:ring-2 focus:ring-emerald-500"
-                    />
-
-                    <div className="max-h-48 overflow-y-auto space-y-1.5 pr-1">
-                      {products
-                        .filter(p => !productSearch || p.name?.toLowerCase().includes(productSearch.toLowerCase()) || p.brand?.toLowerCase().includes(productSearch.toLowerCase()))
-                        .slice(0, 10)
-                        .map(p => (
-                          <div 
-                            key={p.id}
-                            onClick={() => handleSelectProduct(p)}
-                            className="p-2.5 bg-white hover:bg-emerald-50/70 border border-slate-200 hover:border-emerald-300 rounded-xl flex items-center justify-between cursor-pointer transition-colors text-xs"
-                          >
-                            <div>
-                              <p className="font-bold text-slate-800">{p.name}</p>
-                              <p className="text-[11px] text-slate-400">{p.brand || 'Generic'} · Category: {p.category || 'General'} · Stock: {p.currentStock ?? 'In Stock'}</p>
-                            </div>
-                            <div className="text-right">
-                              <span className="font-black text-[#071A2B]">₹{(p.sellingPrice || 0).toLocaleString()}</span>
-                              <span className="block text-[10px] text-emerald-600 font-bold">+ Select</span>
-                            </div>
-                          </div>
-                        ))}
-                      {products.length === 0 && (
-                        <p className="text-xs text-slate-400 py-3 text-center">No products found in inventory. You can use custom line items.</p>
-                      )}
-                    </div>
                   </div>
-                )}
 
-                {/* ITEMIZED TABLE */}
-                <div className="border border-slate-200 rounded-2xl overflow-hidden bg-white">
-                  <div className="max-h-80 overflow-y-auto">
+                  {/* INVENTORY CATALOG DRAWER */}
+                  {showProductPicker && (
+                    <div className="p-4 bg-slate-50 border border-emerald-200 rounded-2xl space-y-3 animate-in fade-in">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-extrabold uppercase text-slate-700 flex items-center gap-1.5">
+                          <Search size={14} className="text-emerald-600" /> Live Inventory Products
+                        </span>
+                        <button type="button" onClick={() => setShowProductPicker(false)} className="text-xs text-slate-400 hover:text-slate-600">
+                          Close
+                        </button>
+                      </div>
+
+                      <input
+                        type="text"
+                        placeholder="Search product SKU, brand or name..."
+                        value={productSearch}
+                        onChange={e => setProductSearch(e.target.value)}
+                        className="w-full px-3 py-2 bg-white rounded-xl border border-slate-200 text-xs font-medium outline-none focus:ring-2 focus:ring-emerald-500"
+                      />
+
+                      <div className="max-h-48 overflow-y-auto space-y-1.5 pr-1">
+                        {products
+                          .filter(p => !productSearch || p.name?.toLowerCase().includes(productSearch.toLowerCase()) || p.brand?.toLowerCase().includes(productSearch.toLowerCase()))
+                          .slice(0, 8)
+                          .map(p => (
+                            <div
+                              key={p.id}
+                              onClick={() => handleSelectProduct(p)}
+                              className="p-2.5 bg-white hover:bg-emerald-50 border border-slate-200 hover:border-emerald-300 rounded-xl flex items-center justify-between cursor-pointer transition-colors text-xs"
+                            >
+                              <div>
+                                <p className="font-bold text-slate-900">{p.name}</p>
+                                <p className="text-[11px] text-slate-400">{p.brand || 'Generic'} · Stock: {p.currentStock ?? 'In Stock'}</p>
+                              </div>
+                              <div className="text-right">
+                                <span className="font-black text-[#071A2B]">₹{(p.sellingPrice || 0).toLocaleString()}</span>
+                                <span className="block text-[10px] text-emerald-600 font-bold">+ Add Item</span>
+                              </div>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ITEMIZED TABLE */}
+                  <div className="border border-slate-200 rounded-2xl overflow-hidden bg-white shadow-sm">
                     <table className="w-full text-left text-xs">
-                      <thead className="bg-slate-50 text-slate-500 font-extrabold uppercase text-[10px] tracking-wider border-b border-slate-200 sticky top-0 z-10">
+                      <thead className="bg-slate-50 text-slate-500 font-extrabold uppercase text-[10px] tracking-wider border-b border-slate-200">
                         <tr>
-                          <th className="py-2.5 px-3">Item Description</th>
-                          <th className="py-2.5 px-2 w-20">Qty</th>
-                          <th className="py-2.5 px-2 w-28">Unit Rate (₹)</th>
-                          <th className="py-2.5 px-2 w-20">GST %</th>
-                          <th className="py-2.5 px-3 text-right w-28">Amount (₹)</th>
-                          <th className="py-2.5 px-2 text-center w-10"></th>
+                          <th className="py-3 px-4">Description</th>
+                          <th className="py-3 px-2 w-20 text-center">Qty</th>
+                          <th className="py-3 px-3 w-32">Unit Rate (₹)</th>
+                          <th className="py-3 px-2 w-24 text-center">GST %</th>
+                          <th className="py-3 px-4 text-right w-32">Line Total (₹)</th>
+                          <th className="py-3 px-2 text-center w-10"></th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
@@ -1110,7 +1251,7 @@ export function QuotationWizardModal({
                                 type="text"
                                 value={item.description}
                                 onChange={e => handleUpdateItem(idx, 'description', e.target.value)}
-                                className="w-full px-2 py-1.5 bg-slate-50/80 hover:bg-white focus:bg-white rounded-lg border border-transparent hover:border-slate-300 focus:border-emerald-500 font-semibold text-slate-800 text-xs outline-none"
+                                className="w-full px-2.5 py-1.5 bg-slate-50/80 hover:bg-white focus:bg-white rounded-lg border border-transparent hover:border-slate-300 focus:border-emerald-500 font-bold text-slate-800 text-xs outline-none"
                               />
                             </td>
                             <td className="p-2">
@@ -1131,11 +1272,11 @@ export function QuotationWizardModal({
                                 className="w-full px-2 py-1.5 bg-slate-50/80 hover:bg-white focus:bg-white rounded-lg border border-transparent hover:border-slate-300 focus:border-emerald-500 font-bold text-slate-900 text-xs outline-none"
                               />
                             </td>
-                            <td className="p-2">
+                            <td className="p-2 text-center">
                               <select
                                 value={item.taxRate}
                                 onChange={e => handleUpdateItem(idx, 'taxRate', Number(e.target.value))}
-                                className="w-full px-1.5 py-1.5 bg-slate-50/80 hover:bg-white focus:bg-white rounded-lg border border-transparent hover:border-slate-300 focus:border-emerald-500 font-bold text-slate-800 text-[11px] outline-none"
+                                className="px-2 py-1.5 bg-slate-50/80 hover:bg-white focus:bg-white rounded-lg border border-transparent hover:border-slate-300 focus:border-emerald-500 font-bold text-slate-800 text-[11px] outline-none"
                               >
                                 <option value="0">0%</option>
                                 <option value="5">5%</option>
@@ -1143,7 +1284,7 @@ export function QuotationWizardModal({
                                 <option value="18">18%</option>
                               </select>
                             </td>
-                            <td className="p-2.5 text-right font-black text-slate-900">
+                            <td className="p-3 text-right font-black text-slate-900">
                               ₹{(Math.round(item.quantity * item.unitPrice)).toLocaleString()}
                             </td>
                             <td className="p-2 text-center">
@@ -1153,295 +1294,291 @@ export function QuotationWizardModal({
                                 title="Delete line item"
                                 className="p-1 text-slate-400 hover:text-red-600 rounded-lg transition-colors"
                               >
-                                <Trash2 size={13} />
+                                <Trash2 size={14} />
                               </button>
                             </td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
+
+                    {/* COMMERCIAL SUMMARY STRIP */}
+                    <div className="bg-slate-50/90 p-5 border-t border-slate-200 grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
+                      <div>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase block">Subtotal</span>
+                        <span className="text-base font-extrabold text-slate-800">₹{calculations.subtotal.toLocaleString()}</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase block">Taxes (GST)</span>
+                        <span className="text-base font-extrabold text-slate-800">₹{calculations.tax.toLocaleString()}</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase block">Special Discount (₹)</span>
+                        <input
+                          type="number"
+                          value={formData.discount}
+                          onChange={e => setFormData({ ...formData, discount: Number(e.target.value) })}
+                          className="w-full px-2.5 py-1 bg-white rounded-lg border border-slate-200 font-bold text-emerald-600 text-xs mt-0.5 outline-none focus:ring-1 focus:ring-emerald-500"
+                        />
+                      </div>
+                      <div className="text-right">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase block">Total Payable</span>
+                        <span className="text-xl font-black text-[#071A2B]">₹{calculations.total.toLocaleString()}</span>
+                      </div>
+                    </div>
                   </div>
 
-                  {/* COMMERCIAL TOTALS STRIP */}
-                  <div className="bg-slate-50 p-4 border-t border-slate-200 grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
-                    <div>
-                      <span className="text-[10px] font-bold text-slate-400 uppercase block">Subtotal</span>
-                      <span className="text-base font-extrabold text-slate-800">₹{calculations.subtotal.toLocaleString()}</span>
+                  {/* SUBSIDY CALLOUT */}
+                  {calculations.indicativeSubsidy > 0 && (
+                    <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div>
+                        <p className="font-bold text-emerald-900 flex items-center gap-1.5">
+                          <Sparkles size={14} className="text-emerald-600" /> PM Surya Ghar Central Subsidy: ₹{calculations.indicativeSubsidy.toLocaleString()}
+                        </p>
+                        <p className="text-slate-600 text-[11px] mt-0.5">
+                          Direct DBT credit to customer account upon MSEDCL commissioning. Not deducted from vendor invoice.
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-[10px] text-slate-400 uppercase font-bold">Effective Net Outflow</span>
+                        <p className="text-base font-black text-[#071A2B]">₹{calculations.netCustomerCost.toLocaleString()}</p>
+                      </div>
                     </div>
-                    <div>
-                      <span className="text-[10px] font-bold text-slate-400 uppercase block">Total GST</span>
-                      <span className="text-base font-extrabold text-slate-800">₹{calculations.tax.toLocaleString()}</span>
-                    </div>
-                    <div>
-                      <span className="text-[10px] font-bold text-slate-400 uppercase block">Special Discount (₹)</span>
-                      <input
-                        type="number"
-                        value={formData.discount}
-                        onChange={e => setFormData({ ...formData, discount: Number(e.target.value) })}
-                        className="w-full px-2.5 py-1 bg-white rounded-lg border border-slate-200 font-bold text-emerald-600 text-xs mt-0.5 outline-none focus:ring-1 focus:ring-emerald-500"
-                      />
-                    </div>
-                    <div className="text-right">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase block">Total Investment</span>
-                      <span className="text-lg font-black text-[#071A2B]">₹{calculations.total.toLocaleString()}</span>
-                    </div>
-                  </div>
-                </div>
+                  )}
 
-                {/* CONDITIONAL SUBSIDY CALLOUT */}
-                <div className="p-4 rounded-2xl bg-emerald-50/80 border border-emerald-200 text-xs space-y-1.5">
-                  <div className="flex items-center justify-between text-emerald-900 font-bold">
-                    <span className="flex items-center gap-1.5">
-                      <Sparkles size={14} className="text-emerald-600" />
-                      Indicative PM Surya Ghar Central Subsidy
-                    </span>
-                    <span className="text-sm font-black text-emerald-700">₹{calculations.indicativeSubsidy.toLocaleString()}</span>
-                  </div>
-                  <p className="text-slate-600 text-[11px] leading-relaxed">
-                    Conditional central subsidy credited directly by MNRE/DISCOM to the consumer bank account. <strong>This is not deducted from the vendor invoice payable.</strong>
-                  </p>
                 </div>
               </div>
             )}
 
+            {/* ======================================================== */}
             {/* STEP 4: TERMS & MILESTONES */}
+            {/* ======================================================== */}
             {currentStep === 4 && (
               <div className="space-y-6 animate-in fade-in duration-200">
-                <div>
-                  <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                    <Shield size={18} className="text-indigo-600" /> 4. Payment Schedule & Commitments
-                  </h3>
-                  <p className="text-xs text-slate-500 mt-0.5">Staged milestone payment terms and contractual warranty obligations.</p>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-700 uppercase">Quotation Validity (Days)</label>
-                    <input
-                      type="number"
-                      value={formData.validityDays}
-                      onChange={e => setFormData({ ...formData, validityDays: Number(e.target.value) })}
-                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-bold text-slate-900"
-                    />
+                <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-6">
+                  <div>
+                    <h3 className="text-lg font-black text-slate-900 flex items-center gap-2">
+                      <Shield size={20} className="text-emerald-600" /> Payment Milestones & Contract Terms
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Configure standard milestone release stages, execution delivery SLA, and warranty commitments.
+                    </p>
                   </div>
 
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-700 uppercase">Expected Delivery & Commissioning</label>
-                    <input
-                      type="text"
-                      value={formData.deliveryTimeline}
-                      onChange={e => setFormData({ ...formData, deliveryTimeline: e.target.value })}
-                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-bold text-slate-900"
-                    />
-                  </div>
-                </div>
-
-                {/* MILESTONE SCHEDULE */}
-                <div className="space-y-3">
-                  <h4 className="text-xs font-extrabold text-slate-700 uppercase tracking-wider flex items-center justify-between">
-                    <span>Payment Milestone Schedule</span>
-                    <span className="text-slate-400 font-medium lowercase">Total 100%</span>
-                  </h4>
-
-                  <div className="space-y-2">
-                    {formData.paymentMilestones.map((m, idx) => (
-                      <div key={idx} className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs">
-                        <span className="w-12 px-2 py-1 bg-[#071A2B] text-white rounded-lg text-center font-bold">
-                          {m.percentage}%
-                        </span>
-                        <input
-                          type="text"
-                          value={m.description}
-                          onChange={e => {
-                            const updated = [...formData.paymentMilestones];
-                            updated[idx].description = e.target.value;
-                            setFormData({ ...formData, paymentMilestones: updated });
-                          }}
-                          className="flex-1 bg-transparent font-medium text-slate-700 outline-none"
-                        />
-                        <span className="font-bold text-slate-900">
-                          ₹{Math.round(calculations.total * (m.percentage / 100)).toLocaleString()}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* WARRANTIES */}
-                <div className="space-y-3 bg-slate-50 p-4 rounded-2xl border border-slate-200">
-                  <h4 className="text-xs font-extrabold text-slate-700 uppercase tracking-wider">Contractual Warranty Obligations</h4>
-                  <div className="grid grid-cols-2 gap-3 text-xs">
-                    <div className="p-3 bg-white rounded-xl border border-slate-200">
-                      <p className="font-bold text-slate-800">Solar PV Modules</p>
-                      <p className="text-slate-500 mt-0.5">25 Years OEM Performance (min 80% generation)</p>
-                    </div>
-                    <div className="p-3 bg-white rounded-xl border border-slate-200">
-                      <p className="font-bold text-slate-800">Solar Inverter</p>
-                      <p className="text-slate-500 mt-0.5">10 Years Replacement / Repair Warranty</p>
-                    </div>
-                    <div className="p-3 bg-white rounded-xl border border-slate-200">
-                      <p className="font-bold text-slate-800">Mounting Structure</p>
-                      <p className="text-slate-500 mt-0.5">10 Years Hot-Dip Galvanized Structural Integrity</p>
-                    </div>
-                    <div className="p-3 bg-white rounded-xl border border-slate-200">
-                      <p className="font-bold text-slate-800">Workmanship</p>
-                      <p className="text-slate-500 mt-0.5">5 Years Turnkey Installation & Liasoning</p>
+                  {/* PAYMENT MILESTONES */}
+                  <div className="space-y-3">
+                    <h4 className="text-xs font-black uppercase text-slate-400 tracking-wider">Payment Milestone Schedule (Total 100%)</h4>
+                    <div className="space-y-2.5">
+                      {formData.paymentMilestones.map((m, idx) => (
+                        <div key={idx} className="flex items-center gap-3 p-3.5 bg-slate-50 rounded-2xl border border-slate-200 text-xs">
+                          <span className="w-14 py-1.5 bg-[#071A2B] text-white rounded-xl text-center font-black flex-shrink-0">
+                            {m.percentage}%
+                          </span>
+                          <input
+                            type="text"
+                            value={m.description}
+                            onChange={e => {
+                              const updated = [...formData.paymentMilestones];
+                              updated[idx].description = e.target.value;
+                              setFormData({ ...formData, paymentMilestones: updated });
+                            }}
+                            className="flex-1 bg-transparent font-semibold text-slate-800 outline-none"
+                          />
+                          <span className="font-black text-slate-900 text-sm whitespace-nowrap">
+                            ₹{Math.round(calculations.total * (m.percentage / 100)).toLocaleString()}
+                          </span>
+                        </div>
+                      ))}
                     </div>
                   </div>
+
+                  {/* TIMELINE & VALIDITY */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs pt-2">
+                    <div className="space-y-1">
+                      <label className="font-bold text-slate-700 uppercase">Proposal Validity (Days)</label>
+                      <input
+                        type="number"
+                        value={formData.validityDays}
+                        onChange={e => setFormData({ ...formData, validityDays: Number(e.target.value) })}
+                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 font-bold"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="font-bold text-slate-700 uppercase">Execution & Delivery Timeline</label>
+                      <input
+                        type="text"
+                        value={formData.deliveryTimeline}
+                        onChange={e => setFormData({ ...formData, deliveryTimeline: e.target.value })}
+                        className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 font-bold"
+                      />
+                    </div>
+                  </div>
+
+                  {/* WARRANTIES GRID */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs pt-2">
+                    <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
+                      <span className="text-[10px] font-bold text-slate-400 block">PV Modules</span>
+                      <span className="font-bold text-slate-800">25 Years</span>
+                      <span className="text-[10px] text-slate-500 block">Performance</span>
+                    </div>
+                    <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
+                      <span className="text-[10px] font-bold text-slate-400 block">Inverter</span>
+                      <span className="font-bold text-slate-800">10 Years</span>
+                      <span className="text-[10px] text-slate-500 block">Replacement</span>
+                    </div>
+                    <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
+                      <span className="text-[10px] font-bold text-slate-400 block">Structure</span>
+                      <span className="font-bold text-slate-800">10 Years</span>
+                      <span className="text-[10px] text-slate-500 block">HDG Structural</span>
+                    </div>
+                    <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
+                      <span className="text-[10px] font-bold text-slate-400 block">Workmanship</span>
+                      <span className="font-bold text-slate-800">5 Years</span>
+                      <span className="text-[10px] text-slate-500 block">Turnkey EPC</span>
+                    </div>
+                  </div>
+
                 </div>
               </div>
             )}
 
-            {/* STEP 5: REVIEW & SUMMARY */}
+            {/* ======================================================== */}
+            {/* STEP 5: PROPOSAL SUMMARY & REVIEW */}
+            {/* ======================================================== */}
             {currentStep === 5 && (
               <div className="space-y-6 animate-in fade-in duration-200">
-                <div>
-                  <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                    <CheckCircle2 size={18} className="text-emerald-600" /> 5. Final Proposal Summary
-                  </h3>
-                  <p className="text-xs text-slate-500 mt-0.5">Review configuration before generating proposal PDF and linking to CRM pipeline.</p>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4 text-xs">
-                  <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Customer Details</span>
-                    <p className="font-bold text-sm text-slate-900">
-                      {customerMode === 'new' 
-                        ? (formData.newCustomer.name || 'New Customer')
-                        : formData.selectedType === 'customer'
-                          ? (customers.find(c => c.id === formData.customerId)?.name || 'Selected Customer')
-                          : (leads.find(l => l.id === formData.leadId)?.name || 'Selected Lead')}
+                <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-6">
+                  <div>
+                    <h3 className="text-lg font-black text-slate-900 flex items-center gap-2">
+                      <CheckCircle2 size={20} className="text-emerald-600" /> Review Final Proposal Summary
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Verify customer information, system hardware, and financial ROI before creating and syncing with CRM.
                     </p>
-                    <p className="text-slate-600">{formData.systemCapacity} kWp · {formData.systemType} ({formData.connectionType})</p>
-                    <p className="text-slate-500">{formData.roofType} · {formData.phase}</p>
                   </div>
 
-                  <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Hardware BOM Summary</span>
-                    <p className="font-bold text-sm text-slate-900">{formData.panelBrand} ({formData.panelQuantity} Panels × {formData.panelWattage}W)</p>
-                    <p className="text-slate-600">{formData.inverterBrand} {formData.inverterCapacity}kW Inverter</p>
-                    <p className="text-slate-500">{formData.structureBrand}</p>
-                  </div>
-                </div>
+                  {/* 2-COLUMN COMPARISON SUMMARY */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                    {/* CLIENT & SYSTEM SPECS */}
+                    <div className="p-5 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
+                      <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">System Specifications</span>
+                      <div className="space-y-1.5">
+                        <div className="flex justify-between py-1 border-b border-slate-200/60">
+                          <span className="text-slate-500">Client Name:</span>
+                          <span className="font-bold text-slate-800">{currentClientName}</span>
+                        </div>
+                        <div className="flex justify-between py-1 border-b border-slate-200/60">
+                          <span className="text-slate-500">Capacity & Type:</span>
+                          <span className="font-bold text-slate-800">{formData.systemCapacity} kWp ({formData.systemType})</span>
+                        </div>
+                        <div className="flex justify-between py-1 border-b border-slate-200/60">
+                          <span className="text-slate-500">PV Modules:</span>
+                          <span className="font-bold text-slate-800">{formData.panelBrand} ({formData.panelQuantity} Panels × {formData.panelWattage}W)</span>
+                        </div>
+                        <div className="flex justify-between py-1 border-b border-slate-200/60">
+                          <span className="text-slate-500">Inverter:</span>
+                          <span className="font-bold text-slate-800">{formData.inverterBrand} {formData.inverterCapacity}kW</span>
+                        </div>
+                        <div className="flex justify-between py-1">
+                          <span className="text-slate-500">Mounting Structure:</span>
+                          <span className="font-bold text-slate-800">{formData.structureBrand}</span>
+                        </div>
+                      </div>
+                    </div>
 
-                {/* FINANCIAL ROI BOX */}
-                <div className="p-5 rounded-2xl bg-[#071A2B] text-white space-y-4">
-                  <p className="text-xs font-bold uppercase tracking-widest text-emerald-400">Solar Financial Projection (Maharashtra 25 Years)</p>
-                  <div className="grid grid-cols-4 gap-4">
-                    <div>
-                      <p className="text-[10px] text-slate-400 uppercase font-semibold">Annual Output</p>
-                      <p className="text-xl font-bold text-white mt-1">{calculations.annualGeneration.toLocaleString()} <span className="text-xs font-normal">kWh</span></p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] text-slate-400 uppercase font-semibold">Annual Savings</p>
-                      <p className="text-xl font-bold text-emerald-400 mt-1">₹{calculations.annualSavings.toLocaleString()}</p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] text-slate-400 uppercase font-semibold">Payback Period</p>
-                      <p className="text-xl font-bold text-amber-400 mt-1">{calculations.paybackYears} <span className="text-xs font-normal">Yrs</span></p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] text-slate-400 uppercase font-semibold">CO₂ Offset</p>
-                      <p className="text-xl font-bold text-white mt-1">{(calculations.co2Reduction / 1000).toFixed(1)} <span className="text-xs font-normal">T/Yr</span></p>
+                    {/* FINANCIAL & COMMERCIALS */}
+                    <div className="p-5 bg-[#071A2B] text-white rounded-2xl space-y-3">
+                      <span className="text-[10px] font-black uppercase text-emerald-400 tracking-wider">Solar Financial Projections</span>
+                      <div className="space-y-1.5 text-xs">
+                        <div className="flex justify-between py-1 border-b border-white/10">
+                          <span className="text-slate-400">Total Investment:</span>
+                          <span className="font-black text-lg text-white">₹{calculations.total.toLocaleString()}</span>
+                        </div>
+                        {calculations.indicativeSubsidy > 0 && (
+                          <div className="flex justify-between py-1 border-b border-white/10 text-emerald-400 font-bold">
+                            <span>Central Subsidy (Surya Ghar):</span>
+                            <span>₹{calculations.indicativeSubsidy.toLocaleString()}</span>
+                          </div>
+                        )}
+                        <div className="flex justify-between py-1 border-b border-white/10">
+                          <span className="text-slate-400">Net Customer Outflow:</span>
+                          <span className="font-black text-white">₹{calculations.netCustomerCost.toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between py-1 border-b border-white/10">
+                          <span className="text-slate-400">Est. Annual Generation:</span>
+                          <span className="font-bold text-white">{calculations.annualGeneration.toLocaleString()} kWh/yr</span>
+                        </div>
+                        <div className="flex justify-between py-1">
+                          <span className="text-slate-400">Estimated Payback:</span>
+                          <span className="font-bold text-amber-300">{calculations.paybackYears} Years</span>
+                        </div>
+                      </div>
                     </div>
                   </div>
+
+                  {/* CONFIRMATION CALLOUT */}
+                  <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-2 text-slate-700">
+                      <FileCheck size={18} className="text-emerald-600 flex-shrink-0" />
+                      <span>Ready to generate proposal? This will create an active quotation with immutable revision tracking and sync deal size in CRM.</span>
+                    </div>
+                  </div>
+
                 </div>
               </div>
+            )}
+
+          </div>
+        </div>
+
+        {/* PERSISTENT SLEEK BOTTOM ACTION BAR */}
+        <div className="bg-white border-t border-slate-200/80 px-6 sm:px-8 py-3.5 flex items-center justify-between gap-4 flex-shrink-0">
+          
+          {/* LIVE SUMMARY CHIPS (LEFT) */}
+          <div className="hidden sm:flex items-center gap-3 text-xs">
+            <div className="flex items-center gap-1.5 font-bold text-slate-700">
+              <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+              <span>{formData.systemCapacity} kWp {formData.systemType}</span>
+            </div>
+            <span className="text-slate-300">·</span>
+            <span className="font-extrabold text-[#071A2B]">₹{calculations.total.toLocaleString()}</span>
+            {calculations.indicativeSubsidy > 0 && (
+              <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                Net: ₹{calculations.netCustomerCost.toLocaleString()}
+              </span>
             )}
           </div>
 
-          {/* LIVE STICKY PREVIEW SIDEBAR (4 COLS) */}
-          <div className="lg:col-span-4 bg-slate-50 border-t lg:border-t-0 lg:border-l border-slate-200 p-6 flex flex-col justify-between overflow-y-auto">
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-black uppercase text-slate-400 tracking-wider">Live Proposal Preview</span>
-                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800">
-                  {formData.systemType}
-                </span>
-              </div>
+          {/* PREV / NEXT NAVIGATION (RIGHT) */}
+          <div className="flex items-center gap-2 ml-auto">
+            {currentStep > 1 && (
+              <button
+                type="button"
+                onClick={() => setCurrentStep(prev => prev - 1)}
+                className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors"
+              >
+                <ChevronLeft size={16} /> Back
+              </button>
+            )}
 
-              {/* TOTAL AMOUNT CARD */}
-              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-2">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wide">Quotation Total Payable</span>
-                <div className="text-3xl font-black text-[#071A2B]">
-                  ₹{calculations.total.toLocaleString()}
-                </div>
-                {calculations.discount > 0 && (
-                  <p className="text-xs font-bold text-emerald-600">Includes −₹{calculations.discount.toLocaleString()} special discount</p>
-                )}
-              </div>
-
-              {/* EFFECTIVE CUSTOMER COST */}
-              {calculations.indicativeSubsidy > 0 && (
-                <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-xs">
-                  <div className="flex justify-between items-center text-emerald-900 font-bold mb-0.5">
-                    <span>Central Subsidy (PM Surya Ghar)</span>
-                    <span>₹{calculations.indicativeSubsidy.toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between items-center text-slate-700 font-medium">
-                    <span>Effective Net Customer Outflow</span>
-                    <span className="font-bold text-[#071A2B]">₹{calculations.netCustomerCost.toLocaleString()}</span>
-                  </div>
-                </div>
-              )}
-
-              {/* SYSTEM HIGHLIGHTS */}
-              <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-2.5 text-xs">
-                <div className="flex justify-between items-center py-1 border-b border-slate-100">
-                  <span className="text-slate-500">System Capacity</span>
-                  <span className="font-bold text-slate-800">{formData.systemCapacity} kWp</span>
-                </div>
-                <div className="flex justify-between items-center py-1 border-b border-slate-100">
-                  <span className="text-slate-500">Solar Modules</span>
-                  <span className="font-bold text-slate-800">{formData.panelQuantity} Panels ({formData.panelWattage}W)</span>
-                </div>
-                <div className="flex justify-between items-center py-1 border-b border-slate-100">
-                  <span className="text-slate-500">Inverter</span>
-                  <span className="font-bold text-slate-800">{formData.inverterBrand} {formData.inverterCapacity}kW</span>
-                </div>
-                <div className="flex justify-between items-center py-1 border-b border-slate-100">
-                  <span className="text-slate-500">Est. Generation</span>
-                  <span className="font-bold text-slate-800">{calculations.annualGeneration.toLocaleString()} kWh/yr</span>
-                </div>
-                <div className="flex justify-between items-center py-1">
-                  <span className="text-slate-500">Payback Period</span>
-                  <span className="font-bold text-emerald-700">{calculations.paybackYears} Years</span>
-                </div>
-              </div>
-            </div>
-
-            {/* NAVIGATION BUTTONS */}
-            <div className="pt-6 border-t border-slate-200 flex gap-2.5 mt-4">
-              {currentStep > 1 && (
-                <button
-                  type="button"
-                  onClick={() => setCurrentStep(prev => prev - 1)}
-                  className="px-4 py-3 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-colors"
-                >
-                  <ChevronLeft size={16} /> Prev
-                </button>
-              )}
-              
-              {currentStep < 5 ? (
-                <button
-                  type="button"
-                  onClick={() => setCurrentStep(prev => prev + 1)}
-                  className="flex-1 py-3 bg-[#071A2B] hover:bg-[#0B2942] text-white rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition-all"
-                >
-                  Next Step <ChevronRight size={16} />
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  disabled={loading}
-                  onClick={handleSubmit}
-                  className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-md transition-all disabled:opacity-50"
-                >
-                  {loading ? 'Creating Proposal...' : 'Create & Link Proposal'} <Check size={16} />
-                </button>
-              )}
-            </div>
-
+            {currentStep < 5 ? (
+              <button
+                type="button"
+                onClick={() => setCurrentStep(prev => prev + 1)}
+                className="px-5 py-2.5 bg-[#071A2B] hover:bg-[#0B2942] text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-sm transition-all"
+              >
+                Continue to {steps[currentStep].name} <ChevronRight size={16} />
+              </button>
+            ) : (
+              <button
+                type="button"
+                disabled={loading}
+                onClick={handleSubmit}
+                className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-md transition-all disabled:opacity-50"
+              >
+                {loading ? 'Creating Proposal...' : 'Create & Link Proposal'} <Check size={16} />
+              </button>
+            )}
           </div>
 
         </div>
