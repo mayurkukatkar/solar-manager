@@ -29,6 +29,7 @@ export default function SuperAdminLogin() {
       } else {
         if (res.data.token) {
           localStorage.setItem('token', res.data.token);
+          localStorage.setItem('auth_token', res.data.token);
         }
         if (res.data.role === 'SUPER_ADMIN') {
           router.push('/super-admin/dashboard');

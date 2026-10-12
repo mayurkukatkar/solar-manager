@@ -73,6 +73,8 @@ export interface QuotationData {
   tax: number;
   other_charges: number;
   grand_total: number;
+  indicative_subsidy?: number;
+  net_customer_cost?: number;
   amount_in_words: string;
   
   current_monthly_bill: number;
@@ -790,6 +792,22 @@ export const QuotationPDF = ({ data }: { data: QuotationData }) => {
             <span className="text-3xl font-black text-[#071A2B]">{formatCurrency(data.grand_total)}</span>
           </div>
           <p className="text-right text-xs text-slate-500 italic">{data.amount_in_words}</p>
+
+          {data.indicative_subsidy && data.indicative_subsidy > 0 ? (
+            <div className="mt-4 p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-xs">
+              <div className="flex justify-between items-center text-emerald-800 font-bold mb-1">
+                <span>Indicative Central Subsidy (PM Surya Ghar)*</span>
+                <span className="text-sm font-black text-emerald-700">₹{data.indicative_subsidy.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between items-center text-slate-700 font-medium">
+                <span>Est. Net Customer Outflow (After Subsidy Credit)</span>
+                <span className="font-bold text-[#071A2B]">₹{Math.max(0, data.grand_total - data.indicative_subsidy).toLocaleString()}</span>
+              </div>
+              <p className="text-[10px] text-slate-500 mt-2 leading-tight">
+                *Subsidy is a conditional estimate subject to MNRE/DISCOM approval and is credited directly to the customer's Aadhaar-linked account. It is not deducted from the vendor's total payable invoice.
+              </p>
+            </div>
+          ) : null}
         </div>
 
         <Footer data={data} pageNum={getPageNum()} />

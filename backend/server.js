@@ -28,6 +28,10 @@ app.use('/api/super-admin', superAdminRoutes);
 const crmRoutes = require('./routes/tenant/crm');
 app.use('/', crmRoutes);
 
+// TENANT - Quotations Engine (Proposals, Pricing, Milestones, PDF, Project Conversion)
+const quotationsRoutes = require('./routes/tenant/quotations');
+app.use('/', quotationsRoutes);
+
 // TENANT - Operations (Surveys, Quotations, Installations)
 const operationsRoutes = require('./routes/tenant/operations');
 app.use('/', operationsRoutes);

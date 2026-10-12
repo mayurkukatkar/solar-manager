@@ -318,7 +318,58 @@ model Quotation {
   tax          Float    @default(0)
   discount     Float    @default(0)
   total        Float    @default(0)
-  status       String   @default("DRAFT") // DRAFT, SENT, ACCEPTED, REJECTED
+  status       String   @default("DRAFT") // DRAFT, SENT, VIEWED, NEGOTIATION, ACCEPTED, REJECTED, EXPIRED
+
+  // Technical & System Configuration
+  systemCapacity    Float?   @default(5.0)
+  systemType        String?  @default("On-grid")
+  connectionType    String?  @default("Residential")
+  phase             String?  @default("Single Phase")
+  roofType          String?  @default("RCC Flat Roof")
+  panelBrand        String?
+  panelModel        String?
+  panelWattage      Float?
+  panelQuantity     Int?
+  panelWarranty     String?
+  inverterBrand     String?
+  inverterModel     String?
+  inverterCapacity  Float?
+  inverterQuantity  Int?     @default(1)
+  inverterWarranty  String?
+  structureBrand    String?
+  structureWarranty String?
+
+  // Financial & Solar Generation Estimates
+  annualGeneration   Float?
+  lifetimeGeneration Float?
+  monthlySavings     Float?
+  annualSavings      Float?
+  lifetimeSavings    Float?
+  paybackYears       Float?
+  co2ReductionKg     Float?
+  treeEquivalent     Int?
+  indicativeSubsidy  Float?   @default(0)
+  netCustomerCost    Float?   @default(0)
+
+  // Structured Milestones, Scope & Warranties
+  paymentMilestones  Json?
+  scopeOfSupply      Json?
+  warranties         Json?
+  termsAndConditions Json?
+  exclusions         Json?
+  bankDetails        Json?
+
+  // Revisions & Audit Trail Locking
+  version         Int       @default(1)
+  isLocked        Boolean   @default(false)
+  revisionHistory Json?
+
+  // Tracking timestamps & engagement
+  sentAt     DateTime?
+  viewedAt   DateTime?
+  acceptedAt DateTime?
+  rejectedAt DateTime?
+  viewCount  Int       @default(0)
 
   items    QuotationItem[]
   projects Project[]
