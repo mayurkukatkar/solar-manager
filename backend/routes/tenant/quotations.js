@@ -766,10 +766,14 @@ router.post('/api/tenant/quotations/:id/convert', requireTenantAuth, async (req,
 
     // Convert Lead to Customer if linked
     if (quotation.leadId) {
-      await prisma.lead.update({
-        where: { id: quotation.leadId },
-        data: { status: 'WON' }
-      });
+      try {
+        await prisma.lead.update({
+          where: { id: quotation.leadId },
+          data: { status: 'WON' }
+        });
+      } catch (err) {
+        console.warn('Lead WON update skipped:', err.message);
+      }
 
       let existingCustomer = await prisma.customer.findFirst({
         where: { leadId: quotation.leadId, tenantId }
@@ -778,28 +782,35 @@ router.post('/api/tenant/quotations/:id/convert', requireTenantAuth, async (req,
       if (!existingCustomer) {
         const lead = quotation.lead || await prisma.lead.findUnique({ where: { id: quotation.leadId } });
         if (lead) {
-          existingCustomer = await prisma.customer.create({
-            data: {
-              tenantId,
-              leadId: quotation.leadId,
-              name: lead.name,
-              email: lead.email,
-              mobile: lead.mobile,
-              company: lead.company,
-              address: lead.address,
-              city: lead.city
-            }
-          });
+          try {
+            existingCustomer = await prisma.customer.create({
+              data: {
+                tenantId,
+                leadId: quotation.leadId,
+                name: lead.name || 'Solar Customer',
+                email: lead.email || null,
+                mobile: lead.mobile || '0000000000',
+                company: lead.company || null,
+                address: lead.address || null,
+                city: lead.city || 'Pune',
+                customerType: 'RESIDENTIAL'
+              }
+            });
+          } catch (cErr) {
+            console.warn('Customer auto-create warning:', cErr.message);
+            existingCustomer = await prisma.customer.findFirst({
+              where: { tenantId, OR: [{ leadId: quotation.leadId }, { mobile: lead.mobile || '0000000000' }] }
+            });
+          }
         }
       }
 
       if (existingCustomer) {
         customerId = existingCustomer.id;
-        // Link customer to quotation
         await prisma.quotation.update({
           where: { id, tenantId },
           data: { customerId }
-        });
+        }).catch(() => {});
       }
     }
 
@@ -809,32 +820,40 @@ router.post('/api/tenant/quotations/:id/convert', requireTenantAuth, async (req,
     });
 
     if (!project) {
-      // Find existing site survey for this lead or customer to link pipeline
+      // Find existing site survey for this lead or customer
       const existingSurvey = await prisma.siteSurvey.findFirst({
         where: {
           tenantId,
           OR: [
-            { leadId: quotation.leadId || undefined },
-            { customerId: customerId || undefined }
+            ...(quotation.leadId ? [{ leadId: quotation.leadId }] : []),
+            ...(customerId ? [{ customerId }] : [])
           ]
         }
-      });
+      }).catch(() => null);
+
+      const projectCount = await prisma.project.count({ where: { tenantId } });
+      const projectNumber = `PRJ-${(projectCount + 1).toString().padStart(5, '0')}`;
 
       project = await prisma.project.create({
         data: {
           tenantId,
+          projectNumber,
           quotationId: id,
-          customerId,
-          leadId: quotation.leadId,
+          customerId: customerId || null,
+          leadId: quotation.leadId || null,
           surveyId: existingSurvey ? existingSurvey.id : null,
-          name: `PRJ-${quotation.qNumber}`,
+          name: `${projectNumber}: ${quotation.customer?.name || quotation.lead?.name || 'Solar Installation'} (${quotation.systemCapacity || 5} kWp)`,
           capacity: quotation.systemCapacity || 5.0,
+          capacityUnit: 'kWp',
           systemType: quotation.systemType || 'On-grid',
+          projectType: quotation.connectionType || 'Residential',
           currentStage: 'Planning',
           status: 'In Progress',
-          estimatedValue: quotation.total,
-          estimatedCost: Math.round(quotation.total * 0.75),
+          progressPercent: 15,
+          estimatedValue: quotation.total || 0,
+          estimatedCost: Math.round((quotation.total || 0) * 0.72),
           city: quotation.customer?.city || quotation.lead?.city || 'Pune',
+          state: 'Maharashtra',
           installationAddress: quotation.customer?.address || quotation.lead?.address || 'Site Roof'
         }
       });
@@ -842,78 +861,106 @@ router.post('/api/tenant/quotations/:id/convert', requireTenantAuth, async (req,
       // Auto-create BOM (ProjectMaterialRequirement) entries from quotation line items
       if (quotation.items && quotation.items.length > 0) {
         for (const item of quotation.items) {
-          await prisma.projectMaterialRequirement.create({
-            data: {
-              projectId: project.id,
-              productId: item.productId || null,
-              description: item.description,
-              quantity: item.quantity || 1,
-              status: 'Required'
-            }
-          }).catch(e => console.log('BOM item skipped:', e.message));
+          try {
+            await prisma.projectMaterialRequirement.create({
+              data: {
+                projectId: project.id,
+                productId: item.productId || null,
+                description: item.description,
+                quantity: item.quantity || 1,
+                status: 'Required'
+              }
+            });
+          } catch (e) {
+            console.warn('BOM item skipped:', e.message);
+          }
         }
       }
 
-      // If no survey existed, auto-create Site Survey Task
-      if (!existingSurvey) {
+      // Auto-create Site Survey Task (Notice: ProjectTask does not have tenantId)
+      try {
         await prisma.projectTask.create({
           data: {
-            tenantId,
             projectId: project.id,
             name: 'Site Feasibility & Shadow Analysis Survey',
-            description: `Detailed roof structural measurement and shadow analysis for ${quotation.systemCapacity} kWp`,
+            description: `Detailed roof structural measurement and shadow analysis for ${quotation.systemCapacity || 5} kWp system`,
             priority: 'High',
-            status: 'To Do'
+            status: 'To Do',
+            dueDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000)
           }
         });
+      } catch (tErr) {
+        console.warn('Project task creation skipped:', tErr.message);
       }
 
-      // 2. Auto-create Discom Net Metering Application
-      await prisma.discomApplication.create({
-        data: {
-          tenantId,
-          projectId: project.id,
-          status: 'FEASIBILITY_PENDING'
+      // Auto-create Discom Net Metering Application (Notice: DiscomApplication has projectId, tenantId, status)
+      try {
+        const existingDiscom = await prisma.discomApplication.findUnique({
+          where: { projectId: project.id }
+        });
+        if (!existingDiscom) {
+          await prisma.discomApplication.create({
+            data: {
+              tenantId,
+              projectId: project.id,
+              status: 'FEASIBILITY_PENDING'
+            }
+          });
         }
-      });
+      } catch (dErr) {
+        console.warn('Discom creation skipped:', dErr.message);
+      }
 
-      // 3. Auto-create Initial Proforma / Milestone Invoices if milestones exist
-      if (Array.isArray(quotation.paymentMilestones) && quotation.paymentMilestones.length > 0) {
-        const firstMilestone = quotation.paymentMilestones[0];
-        await prisma.invoice.create({
+      // Auto-create Initial Proforma / Milestone Invoices if customer exists
+      if (customerId && Array.isArray(quotation.paymentMilestones) && quotation.paymentMilestones.length > 0) {
+        try {
+          const firstMilestone = quotation.paymentMilestones[0];
+          await prisma.invoice.create({
+            data: {
+              tenantId,
+              projectId: project.id,
+              customerId,
+              invoiceNumber: `INV-${quotation.qNumber}-01`,
+              status: 'UNPAID',
+              amount: Number(firstMilestone.amount) || Math.round((quotation.total || 0) * 0.2),
+              date: new Date(),
+              dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+            }
+          });
+        } catch (invErr) {
+          console.warn('Invoice creation skipped:', invErr.message);
+        }
+      }
+
+      // Log Project Timeline Event (Notice: ProjectTimelineEvent does not have tenantId)
+      try {
+        await prisma.projectTimelineEvent.create({
           data: {
-            tenantId,
             projectId: project.id,
-            customerId: customerId || undefined,
-            invoiceNumber: `INV-${quotation.qNumber}-01`,
-            status: 'PENDING',
-            totalAmount: Number(firstMilestone.amount) || Math.round(quotation.total * 0.2),
-            notes: `Advance Booking Invoice: ${firstMilestone.description}`
-          }
-        }).catch(err => console.log('Notice: Invoice model creation skipped:', err.message));
-      }
-
-      // 4. Log Project Timeline Event
-      await prisma.projectTimelineEvent.create({
-        data: {
-          tenantId,
-          projectId: project.id,
-          title: 'Project Auto-Created',
-          description: `Created from accepted Quotation ${quotation.qNumber} (${quotation.systemCapacity} kWp for ₹${quotation.total.toLocaleString()})`,
-          eventType: 'STATUS_UPDATE'
-        }
-      });
-
-      // 5. Log Lead Activity
-      if (quotation.leadId) {
-        await prisma.leadActivity.create({
-          data: {
-            leadId: quotation.leadId,
-            type: 'PROJECT_CONVERTED',
-            description: `Converted to project ${project.name}`,
-            performedBy: req.user.id
+            title: 'Project Auto-Created',
+            description: `Created from accepted Quotation ${quotation.qNumber} (${quotation.systemCapacity || 5} kWp for ₹${(quotation.total || 0).toLocaleString()})`,
+            eventType: 'STATUS_UPDATE',
+            createdBy: req.user.id
           }
         });
+      } catch (tlErr) {
+        console.warn('Project timeline event skipped:', tlErr.message);
+      }
+
+      // Log Lead Activity if leadId exists
+      if (quotation.leadId) {
+        try {
+          await prisma.leadActivity.create({
+            data: {
+              leadId: quotation.leadId,
+              type: 'PROJECT_CONVERTED',
+              description: `Converted to project ${project.name}`,
+              performedBy: req.user.id
+            }
+          });
+        } catch (laErr) {
+          console.warn('LeadActivity skipped:', laErr.message);
+        }
       }
     }
 
@@ -925,7 +972,10 @@ router.post('/api/tenant/quotations/:id/convert', requireTenantAuth, async (req,
     });
   } catch (error) {
     console.error('Error converting quotation to project:', error);
-    res.status(500).json({ error: 'Failed to convert quotation to project', details: error.message });
+    res.status(500).json({ 
+      error: error.message || 'Failed to convert quotation to project', 
+      details: error.message 
+    });
   }
 });
 

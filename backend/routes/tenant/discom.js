@@ -93,15 +93,19 @@ router.patch('/api/tenant/projects/:projectId/discom/stage', requireTenantAuth, 
     });
 
     // Phase 2 Sync: Log timeline event
-    await prisma.projectTimelineEvent.create({
-      data: {
-        tenantId: req.user.tenantId,
-        projectId,
-        title: 'DISCOM Stage Updated',
-        description: `DISCOM application moved to ${status}`,
-        eventType: 'STAGE_CHANGE'
-      }
-    });
+    try {
+      await prisma.projectTimelineEvent.create({
+        data: {
+          projectId,
+          title: 'DISCOM Stage Updated',
+          description: `DISCOM application moved to ${status}`,
+          eventType: 'STAGE_CHANGE',
+          createdBy: req.user.id
+        }
+      });
+    } catch (e) {
+      console.warn('Discom timeline event skipped:', e.message);
+    }
 
     res.json({ discom: updated });
   } catch (error) {

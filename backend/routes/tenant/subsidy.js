@@ -110,15 +110,19 @@ router.patch('/api/tenant/subsidies/:id', requireTenantAuth, async (req, res) =>
     });
 
     if (updated.projectId) {
-      await prisma.projectTimelineEvent.create({
-        data: {
-          tenantId: req.user.tenantId,
-          projectId: updated.projectId,
-          title: 'Subsidy Stage Updated',
-          description: `Subsidy application moved to ${status}`,
-          eventType: 'STAGE_CHANGE'
-        }
-      });
+      try {
+        await prisma.projectTimelineEvent.create({
+          data: {
+            projectId: updated.projectId,
+            title: 'Subsidy Stage Updated',
+            description: `Subsidy application moved to ${status}`,
+            eventType: 'STAGE_CHANGE',
+            createdBy: req.user.id
+          }
+        });
+      } catch (e) {
+        console.warn('Subsidy timeline event skipped:', e.message);
+      }
     }
 
     res.json({ subsidy: updated });

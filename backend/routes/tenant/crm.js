@@ -225,36 +225,52 @@ router.post('/api/tenant/leads/:id/convert', requireTenantAuth, async (req, res)
     });
 
     // Phase 2 Sync: Auto-initialize Site Survey Task
-    await prisma.projectTask.create({
-      data: {
-        tenantId,
-        projectId: project.id,
-        name: 'Initial Site Survey',
-        description: 'Perform site survey and measurements',
-        priority: 'High',
-        status: 'To Do',
-      }
-    });
+    try {
+      await prisma.projectTask.create({
+        data: {
+          projectId: project.id,
+          name: 'Initial Site Survey',
+          description: 'Perform site survey and measurements',
+          priority: 'High',
+          status: 'To Do',
+        }
+      });
+    } catch (e) {
+      console.warn('Initial Site Survey task skipped:', e.message);
+    }
 
     // Phase 2 Sync: Auto-initialize Discom Tracking
-    await prisma.discomApplication.create({
-      data: {
-        tenantId,
-        projectId: project.id,
-        status: 'FEASIBILITY_PENDING'
+    try {
+      const existingDiscom = await prisma.discomApplication.findUnique({
+        where: { projectId: project.id }
+      });
+      if (!existingDiscom) {
+        await prisma.discomApplication.create({
+          data: {
+            tenantId,
+            projectId: project.id,
+            status: 'FEASIBILITY_PENDING'
+          }
+        });
       }
-    });
+    } catch (e) {
+      console.warn('Discom tracking skipped:', e.message);
+    }
 
     // Phase 2 Sync: Log timeline event
-    await prisma.projectTimelineEvent.create({
-      data: {
-        tenantId,
-        projectId: project.id,
-        title: 'Project Created',
-        description: `Project auto-created from direct Lead Conversion`,
-        eventType: 'STATUS_UPDATE'
-      }
-    });
+    try {
+      await prisma.projectTimelineEvent.create({
+        data: {
+          projectId: project.id,
+          title: 'Project Created',
+          description: `Project auto-created from direct Lead Conversion`,
+          eventType: 'STATUS_UPDATE',
+          createdBy: req.user.id
+        }
+      });
+    } catch (e) {
+      console.warn('Project timeline event skipped:', e.message);
+    }
 
     // Phase 8 Sync: Auto-request Mandatory Documents
     const requiredDocTypes = await prisma.documentType.findMany({
@@ -1006,34 +1022,38 @@ router.post('/api/tenant/projects', requireTenantAuth, async (req, res) => {
     });
 
     // Auto-create initial Site Survey Task
-    await prisma.projectTask.create({
-      data: {
-        tenantId: req.user.tenantId,
-        projectId: project.id,
-        name: 'Conduct Detailed Engineering Roof Survey',
-        description: 'Verify roof shadow patterns, azimuth angle, structure anchor points, and net metering cable runs.',
-        priority: 'High',
-        status: 'Pending',
-        dueDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000) // +3 days
-      }
-    });
+    try {
+      await prisma.projectTask.create({
+        data: {
+          projectId: project.id,
+          name: 'Conduct Detailed Engineering Roof Survey',
+          description: 'Verify roof shadow patterns, azimuth angle, structure anchor points, and net metering cable runs.',
+          priority: 'High',
+          status: 'Pending',
+          dueDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000) // +3 days
+        }
+      });
+    } catch (e) {
+      console.warn('Site survey task creation skipped:', e.message);
+    }
 
     // Auto-initialize DISCOM Tracking if customer assigned
     if (project.customerId) {
-      const existingDiscom = await prisma.discomApplication.findUnique({
-        where: { projectId: project.id }
-      });
-      if (!existingDiscom) {
-        await prisma.discomApplication.create({
-          data: {
-            tenantId: req.user.tenantId,
-            projectId: project.id,
-            customerId: project.customerId,
-            discomName: 'MSEDCL',
-            stage: 'Application Submission',
-            status: 'IN_PROGRESS'
-          }
+      try {
+        const existingDiscom = await prisma.discomApplication.findUnique({
+          where: { projectId: project.id }
         });
+        if (!existingDiscom) {
+          await prisma.discomApplication.create({
+            data: {
+              tenantId: req.user.tenantId,
+              projectId: project.id,
+              status: 'FEASIBILITY_PENDING'
+            }
+          });
+        }
+      } catch (e) {
+        console.warn('DISCOM tracking creation skipped:', e.message);
       }
     }
 

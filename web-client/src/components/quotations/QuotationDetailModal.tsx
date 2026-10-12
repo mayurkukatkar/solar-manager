@@ -270,7 +270,8 @@ export function QuotationDetailModal({
       onUpdate();
       onClose();
     } catch (err: any) {
-      alert('Failed to convert quotation: ' + (err.response?.data?.error || err.message));
+      const errMsg = err.response?.data?.details || err.response?.data?.error || err.message;
+      alert('Failed to convert quotation: ' + errMsg);
     } finally {
       setLoadingAction(null);
     }
