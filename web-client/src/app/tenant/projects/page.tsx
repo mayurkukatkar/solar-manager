@@ -520,14 +520,14 @@ export default function ProjectsDashboard() {
                         <div className="space-y-1">
                           {discom ? (
                             <span className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200 block w-fit">
-                              <Zap size={10} /> MSEDCL: {discom.stage || 'In Progress'}
+                              <Zap size={10} /> MSEDCL: {discom.status || 'In Progress'}
                             </span>
                           ) : (
                             <span className="text-[10px] text-slate-400 block">DISCOM: Pending filing</span>
                           )}
                           {subsidy ? (
                             <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 block w-fit">
-                              <ShieldCheck size={10} /> Subsidy: {subsidy.currentStage || 'Initiated'}
+                              <ShieldCheck size={10} /> Subsidy: {subsidy.status || 'Initiated'}
                             </span>
                           ) : null}
                         </div>

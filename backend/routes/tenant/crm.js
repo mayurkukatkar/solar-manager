@@ -875,10 +875,10 @@ router.get('/api/tenant/projects', requireTenantAuth, async (req, res) => {
       orderBy: { createdAt: 'desc' },
       include: {
         customer: {
-          select: { id: true, name: true, mobile: true, email: true, city: true, state: true }
+          select: { id: true, name: true, mobile: true, email: true, city: true, address: true }
         },
         lead: {
-          select: { id: true, name: true, mobile: true, email: true, city: true }
+          select: { id: true, name: true, mobile: true, email: true, city: true, state: true }
         },
         quotation: {
           select: { id: true, qNumber: true, total: true, systemCapacity: true, status: true, version: true }
@@ -886,12 +886,8 @@ router.get('/api/tenant/projects', requireTenantAuth, async (req, res) => {
         projectOwner: {
           select: { id: true, name: true, email: true }
         },
-        discomApplication: {
-          select: { id: true, stage: true, status: true, consumerNumber: true, applicationNumber: true }
-        },
-        subsidies: {
-          select: { id: true, currentStage: true, status: true, subsidyAmount: true, tokenNumber: true }
-        },
+        discomApplication: true,
+        subsidies: true,
         _count: {
           select: {
             tasks: true,
