@@ -1,29 +1,31 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
 import { 
   FileText, Plus, User, Calendar, IndianRupee, Download, 
   Search, Filter, ArrowUpRight, CheckCircle2, Clock, 
   AlertCircle, MessageSquare, Sun, Shield, Lock, 
   RotateCcw, Sparkles, Send, Eye, ChevronRight, Trash2,
-  ExternalLink
+  ExternalLink, Copy, Check, CheckCheck, Loader2, RefreshCw, 
+  Phone, X, Printer
 } from 'lucide-react';
 import Link from 'next/link';
-import { QuotationPDF } from '@/components/pdf/QuotationPDF';
 import { QuotationWizardModal } from '@/components/quotations/QuotationWizardModal';
 import { QuotationDetailModal } from '@/components/quotations/QuotationDetailModal';
 
 export default function QuotationsPage() {
   const [quotations, setQuotations] = useState<any[]>([]);
   const [metrics, setMetrics] = useState({
-    totalQuotations: 128,
-    awaitingResponse: 24,
-    accepted: 46,
-    totalQuotedValue: 3850000
+    totalQuotations: 0,
+    awaitingResponse: 0,
+    accepted: 0,
+    totalQuotedValue: 0
   });
   const [followUpReminders, setFollowUpReminders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [deletingQuoteId, setDeletingQuoteId] = useState<string | null>(null);
 
   // FILTERS & SEARCH
   const [searchTerm, setSearchTerm] = useState('');
@@ -42,8 +44,14 @@ export default function QuotationsPage() {
   // MODALS
   const [showWizard, setShowWizard] = useState(false);
   const [selectedQuoteForDetail, setSelectedQuoteForDetail] = useState<any>(null);
-  const [selectedQuoteForPdf, setSelectedQuoteForPdf] = useState<any>(null);
-  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [detailModalInitialTab, setDetailModalInitialTab] = useState<'overview' | 'preview' | 'milestones' | 'revisions'>('overview');
+
+  // WHATSAPP SHARE MODAL STATE
+  const [selectedQuoteForWhatsApp, setSelectedQuoteForWhatsApp] = useState<any>(null);
+  const [whatsAppPhone, setWhatsAppPhone] = useState('');
+  const [whatsAppText, setWhatsAppText] = useState('');
+  const [copiedPitch, setCopiedPitch] = useState(false);
+  const [isSendingWhatsApp, setIsSendingWhatsApp] = useState(false);
 
   // Parse URL parameters for cross-module interconnectivity (CRM/Surveys -> Quotations)
   useEffect(() => {
@@ -96,13 +104,20 @@ export default function QuotationsPage() {
       const quotesData = quoteRes.data.quotations || [];
       setQuotations(quotesData);
 
-      // If backend provided metrics, use them, otherwise use illustrative defaults
       if (quoteRes.data.metrics) {
         setMetrics({
-          totalQuotations: quotesData.length > 0 ? quoteRes.data.metrics.totalQuotations : 128,
-          awaitingResponse: quotesData.length > 0 ? quoteRes.data.metrics.awaitingResponse : 24,
-          accepted: quotesData.length > 0 ? quoteRes.data.metrics.accepted : 46,
-          totalQuotedValue: quotesData.length > 0 ? quoteRes.data.metrics.totalQuotedValue : 3850000
+          totalQuotations: quoteRes.data.metrics.totalQuotations,
+          awaitingResponse: quoteRes.data.metrics.awaitingResponse,
+          accepted: quoteRes.data.metrics.accepted,
+          totalQuotedValue: quoteRes.data.metrics.totalQuotedValue
+        });
+      } else {
+        // Compute dynamically from loaded quotes
+        setMetrics({
+          totalQuotations: quotesData.length,
+          awaitingResponse: quotesData.filter((q: any) => ['SENT', 'VIEWED', 'NEGOTIATION'].includes(q.status)).length,
+          accepted: quotesData.filter((q: any) => q.status === 'ACCEPTED').length,
+          totalQuotedValue: quotesData.reduce((acc: number, q: any) => acc + (q.total || 0), 0)
         });
       }
 
@@ -119,6 +134,7 @@ export default function QuotationsPage() {
       console.error('Failed to fetch quotations data:', err);
     } finally {
       setLoading(false);
+      setIsRefreshing(false);
     }
   };
 
@@ -131,39 +147,108 @@ export default function QuotationsPage() {
     fetchData();
   };
 
-  // PDF DOWNLOAD HANDLER
-  const handleDownloadPdf = async (quote: any) => {
-    try {
-      setSelectedQuoteForPdf(quote);
-      setIsGeneratingPdf(true);
+  const handleRefresh = () => {
+    setIsRefreshing(true);
+    fetchData();
+  };
 
-      setTimeout(async () => {
-        try {
-          const filename = `Proposal_${quote.qNumber || 'QT'}.pdf`;
-          const { generatePDF } = await import('@/components/pdf/QuotationPDF');
-          await generatePDF('hidden-pdf-container', filename);
-        } catch (pdfErr: any) {
-          console.error('PDF error:', pdfErr);
-          alert('Failed to generate proposal PDF. Please try again.');
-        } finally {
-          setIsGeneratingPdf(false);
-          setSelectedQuoteForPdf(null);
-        }
-      }, 500);
-    } catch (err) {
-      console.error(err);
-      alert('Error initiating PDF download');
+  // OPEN WHATSAPP SHARE MODAL
+  const openWhatsAppModal = (quote: any, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const client = quote.customer || quote.lead;
+    const raw = client?.mobile || client?.phone || '';
+    const digits = raw.replace(/[^0-9]/g, '');
+    const clean = digits.startsWith('91') ? digits.slice(2) : digits.replace(/^0+/, '');
+    setWhatsAppPhone(clean || '');
+
+    const tenantName = tenantInfo?.legalName || tenantInfo?.name || 'WhereReady Solar';
+    const cap = quote.systemCapacity || 5;
+    const total = (quote.total || 0).toLocaleString();
+    const sub = quote.indicativeSubsidy || 0;
+    const net = Math.max(0, (quote.total || 0) - sub).toLocaleString();
+    const annualSavings = (quote.annualSavings || Math.round(cap * 1460 * 8.5)).toLocaleString();
+
+    const msg = `Dear ${client?.name || 'Valued Customer'},\n\nGreetings from *${tenantName}*!\n\nWe have prepared your personalized Solar Rooftop Proposal for *${cap} kWp (${quote.systemType || 'On-grid'})*.\n\n*Proposal Highlights:*\n• Total Investment: ₹${total}\n${sub > 0 ? `• PM Surya Ghar Central Subsidy: ₹${sub.toLocaleString()}\n• Net Investment Outflow: ₹${net}\n` : ''}• Est. Annual Electricity Savings: ₹${annualSavings}/yr\n• Proposal No: ${quote.qNumber}\n• Proposal Validity: ${quote.validityDays || 15} Days\n\nPlease let us know if you have any questions or wish to schedule a roof technical inspection.\n\nBest Regards,\n*${tenantName}*\nPhone: ${tenantInfo?.phone || '+91 98220 12345'}`;
+    
+    setWhatsAppText(msg);
+    setSelectedQuoteForWhatsApp(quote);
+    setCopiedPitch(false);
+  };
+
+  // SEND ON WHATSAPP & UPDATE DRAFT STATUS
+  const handleSendWhatsApp = async () => {
+    const rawDigits = whatsAppPhone.replace(/[^0-9]/g, '');
+    const cleanDigits = rawDigits.startsWith('91') ? rawDigits : rawDigits.replace(/^0+/, '');
+    const finalPhone = cleanDigits.startsWith('91') ? cleanDigits : (cleanDigits ? '91' + cleanDigits : '');
+
+    if (!finalPhone) {
+      alert('Please enter a valid 10-digit mobile number.');
+      return;
+    }
+
+    const url = `https://wa.me/${finalPhone}?text=${encodeURIComponent(whatsAppText)}`;
+    window.open(url, '_blank');
+
+    // Auto-update status to SENT if current status is DRAFT
+    if (selectedQuoteForWhatsApp?.status === 'DRAFT') {
+      try {
+        await axios.patch(
+          `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/quotations/${selectedQuoteForWhatsApp.id}`,
+          { status: 'SENT' },
+          { withCredentials: true }
+        );
+        fetchData();
+      } catch (err) {
+        console.warn('Auto status update to SENT failed:', err);
+      }
+    }
+
+    setSelectedQuoteForWhatsApp(null);
+  };
+
+  // COPY PITCH TO CLIPBOARD
+  const handleCopyPitch = () => {
+    navigator.clipboard.writeText(whatsAppText);
+    setCopiedPitch(true);
+    setTimeout(() => setCopiedPitch(false), 2000);
+  };
+
+  // DELETE QUOTATION HANDLER
+  const handleDeleteQuotation = async (quote: any, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!confirm(`Are you sure you want to permanently delete quotation ${quote.qNumber}? This cannot be undone.`)) {
+      return;
+    }
+
+    setDeletingQuoteId(quote.id);
+    try {
+      // Optimistic delete
+      setQuotations(prev => prev.filter(q => q.id !== quote.id));
+      await axios.delete(
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/quotations/${quote.id}`,
+        { withCredentials: true }
+      );
+      fetchData();
+    } catch (err: any) {
+      alert('Failed to delete quotation: ' + (err.response?.data?.error || err.message));
+      fetchData(); // Restore on failure
+    } finally {
+      setDeletingQuoteId(null);
     }
   };
 
-  // QUICK WHATSAPP SHARE
-  const handleQuickWhatsApp = (quote: any) => {
-    const client = quote.customer || quote.lead;
-    const phone = client?.mobile || client?.phone || '';
-    const cleanPhone = phone.replace(/[^0-9]/g, '');
-    const message = `Hello ${client?.name || 'Customer'},\n\nHere is your Solar Proposal for ${quote.systemCapacity || 5} kWp Rooftop System (${quote.qNumber}).\nTotal: ₹${(quote.total || 0).toLocaleString()}\nEst. Annual Savings: ₹${(quote.annualSavings || 62000).toLocaleString()}.\n\nBest Regards,\nWhereReady Solar OS`;
-    const url = `https://wa.me/${cleanPhone.startsWith('91') ? cleanPhone : '91' + cleanPhone}?text=${encodeURIComponent(message)}`;
-    window.open(url, '_blank');
+  // VIEW A4 PROPOSAL DOCUMENT / DOWNLOAD
+  const handleOpenPreviewPdf = (quote: any, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setDetailModalInitialTab('preview');
+    setSelectedQuoteForDetail(quote);
+  };
+
+  // VIEW PROPOSAL 360° OVERVIEW
+  const handleOpenOverview = (quote: any, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setDetailModalInitialTab('overview');
+    setSelectedQuoteForDetail(quote);
   };
 
   const getStatusBadge = (status: string) => {
@@ -187,16 +272,17 @@ export default function QuotationsPage() {
     }
   };
 
-  const statusTabs = [
-    { id: 'ALL', label: 'All Quotations' },
-    { id: 'DRAFT', label: 'Draft' },
-    { id: 'SENT', label: 'Sent' },
-    { id: 'VIEWED', label: 'Viewed' },
-    { id: 'NEGOTIATION', label: 'Negotiation' },
-    { id: 'ACCEPTED', label: 'Accepted' },
-    { id: 'REJECTED', label: 'Rejected' },
-    { id: 'EXPIRED', label: 'Expired' }
-  ];
+  // STATUS TABS WITH DYNAMIC COUNTS
+  const statusTabs = useMemo(() => [
+    { id: 'ALL', label: 'All Quotations', count: quotations.length },
+    { id: 'DRAFT', label: 'Draft', count: quotations.filter(q => q.status === 'DRAFT').length },
+    { id: 'SENT', label: 'Sent', count: quotations.filter(q => q.status === 'SENT').length },
+    { id: 'VIEWED', label: 'Viewed', count: quotations.filter(q => q.status === 'VIEWED').length },
+    { id: 'NEGOTIATION', label: 'Negotiation', count: quotations.filter(q => q.status === 'NEGOTIATION').length },
+    { id: 'ACCEPTED', label: 'Accepted', count: quotations.filter(q => q.status === 'ACCEPTED').length },
+    { id: 'REJECTED', label: 'Rejected', count: quotations.filter(q => q.status === 'REJECTED').length },
+    { id: 'EXPIRED', label: 'Expired', count: quotations.filter(q => q.status === 'EXPIRED').length }
+  ], [quotations]);
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12">
@@ -216,14 +302,15 @@ export default function QuotationsPage() {
         </div>
 
         <button 
+          type="button"
           onClick={() => setShowWizard(true)}
-          className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-2xl font-bold text-xs transition-all flex items-center justify-center gap-2 shadow-sm hover:shadow-md"
+          className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-2xl font-bold text-xs transition-all flex items-center justify-center gap-2 shadow-sm hover:shadow-md cursor-pointer"
         >
           <Plus size={16} /> New Quotation
         </button>
       </div>
 
-      {/* DASHBOARD METRICS CARDS (ACCORDING TO USER SPEC) */}
+      {/* DASHBOARD METRICS CARDS */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm space-y-1">
           <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total quotations</p>
@@ -245,7 +332,7 @@ export default function QuotationsPage() {
 
         <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm space-y-1">
           <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Quoted value</p>
-          <p className="text-3xl font-black text-[#071A2B]">₹{(metrics.totalQuotedValue / 100000).toFixed(1)}L</p>
+          <p className="text-3xl font-black text-[#071A2B]">₹{((metrics.totalQuotedValue || 0) / 100000).toFixed(1)}L</p>
           <p className="text-[11px] text-slate-400 font-medium">Pipeline commercial volume</p>
         </div>
       </div>
@@ -261,14 +348,15 @@ export default function QuotationsPage() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 pt-1">
             {followUpReminders.map(rem => (
-              <div key={rem.id} className="p-3 bg-white rounded-2xl border border-amber-200 shadow-2xl flex items-center justify-between text-xs">
+              <div key={rem.id} className="p-3 bg-white rounded-2xl border border-amber-200 shadow-sm flex items-center justify-between text-xs">
                 <div>
                   <p className="font-bold text-slate-800">{rem.customerName} ({rem.qNumber})</p>
                   <p className="text-[11px] text-amber-700 mt-0.5">{rem.reason}</p>
                 </div>
                 <button
-                  onClick={() => handleQuickWhatsApp({ customer: { name: rem.customerName }, qNumber: rem.qNumber, total: rem.total })}
-                  className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[10px] font-bold flex items-center gap-1"
+                  type="button"
+                  onClick={() => openWhatsAppModal({ customer: { name: rem.customerName, mobile: rem.customerMobile }, qNumber: rem.qNumber, total: rem.total, systemCapacity: rem.systemCapacity || 5 })}
+                  className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[10px] font-bold flex items-center gap-1 transition-colors cursor-pointer"
                 >
                   <MessageSquare size={12} /> Ping
                 </button>
@@ -281,7 +369,7 @@ export default function QuotationsPage() {
       {/* SEARCH & FILTERS BAR */}
       <div className="bg-white p-4 rounded-3xl border border-slate-200 shadow-sm space-y-4">
         
-        {/* TOP CONTROLS: SEARCH & CUSTOMER PICKER */}
+        {/* TOP CONTROLS: SEARCH, CUSTOMER FILTER & REFRESH */}
         <div className="flex flex-col sm:flex-row items-center gap-3">
           <form onSubmit={handleSearchSubmit} className="relative flex-1 w-full">
             <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -297,7 +385,7 @@ export default function QuotationsPage() {
           <select
             value={selectedCustomerId}
             onChange={e => setSelectedCustomerId(e.target.value)}
-            className="w-full sm:w-64 px-4 py-2.5 rounded-2xl border border-slate-200 text-xs font-semibold bg-white outline-none focus:ring-2 focus:ring-emerald-500"
+            className="w-full sm:w-64 px-4 py-2.5 rounded-2xl border border-slate-200 text-xs font-semibold bg-white outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
           >
             <option value="">All Customers</option>
             {customers.map(c => (
@@ -306,10 +394,13 @@ export default function QuotationsPage() {
           </select>
 
           <button
-            onClick={() => fetchData()}
-            className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl text-xs font-bold transition-colors"
+            type="button"
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
           >
-            Refresh
+            <RefreshCw size={14} className={isRefreshing ? "animate-spin" : ""} />
+            <span>Refresh</span>
           </button>
         </div>
 
@@ -318,14 +409,20 @@ export default function QuotationsPage() {
           {statusTabs.map(tab => (
             <button
               key={tab.id}
+              type="button"
               onClick={() => setSelectedStatus(tab.id)}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer ${
                 selectedStatus === tab.id
                   ? 'bg-[#071A2B] text-white shadow-sm'
                   : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800'
               }`}
             >
-              {tab.label}
+              <span>{tab.label}</span>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${
+                selectedStatus === tab.id ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
+              }`}>
+                {tab.count}
+              </span>
             </button>
           ))}
         </div>
@@ -359,43 +456,52 @@ export default function QuotationsPage() {
                   <td colSpan={7} className="px-6 py-16 text-center">
                     <Sun size={36} className="text-slate-300 mx-auto mb-2" />
                     <p className="text-sm font-bold text-slate-700">No quotations found</p>
-                    <p className="text-xs text-slate-400 mt-1">Get started by creating your first rooftop proposal.</p>
+                    <p className="text-xs text-slate-400 mt-1">Create a new solar proposal to begin or reset your search filters.</p>
                     <button
+                      type="button"
                       onClick={() => setShowWizard(true)}
-                      className="mt-4 px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 transition-colors"
+                      className="mt-4 px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 transition-colors inline-flex items-center gap-1.5 cursor-pointer"
                     >
-                      + Create Quotation
+                      <Plus size={14} /> Create Quotation
                     </button>
                   </td>
                 </tr>
               ) : (
                 quotations.map(quote => {
                   const client = quote.customer || quote.lead;
+                  const isDeleting = deletingQuoteId === quote.id;
+
                   return (
                     <tr 
                       key={quote.id} 
-                      className="hover:bg-slate-50/80 transition-colors group cursor-pointer"
-                      onClick={() => setSelectedQuoteForDetail(quote)}
+                      onClick={() => handleOpenOverview(quote)}
+                      className="hover:bg-slate-50/80 transition-colors cursor-pointer group"
                     >
-                      {/* QUOTE NO */}
-                      <td className="px-6 py-4 font-bold text-slate-900">
+                      {/* QUOTATION NUMBER */}
+                      <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
-                          <FileText size={16} className="text-slate-400 group-hover:text-emerald-600 transition-colors" />
-                          <span>{quote.qNumber}</span>
-                          {quote.version > 1 && (
-                            <span className="text-[10px] font-bold px-1.5 py-0.5 bg-amber-100 text-amber-800 rounded">
-                              v{quote.version}
+                          <span className="w-7 h-7 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center font-bold text-[11px] group-hover:bg-emerald-50 group-hover:text-emerald-700 transition-colors">
+                            <FileText size={14} />
+                          </span>
+                          <div>
+                            <span className="font-extrabold text-slate-900 block group-hover:text-emerald-700 transition-colors">
+                              {quote.qNumber}
                             </span>
-                          )}
+                            {quote.version > 1 && (
+                              <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.2 rounded border border-amber-200">
+                                Rev v{quote.version}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </td>
 
                       {/* CUSTOMER */}
                       <td className="px-6 py-4">
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-bold text-[10px]">
-                            {client?.name ? client.name.charAt(0).toUpperCase() : 'C'}
-                          </div>
+                        <div className="flex items-center gap-2">
+                          <span className="w-6 h-6 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center text-[10px] font-bold uppercase">
+                            {(client?.name || 'C')[0]}
+                          </span>
                           <div>
                             <p className="font-bold text-slate-800">{client?.name || 'Customer'}</p>
                             <p className="text-[10px] text-slate-400">{client?.mobile || client?.phone || client?.city || 'Maharashtra'}</p>
@@ -447,48 +553,52 @@ export default function QuotationsPage() {
                           {quote.projects && quote.projects.length > 0 ? (
                             <Link
                               href={`/tenant/projects/${quote.projects[0].id}`}
-                              title={`View linked project: ${quote.projects[0].name}`}
+                              title={`View linked active project: ${quote.projects[0].name}`}
                               className="p-2 text-emerald-600 hover:text-emerald-700 bg-emerald-50 rounded-xl hover:bg-emerald-100 transition-colors"
                             >
                               <ExternalLink size={15} />
                             </Link>
                           ) : null}
+
+                          {/* ACTION 1: PREVIEW & DOWNLOAD A4 PROPOSAL */}
                           <button
-                            title="Download A4 Proposal PDF"
-                            onClick={() => handleDownloadPdf(quote)}
-                            className="p-2 text-slate-400 hover:text-emerald-600 rounded-xl hover:bg-emerald-50 transition-colors"
+                            type="button"
+                            title="In-App Proposal Preview & Print / PDF Download"
+                            onClick={(e) => handleOpenPreviewPdf(quote, e)}
+                            className="p-2 text-slate-400 hover:text-emerald-600 rounded-xl hover:bg-emerald-50 transition-colors cursor-pointer"
                           >
                             <Download size={16} />
                           </button>
+
+                          {/* ACTION 2: WHATSAPP SHARE MODAL */}
                           <button
-                            title="Share on WhatsApp"
-                            onClick={() => handleQuickWhatsApp(quote)}
-                            className="p-2 text-slate-400 hover:text-emerald-600 rounded-xl hover:bg-emerald-50 transition-colors"
+                            type="button"
+                            title="Share Proposal on WhatsApp"
+                            onClick={(e) => openWhatsAppModal(quote, e)}
+                            className="p-2 text-slate-400 hover:text-emerald-600 rounded-xl hover:bg-emerald-50 transition-colors cursor-pointer"
                           >
                             <MessageSquare size={16} />
                           </button>
+
+                          {/* ACTION 3: DELETE QUOTATION */}
                           {(!quote.projects || quote.projects.length === 0) && (
                             <button
+                              type="button"
                               title="Delete Quotation"
-                              onClick={async (e) => {
-                                e.stopPropagation();
-                                if (!confirm(`Delete proposal ${quote.qNumber}? This cannot be undone.`)) return;
-                                try {
-                                  await axios.delete(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/quotations/${quote.id}`, { withCredentials: true });
-                                  fetchData();
-                                } catch (err: any) {
-                                  alert('Failed to delete quotation: ' + (err.response?.data?.error || err.message));
-                                }
-                              }}
-                              className="p-2 text-slate-400 hover:text-red-600 rounded-xl hover:bg-red-50 transition-colors"
+                              disabled={isDeleting}
+                              onClick={(e) => handleDeleteQuotation(quote, e)}
+                              className="p-2 text-slate-400 hover:text-red-600 rounded-xl hover:bg-red-50 transition-colors cursor-pointer disabled:opacity-50"
                             >
-                              <Trash2 size={15} />
+                              {isDeleting ? <Loader2 size={15} className="animate-spin text-red-500" /> : <Trash2 size={15} />}
                             </button>
                           )}
+
+                          {/* ACTION 4: VIEW DETAILS */}
                           <button
-                            title="View Proposal Details"
-                            onClick={() => setSelectedQuoteForDetail(quote)}
-                            className="p-2 text-slate-400 hover:text-[#071A2B] rounded-xl hover:bg-slate-100 transition-colors"
+                            type="button"
+                            title="View Proposal 360° Details"
+                            onClick={(e) => handleOpenOverview(quote, e)}
+                            className="p-2 text-slate-400 hover:text-[#071A2B] rounded-xl hover:bg-slate-100 transition-colors cursor-pointer"
                           >
                             <ChevronRight size={16} />
                           </button>
@@ -531,122 +641,106 @@ export default function QuotationsPage() {
           fetchData();
           setSelectedQuoteForDetail(null);
         }}
-        onDownloadPdf={quote => handleDownloadPdf(quote)}
         tenantInfo={tenantInfo}
+        initialTab={detailModalInitialTab}
       />
 
-      {/* HIDDEN PROPOSAL PDF CONTAINER (FOR CLIENT-SIDE MULTI-PAGE RENDER) */}
-      {selectedQuoteForPdf && (
-        <div style={{ position: 'absolute', top: 0, left: 0, opacity: 0, pointerEvents: 'none', zIndex: -50 }}>
-          <div id="hidden-pdf-container">
-            <QuotationPDF
-              data={{
-                quotation_number: selectedQuoteForPdf.qNumber || "QT-2026",
-                quotation_date: new Date(selectedQuoteForPdf.date).toLocaleDateString(),
-                valid_until: `${selectedQuoteForPdf.validityDays || 15} Days`,
-                company_name: tenantInfo?.legalName || tenantInfo?.name || "Apex Solar Energy Solutions",
-                company_logo: tenantInfo?.logoUrl || "",
-                company_address: [tenantInfo?.address, tenantInfo?.city, tenantInfo?.state, tenantInfo?.pincode].filter(Boolean).join(", ") || "Tech Centre, MIDC, Pune, Maharashtra 411019",
-                company_phone: tenantInfo?.phone || "+91 98220 12345",
-                company_email: tenantInfo?.email || "contact@apexsolar.in",
-                company_website: "www.apexsolar.in",
-                customer_name: selectedQuoteForPdf.customer?.name || selectedQuoteForPdf.lead?.name || "Customer",
-                customer_phone: selectedQuoteForPdf.customer?.mobile || selectedQuoteForPdf.lead?.mobile || "+91 98XXX XXXXX",
-                customer_email: selectedQuoteForPdf.customer?.email || selectedQuoteForPdf.lead?.email || "customer@example.com",
-                project_address: selectedQuoteForPdf.customer?.address || selectedQuoteForPdf.lead?.address || "Site Roof, Maharashtra",
-                system_capacity: selectedQuoteForPdf.systemCapacity || 5,
-                annual_generation: selectedQuoteForPdf.annualGeneration || Math.round((selectedQuoteForPdf.systemCapacity || 5) * 1460),
-                system_type: selectedQuoteForPdf.systemType || "On-grid Rooftop PV",
-                connection_type: selectedQuoteForPdf.connectionType || "Residential Net Metering",
-                phase: selectedQuoteForPdf.phase || "Single Phase",
-                roof_type: selectedQuoteForPdf.roofType || "RCC Flat Roof",
-                installation_type: "Galvanized High Rise Structure",
-                expected_timeline: "15 to 20 Working Days",
-                panel_brand: selectedQuoteForPdf.panelBrand || "Waaree",
-                panel_model: selectedQuoteForPdf.panelModel || "550Wp Mono PERC Bifacial",
-                panel_wattage: selectedQuoteForPdf.panelWattage || 550,
-                panel_quantity: selectedQuoteForPdf.panelQuantity || 9,
-                panel_warranty: selectedQuoteForPdf.panelWarranty || "25 Years OEM Performance",
-                inverter_brand: selectedQuoteForPdf.inverterBrand || "Growatt",
-                inverter_model: selectedQuoteForPdf.inverterModel || "5kW On-Grid Inverter",
-                inverter_capacity: selectedQuoteForPdf.inverterCapacity || selectedQuoteForPdf.systemCapacity || 5,
-                inverter_quantity: selectedQuoteForPdf.inverterQuantity || 1,
-                inverter_warranty: selectedQuoteForPdf.inverterWarranty || "10 Years Replacement",
-                structure_brand: selectedQuoteForPdf.structureBrand || "Galvanized HDG High Rise",
-                structure_warranty: selectedQuoteForPdf.structureWarranty || "10 Years Structural",
-                components: [
-                  { category: "Solar PV Modules", brand: selectedQuoteForPdf.panelBrand || "Waaree", model: "550Wp Bifacial", specification: "ALMM Approved Tier-1", quantity: selectedQuoteForPdf.panelQuantity || 9, warranty: "25 Yrs" },
-                  { category: "Solar Inverter", brand: selectedQuoteForPdf.inverterBrand || "Growatt", model: "Grid-Tied IP65", specification: "Dual MPPT High Efficiency", quantity: 1, warranty: "10 Yrs" },
-                  { category: "Mounting Structure", brand: selectedQuoteForPdf.structureBrand || "Galvanized HDG", model: "High Rise", specification: "80+ Micron Galvanized", quantity: "1 Set", warranty: "10 Yrs" },
-                  { category: "Electrical Balance", brand: "Polycab / LAPP", model: "Solar DC 4sq.mm", specification: "ACDB/DCDB with Type-II SPD", quantity: "Complete", warranty: "5 Yrs" }
-                ],
-                scope_of_supply: selectedQuoteForPdf.scopeOfSupply || [
-                  "Tier-1 Solar PV Modules with ALMM Approval",
-                  "Grid-Tied String Inverter with Wi-Fi Remote Monitoring",
-                  "Hot-Dip Galvanized Module Mounting Structure",
-                  "AC Distribution Box & DC Distribution Box with SPDs",
-                  "Dual Dedicated Chemical Earthing & Lightning Protection",
-                  "MSEDCL Net Metering Liasoning, Inspection & Activation"
-                ],
-                pricing: [
-                  { description: `${selectedQuoteForPdf.systemCapacity || 5} kWp Solar Power Plant Equipment`, qty: 1, unit_price: Math.round((selectedQuoteForPdf.subtotal || selectedQuoteForPdf.total) * 0.8), amount: Math.round((selectedQuoteForPdf.subtotal || selectedQuoteForPdf.total) * 0.8) },
-                  { description: "Installation, Engineering, Liasoning & Commissioning", qty: 1, unit_price: Math.round((selectedQuoteForPdf.subtotal || selectedQuoteForPdf.total) * 0.2), amount: Math.round((selectedQuoteForPdf.subtotal || selectedQuoteForPdf.total) * 0.2) }
-                ],
-                subtotal: selectedQuoteForPdf.subtotal || selectedQuoteForPdf.total,
-                discount: selectedQuoteForPdf.discount || 0,
-                tax: selectedQuoteForPdf.tax || 0,
-                other_charges: 0,
-                grand_total: selectedQuoteForPdf.total,
-                indicative_subsidy: selectedQuoteForPdf.indicativeSubsidy || 0,
-                net_customer_cost: Math.max(0, (selectedQuoteForPdf.total || 0) - (selectedQuoteForPdf.indicativeSubsidy || 0)),
-                amount_in_words: "Total project payable amount",
-                current_monthly_bill: 8000,
-                estimated_monthly_bill: 1200,
-                annual_savings: selectedQuoteForPdf.annualSavings || 62050,
-                monthly_savings: selectedQuoteForPdf.monthlySavings || 5170,
-                payback_period: selectedQuoteForPdf.paybackYears || 4.4,
-                lifetime_savings: (selectedQuoteForPdf.annualSavings || 62050) * 25,
-                lifetime_generation: (selectedQuoteForPdf.annualGeneration || 7300) * 25 * 0.92,
-                co2_reduction: Math.round((selectedQuoteForPdf.annualGeneration || 7300) * 0.82),
-                treeEquivalent: Math.round(((selectedQuoteForPdf.annualGeneration || 7300) * 0.82) / 20),
-                peak_month: "May",
-                payment_terms: selectedQuoteForPdf.paymentMilestones || [
-                  { percentage: 20, amount: Math.round(selectedQuoteForPdf.total * 0.2), description: "Advance along with work order confirmation" },
-                  { percentage: 60, amount: Math.round(selectedQuoteForPdf.total * 0.6), description: "Upon delivery of panels, inverter & structure at site" },
-                  { percentage: 15, amount: Math.round(selectedQuoteForPdf.total * 0.15), description: "Upon installation & testing completion" },
-                  { percentage: 5, amount: Math.round(selectedQuoteForPdf.total * 0.05), description: "Upon MSEDCL Net Metering activation" }
-                ],
-                warranties: {
-                  modules: "25 Years OEM Performance",
-                  inverter: "10 Years Replacement Warranty",
-                  structure: "10 Years Structural Integrity",
-                  installation: "5 Years Workmanship Guarantee",
-                  other: "OEM Standard Terms"
-                },
-                included_terms: [
-                  "Complete installation and turnkey commissioning",
-                  "Net metering application filing with MSEDCL",
-                  "Site shadow assessment and engineering drawings"
-                ],
-                exclusions: [
-                  "Statutory MSEDCL processing and meter testing fees",
-                  "Major civil foundation or structural roof repairs",
-                  "AC cabling exceeding standard 25 meters"
-                ],
-                terms_and_conditions: [
-                  `Proposal valid for ${selectedQuoteForPdf.validityDays || 15} days from issue date.`,
-                  "Central government subsidy is credited directly by MNRE/DISCOM to the consumer account upon approval.",
-                  "Single/Three-phase power and roof access to be provided by the customer during execution."
-                ],
-                bankDetails: {
-                  account_name: "Apex Solar Energy Solutions Pvt Ltd",
-                  bank_name: "HDFC Bank Ltd",
-                  account_number: "50200088991234",
-                  ifsc: "HDFC0001234",
-                  upi_id: "apexsolar@hdfcbank"
-                }
-              }}
-            />
+      {/* DEDICATED WHATSAPP SHARE MODAL */}
+      {selectedQuoteForWhatsApp && (
+        <div className="fixed inset-0 z-50 bg-[#071A2B]/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-lg w-full p-6 sm:p-7 space-y-5 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+              <div className="flex items-center gap-2.5">
+                <span className="w-10 h-10 rounded-2xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center font-bold">
+                  <MessageSquare size={20} />
+                </span>
+                <div>
+                  <h3 className="font-black text-slate-900 text-base">Share Proposal via WhatsApp</h3>
+                  <p className="text-xs text-slate-500">Proposal No: <strong className="text-slate-800">{selectedQuoteForWhatsApp.qNumber}</strong></p>
+                </div>
+              </div>
+              <button 
+                type="button"
+                onClick={() => setSelectedQuoteForWhatsApp(null)}
+                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="space-y-4 text-xs">
+              {/* RECIPIENT PHONE */}
+              <div className="space-y-1.5">
+                <label className="font-extrabold text-slate-700 uppercase text-[11px] flex items-center justify-between">
+                  <span>Customer Mobile / WhatsApp *</span>
+                  <span className="text-[10px] text-slate-400 font-medium">Auto-prefixed +91</span>
+                </label>
+                <div className="flex items-center bg-slate-50 rounded-2xl border border-slate-200 px-3 py-2.5 focus-within:ring-2 focus-within:ring-emerald-500">
+                  <span className="font-bold text-slate-500 mr-2 text-xs">+91</span>
+                  <input
+                    type="tel"
+                    value={whatsAppPhone}
+                    onChange={e => setWhatsAppPhone(e.target.value.replace(/[^0-9]/g, ''))}
+                    placeholder="98220 12345"
+                    className="bg-transparent flex-1 font-bold text-slate-800 outline-none text-xs"
+                  />
+                </div>
+              </div>
+
+              {/* PITCH MESSAGE */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="font-extrabold text-slate-700 uppercase text-[11px]">Personalized Pitch Copy</label>
+                  <button
+                    type="button"
+                    onClick={handleCopyPitch}
+                    className="text-[11px] font-bold text-emerald-700 hover:text-emerald-800 flex items-center gap-1 cursor-pointer"
+                  >
+                    {copiedPitch ? <CheckCheck size={13} className="text-emerald-600" /> : <Copy size={13} />}
+                    {copiedPitch ? 'Copied to Clipboard!' : 'Copy Text'}
+                  </button>
+                </div>
+                <textarea
+                  rows={8}
+                  value={whatsAppText}
+                  onChange={e => setWhatsAppText(e.target.value)}
+                  className="w-full p-3.5 bg-slate-50 rounded-2xl border border-slate-200 text-xs font-medium text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500 resize-none font-sans leading-relaxed"
+                />
+              </div>
+
+              {/* QUICK STATS CHIPS */}
+              <div className="grid grid-cols-3 gap-2 py-1">
+                <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-center">
+                  <span className="text-[10px] text-slate-400 block font-semibold">Capacity</span>
+                  <strong className="text-slate-800 text-xs font-black">{selectedQuoteForWhatsApp.systemCapacity || 5} kWp</strong>
+                </div>
+                <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-center">
+                  <span className="text-[10px] text-slate-400 block font-semibold">Investment</span>
+                  <strong className="text-slate-800 text-xs font-black">₹{(selectedQuoteForWhatsApp.total || 0).toLocaleString()}</strong>
+                </div>
+                <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-center">
+                  <span className="text-[10px] text-emerald-800 block font-semibold">Net Outflow</span>
+                  <strong className="text-emerald-700 text-xs font-black">₹{Math.max(0, (selectedQuoteForWhatsApp.total || 0) - (selectedQuoteForWhatsApp.indicativeSubsidy || 0)).toLocaleString()}</strong>
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-2 flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setSelectedQuoteForWhatsApp(null)}
+                className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSendWhatsApp}
+                className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer"
+              >
+                <Send size={14} /> Open in WhatsApp
+              </button>
+            </div>
           </div>
         </div>
       )}

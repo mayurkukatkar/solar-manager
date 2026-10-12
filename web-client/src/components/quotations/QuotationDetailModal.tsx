@@ -17,8 +17,9 @@ interface DetailProps {
   onClose: () => void;
   quotation: any;
   onUpdate: () => void;
-  onDownloadPdf: (quote: any) => void;
+  onDownloadPdf?: (quote: any) => void;
   tenantInfo?: any;
+  initialTab?: 'overview' | 'preview' | 'milestones' | 'revisions';
 }
 
 export function QuotationDetailModal({ 
@@ -27,9 +28,10 @@ export function QuotationDetailModal({
   quotation, 
   onUpdate, 
   onDownloadPdf,
-  tenantInfo 
+  tenantInfo,
+  initialTab = 'overview'
 }: DetailProps) {
-  const [activeTab, setActiveTab] = useState<'overview' | 'preview' | 'milestones' | 'revisions'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'preview' | 'milestones' | 'revisions'>(initialTab);
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
   const [newStatus, setNewStatus] = useState<string>(quotation?.status || 'DRAFT');
 
@@ -47,13 +49,22 @@ export function QuotationDetailModal({
   const [whatsAppText, setWhatsAppText] = useState('');
   const [copiedPitch, setCopiedPitch] = useState(false);
 
+  // Sync initial tab and quotation changes
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab, quotation?.id]);
+
   // Initialize edit form data when quotation changes
   useEffect(() => {
     if (quotation) {
       setNewStatus(quotation.status || 'DRAFT');
       const client = quotation.customer || quotation.lead;
       const phone = client?.mobile || client?.phone || '';
-      setWhatsAppPhone(phone);
+      const rawDigits = phone.replace(/[^0-9]/g, '');
+      const normalizedPhone = rawDigits.startsWith('91') ? rawDigits.slice(2) : rawDigits.replace(/^0+/, '');
+      setWhatsAppPhone(normalizedPhone || phone);
 
       const tenantName = tenantInfo?.legalName || tenantInfo?.name || 'WhereReady Solar';
       const msg = `Dear ${client?.name || 'Valued Customer'},\n\nGreetings from *${tenantName}*!\n\nWe have prepared your personalized Solar Project Proposal for *${quotation.systemCapacity || 5} kWp Rooftop System*.\n\n*Proposal Highlights:*\n• System Capacity: ${quotation.systemCapacity || 5} kWp (${quotation.systemType || 'On-grid'})\n• Total Investment: ₹${(quotation.total || 0).toLocaleString()}\n• Est. Annual Savings: ₹${(quotation.annualSavings || Math.round((quotation.systemCapacity || 5) * 1460 * 8.5)).toLocaleString()}\n${quotation.indicativeSubsidy > 0 ? `• Indicative Central Subsidy: ₹${quotation.indicativeSubsidy.toLocaleString()}\n• Net Outflow: ₹${Math.max(0, (quotation.total || 0) - quotation.indicativeSubsidy).toLocaleString()}\n` : ''}• Proposal No: ${quotation.qNumber}\n• Valid Until: ${quotation.validityDays || 15} Days\n\nPlease review your complete proposal. Feel free to contact us for any technical or commercial queries!\n\nBest Regards,\n*${tenantName}*\nPhone: ${tenantInfo?.phone || '+91 98220 12345'}`;
@@ -215,8 +226,10 @@ export function QuotationDetailModal({
 
   // Handle WhatsApp Link Open
   const handleWhatsAppOpen = async () => {
-    const cleanPhone = whatsAppPhone.replace(/[^0-9]/g, '');
-    const url = `https://wa.me/${cleanPhone.startsWith('91') ? cleanPhone : '91' + cleanPhone}?text=${encodeURIComponent(whatsAppText)}`;
+    const rawDigits = whatsAppPhone.replace(/[^0-9]/g, '');
+    const cleanDigits = rawDigits.startsWith('91') ? rawDigits : rawDigits.replace(/^0+/, '');
+    const finalPhone = cleanDigits.startsWith('91') ? cleanDigits : (cleanDigits ? '91' + cleanDigits : '');
+    const url = `https://wa.me/${finalPhone}?text=${encodeURIComponent(whatsAppText)}`;
     window.open(url, '_blank');
 
     // Mark as sent if draft
@@ -464,10 +477,26 @@ export function QuotationDetailModal({
                   <History size={14} /> Revise (v{(quotation.version || 1) + 1})
                 </button>
                 <button
-                  onClick={() => onDownloadPdf(quotation)}
+                  onClick={async () => {
+                    setActiveTab('preview');
+                    setTimeout(async () => {
+                      try {
+                        setLoadingAction('pdf');
+                        const filename = `Proposal_${quotation.qNumber || 'QT'}.pdf`;
+                        const { generatePDF } = await import('@/components/pdf/QuotationPDF');
+                        await generatePDF('detail-modal-pdf-content', filename);
+                      } catch (err) {
+                        console.error('PDF generation fallback to print:', err);
+                        window.print();
+                      } finally {
+                        setLoadingAction(null);
+                      }
+                    }, 350);
+                  }}
+                  disabled={loadingAction === 'pdf'}
                   className="px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-colors"
                 >
-                  <Download size={14} /> Download PDF
+                  <Download size={14} /> {loadingAction === 'pdf' ? 'Generating...' : 'Download PDF'}
                 </button>
                 <button
                   onClick={() => setShowWhatsAppModal(true)}
@@ -931,22 +960,35 @@ export function QuotationDetailModal({
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => window.print()}
-                    className="px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl font-bold flex items-center gap-1.5 shadow-sm transition-colors"
+                    className="px-3.5 py-2 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl font-bold flex items-center gap-1.5 shadow-sm transition-colors text-xs"
                   >
-                    <Printer size={14} /> Print
+                    <Printer size={14} /> Print / Save PDF
                   </button>
                   <button
-                    onClick={() => onDownloadPdf(quotation)}
-                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold flex items-center gap-1.5 shadow-sm transition-colors"
+                    onClick={async () => {
+                      try {
+                        setLoadingAction('pdfPreview');
+                        const filename = `Proposal_${quotation.qNumber || 'QT'}.pdf`;
+                        const { generatePDF } = await import('@/components/pdf/QuotationPDF');
+                        await generatePDF('detail-modal-pdf-content', filename);
+                      } catch (err) {
+                        console.error(err);
+                        window.print();
+                      } finally {
+                        setLoadingAction(null);
+                      }
+                    }}
+                    disabled={loadingAction === 'pdfPreview'}
+                    className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold flex items-center gap-1.5 shadow-sm transition-colors text-xs"
                   >
-                    <Download size={14} /> Download PDF
+                    <Download size={14} /> {loadingAction === 'pdfPreview' ? 'Downloading...' : 'Download PDF'}
                   </button>
                 </div>
               </div>
 
               {/* RENDERED PREVIEW CONTAINER */}
               <div className="border border-slate-200 rounded-3xl overflow-hidden shadow-inner bg-slate-100 p-4 sm:p-6 flex justify-center max-h-[620px] overflow-y-auto">
-                <div className="w-full max-w-[850px] shadow-2xl rounded-2xl overflow-hidden bg-white">
+                <div id="detail-modal-pdf-content" className="w-full max-w-[850px] shadow-2xl rounded-2xl overflow-hidden bg-white">
                   <QuotationPDF data={pdfProposalData} />
                 </div>
               </div>
