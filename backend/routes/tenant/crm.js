@@ -51,8 +51,8 @@ router.get('/api/tenant/leads', requireTenantAuth, async (req, res) => {
       include: {
         assignee: true,
         customer: true,
-        projects: { select: { id: true, name: true, status: true, systemCapacity: true } },
-        quotations: { select: { id: true, quoteNumber: true, totalAmount: true, status: true } }
+        projects: { select: { id: true, name: true, status: true, capacity: true } },
+        quotations: { select: { id: true, qNumber: true, total: true, status: true } }
       },
       orderBy: { createdAt: 'desc' }
     });
@@ -1553,11 +1553,11 @@ router.get(['/api/tenant/customers', '/api/tenant/crm/customers'], requireTenant
       orderBy: { createdAt: 'desc' },
       include: {
         lead: true,
-        projects: { select: { id: true, name: true, status: true, systemCapacity: true, contractPrice: true, executionStage: true } },
-        quotations: { select: { id: true, quoteNumber: true, totalAmount: true, status: true } },
-        invoices: { select: { id: true, invoiceNumber: true, totalAmount: true, status: true } },
+        projects: { select: { id: true, name: true, status: true, capacity: true, estimatedValue: true, currentStage: true } },
+        quotations: { select: { id: true, qNumber: true, total: true, status: true } },
+        invoices: { select: { id: true, invoiceNumber: true, amount: true, status: true } },
         amcs: { select: { id: true, contractNumber: true, status: true } },
-        tickets: { select: { id: true, ticketNumber: true, status: true } }
+        tickets: { select: { id: true, subject: true, status: true } }
       }
     });
     res.json({ customers });

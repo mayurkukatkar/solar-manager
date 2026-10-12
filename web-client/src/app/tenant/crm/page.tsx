@@ -95,8 +95,8 @@ export default function CRMHub() {
     customers.forEach(c => {
       if (c.projects && c.projects.length > 0) {
         c.projects.forEach((p: any) => {
-          totalKw += p.systemCapacity || 0;
-          totalRevenue += p.contractPrice || 0;
+          totalKw += p.capacity || p.systemCapacity || 0;
+          totalRevenue += p.estimatedValue || p.contractPrice || 0;
         });
       }
       if (c.amcs && c.amcs.length > 0) {
@@ -426,7 +426,7 @@ export default function CRMHub() {
                           </span>
                           {primaryProject ? (
                             <span className="font-black text-slate-900">
-                              {primaryProject.systemCapacity ? `${primaryProject.systemCapacity} kWp` : '5 kWp On-grid'}
+                              {(primaryProject.capacity || primaryProject.systemCapacity) ? `${primaryProject.capacity || primaryProject.systemCapacity} kWp` : '5 kWp On-grid'}
                             </span>
                           ) : (
                             <span className="text-slate-400 font-medium">Direct Account</span>
@@ -592,7 +592,7 @@ export default function CRMHub() {
                                     {primaryProject.name}
                                   </span>
                                   <span className="px-1.5 py-0.5 rounded text-[10px] font-black bg-amber-50 text-amber-800 border border-amber-200">
-                                    {primaryProject.systemCapacity ? `${primaryProject.systemCapacity} kWp` : '5 kWp'}
+                                    {(primaryProject.capacity || primaryProject.systemCapacity) ? `${primaryProject.capacity || primaryProject.systemCapacity} kWp` : '5 kWp'}
                                   </span>
                                 </div>
                                 <span className="text-[11px] text-blue-600 font-semibold block">
