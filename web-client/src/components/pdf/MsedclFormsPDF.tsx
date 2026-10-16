@@ -111,16 +111,21 @@ export const printHtmlElement = (elementId: string) => {
     return;
   }
 
-  // Create an isolated hidden iframe with true A4 dimensions off-screen
+  // Remove any previously created print iframe
+  const oldIframe = document.getElementById("discom-isolated-print-iframe");
+  if (oldIframe) {
+    oldIframe.remove();
+  }
+
+  // Create an isolated iframe positioned off-screen to the left (NOT opacity 0, NOT -99999px)
   const iframe = document.createElement("iframe");
+  iframe.id = "discom-isolated-print-iframe";
   iframe.style.position = "fixed";
-  iframe.style.top = "-99999px";
-  iframe.style.left = "-99999px";
+  iframe.style.left = "-3000px";
+  iframe.style.top = "0";
   iframe.style.width = "210mm";
   iframe.style.height = "297mm";
   iframe.style.border = "none";
-  iframe.style.opacity = "0";
-  iframe.style.pointerEvents = "none";
   iframe.style.zIndex = "-9999";
   document.body.appendChild(iframe);
 
@@ -131,8 +136,15 @@ export const printHtmlElement = (elementId: string) => {
   }
 
   // Extract all loaded styles & link stylesheets from parent window
-  const styleElements = Array.from(document.querySelectorAll("style, link[rel='stylesheet']"));
-  const collectedStyles = styleElements.map((el) => el.outerHTML).join("\n");
+  const links = Array.from(document.querySelectorAll("link[rel='stylesheet']"))
+    .map((el) => el.outerHTML)
+    .join("\n");
+  
+  // Filter out any style that has conflicting visibility: hidden
+  const styles = Array.from(document.querySelectorAll("style"))
+    .filter((el) => !el.innerHTML.includes("visibility: hidden") && !el.innerHTML.includes("discom-live-preview-content"))
+    .map((el) => el.outerHTML)
+    .join("\n");
 
   const html = `<!DOCTYPE html>
 <html>
@@ -140,11 +152,19 @@ export const printHtmlElement = (elementId: string) => {
   <meta charset="utf-8" />
   <base href="${typeof window !== 'undefined' ? window.location.origin : ''}" />
   <title>Official Solar Statutory Document</title>
-  ${collectedStyles}
+  ${links}
+  ${styles}
   <style>
     @page {
       size: A4 portrait;
-      margin: 0 !important;
+      margin: 0mm !important;
+    }
+    *, *::before, *::after {
+      box-sizing: border-box !important;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+      visibility: visible !important;
+      opacity: 1 !important;
     }
     html, body {
       margin: 0 !important;
@@ -153,15 +173,13 @@ export const printHtmlElement = (elementId: string) => {
       color: #000000 !important;
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;
-      width: 100% !important;
+      width: 210mm !important;
+      visibility: visible !important;
+      opacity: 1 !important;
     }
-    * {
-      box-shadow: none !important;
-      -webkit-print-color-adjust: exact !important;
-      print-color-adjust: exact !important;
-      box-sizing: border-box !important;
-    }
-    .page-break-after-always, [style*="page-break-after: always"] {
+    .page-break-after-always, 
+    [style*="page-break-after: always"],
+    [style*="break-after: page"] {
       page-break-after: always !important;
       break-after: page !important;
     }
@@ -174,7 +192,7 @@ export const printHtmlElement = (elementId: string) => {
   </style>
 </head>
 <body style="margin: 0; padding: 0; background: #ffffff; color: #000000;">
-  <div style="width: 210mm; margin: 0 auto; background: #ffffff;">
+  <div id="${elementId}" class="${element.className}" style="width: 210mm; margin: 0 auto; background: #ffffff; visibility: visible !important; opacity: 1 !important;">
     ${element.innerHTML}
   </div>
 </body>
@@ -184,6 +202,7 @@ export const printHtmlElement = (elementId: string) => {
   doc.write(html);
   doc.close();
 
+  // Give enough time for fonts & styles to compute
   setTimeout(() => {
     try {
       iframe.contentWindow?.focus();
@@ -196,9 +215,9 @@ export const printHtmlElement = (elementId: string) => {
         if (document.body.contains(iframe)) {
           document.body.removeChild(iframe);
         }
-      }, 3000);
+      }, 5000);
     }
-  }, 450);
+  }, 500);
 };
 
 // ============================================================================

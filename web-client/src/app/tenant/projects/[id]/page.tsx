@@ -2048,29 +2048,6 @@ export default function ProjectDetails() {
                 </div>
               </div>
             </div>
-
-            {/* Print Isolation Styles for DISCOM Studio */}
-            <style dangerouslySetInnerHTML={{ __html: `
-              @media print {
-                body > * {
-                  visibility: hidden !important;
-                }
-                #discom-live-preview-content,
-                #discom-live-preview-content * {
-                  visibility: visible !important;
-                }
-                #discom-live-preview-content {
-                  position: absolute !important;
-                  left: 0 !important;
-                  top: 0 !important;
-                  width: 210mm !important;
-                  margin: 0 !important;
-                  padding: 0 !important;
-                  background: white !important;
-                  box-shadow: none !important;
-                }
-              }
-            ` }} />
           </div>
         </div>
       )}
