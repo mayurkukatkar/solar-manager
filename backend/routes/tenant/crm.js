@@ -1143,6 +1143,7 @@ router.get('/api/tenant/projects/:id', requireTenantAuth, async (req, res) => {
     const project = await prisma.project.findUnique({
       where: { id: req.params.id, tenantId: req.user.tenantId },
       include: {
+        tenant: true,
         customer: true,
         lead: true,
         quotation: { 

@@ -14,6 +14,7 @@ import Link from 'next/link';
 import { QuotationWizardModal } from '@/components/quotations/QuotationWizardModal';
 import { QuotationDetailModal } from '@/components/quotations/QuotationDetailModal';
 import { QuotationPDF, QuotationData, mapQuotationToPdfData, generatePDF } from '@/components/pdf/QuotationPDF';
+import { StandardQuotationPDF } from '@/components/pdf/MsedclFormsPDF';
 
 export default function QuotationsPage() {
   const [quotations, setQuotations] = useState<any[]>([]);
@@ -31,6 +32,7 @@ export default function QuotationsPage() {
   // DIRECT PDF DOWNLOAD STATE
   const [downloadingQuoteId, setDownloadingQuoteId] = useState<string | null>(null);
   const [downloadingQuoteData, setDownloadingQuoteData] = useState<QuotationData | null>(null);
+  const [downloadingStandardQuoteData, setDownloadingStandardQuoteData] = useState<any | null>(null);
 
   // FILTERS & SEARCH
   const [searchTerm, setSearchTerm] = useState('');
@@ -202,6 +204,43 @@ export default function QuotationsPage() {
     } finally {
       setDownloadingQuoteId(null);
       setDownloadingQuoteData(null);
+    }
+  };
+
+  // DIRECT 1-PAGE OFFICIAL QUOTATION DOWNLOAD (DISCOM FORMAT)
+  const handleDirectDownloadStandardQuote = async (quote: any, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    try {
+      setDownloadingQuoteId(quote.id + '_standard');
+      const standardData = {
+        company_name: tenantInfo?.legalName || tenantInfo?.name || "Ekvarta Energy Solutions",
+        gstin: tenantInfo?.gstin || "27DTXPM6427E1Z3",
+        quotation_date: quote.date ? new Date(quote.date).toLocaleDateString() : new Date().toLocaleDateString(),
+        quotation_number: quote.qNumber || "EES/2026/031",
+        customer_name: (quote.customer?.name || quote.lead?.name || "RAVI DODKUJI KAWALE").toUpperCase(),
+        consumer_number: quote.consumerNumber || quote.customer?.consumerNumber || "413472965142",
+        panel_brand: quote.panelBrand || "Adani",
+        panel_wattage: quote.panelWattage || 550,
+        panel_quantity: quote.panelQuantity || 8,
+        inverter_brand: quote.inverterBrand || "Polycab",
+        inverter_capacity: quote.inverterCapacity || quote.systemCapacity || 4.3,
+        inverter_quantity: quote.inverterQuantity || 1,
+        structure_brand: quote.structureBrand || "GI Structure",
+        grand_total: quote.total || 245000,
+        signatureUrl: tenantInfo?.signatureUrl
+      };
+      setDownloadingStandardQuoteData(standardData);
+
+      await new Promise(r => setTimeout(r, 350));
+      const filename = `Quotation_${quote.qNumber || 'QT'}.pdf`;
+      const { generateDiscomPDF } = await import('@/components/pdf/MsedclFormsPDF');
+      await generateDiscomPDF('page-direct-standard-quote-generator', filename);
+    } catch (err) {
+      console.error('Direct Standard Quotation generation error:', err);
+      handleOpenPreviewPdf(quote);
+    } finally {
+      setDownloadingQuoteId(null);
+      setDownloadingStandardQuoteData(null);
     }
   };
 
@@ -611,10 +650,25 @@ export default function QuotationsPage() {
                             </Link>
                           ) : null}
 
+                          {/* ACTION 0: DIRECT DOWNLOAD OFFICIAL 1-PAGE QUOTATION */}
+                          <button
+                            type="button"
+                            title="Download Official 1-Page Quotation (DISCOM & Submission Format)"
+                            disabled={downloadingQuoteId === quote.id + '_standard'}
+                            onClick={(e) => handleDirectDownloadStandardQuote(quote, e)}
+                            className="p-2 text-slate-400 hover:text-emerald-600 rounded-xl hover:bg-emerald-50 transition-colors cursor-pointer disabled:opacity-50"
+                          >
+                            {downloadingQuoteId === quote.id + '_standard' ? (
+                              <Loader2 size={16} className="animate-spin text-emerald-600" />
+                            ) : (
+                              <FileText size={16} />
+                            )}
+                          </button>
+
                           {/* ACTION 1: DIRECT DOWNLOAD A4 PROPOSAL PDF */}
                           <button
                             type="button"
-                            title="Download Proposal PDF (1-Click)"
+                            title="Download Full Proposal PDF (18 Pages)"
                             disabled={downloadingQuoteId === quote.id}
                             onClick={(e) => handleDirectDownloadPdf(quote, e)}
                             className="p-2 text-slate-400 hover:text-emerald-600 rounded-xl hover:bg-emerald-50 transition-colors cursor-pointer disabled:opacity-50"
@@ -844,6 +898,23 @@ export default function QuotationsPage() {
         >
           <div id="page-direct-pdf-generator" className="bg-white">
             <QuotationPDF data={downloadingQuoteData} />
+          </div>
+        </div>
+      )}
+
+      {downloadingStandardQuoteData && (
+        <div
+          style={{
+            position: 'absolute',
+            left: '-9999px',
+            top: 0,
+            width: '794px',
+            background: '#ffffff',
+            zIndex: -9999
+          }}
+        >
+          <div id="page-direct-standard-quote-generator" className="bg-white">
+            <StandardQuotationPDF data={downloadingStandardQuoteData} />
           </div>
         </div>
       )}

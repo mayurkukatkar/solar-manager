@@ -11,6 +11,7 @@ import {
   Package, Layers, Sparkles, Loader2
 } from 'lucide-react';
 import { QuotationPDF, QuotationData, mapQuotationToPdfData, generatePDF } from '@/components/pdf/QuotationPDF';
+import { StandardQuotationPDF } from '@/components/pdf/MsedclFormsPDF';
 
 interface DetailProps {
   isOpen: boolean;
@@ -32,6 +33,7 @@ export function QuotationDetailModal({
   initialTab = 'overview'
 }: DetailProps) {
   const [activeTab, setActiveTab] = useState<'overview' | 'preview' | 'milestones' | 'revisions'>(initialTab);
+  const [previewFormat, setPreviewFormat] = useState<'standard' | 'proposal'>('standard');
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
   const [newStatus, setNewStatus] = useState<string>(quotation?.status || 'DRAFT');
 
@@ -830,25 +832,56 @@ export function QuotationDetailModal({
           {/* TAB 2: IN-APP LIVE PROPOSAL PREVIEW (A4) */}
           {activeTab === 'preview' && (
             <div className="space-y-4">
-              <div className="flex items-center justify-between bg-slate-50 p-4 rounded-2xl border border-slate-200 text-xs">
-                <div>
-                  <p className="font-bold text-slate-800">Live Rendered Proposal Document</p>
-                  <p className="text-slate-500 text-[11px]">Visual representation of the proposal as presented to the customer.</p>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between bg-slate-50 p-4 rounded-2xl border border-slate-200 text-xs gap-3">
+                {/* Format Switcher */}
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-slate-700 mr-1">Format:</span>
+                  <button
+                    type="button"
+                    onClick={() => setPreviewFormat('standard')}
+                    className={`px-3 py-1.5 rounded-lg font-bold transition-all text-xs flex items-center gap-1.5 ${
+                      previewFormat === 'standard'
+                        ? 'bg-emerald-600 text-white shadow-sm'
+                        : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'
+                    }`}
+                  >
+                    <FileText size={13} />
+                    <span>Official 1-Page Quotation</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPreviewFormat('proposal')}
+                    className={`px-3 py-1.5 rounded-lg font-bold transition-all text-xs flex items-center gap-1.5 ${
+                      previewFormat === 'proposal'
+                        ? 'bg-emerald-600 text-white shadow-sm'
+                        : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'
+                    }`}
+                  >
+                    <Sparkles size={13} />
+                    <span>18-Page Sales Proposal</span>
+                  </button>
                 </div>
+
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => window.print()}
-                    className="px-3.5 py-2 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl font-bold flex items-center gap-1.5 shadow-sm transition-colors text-xs"
+                    className="px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl font-bold flex items-center gap-1.5 shadow-sm transition-colors text-xs"
                   >
-                    <Printer size={14} /> Print / Save PDF
+                    <Printer size={13} /> Print
                   </button>
                   <button
                     onClick={async () => {
                       try {
                         setLoadingAction('pdfPreview');
-                        const filename = `Proposal_${quotation.qNumber || 'QT'}.pdf`;
-                        const { generatePDF } = await import('@/components/pdf/QuotationPDF');
-                        await generatePDF('detail-modal-pdf-content', filename);
+                        if (previewFormat === 'standard') {
+                          const filename = `Quotation_${quotation.qNumber || 'QT'}.pdf`;
+                          const { generateDiscomPDF } = await import('@/components/pdf/MsedclFormsPDF');
+                          await generateDiscomPDF('detail-modal-standard-quote-content', filename);
+                        } else {
+                          const filename = `Proposal_${quotation.qNumber || 'QT'}.pdf`;
+                          const { generatePDF } = await import('@/components/pdf/QuotationPDF');
+                          await generatePDF('detail-modal-pdf-content', filename);
+                        }
                       } catch (err) {
                         console.error(err);
                         window.print();
@@ -857,18 +890,42 @@ export function QuotationDetailModal({
                       }
                     }}
                     disabled={loadingAction === 'pdfPreview'}
-                    className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold flex items-center gap-1.5 shadow-sm transition-colors text-xs"
+                    className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold flex items-center gap-1.5 shadow-sm transition-colors text-xs"
                   >
-                    <Download size={14} /> {loadingAction === 'pdfPreview' ? 'Downloading...' : 'Download PDF'}
+                    <Download size={13} /> {loadingAction === 'pdfPreview' ? 'Downloading...' : 'Download PDF'}
                   </button>
                 </div>
               </div>
 
               {/* RENDERED PREVIEW CONTAINER */}
-              <div className="border border-slate-200 rounded-3xl overflow-hidden shadow-inner bg-slate-100 p-4 sm:p-6 flex justify-center max-h-[620px] overflow-y-auto">
-                <div id="detail-modal-pdf-content" className="w-full max-w-[850px] shadow-2xl rounded-2xl overflow-hidden bg-white">
-                  <QuotationPDF data={pdfProposalData} />
-                </div>
+              <div className="border border-slate-200 rounded-3xl overflow-hidden shadow-inner bg-slate-200/80 p-4 sm:p-6 flex justify-center max-h-[640px] overflow-y-auto">
+                {previewFormat === 'standard' ? (
+                  <div id="detail-modal-standard-quote-content" className="w-full max-w-[210mm] shadow-2xl rounded-sm overflow-hidden bg-white">
+                    <StandardQuotationPDF 
+                      data={{
+                        company_name: tenantInfo?.legalName || tenantInfo?.name || "Ekvarta Energy Solutions",
+                        gstin: tenantInfo?.gstin || "27DTXPM6427E1Z3",
+                        quotation_date: quotation.date ? new Date(quotation.date).toLocaleDateString() : new Date().toLocaleDateString(),
+                        quotation_number: quotation.qNumber || "EES/2026/031",
+                        customer_name: (quotation.customer?.name || quotation.lead?.name || "RAVI DODKUJI KAWALE").toUpperCase(),
+                        consumer_number: quotation.consumerNumber || quotation.customer?.consumerNumber || "413472965142",
+                        panel_brand: quotation.panelBrand || "Adani",
+                        panel_wattage: quotation.panelWattage || 550,
+                        panel_quantity: quotation.panelQuantity || 8,
+                        inverter_brand: quotation.inverterBrand || "Polycab",
+                        inverter_capacity: quotation.inverterCapacity || quotation.systemCapacity || 4.3,
+                        inverter_quantity: quotation.inverterQuantity || 1,
+                        structure_brand: quotation.structureBrand || "GI Structure",
+                        grand_total: quotation.total || 245000,
+                        signatureUrl: tenantInfo?.signatureUrl
+                      }} 
+                    />
+                  </div>
+                ) : (
+                  <div id="detail-modal-pdf-content" className="w-full max-w-[850px] shadow-2xl rounded-2xl overflow-hidden bg-white">
+                    <QuotationPDF data={pdfProposalData} />
+                  </div>
+                )}
               </div>
             </div>
           )}

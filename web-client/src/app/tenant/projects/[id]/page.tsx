@@ -8,9 +8,19 @@ import {
   CheckSquare, Flag, Box, History, DollarSign, Activity, Settings, Plus,
   CheckCircle2, Clock, AlertTriangle, MessageSquare, Trash2, FileText, Download, Wrench, ShieldCheck,
   ChevronRight, ExternalLink, Phone, MessageCircle, Sun, Award, TrendingUp, Sparkles, Check, ArrowRight,
-  RefreshCw, Layers
+  RefreshCw, Layers, Eye, Printer, Edit3, X
 } from 'lucide-react';
-import { WorkCompletionReport, GuaranteeCertificate, DcrDeclaration, AnnexureProforma, NetMeteringAgreement } from '@/components/pdf/MsedclFormsPDF';
+import { 
+  WorkCompletionReport, 
+  CommissioningCertificate, 
+  DcrUndertaking, 
+  WcrFullPack, 
+  NetMeteringAgreement2019, 
+  Annexure2ConsumerVendorAgreement, 
+  StandardQuotationPDF, 
+  GuaranteeCertificate,
+  toIndianWords
+} from '@/components/pdf/MsedclFormsPDF';
 
 export default function ProjectDetails() {
   const params = useParams();
@@ -30,8 +40,13 @@ export default function ProjectDetails() {
   const [showTicketModal, setShowTicketModal] = useState(false);
   const [newTicket, setNewTicket] = useState({ subject: '', description: '', priority: 'MEDIUM' });
 
+  // DISCOM GENERATION & PREVIEW MODAL STATE
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [selectedForm, setSelectedForm] = useState<string | null>(null);
+  const [showDiscomModal, setShowDiscomModal] = useState(false);
+  const [previewDocId, setPreviewDocId] = useState<string>('WCR_FULL');
+  const [includeStampGraphic, setIncludeStampGraphic] = useState(true);
+  const [discomCustomOverrides, setDiscomCustomOverrides] = useState<any>({});
 
   const STAGES = [
     { id: 'Planning', label: 'Planning', percent: 15, desc: 'Roof survey & permits' },
@@ -43,13 +58,90 @@ export default function ProjectDetails() {
     { id: 'Completed', label: 'Completed', percent: 100, desc: 'Commissioned & AMC active' }
   ];
 
-  const handleDownloadForm = (formType: string) => {
+  const getDiscomFormData = (overrides: any = {}) => {
+    const cust = project?.customer || project?.lead;
+    const quote = project?.quotation;
+    const tenant = project?.tenant;
+    const cap = project?.capacity || quote?.systemCapacity || 3.3;
+    const appliedCap = Number(cap).toFixed(3);
+    const moduleWatt = quote?.panelWattage || 535;
+    const moduleQty = quote?.panelQuantity || Math.ceil((Number(cap) * 1000) / moduleWatt);
+    const installedCap = ((moduleQty * moduleWatt) / 1000).toFixed(3);
+    const totalAmount = quote?.total || project?.estimatedValue || 245000;
+
+    return {
+      beneficiaryName: cust?.name || "SHRI. SURENDRA RAMBHAU THAKRE",
+      customerName: cust?.name || "SHRI. SURENDRA RAMBHAU THAKRE",
+      consumerNumber: cust?.consumerNumber || cust?.caNumber || project?.consumerNumber || "410022120526",
+      consumerAccountNo: cust?.consumerNumber || cust?.caNumber || project?.consumerNumber || "410022120526",
+      applicationRefNo: project?.subsidies?.[0]?.nationalPortalAppNo || project?.discomApplication?.applicationNo || "NP-MHSED26-11317031",
+      nationalPortalAppNo: project?.subsidies?.[0]?.nationalPortalAppNo || "NP-MHSED26-11317031",
+      applicationDate: project?.startDate ? new Date(project.startDate).toLocaleDateString() : "08-04-2026",
+      commissioningDate: project?.actualCompletionDate ? new Date(project.actualCompletionDate).toLocaleDateString() : "09-10-2026",
+      agreementDay: String(new Date().getDate()).padStart(2, '0'),
+      agreementMonth: new Date().toLocaleString('default', { month: 'short' }).toUpperCase(),
+      agreementYear: String(new Date().getFullYear()),
+      agreementCity: project?.city || "NAGPUR",
+      mobileNo: cust?.mobile || cust?.phone || "8605849639",
+      customerMobile: cust?.mobile || cust?.phone || "8605849639",
+      email: cust?.email || "thakresurendra933@gmail.com",
+      category: cust?.customerType || "Residential",
+      address: project?.installationAddress || cust?.address || "PLOT NO 87 NAVIN NAGAR LIKKLYAN HOUS. SOC. NAGPUR",
+      city: project?.city || "Nagpur",
+      district: project?.city || "Nagpur",
+      state: project?.state || "MAHARASHTRA",
+      pincode: project?.pincode || "440008",
+      sanctionedLoad: "1.000",
+      appliedCapacity: appliedCap,
+      capacity: cap,
+      installedCapacity: installedCap,
+      systemType: quote?.systemType || "Grid-Tied Rooftop Solar PV System",
+      moduleMake: quote?.panelBrand || "ADANI SOLAR",
+      moduleManufacturer: "MUNDRA SOLAR PV LIMITED (ADANI SOLAR)",
+      cellManufacturer: "MUNDRA SOLAR PV LIMITED (ADANI SOLAR)",
+      moduleWattage: moduleWatt,
+      moduleQuantity: moduleQty,
+      inverterMake: quote?.inverterBrand || "Grid-Tied",
+      inverterCapacity: quote?.inverterCapacity || appliedCap,
+      inverterBrand: quote?.inverterBrand || "Polycab",
+      inverterQuantity: quote?.inverterQuantity || 1,
+      phase: quote?.phase || "Single Phase",
+      structureBrand: quote?.structureBrand || "GI Structure",
+      earthingProtection: "Separate AC, DC & LA Earthing provided as per MNRE standards",
+      vendorName: tenant?.legalName || tenant?.name || "EKVARTA ENERGY SOLUTIONS",
+      vendorAddress: tenant?.address || "PLOT NO 4 HOUSE NO 85, TAJ HOUSING SOCIETY, HUDKESHWAR ROAD, PIPLA FATA",
+      vendorCity: tenant?.city || "Nagpur",
+      vendorState: tenant?.state || "Maharashtra",
+      vendorPincode: tenant?.pincode || "440034",
+      gstin: tenant?.gstin || "27DTXPM6427E1Z3",
+      quotationNumber: quote?.qNumber || `EES/${new Date().getFullYear()}/${project?.projectNumber || '031'}`,
+      quotationDate: quote?.date ? new Date(quote.date).toLocaleDateString() : new Date().toLocaleDateString(),
+      total: totalAmount,
+      grand_total: totalAmount,
+      amount_in_words_custom: toIndianWords(totalAmount),
+      signatureUrl: tenant?.signatureUrl,
+      customerSignature: project?.customerSignatureUrl,
+      subDivision: `${project?.city || 'NAGPUR'} S/DN`,
+      witness1: cust?.name || "SURENDRA RAMBHAU THAKRE",
+      witness2: "RAMBHAU THAKRE",
+      moduleSerialNumbers: [
+        "MS2608211A3882", "MS2608211A3908", "MS2608211A4160",
+        "MS2608211A4181", "MS2608211A4247", "MS2608211A4462"
+      ],
+      ...overrides
+    };
+  };
+
+  const handleDownloadForm = (formType: string, customData?: any) => {
     setSelectedForm(formType);
+    if (customData) {
+      setDiscomCustomOverrides((prev: any) => ({ ...prev, ...customData }));
+    }
     setIsGeneratingPDF(true);
     setTimeout(async () => {
       try {
         const { generateDiscomPDF } = await import('@/components/pdf/MsedclFormsPDF');
-        await generateDiscomPDF(`discom-${formType}`, `${project.projectNumber}_${formType}.pdf`);
+        await generateDiscomPDF(`discom-${formType}`, `${project?.projectNumber || 'Project'}_${formType}.pdf`);
       } catch (err) {
         console.error(err);
         alert('Failed to generate PDF');
@@ -1302,40 +1394,132 @@ export default function ProjectDetails() {
           {/* DISCOM FORMS TAB */}
           {activeTab === 'DISCOM' && (
             <div className="animate-in fade-in duration-300 h-full flex flex-col">
-              <div className="p-5 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+              <div className="p-6 border-b border-slate-100 bg-gradient-to-r from-emerald-50/60 via-slate-50 to-white flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
-                  <h2 className="font-bold text-slate-800">MSEDCL Discom Forms</h2>
-                  <p className="text-xs text-slate-500 mt-0.5">Auto-generated official forms pre-filled with project data.</p>
+                  <div className="flex items-center gap-2">
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-600 text-white">
+                      MSEDCL &amp; PM Surya Ghar
+                    </span>
+                    <span className="text-xs text-slate-500 font-medium">Official DISCOM Compliance Suite</span>
+                  </div>
+                  <h2 className="font-extrabold text-xl text-slate-900 mt-1">Official Statutory Documents &amp; Agreements</h2>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Pre-filled with consumer, technical and vendor credentials. Click Preview &amp; Edit to adjust serial numbers or stamp paper settings.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      setPreviewDocId('WCR_FULL');
+                      setShowDiscomModal(true);
+                    }}
+                    className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-sm flex items-center gap-2 transition-all hover:scale-105"
+                  >
+                    <Eye size={15} />
+                    <span>Open Document Studio</span>
+                  </button>
                 </div>
               </div>
+
               <div className="p-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                   {[
-                    { id: 'WCR', name: 'Work Completion Report (WCR)', desc: 'Official report for completed solar plant' },
-                    { id: 'AnnexureI', name: 'Annexure-I & Proforma-A', desc: 'Provisional Commissioning Report' },
-                    { id: 'DCR', name: 'DCR Declaration', desc: 'Domestic Content Requirement fulfillment' },
-                    { id: 'Guarantee', name: 'Guarantee Certificate', desc: '5-year comprehensive maintenance contract' },
-                    { id: 'NetMetering', name: 'Net Metering Agreement', desc: 'MSEDCL Net Metering Connection Agreement' },
+                    { 
+                      id: 'WCR_FULL', 
+                      name: 'Work Completion Report Pack', 
+                      pages: '3 Pages Dossier',
+                      tag: 'MSEDCL Mandatory',
+                      tagColor: 'bg-emerald-100 text-emerald-800 border-emerald-300',
+                      desc: 'Full 3-page pack: WCR + Annexure I (Commissioning) + Annexure A (DCR with Serial Numbers).' 
+                    },
+                    { 
+                      id: 'NetMetering', 
+                      name: 'Net Metering Agreement (Annexure 3)', 
+                      pages: '6 Pages',
+                      tag: 'MERC 2019 / ₹100 Stamp',
+                      tagColor: 'bg-purple-100 text-purple-800 border-purple-300',
+                      desc: 'Official 20-year grid connectivity agreement between Eligible Consumer and MSEDCL with stamp header.' 
+                    },
+                    { 
+                      id: 'ConsumerVendor', 
+                      name: 'Consumer & Vendor Agreement (Annexure 2)', 
+                      pages: '3 Pages',
+                      tag: 'PM Surya Ghar / ₹100 Stamp',
+                      tagColor: 'bg-indigo-100 text-indigo-800 border-indigo-300',
+                      desc: 'Model Draft Agreement covering design, supply, commissioning and 5-year maintenance warranty.' 
+                    },
+                    { 
+                      id: 'StandardQuotation', 
+                      name: 'Official Standard Quotation', 
+                      pages: '1 Page',
+                      tag: 'DISCOM / Consumer Format',
+                      tagColor: 'bg-amber-100 text-amber-800 border-amber-300',
+                      desc: 'Itemized quotation with consumer number, inverter/panel specs, and amount in words.' 
+                    },
+                    { 
+                      id: 'AnnexureI', 
+                      name: 'Commissioning Certificate (Annexure I)', 
+                      pages: '1 Page Standalone',
+                      tag: 'Grid Connection',
+                      tagColor: 'bg-blue-100 text-blue-800 border-blue-300',
+                      desc: 'Provisional Commissioning Report with technical details of solar PV array and inverter.' 
+                    },
+                    { 
+                      id: 'DCR', 
+                      name: 'DCR Self-Declaration (Annexure A)', 
+                      pages: '1 Page Standalone',
+                      tag: 'Domestic Content Req.',
+                      tagColor: 'bg-teal-100 text-teal-800 border-teal-300',
+                      desc: 'Domestic Content Requirement undertaking with dynamic module serial numbers list.' 
+                    },
                   ].map(form => (
-                    <div key={form.id} className="border border-slate-200 rounded-xl p-5 hover:shadow-md transition-shadow bg-white flex flex-col justify-between group">
+                    <div 
+                      key={form.id} 
+                      className="border border-slate-200/90 rounded-2xl p-5 hover:shadow-lg transition-all bg-white flex flex-col justify-between group hover:border-emerald-300"
+                    >
                       <div>
-                        <div className="w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mb-4 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
-                          <FileText size={20} />
+                        <div className="flex justify-between items-start mb-3">
+                          <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center group-hover:bg-emerald-600 group-hover:text-white transition-colors shadow-sm">
+                            <FileText size={20} />
+                          </div>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${form.tagColor}`}>
+                            {form.tag}
+                          </span>
                         </div>
-                        <h4 className="font-bold text-slate-900 mb-1">{form.name}</h4>
+                        <h4 className="font-bold text-slate-900 text-sm mb-1 group-hover:text-emerald-700 transition-colors">
+                          {form.name}
+                        </h4>
+                        <p className="text-[11px] font-semibold text-slate-400 mb-2">{form.pages}</p>
                         <p className="text-xs text-slate-500 leading-relaxed mb-6">{form.desc}</p>
                       </div>
-                      <button 
-                        onClick={() => handleDownloadForm(form.id)}
-                        disabled={isGeneratingPDF && selectedForm === form.id}
-                        className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-sm rounded-lg flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
-                      >
-                        {isGeneratingPDF && selectedForm === form.id ? (
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-slate-700"></div>
-                        ) : (
-                          <><Download size={16} /> Generate PDF</>
-                        )}
-                      </button>
+
+                      <div className="flex gap-2 pt-2 border-t border-slate-100">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPreviewDocId(form.id);
+                            setShowDiscomModal(true);
+                          }}
+                          className="flex-1 py-2 px-3 bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-colors border border-slate-200"
+                        >
+                          <Eye size={14} />
+                          <span>Preview &amp; Edit</span>
+                        </button>
+                        
+                        <button 
+                          type="button"
+                          onClick={() => handleDownloadForm(form.id)}
+                          disabled={isGeneratingPDF && selectedForm === form.id}
+                          className="py-2 px-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50 shadow-sm"
+                        >
+                          {isGeneratingPDF && selectedForm === form.id ? (
+                            <div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-white"></div>
+                          ) : (
+                            <><Download size={14} /> PDF</>
+                          )}
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -1593,54 +1777,304 @@ export default function ProjectDetails() {
         </div>
       )}
 
-      {/* HIDDEN PDF CONTAINERS FOR DISCOM FORMS */}
+      {/* INTERACTIVE DISCOM DOCUMENT STUDIO / CUSTOMIZER MODAL */}
+      {showDiscomModal && (
+        <div className="fixed inset-0 bg-black/75 z-50 flex items-center justify-center p-3 sm:p-6 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl w-full max-w-7xl max-h-[94vh] shadow-2xl flex flex-col overflow-hidden border border-slate-200">
+            {/* Modal Header */}
+            <div className="px-6 py-4 bg-slate-900 text-white flex justify-between items-center shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center font-bold">
+                  <FileText size={18} />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base text-white flex items-center gap-2">
+                    DISCOM Document Studio &amp; PDF Generator
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/30 text-emerald-300 font-bold uppercase">
+                      Live Dynamic
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    Project #{project?.projectNumber || 'PROJ'} · {project?.customer?.name || 'Customer'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const printContents = document.getElementById('discom-live-preview-content');
+                    if (!printContents) return;
+                    window.print();
+                  }}
+                  className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors border border-slate-700"
+                >
+                  <Printer size={14} /> Print
+                </button>
+                <button
+                  type="button"
+                  disabled={isGeneratingPDF}
+                  onClick={() => handleDownloadForm(previewDocId, discomCustomOverrides)}
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-colors disabled:opacity-50"
+                >
+                  {isGeneratingPDF ? (
+                    <div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-white"></div>
+                  ) : (
+                    <><Download size={14} /> Download PDF</>
+                  )}
+                </button>
+                <button 
+                  onClick={() => setShowDiscomModal(false)}
+                  className="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition-colors ml-2"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Body: Left Controls + Right Live Preview */}
+            <div className="flex-1 flex flex-col lg:flex-row overflow-hidden bg-slate-100">
+              {/* Left Controls Column */}
+              <div className="w-full lg:w-96 bg-white border-r border-slate-200 p-5 overflow-y-auto space-y-5 shrink-0">
+                {/* Document Type Selector */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
+                    Select Document Template
+                  </label>
+                  <select
+                    value={previewDocId}
+                    onChange={(e) => setPreviewDocId(e.target.value)}
+                    className="w-full px-3 py-2.5 rounded-xl border border-slate-300 text-xs font-bold text-slate-800 bg-white focus:ring-2 focus:ring-emerald-500 outline-none shadow-sm"
+                  >
+                    <option value="WCR_FULL">Work Completion Report Pack (3-Page Dossier)</option>
+                    <option value="WCR">WCR Page 1 (Work Completion Report)</option>
+                    <option value="AnnexureI">Annexure - I (Commissioning Certificate)</option>
+                    <option value="DCR">Annexure - A (DCR &amp; Module Serials)</option>
+                    <option value="NetMetering">Annexure – 3 (Net Metering Agreement - 6 Pages)</option>
+                    <option value="ConsumerVendor">Annexure 2 (PM Surya Ghar Agreement - 3 Pages)</option>
+                    <option value="StandardQuotation">Official Standard 1-Page Quotation</option>
+                  </select>
+                </div>
+
+                {/* Stamp Paper Graphic Toggle (For Agreements) */}
+                {(previewDocId === 'NetMetering' || previewDocId === 'ConsumerVendor') && (
+                  <div className="p-3.5 bg-purple-50 rounded-2xl border border-purple-200 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-purple-900">₹100 Stamp Paper Header</span>
+                      <input
+                        type="checkbox"
+                        checked={includeStampGraphic}
+                        onChange={(e) => setIncludeStampGraphic(e.target.checked)}
+                        className="w-4 h-4 rounded text-purple-600 focus:ring-purple-500"
+                      />
+                    </div>
+                    <p className="text-[11px] text-purple-700 leading-snug">
+                      {includeStampGraphic 
+                        ? 'Includes digital ₹100 Maharashtra Non-Judicial Stamp graphic.' 
+                        : 'Leaves blank ~115mm margin on Page 1 for printing on physical stamp paper.'}
+                    </p>
+                  </div>
+                )}
+
+                {/* Dynamic Parameter Overrides */}
+                <div className="space-y-3.5 border-t border-slate-200 pt-4">
+                  <h4 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                    <Edit3 size={13} className="text-emerald-600" />
+                    <span>Dynamic Data Fields</span>
+                  </h4>
+
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-semibold text-slate-600">Beneficiary / Consumer Name</label>
+                    <input
+                      type="text"
+                      value={discomCustomOverrides.beneficiaryName || getDiscomFormData().beneficiaryName}
+                      onChange={(e) => setDiscomCustomOverrides({ ...discomCustomOverrides, beneficiaryName: e.target.value })}
+                      className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-medium focus:ring-2 focus:ring-emerald-500 outline-none"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-semibold text-slate-600">Consumer Account No.</label>
+                      <input
+                        type="text"
+                        value={discomCustomOverrides.consumerNumber || getDiscomFormData().consumerNumber}
+                        onChange={(e) => setDiscomCustomOverrides({ ...discomCustomOverrides, consumerNumber: e.target.value })}
+                        className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-mono font-medium focus:ring-2 focus:ring-emerald-500 outline-none"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-semibold text-slate-600">Sanctioned Load (kW)</label>
+                      <input
+                        type="text"
+                        value={discomCustomOverrides.sanctionedLoad || getDiscomFormData().sanctionedLoad}
+                        onChange={(e) => setDiscomCustomOverrides({ ...discomCustomOverrides, sanctionedLoad: e.target.value })}
+                        className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-medium focus:ring-2 focus:ring-emerald-500 outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-semibold text-slate-600">Application Ref. No.</label>
+                    <input
+                      type="text"
+                      value={discomCustomOverrides.applicationRefNo || getDiscomFormData().applicationRefNo}
+                      onChange={(e) => setDiscomCustomOverrides({ ...discomCustomOverrides, applicationRefNo: e.target.value })}
+                      className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-mono font-medium focus:ring-2 focus:ring-emerald-500 outline-none"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-semibold text-slate-600">Capacity (kWp)</label>
+                      <input
+                        type="text"
+                        value={discomCustomOverrides.appliedCapacity || getDiscomFormData().appliedCapacity}
+                        onChange={(e) => setDiscomCustomOverrides({ ...discomCustomOverrides, appliedCapacity: e.target.value })}
+                        className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-medium focus:ring-2 focus:ring-emerald-500 outline-none"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-semibold text-slate-600">Sub-Division</label>
+                      <input
+                        type="text"
+                        value={discomCustomOverrides.subDivision || getDiscomFormData().subDivision}
+                        onChange={(e) => setDiscomCustomOverrides({ ...discomCustomOverrides, subDivision: e.target.value })}
+                        className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-medium focus:ring-2 focus:ring-emerald-500 outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-semibold text-slate-600">Module Wattage (Wp)</label>
+                      <input
+                        type="number"
+                        value={discomCustomOverrides.moduleWattage || getDiscomFormData().moduleWattage}
+                        onChange={(e) => setDiscomCustomOverrides({ ...discomCustomOverrides, moduleWattage: Number(e.target.value) })}
+                        className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-medium focus:ring-2 focus:ring-emerald-500 outline-none"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-semibold text-slate-600">Module Qty (NOS)</label>
+                      <input
+                        type="number"
+                        value={discomCustomOverrides.moduleQuantity || getDiscomFormData().moduleQuantity}
+                        onChange={(e) => setDiscomCustomOverrides({ ...discomCustomOverrides, moduleQuantity: Number(e.target.value) })}
+                        className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-medium focus:ring-2 focus:ring-emerald-500 outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Module Serial Numbers Section */}
+                  <div className="space-y-1 pt-2 border-t border-slate-100">
+                    <div className="flex justify-between items-center mb-1">
+                      <label className="text-[11px] font-bold text-slate-700">PV Module Serial Numbers</label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const count = discomCustomOverrides.moduleQuantity || getDiscomFormData().moduleQuantity || 6;
+                          const generated = Array.from({ length: count }).map((_, i) => `MS2608211A${3882 + i * 26}`);
+                          setDiscomCustomOverrides({ ...discomCustomOverrides, moduleSerialNumbers: generated });
+                        }}
+                        className="text-[10px] text-emerald-600 hover:text-emerald-700 font-bold underline"
+                      >
+                        Auto-Generate
+                      </button>
+                    </div>
+                    <textarea
+                      rows={4}
+                      value={(discomCustomOverrides.moduleSerialNumbers || getDiscomFormData().moduleSerialNumbers).join('\n')}
+                      onChange={(e) => {
+                        const arr = e.target.value.split('\n').map(s => s.trim()).filter(Boolean);
+                        setDiscomCustomOverrides({ ...discomCustomOverrides, moduleSerialNumbers: arr });
+                      }}
+                      className="w-full p-2.5 rounded-lg border border-slate-200 text-[11px] font-mono leading-relaxed focus:ring-2 focus:ring-emerald-500 outline-none bg-slate-50"
+                      placeholder="One serial number per line"
+                    />
+                    <p className="text-[10px] text-slate-400">Used dynamically in Annexure - A DCR serial numbers table.</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Live Preview Column */}
+              <div className="flex-1 p-6 overflow-y-auto flex justify-center bg-slate-200/70">
+                <div 
+                  id="discom-live-preview-content" 
+                  className="bg-white shadow-2xl rounded-sm max-w-[210mm] w-full origin-top text-black"
+                >
+                  {previewDocId === 'WCR_FULL' && (
+                    <WcrFullPack data={getDiscomFormData(discomCustomOverrides)} />
+                  )}
+                  {previewDocId === 'WCR' && (
+                    <WorkCompletionReport data={getDiscomFormData(discomCustomOverrides)} />
+                  )}
+                  {previewDocId === 'AnnexureI' && (
+                    <CommissioningCertificate data={getDiscomFormData(discomCustomOverrides)} />
+                  )}
+                  {previewDocId === 'DCR' && (
+                    <DcrUndertaking data={getDiscomFormData(discomCustomOverrides)} />
+                  )}
+                  {previewDocId === 'NetMetering' && (
+                    <NetMeteringAgreement2019 
+                      data={getDiscomFormData(discomCustomOverrides)} 
+                      includeStamp={includeStampGraphic} 
+                    />
+                  )}
+                  {previewDocId === 'ConsumerVendor' && (
+                    <Annexure2ConsumerVendorAgreement 
+                      data={getDiscomFormData(discomCustomOverrides)} 
+                      includeStamp={includeStampGraphic} 
+                    />
+                  )}
+                  {previewDocId === 'StandardQuotation' && (
+                    <StandardQuotationPDF data={getDiscomFormData(discomCustomOverrides)} />
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* HIDDEN PDF CONTAINERS FOR DISCOM FORMS EXPORT */}
       {selectedForm && (
         <div style={{ position: 'absolute', top: 0, left: 0, opacity: 0, pointerEvents: 'none', zIndex: -50 }}>
           <div id={`discom-${selectedForm}`}>
-            {selectedForm === 'WCR' && <WorkCompletionReport data={{
-              vendorName: "Apex Solar Solutions",
-              customerName: project.customer?.name || "Consumer",
-              consumerNumber: "1234567890",
-              address: project.installationAddress || "Installation Address",
-              city: project.city,
-              capacity: project.capacity,
-              moduleMake: project.quotation?.panelBrand || project.materialReqs?.find((r:any) => r.description?.toLowerCase()?.includes('panel'))?.description?.split(' ')[0] || "Waaree",
-              moduleWattage: project.quotation?.panelWattage || 540,
-              moduleQuantity: project.quotation?.panelQuantity || Math.ceil((project.capacity * 1000) / (project.quotation?.panelWattage || 540)),
-              inverterMake: project.quotation?.inverterBrand || project.materialReqs?.find((r:any) => r.description?.toLowerCase()?.includes('inverter'))?.description?.split(' ')[0] || "Growatt",
-            }} />}
-            {selectedForm === 'Guarantee' && <GuaranteeCertificate data={{
-              customerName: project.customer?.name || "Consumer",
-            }} />}
-            {selectedForm === 'DCR' && <DcrDeclaration data={{
-              vendorName: "Apex Solar Solutions",
-              customerName: project.customer?.name || "Consumer",
-              address: project.installationAddress || "Installation Address",
-              capacity: project.capacity,
-              moduleMake: project.quotation?.panelBrand || project.materialReqs?.find((r:any) => r.description?.toLowerCase()?.includes('panel'))?.description?.split(' ')[0] || "Waaree",
-              moduleWattage: project.quotation?.panelWattage || 540,
-              moduleQuantity: project.quotation?.panelQuantity || Math.ceil((project.capacity * 1000) / (project.quotation?.panelWattage || 540)),
-            }} />}
-            {selectedForm === 'AnnexureI' && <AnnexureProforma data={{
-              vendorName: "Apex Solar Solutions",
-              customerName: project.customer?.name || "Consumer",
-              customerPhone: project.customer?.mobile || project.customer?.phone || "+91 9999999999",
-              customerEmail: project.customer?.email || "customer@example.com",
-              address: project.installationAddress || "Installation Address",
-              city: project.city,
-              capacity: project.capacity,
-              moduleMake: project.quotation?.panelBrand || project.materialReqs?.find((r:any) => r.description?.toLowerCase()?.includes('panel'))?.description?.split(' ')[0] || "Waaree",
-              moduleQuantity: project.quotation?.panelQuantity || Math.ceil((project.capacity * 1000) / (project.quotation?.panelWattage || 540)),
-              inverterMake: project.quotation?.inverterBrand || project.materialReqs?.find((r:any) => r.description?.toLowerCase()?.includes('inverter'))?.description?.split(' ')[0] || "Growatt",
-            }} />}
-            {selectedForm === 'NetMetering' && <NetMeteringAgreement data={{
-              vendorName: "Apex Solar Solutions",
-              customerName: project.customer?.name || "Consumer",
-              address: project.installationAddress || "Installation Address",
-              city: project.city || "Solapur",
-              capacity: project.capacity,
-              consumerNumber: "1234567890",
-            }} />}
+            {selectedForm === 'WCR_FULL' && (
+              <WcrFullPack data={getDiscomFormData(discomCustomOverrides)} />
+            )}
+            {selectedForm === 'WCR' && (
+              <WorkCompletionReport data={getDiscomFormData(discomCustomOverrides)} />
+            )}
+            {selectedForm === 'AnnexureI' && (
+              <CommissioningCertificate data={getDiscomFormData(discomCustomOverrides)} />
+            )}
+            {selectedForm === 'DCR' && (
+              <DcrUndertaking data={getDiscomFormData(discomCustomOverrides)} />
+            )}
+            {selectedForm === 'NetMetering' && (
+              <NetMeteringAgreement2019 
+                data={getDiscomFormData(discomCustomOverrides)} 
+                includeStamp={includeStampGraphic} 
+              />
+            )}
+            {selectedForm === 'ConsumerVendor' && (
+              <Annexure2ConsumerVendorAgreement 
+                data={getDiscomFormData(discomCustomOverrides)} 
+                includeStamp={includeStampGraphic} 
+              />
+            )}
+            {selectedForm === 'StandardQuotation' && (
+              <StandardQuotationPDF data={getDiscomFormData(discomCustomOverrides)} />
+            )}
+            {selectedForm === 'Guarantee' && (
+              <GuaranteeCertificate data={getDiscomFormData(discomCustomOverrides)} />
+            )}
           </div>
         </div>
       )}
