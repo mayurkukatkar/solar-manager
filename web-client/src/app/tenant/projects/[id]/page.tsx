@@ -19,6 +19,7 @@ import {
   Annexure2ConsumerVendorAgreement, 
   StandardQuotationPDF, 
   GuaranteeCertificate,
+  printHtmlElement,
   toIndianWords
 } from '@/components/pdf/MsedclFormsPDF';
 
@@ -47,6 +48,19 @@ export default function ProjectDetails() {
   const [previewDocId, setPreviewDocId] = useState<string>('WCR_FULL');
   const [includeStampGraphic, setIncludeStampGraphic] = useState(true);
   const [discomCustomOverrides, setDiscomCustomOverrides] = useState<any>({});
+
+  // Intercept Ctrl+P / Cmd+P to print only the statutory document instead of the entire screen
+  useEffect(() => {
+    if (!showDiscomModal) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'p' || e.key === 'P')) {
+        e.preventDefault();
+        printHtmlElement('discom-live-preview-content');
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showDiscomModal]);
 
   const STAGES = [
     { id: 'Planning', label: 'Planning', percent: 15, desc: 'Roof survey & permits' },
@@ -1803,12 +1817,9 @@ export default function ProjectDetails() {
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => {
-                    const printContents = document.getElementById('discom-live-preview-content');
-                    if (!printContents) return;
-                    window.print();
-                  }}
-                  className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors border border-slate-700"
+                  onClick={() => printHtmlElement('discom-live-preview-content')}
+                  className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors border border-slate-700 shadow-sm"
+                  title="Print official document directly (or press Ctrl+P)"
                 >
                   <Printer size={14} /> Print
                 </button>
@@ -2037,6 +2048,29 @@ export default function ProjectDetails() {
                 </div>
               </div>
             </div>
+
+            {/* Print Isolation Styles for DISCOM Studio */}
+            <style dangerouslySetInnerHTML={{ __html: `
+              @media print {
+                body > * {
+                  visibility: hidden !important;
+                }
+                #discom-live-preview-content,
+                #discom-live-preview-content * {
+                  visibility: visible !important;
+                }
+                #discom-live-preview-content {
+                  position: absolute !important;
+                  left: 0 !important;
+                  top: 0 !important;
+                  width: 210mm !important;
+                  margin: 0 !important;
+                  padding: 0 !important;
+                  background: white !important;
+                  box-shadow: none !important;
+                }
+              }
+            ` }} />
           </div>
         </div>
       )}

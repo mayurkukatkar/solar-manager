@@ -11,7 +11,7 @@ import {
   Package, Layers, Sparkles, Loader2
 } from 'lucide-react';
 import { QuotationPDF, QuotationData, mapQuotationToPdfData, generatePDF } from '@/components/pdf/QuotationPDF';
-import { StandardQuotationPDF } from '@/components/pdf/MsedclFormsPDF';
+import { StandardQuotationPDF, printHtmlElement } from '@/components/pdf/MsedclFormsPDF';
 
 interface DetailProps {
   isOpen: boolean;
@@ -36,6 +36,22 @@ export function QuotationDetailModal({
   const [previewFormat, setPreviewFormat] = useState<'standard' | 'proposal'>('standard');
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
   const [newStatus, setNewStatus] = useState<string>(quotation?.status || 'DRAFT');
+
+  // Intercept Ctrl+P / Cmd+P to print only the statutory document instead of the entire screen
+  useEffect(() => {
+    if (!isOpen || activeTab !== 'preview') return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'p' || e.key === 'P')) {
+        e.preventDefault();
+        const targetId = previewFormat === 'standard' 
+          ? 'detail-modal-standard-quote-content' 
+          : 'detail-modal-pdf-content';
+        printHtmlElement(targetId);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, activeTab, previewFormat]);
 
   // EDIT STATE
   const [isEditing, setIsEditing] = useState(false);
@@ -367,7 +383,7 @@ export function QuotationDetailModal({
                         await generatePDF('detail-modal-pdf-content', filename);
                       } catch (err) {
                         console.error('PDF generation fallback to print:', err);
-                        window.print();
+                        printHtmlElement('detail-modal-pdf-content');
                       } finally {
                         setLoadingAction(null);
                       }
@@ -864,8 +880,15 @@ export function QuotationDetailModal({
 
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => window.print()}
+                    type="button"
+                    onClick={() => {
+                      const targetId = previewFormat === 'standard' 
+                        ? 'detail-modal-standard-quote-content' 
+                        : 'detail-modal-pdf-content';
+                      printHtmlElement(targetId);
+                    }}
                     className="px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl font-bold flex items-center gap-1.5 shadow-sm transition-colors text-xs"
+                    title="Print document directly"
                   >
                     <Printer size={13} /> Print
                   </button>
@@ -884,7 +907,10 @@ export function QuotationDetailModal({
                         }
                       } catch (err) {
                         console.error(err);
-                        window.print();
+                        const targetId = previewFormat === 'standard' 
+                          ? 'detail-modal-standard-quote-content' 
+                          : 'detail-modal-pdf-content';
+                        printHtmlElement(targetId);
                       } finally {
                         setLoadingAction(null);
                       }
@@ -1105,7 +1131,7 @@ export function QuotationDetailModal({
                     await generatePDF('detail-modal-pdf-content', filename);
                   } catch (err) {
                     console.error('WhatsApp PDF download error:', err);
-                    window.print();
+                    printHtmlElement('detail-modal-pdf-content');
                   } finally {
                     setIsDownloadingWhatsAppPdf(false);
                   }

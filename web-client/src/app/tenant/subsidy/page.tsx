@@ -8,6 +8,7 @@ import {
   Search, Smartphone, MapPin, Building2, Home, Download, Printer, ArrowRight,
   Kanban, List, SlidersHorizontal, Eye, Trash2, Sparkles, AlertTriangle, RefreshCw, Upload
 } from "lucide-react";
+import { printHtmlElement } from "@/components/pdf/MsedclFormsPDF";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
 
@@ -1738,7 +1739,7 @@ IFSC Code: SBIN0001234`;
       {/* 10. PRINTABLE FIELD INSPECTION DOSSIER */}
       {printDossierSub && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 border border-slate-100 p-8 space-y-6">
+          <div id="subsidy-printable-dossier" className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 border border-slate-100 p-8 space-y-6">
             <div className="flex items-center justify-between pb-4 border-b border-slate-200">
               <div>
                 <h3 className="text-xl font-black text-slate-900">Field Inspection Dossier</h3>
@@ -1807,7 +1808,8 @@ IFSC Code: SBIN0001234`;
                 Close
               </button>
               <button 
-                onClick={() => window.print()}
+                type="button"
+                onClick={() => printHtmlElement('subsidy-printable-dossier')}
                 className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold text-xs shadow-md flex items-center justify-center gap-2"
               >
                 <Printer size={15} />

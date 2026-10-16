@@ -104,6 +104,103 @@ export const generateDiscomPDF = async (elementId: string, filename: string) => 
   }
 };
 
+export const printHtmlElement = (elementId: string) => {
+  const element = document.getElementById(elementId);
+  if (!element) {
+    console.error(`printHtmlElement: Element #${elementId} not found`);
+    return;
+  }
+
+  // Create an isolated hidden iframe with true A4 dimensions off-screen
+  const iframe = document.createElement("iframe");
+  iframe.style.position = "fixed";
+  iframe.style.top = "-99999px";
+  iframe.style.left = "-99999px";
+  iframe.style.width = "210mm";
+  iframe.style.height = "297mm";
+  iframe.style.border = "none";
+  iframe.style.opacity = "0";
+  iframe.style.pointerEvents = "none";
+  iframe.style.zIndex = "-9999";
+  document.body.appendChild(iframe);
+
+  const doc = iframe.contentWindow?.document;
+  if (!doc) {
+    window.print();
+    return;
+  }
+
+  // Extract all loaded styles & link stylesheets from parent window
+  const styleElements = Array.from(document.querySelectorAll("style, link[rel='stylesheet']"));
+  const collectedStyles = styleElements.map((el) => el.outerHTML).join("\n");
+
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <base href="${typeof window !== 'undefined' ? window.location.origin : ''}" />
+  <title>Official Solar Statutory Document</title>
+  ${collectedStyles}
+  <style>
+    @page {
+      size: A4 portrait;
+      margin: 0 !important;
+    }
+    html, body {
+      margin: 0 !important;
+      padding: 0 !important;
+      background: #ffffff !important;
+      color: #000000 !important;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+      width: 100% !important;
+    }
+    * {
+      box-shadow: none !important;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+      box-sizing: border-box !important;
+    }
+    .page-break-after-always, [style*="page-break-after: always"] {
+      page-break-after: always !important;
+      break-after: page !important;
+    }
+    .page-break-after-always:last-child,
+    div[style*="page-break-after: always"]:last-child,
+    div[style*="break-after: page"]:last-child {
+      page-break-after: auto !important;
+      break-after: auto !important;
+    }
+  </style>
+</head>
+<body style="margin: 0; padding: 0; background: #ffffff; color: #000000;">
+  <div style="width: 210mm; margin: 0 auto; background: #ffffff;">
+    ${element.innerHTML}
+  </div>
+</body>
+</html>`;
+
+  doc.open();
+  doc.write(html);
+  doc.close();
+
+  setTimeout(() => {
+    try {
+      iframe.contentWindow?.focus();
+      iframe.contentWindow?.print();
+    } catch (err) {
+      console.error("Iframe print error:", err);
+      window.print();
+    } finally {
+      setTimeout(() => {
+        if (document.body.contains(iframe)) {
+          document.body.removeChild(iframe);
+        }
+      }, 3000);
+    }
+  }, 450);
+};
+
 // ============================================================================
 // STAMP PAPER HEADER COMPONENT (₹100 MAHARASHTRA NON-JUDICIAL)
 // ============================================================================
