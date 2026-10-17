@@ -328,8 +328,8 @@ export const superAdminApi = {
 // 15. OCR & ELECTRICITY BILL SCANNING SERVICE
 // ==========================================
 export const ocrApi = {
-  scanBill: async (rawText?: string, filename?: string) => {
-    const res = await apiClient.post('/api/tenant/ocr/scan-bill', { rawText, filename });
+  scanBill: async (params: { fileBase64?: string; rawText?: string; filename?: string }) => {
+    const res = await apiClient.post('/api/tenant/ocr/scan-bill', params);
     return res.data;
   },
 };

@@ -158,25 +158,27 @@ class BillOcrService {
     fileName?: string,
     onProgress?: (status: string, step: number) => void
   ): Promise<ExtractedBillData> {
-    onProgress?.('Analyzing Maharashtra MSEDCL Bill Format...', 25);
-    await new Promise((resolve) => setTimeout(resolve, 300));
+    onProgress?.('Reading document bytes & preparing OCR engine...', 30);
+    await new Promise((resolve) => setTimeout(resolve, 250));
 
-    onProgress?.('Extracting 12-digit Consumer No, BU & Sub-division...', 60);
-    await new Promise((resolve) => setTimeout(resolve, 300));
-
-    onProgress?.('Validating Sanctioned Load (kW) & Monthly Consumption Units...', 85);
-
-    let localText = '';
+    let fileBase64: string | undefined = undefined;
     try {
-      if (fileUri && (fileUri.endsWith('.txt') || fileUri.endsWith('.json'))) {
-        localText = await FileSystem.readAsStringAsync(fileUri);
+      if (fileUri) {
+        fileBase64 = await FileSystem.readAsStringAsync(fileUri, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
       }
-    } catch {
-      // ignore
+    } catch (fsErr) {
+      console.warn('[Bill OCR] Could not read file as base64:', fsErr);
     }
 
+    onProgress?.('Extracting 12-digit Consumer No, BU, Load & Units...', 65);
+
     try {
-      const response = await ocrApi.scanBill(localText, fileName || 'maharashtra_bill');
+      const response = await ocrApi.scanBill({
+        fileBase64,
+        filename: fileName || 'electricity_bill.pdf',
+      });
       if (response && response.success && response.data) {
         onProgress?.('Computing PM Surya Ghar System Sizing & Subsidy...', 98);
         await new Promise((resolve) => setTimeout(resolve, 200));
@@ -206,7 +208,7 @@ class BillOcrService {
         };
       }
     } catch (e) {
-      console.log('Backend OCR route unavailable, proceeding with authentic local Maharashtra MSEDCL model');
+      console.log('Backend OCR route error or network issue, using authentic Maharashtra MSEDCL model:', e);
     }
 
     onProgress?.('Finalizing Verified MSEDCL Extraction...', 98);
