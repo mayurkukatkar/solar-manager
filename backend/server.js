@@ -66,8 +66,11 @@ const financeRoutes = require('./routes/tenant/finance');
 app.use('/', financeRoutes);
 const procurementRoutes = require('./routes/tenant/procurement');
 app.use('/', procurementRoutes);
+// TENANT - Documents & OCR Bill Scanning
 const documentsRoutes = require('./routes/tenant/documents');
 app.use('/', documentsRoutes);
+const ocrRoutes = require('./routes/tenant/ocr');
+app.use('/', ocrRoutes);
 
 // TENANT - Subsidy Applications
 const subsidyRoutes = require('./routes/tenant/subsidy');

@@ -324,6 +324,16 @@ export const superAdminApi = {
   },
 };
 
+// ==========================================
+// 15. OCR & ELECTRICITY BILL SCANNING SERVICE
+// ==========================================
+export const ocrApi = {
+  scanBill: async (rawText?: string, filename?: string) => {
+    const res = await apiClient.post('/api/tenant/ocr/scan-bill', { rawText, filename });
+    return res.data;
+  },
+};
+
 // Backward-compatible aliases
 export const ownerApi = tenantApi;
 export const salesApi = crmApi;
