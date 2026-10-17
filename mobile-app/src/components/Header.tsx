@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Modal, TextInput } from 'react-native';
+import { Sun, Search, X, LogOut, ShieldCheck, ChevronRight } from 'lucide-react-native';
 import { useAuth } from '../context/AuthContext';
 import { colors } from '../theme/colors';
 
@@ -17,11 +18,16 @@ export const Header: React.FC<{
     <View style={styles.container}>
       {/* TOP ROW */}
       <View style={styles.topRow}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.companyName}>
-            {user?.tenantName || 'Solar Manager ERP'}
-          </Text>
-          <Text style={styles.userName}>{user?.name || 'Administrator'}</Text>
+        <View style={styles.brandContainer}>
+          <View style={styles.sunBadge}>
+            <Sun size={18} color="#059669" strokeWidth={2.5} />
+          </View>
+          <View>
+            <Text style={styles.companyName}>
+              {user?.tenantName || 'Solar Manager'}
+            </Text>
+            <Text style={styles.userName}>{user?.name || 'Administrator'}</Text>
+          </View>
         </View>
 
         <View style={styles.actionsRow}>
@@ -49,9 +55,6 @@ export const Header: React.FC<{
                 {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}
               </Text>
             </View>
-            <Text style={styles.roleTag}>
-              {user?.role === 'SUPER_ADMIN' ? 'Platform' : 'Admin'}
-            </Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -67,10 +70,10 @@ export const Header: React.FC<{
       {/* OPTIONAL SEARCH BAR */}
       {showSearch && (
         <View style={styles.searchBox}>
-          <Text style={styles.searchIcon}>🔍</Text>
+          <Search size={16} color="#94a3b8" />
           <TextInput
             style={styles.searchInput}
-            placeholder="Search leads, projects, or customers..."
+            placeholder="Search leads, projects, or contacts..."
             placeholderTextColor="#94a3b8"
             value={searchText}
             onChangeText={(t) => {
@@ -84,8 +87,9 @@ export const Header: React.FC<{
                 setSearchText('');
                 if (onSearch) onSearch('');
               }}
+              style={styles.searchClearBtn}
             >
-              <Text style={{ color: '#94a3b8', fontWeight: '800' }}>✕</Text>
+              <X size={14} color="#94a3b8" />
             </TouchableOpacity>
           ) : null}
         </View>
@@ -99,6 +103,8 @@ export const Header: React.FC<{
           onPress={() => setProfileModalVisible(false)}
         >
           <View style={styles.modalContent}>
+            <View style={styles.modalDragHandle} />
+
             <View style={styles.accountProfileCard}>
               <View style={styles.accountAvatar}>
                 <Text style={styles.accountAvatarText}>
@@ -110,7 +116,7 @@ export const Header: React.FC<{
                 <Text style={styles.accountEmailText}>{user?.email}</Text>
                 <View style={styles.accountRoleBadge}>
                   <Text style={styles.accountRoleBadgeText}>
-                    {user?.role === 'SUPER_ADMIN' ? '👑 PLATFORM SUPER ADMIN' : '🏢 TENANT ADMINISTRATOR'}
+                    {user?.role === 'SUPER_ADMIN' ? 'PLATFORM SUPER ADMIN' : 'TENANT ADMINISTRATOR'}
                   </Text>
                 </View>
               </View>
@@ -118,18 +124,18 @@ export const Header: React.FC<{
 
             <View style={styles.sessionInfoBox}>
               <View style={styles.sessionInfoRow}>
-                <Text style={styles.sessionInfoLabel}>Organization:</Text>
-                <Text style={styles.sessionInfoVal}>{user?.tenantName || 'Solar EPC Enterprise'}</Text>
+                <Text style={styles.sessionInfoLabel}>Workspace</Text>
+                <Text style={styles.sessionInfoVal}>{user?.tenantName || 'Solar EPC'}</Text>
               </View>
               <View style={styles.sessionInfoRow}>
-                <Text style={styles.sessionInfoLabel}>System Status:</Text>
+                <Text style={styles.sessionInfoLabel}>Network</Text>
                 <Text style={[styles.sessionInfoVal, { color: '#059669' }]}>
-                  {backendStatus.isOnline ? 'Operational (Cloud Synced)' : 'Reconnecting...'}
+                  {backendStatus.isOnline ? 'Operational' : 'Reconnecting'}
                 </Text>
               </View>
               <View style={styles.sessionInfoRow}>
-                <Text style={styles.sessionInfoLabel}>Data Security:</Text>
-                <Text style={styles.sessionInfoVal}>TLS 1.3 • Bearer Verified</Text>
+                <Text style={styles.sessionInfoLabel}>Security</Text>
+                <Text style={styles.sessionInfoVal}>TLS 1.3 Verified</Text>
               </View>
             </View>
 
@@ -139,15 +145,18 @@ export const Header: React.FC<{
                 setProfileModalVisible(false);
                 logout();
               }}
+              activeOpacity={0.85}
             >
-              <Text style={styles.logoutBtnText}>🔒 Sign Out</Text>
+              <LogOut size={16} color="#ef4444" style={{ marginRight: 8 }} />
+              <Text style={styles.logoutBtnText}>Sign Out</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               style={styles.closeBtn}
               onPress={() => setProfileModalVisible(false)}
+              activeOpacity={0.8}
             >
-              <Text style={styles.closeBtnText}>Close</Text>
+              <Text style={styles.closeBtnText}>Done</Text>
             </TouchableOpacity>
           </View>
         </TouchableOpacity>
@@ -158,191 +167,193 @@ export const Header: React.FC<{
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: colors.slate900,
-    paddingTop: 52,
-    paddingHorizontal: 18,
-    paddingBottom: 18,
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
+    backgroundColor: '#ffffff',
+    paddingTop: 50,
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
   },
   topRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
+  brandContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  sunBadge: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    backgroundColor: '#ecfdf5',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   companyName: {
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '800',
-    color: colors.primary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
+    color: '#0f172a',
+    letterSpacing: -0.3,
   },
   userName: {
-    fontSize: 17,
-    fontWeight: '900',
-    color: colors.white,
+    fontSize: 12,
+    color: '#64748b',
+    fontWeight: '500',
     marginTop: 1,
   },
   actionsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 10,
   },
   statusPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: 14,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    backgroundColor: '#f8fafc',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 20,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
-    gap: 5,
+    borderColor: '#e2e8f0',
   },
   statusDot: {
     width: 6,
     height: 6,
     borderRadius: 3,
+    marginRight: 6,
   },
   statusText: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: colors.slate300,
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#475569',
   },
   avatarPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    paddingVertical: 3,
-    paddingHorizontal: 6,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
-    gap: 6,
+    padding: 2,
   },
   avatarCircle: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: colors.primary,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#059669',
     justifyContent: 'center',
     alignItems: 'center',
   },
   avatarLetter: {
-    fontSize: 12,
-    fontWeight: '900',
-    color: colors.white,
-  },
-  roleTag: {
-    fontSize: 11,
+    fontSize: 14,
     fontWeight: '800',
-    color: colors.white,
-    paddingRight: 4,
+    color: '#ffffff',
   },
   titleSection: {
-    marginTop: 14,
+    marginTop: 16,
   },
   titleText: {
     fontSize: 22,
-    fontWeight: '900',
-    color: colors.white,
+    fontWeight: '800',
+    color: '#0f172a',
+    letterSpacing: -0.5,
   },
   subtitleText: {
-    fontSize: 12,
-    color: colors.slate400,
-    marginTop: 3,
+    fontSize: 13,
+    color: '#64748b',
+    marginTop: 4,
+    lineHeight: 18,
   },
   searchBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderRadius: 14,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    height: 44,
     marginTop: 14,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
-  },
-  searchIcon: {
-    fontSize: 14,
-    marginRight: 8,
+    borderColor: '#e2e8f0',
   },
   searchInput: {
     flex: 1,
+    marginLeft: 10,
     fontSize: 13,
-    color: colors.white,
-    padding: 0,
+    color: '#0f172a',
+    fontWeight: '500',
+  },
+  searchClearBtn: {
+    padding: 4,
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.65)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
+    backgroundColor: 'rgba(15, 23, 42, 0.4)',
+    justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: colors.white,
-    borderRadius: 24,
+    backgroundColor: '#ffffff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
     padding: 24,
-    width: '100%',
-    maxWidth: 360,
+    paddingBottom: 40,
+  },
+  modalDragHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#e2e8f0',
+    alignSelf: 'center',
+    marginBottom: 20,
   },
   accountProfileCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    padding: 12,
-    backgroundColor: '#f8fafc',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    marginBottom: 14,
+    gap: 14,
+    paddingBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
   },
   accountAvatar: {
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: colors.primary,
+    backgroundColor: '#059669',
     justifyContent: 'center',
     alignItems: 'center',
   },
   accountAvatarText: {
     fontSize: 20,
-    fontWeight: '900',
-    color: colors.white,
+    fontWeight: '800',
+    color: '#ffffff',
   },
   accountNameText: {
-    fontSize: 15,
-    fontWeight: '900',
-    color: colors.slate900,
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#0f172a',
   },
   accountEmailText: {
-    fontSize: 11,
-    color: colors.slate500,
-    marginTop: 1,
+    fontSize: 12,
+    color: '#64748b',
+    marginTop: 2,
   },
   accountRoleBadge: {
     alignSelf: 'flex-start',
-    backgroundColor: 'rgba(15, 23, 42, 0.08)',
+    backgroundColor: '#ecfdf5',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 6,
-    marginTop: 4,
+    marginTop: 6,
   },
   accountRoleBadgeText: {
     fontSize: 9,
-    fontWeight: '900',
-    color: colors.slate800,
+    fontWeight: '800',
+    color: '#059669',
     letterSpacing: 0.5,
   },
   sessionInfoBox: {
+    marginVertical: 18,
     backgroundColor: '#f8fafc',
-    borderRadius: 12,
-    padding: 12,
-    gap: 8,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    marginBottom: 14,
+    borderRadius: 14,
+    padding: 14,
+    gap: 10,
   },
   sessionInfoRow: {
     flexDirection: 'row',
@@ -350,36 +361,36 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   sessionInfoLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: colors.slate500,
+    fontSize: 12,
+    color: '#64748b',
+    fontWeight: '500',
   },
   sessionInfoVal: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: colors.slate800,
-    maxWidth: 180,
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#0f172a',
   },
   logoutBtn: {
-    marginTop: 4,
-    paddingVertical: 12,
-    borderRadius: 12,
-    backgroundColor: '#fee2e2',
+    flexDirection: 'row',
+    justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#fef2f2',
+    paddingVertical: 14,
+    borderRadius: 12,
+    marginBottom: 10,
   },
   logoutBtnText: {
-    color: '#b91c1c',
-    fontSize: 13,
-    fontWeight: '800',
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#ef4444',
   },
   closeBtn: {
-    marginTop: 8,
-    paddingVertical: 8,
+    paddingVertical: 12,
     alignItems: 'center',
   },
   closeBtnText: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: colors.slate500,
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#64748b',
   },
 });

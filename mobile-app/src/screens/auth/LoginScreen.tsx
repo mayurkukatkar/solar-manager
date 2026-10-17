@@ -12,8 +12,19 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import {
+  Sun,
+  Lock,
+  Mail,
+  Eye,
+  EyeOff,
+  ShieldCheck,
+  KeyRound,
+  AlertCircle,
+  X,
+  ArrowRight,
+} from 'lucide-react-native';
 import { useAuth } from '../../context/AuthContext';
-import { colors } from '../../theme/colors';
 
 export const LoginScreen: React.FC = () => {
   const {
@@ -89,62 +100,62 @@ export const LoginScreen: React.FC = () => {
 
   return (
     <KeyboardAvoidingView
-      style={{ flex: 1 }}
+      style={{ flex: 1, backgroundColor: '#f8fafc' }}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ScrollView
         contentContainerStyle={styles.scrollContainer}
         keyboardShouldPersistTaps="handled"
       >
-        {/* ENTERPRISE BRANDING */}
+        {/* BRANDING */}
         <View style={styles.brandBox}>
           <View style={styles.logoBadge}>
-            <Text style={styles.logoSun}>☀️</Text>
+            <Sun size={28} color="#059669" strokeWidth={2.5} />
           </View>
-          <Text style={styles.appName}>SOLAR MANAGER ERP</Text>
-          <Text style={styles.appTagline}>Enterprise Solar EPC & Asset Management</Text>
+          <Text style={styles.appName}>Solar ERP</Text>
+          <Text style={styles.appTagline}>Turnkey EPC Operations & Asset Management</Text>
         </View>
 
         {/* SESSION TIMEOUT BANNER */}
         {sessionExpired && (
           <View style={styles.sessionBanner}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.sessionBannerTitle}>⚠️ Session Expired</Text>
-              <Text style={styles.sessionBannerText}>
-                Your session has timed out. For security, please enter your credentials again.
-              </Text>
-            </View>
-            <TouchableOpacity onPress={clearSessionExpired} style={styles.sessionBannerClose}>
-              <Text style={styles.sessionBannerCloseText}>✕</Text>
+            <AlertCircle size={16} color="#d97706" style={{ marginRight: 8 }} />
+            <Text style={styles.sessionBannerText}>
+              Session timed out. Please sign in again.
+            </Text>
+            <TouchableOpacity onPress={clearSessionExpired} style={{ padding: 4 }}>
+              <X size={14} color="#64748b" />
             </TouchableOpacity>
           </View>
         )}
 
         {/* LOGIN CARD */}
         <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <Text style={styles.cardTitle}>Platform Access</Text>
-            <Text style={styles.cardSubtitle}>Sign in to access your organization workspace</Text>
-          </View>
+          <Text style={styles.cardTitle}>Sign In</Text>
+          <Text style={styles.cardSubtitle}>Access your enterprise workspace</Text>
 
           {/* EMAIL INPUT */}
           <Text style={styles.inputLabel}>WORK EMAIL</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="name@solarcompany.com"
-            placeholderTextColor="#94a3b8"
-            value={email}
-            onChangeText={setEmail}
-            autoCapitalize="none"
-            autoCorrect={false}
-            keyboardType="email-address"
-          />
+          <View style={styles.inputContainer}>
+            <Mail size={16} color="#94a3b8" style={{ marginRight: 10 }} />
+            <TextInput
+              style={styles.textInput}
+              placeholder="name@solarcompany.com"
+              placeholderTextColor="#94a3b8"
+              value={email}
+              onChangeText={setEmail}
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType="email-address"
+            />
+          </View>
 
           {/* PASSWORD INPUT WITH SHOW/HIDE */}
           <Text style={styles.inputLabel}>PASSWORD</Text>
-          <View style={styles.passwordInputContainer}>
+          <View style={styles.inputContainer}>
+            <Lock size={16} color="#94a3b8" style={{ marginRight: 10 }} />
             <TextInput
-              style={styles.passwordInput}
+              style={styles.textInput}
               placeholder="••••••••"
               placeholderTextColor="#94a3b8"
               value={password}
@@ -157,7 +168,11 @@ export const LoginScreen: React.FC = () => {
               style={styles.showPasswordBtn}
               onPress={() => setShowPassword(!showPassword)}
             >
-              <Text style={styles.showPasswordText}>{showPassword ? 'Hide' : 'Show'}</Text>
+              {showPassword ? (
+                <EyeOff size={16} color="#64748b" />
+              ) : (
+                <Eye size={16} color="#64748b" />
+              )}
             </TouchableOpacity>
           </View>
 
@@ -171,100 +186,79 @@ export const LoginScreen: React.FC = () => {
             {loading ? (
               <ActivityIndicator size="small" color="#fff" />
             ) : (
-              <Text style={styles.loginBtnText}>Sign In</Text>
+              <Text style={styles.loginBtnText}>Continue to Workspace</Text>
             )}
           </TouchableOpacity>
 
-          {/* SUPPORT / FORGOT NOTICE */}
-          <View style={styles.supportBox}>
-            <Text style={styles.supportText}>
-              Need access or forgot password? Contact your company system administrator.
-            </Text>
-          </View>
-
           <View style={styles.securityFooter}>
+            <ShieldCheck size={14} color="#059669" style={{ marginRight: 6 }} />
             <Text style={styles.securityFooterText}>
-              🛡️ 256-bit TLS Encrypted • Certified Solar ERP Protocol
+              TLS 1.3 Encrypted • Cloud Synced
             </Text>
           </View>
         </View>
+      </ScrollView>
 
-        {/* FIRST-TIME PASSWORD RESET MODAL */}
-        <Modal visible={resetModalVisible} transparent animationType="slide">
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <View style={styles.modalHeaderRow}>
-                <View style={styles.modalKeyBadge}>
-                  <Text style={{ fontSize: 20 }}>🔑</Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.modalTitle}>Set Permanent Password</Text>
-                  <Text style={styles.modalSubtitle}>
-                    Initial activation requires setting a new secure password.
-                  </Text>
-                </View>
+      {/* FIRST-TIME PASSWORD RESET MODAL */}
+      <Modal visible={resetModalVisible} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeaderRow}>
+              <View style={styles.modalKeyBadge}>
+                <KeyRound size={20} color="#d97706" />
               </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.modalTitle}>Update Password</Text>
+                <Text style={styles.modalSubtitle}>Create a permanent password for security</Text>
+              </View>
+            </View>
 
-              <Text style={styles.inputLabel}>ACCOUNT EMAIL</Text>
+            <Text style={styles.inputLabel}>NEW PASSWORD (MIN. 8 CHARS)</Text>
+            <View style={styles.inputContainer}>
               <TextInput
-                style={[styles.input, { backgroundColor: '#f1f5f9', color: '#64748b' }]}
-                value={resetEmail}
-                editable={false}
-              />
-
-              <Text style={styles.inputLabel}>TEMPORARY PASSWORD</Text>
-              <TextInput
-                style={styles.input}
-                value={tempPassword}
-                onChangeText={setTempPassword}
-                secureTextEntry
-                placeholder="Current temporary password"
+                style={styles.textInput}
+                placeholder="Enter new password"
                 placeholderTextColor="#94a3b8"
-              />
-
-              <Text style={styles.inputLabel}>NEW PERMANENT PASSWORD (MIN 8 CHARS)</Text>
-              <TextInput
-                style={styles.input}
+                secureTextEntry
                 value={newPassword}
                 onChangeText={setNewPassword}
-                secureTextEntry
-                placeholder="Enter at least 8 characters"
-                placeholderTextColor="#94a3b8"
               />
+            </View>
 
-              <Text style={styles.inputLabel}>CONFIRM NEW PASSWORD</Text>
+            <Text style={styles.inputLabel}>CONFIRM PASSWORD</Text>
+            <View style={styles.inputContainer}>
               <TextInput
-                style={styles.input}
-                value={confirmPassword}
-                onChangeText={setConfirmPassword}
-                secureTextEntry
+                style={styles.textInput}
                 placeholder="Confirm new password"
                 placeholderTextColor="#94a3b8"
+                secureTextEntry
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
               />
-
-              <TouchableOpacity
-                style={styles.resetSubmitBtn}
-                onPress={handleResetSubmit}
-                disabled={resetLoading}
-              >
-                {resetLoading ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <Text style={styles.resetSubmitBtnText}>Save Password & Sign In</Text>
-                )}
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.closeBtn}
-                onPress={() => setResetModalVisible(false)}
-                disabled={resetLoading}
-              >
-                <Text style={styles.closeBtnText}>Cancel</Text>
-              </TouchableOpacity>
             </View>
+
+            <TouchableOpacity
+              style={styles.resetSubmitBtn}
+              onPress={handleResetSubmit}
+              disabled={resetLoading}
+              activeOpacity={0.85}
+            >
+              {resetLoading ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Text style={styles.resetSubmitBtnText}>Save Permanent Password</Text>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.closeBtn}
+              onPress={() => setResetModalVisible(false)}
+            >
+              <Text style={styles.closeBtnText}>Cancel</Text>
+            </TouchableOpacity>
           </View>
-        </Modal>
-      </ScrollView>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 };
@@ -272,228 +266,186 @@ export const LoginScreen: React.FC = () => {
 const styles = StyleSheet.create({
   scrollContainer: {
     flexGrow: 1,
-    backgroundColor: colors.slate900,
     justifyContent: 'center',
-    padding: 22,
-    paddingVertical: 44,
+    padding: 24,
+    paddingTop: 60,
   },
   brandBox: {
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 32,
   },
   logoBadge: {
     width: 60,
     height: 60,
-    borderRadius: 30,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 20,
+    backgroundColor: '#ecfdf5',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 16,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
-  },
-  logoSun: {
-    fontSize: 30,
+    borderColor: '#a7f3d0',
   },
   appName: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: '900',
-    color: colors.white,
-    letterSpacing: 1.5,
+    color: '#0f172a',
+    letterSpacing: -0.5,
   },
   appTagline: {
-    fontSize: 12,
-    color: colors.slate400,
+    fontSize: 13,
+    color: '#64748b',
     marginTop: 4,
+    fontWeight: '500',
   },
   sessionBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fef3c7',
-    borderColor: '#f59e0b',
-    borderWidth: 1.5,
-    borderRadius: 14,
+    backgroundColor: '#fffbeb',
     padding: 12,
-    marginBottom: 16,
-  },
-  sessionBannerTitle: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#92400e',
-    marginBottom: 2,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#fde68a',
+    marginBottom: 20,
   },
   sessionBannerText: {
-    fontSize: 11,
-    color: '#78350f',
-  },
-  sessionBannerClose: {
-    padding: 6,
-    marginLeft: 8,
-  },
-  sessionBannerCloseText: {
-    fontSize: 16,
+    flex: 1,
+    fontSize: 12,
     color: '#92400e',
-    fontWeight: '800',
+    fontWeight: '600',
   },
   card: {
-    backgroundColor: colors.white,
+    backgroundColor: '#ffffff',
     borderRadius: 24,
     padding: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
-    elevation: 8,
-  },
-  cardHeader: {
-    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#f1f5f9',
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.03,
+    shadowRadius: 10,
+    elevation: 2,
   },
   cardTitle: {
     fontSize: 20,
-    fontWeight: '900',
-    color: colors.slate900,
+    fontWeight: '800',
+    color: '#0f172a',
   },
   cardSubtitle: {
-    fontSize: 12,
-    color: colors.slate500,
-    marginTop: 3,
+    fontSize: 13,
+    color: '#64748b',
+    marginTop: 4,
+    marginBottom: 20,
   },
   inputLabel: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: colors.slate500,
-    letterSpacing: 0.6,
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#64748b',
+    letterSpacing: 0.5,
     marginBottom: 6,
   },
-  input: {
-    backgroundColor: '#f8fafc',
-    borderWidth: 1.5,
-    borderColor: '#e2e8f0',
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 14,
-    color: colors.slate900,
-    marginBottom: 14,
-  },
-  passwordInputContainer: {
+  inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#f8fafc',
-    borderWidth: 1.5,
+    borderWidth: 1,
     borderColor: '#e2e8f0',
-    borderRadius: 12,
-    marginBottom: 18,
-  },
-  passwordInput: {
-    flex: 1,
+    borderRadius: 14,
     paddingHorizontal: 14,
-    paddingVertical: 12,
+    height: 48,
+    marginBottom: 16,
+  },
+  textInput: {
+    flex: 1,
     fontSize: 14,
-    color: colors.slate900,
+    fontWeight: '500',
+    color: '#0f172a',
   },
   showPasswordBtn: {
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-  },
-  showPasswordText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: colors.slate600,
+    padding: 6,
   },
   loginBtn: {
-    backgroundColor: colors.slate900,
-    paddingVertical: 15,
-    borderRadius: 12,
+    backgroundColor: '#059669',
+    height: 48,
+    borderRadius: 14,
+    justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 4,
+    marginTop: 8,
   },
   loginBtnText: {
-    color: colors.white,
-    fontSize: 15,
-    fontWeight: '800',
-  },
-  supportBox: {
-    marginTop: 18,
-    alignItems: 'center',
-  },
-  supportText: {
-    fontSize: 11,
-    color: colors.slate400,
-    textAlign: 'center',
-    lineHeight: 16,
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '700',
   },
   securityFooter: {
-    marginTop: 18,
-    paddingTop: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 20,
+    paddingTop: 16,
     borderTopWidth: 1,
     borderTopColor: '#f1f5f9',
-    alignItems: 'center',
   },
   securityFooterText: {
-    fontSize: 10,
-    color: colors.slate400,
-    textAlign: 'center',
-    fontWeight: '600',
+    fontSize: 11,
+    color: '#64748b',
+    fontWeight: '500',
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.65)',
+    backgroundColor: 'rgba(15, 23, 42, 0.4)',
     justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
+    padding: 24,
   },
   modalContent: {
-    backgroundColor: colors.white,
+    backgroundColor: '#ffffff',
     borderRadius: 24,
     padding: 24,
-    width: '100%',
-    maxWidth: 380,
   },
   modalHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
     gap: 12,
+    marginBottom: 20,
   },
   modalKeyBadge: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 40,
+    height: 40,
+    borderRadius: 12,
     backgroundColor: '#fef3c7',
     justifyContent: 'center',
     alignItems: 'center',
   },
   modalTitle: {
     fontSize: 17,
-    fontWeight: '900',
-    color: colors.slate900,
+    fontWeight: '800',
+    color: '#0f172a',
   },
   modalSubtitle: {
-    fontSize: 11,
-    color: colors.slate500,
+    fontSize: 12,
+    color: '#64748b',
     marginTop: 2,
   },
   resetSubmitBtn: {
-    backgroundColor: colors.primary,
-    paddingVertical: 14,
-    borderRadius: 12,
+    backgroundColor: '#059669',
+    height: 48,
+    borderRadius: 14,
+    justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: 10,
   },
   resetSubmitBtnText: {
-    color: colors.white,
-    fontSize: 13,
-    fontWeight: '800',
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '700',
   },
   closeBtn: {
-    marginTop: 10,
-    paddingVertical: 10,
+    paddingVertical: 12,
     alignItems: 'center',
+    marginTop: 4,
   },
   closeBtnText: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: colors.slate500,
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#64748b',
   },
 });

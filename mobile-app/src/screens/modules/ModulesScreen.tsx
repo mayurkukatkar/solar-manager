@@ -11,8 +11,26 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
+import {
+  FileText,
+  MapPin,
+  Landmark,
+  Banknote,
+  Zap,
+  Receipt,
+  Truck,
+  ShieldCheck,
+  Layers,
+  ChevronRight,
+  X,
+  MessageCircle,
+  Check,
+  CheckCircle2,
+  Clock,
+  ArrowRight,
+  Plus,
+} from 'lucide-react-native';
 import { Header } from '../../components/Header';
-import { colors } from '../../theme/colors';
 import {
   quotationsApi,
   superAdminApi,
@@ -107,7 +125,7 @@ export const ModulesScreen: React.FC<{ route?: any; navigation?: any }> = ({ rou
   const [loanCapInput, setLoanCapInput] = useState('3.3');
   const [downPaymentInput, setDownPaymentInput] = useState('20000');
   const [loanTenureYears, setLoanTenureYears] = useState(5);
-  const [loanInterestRate] = useState(7.0); // 7% p.a. PM Surya Ghar nationalized bank rate
+  const [loanInterestRate] = useState(7.0);
 
   // 6. Finance State
   const [financeData, setFinanceData] = useState<{
@@ -308,7 +326,7 @@ export const ModulesScreen: React.FC<{ route?: any; navigation?: any }> = ({ rou
         total: grossTotal,
         notes: `Estimated CFA Subsidy: ₹${subsidy.toLocaleString('en-IN')}. Net: ₹${netPayable.toLocaleString('en-IN')}`,
       });
-      Alert.alert('Proposal Generated! 📄', 'Quotation has been recorded in your central ERP repository.');
+      Alert.alert('Proposal Generated', 'Quotation recorded in central repository.');
       fetchQuotations();
     } catch (err: any) {
       Alert.alert('Notice', err.message || 'Quotation generated locally.');
@@ -320,7 +338,7 @@ export const ModulesScreen: React.FC<{ route?: any; navigation?: any }> = ({ rou
   const handleConvertQuotationToProject = async (quoteId: string) => {
     try {
       await quotationsApi.convertQuotation(quoteId);
-      Alert.alert('Project Provisioned! 🎉', 'Accepted quotation converted into an active execution project.');
+      Alert.alert('Project Created', 'Accepted quotation converted into active project.');
       fetchQuotations();
     } catch (err: any) {
       Alert.alert('Conversion Notice', err.message || 'Project created from proposal.');
@@ -340,7 +358,7 @@ export const ModulesScreen: React.FC<{ route?: any; navigation?: any }> = ({ rou
         notes: surveyForm.notes,
         surveyDate: surveyForm.surveyDate || new Date().toISOString(),
       });
-      Alert.alert('Survey Scheduled! 📐', 'Technical site evaluation recorded.');
+      Alert.alert('Survey Scheduled', 'Technical site evaluation recorded.');
       setScheduleSurveyModal(false);
       fetchSurveys();
     } catch (err: any) {
@@ -398,144 +416,147 @@ Let's schedule your 3D roof survey!`;
     });
   };
 
+  const MODULE_CATEGORIES = [
+    {
+      title: 'SALES & PROPOSALS',
+      modules: [
+        {
+          id: 'QUOTES',
+          name: 'Quotations Engine',
+          desc: '60-second solar proposals, CFA calculations & BOM sizing',
+          icon: FileText,
+          iconColor: '#059669',
+          bgColor: '#ecfdf5',
+        },
+        {
+          id: 'SURVEYS',
+          name: 'Site Surveys',
+          desc: 'Rooftop measurements, shadow profile & technical feasibility',
+          icon: MapPin,
+          iconColor: '#2563eb',
+          bgColor: '#eff6ff',
+        },
+      ],
+    },
+    {
+      title: 'COMPLIANCE & FINANCING',
+      modules: [
+        {
+          id: 'SUBSIDY',
+          name: 'PM Surya Ghar Studio',
+          desc: '7-stage national portal tracking, consumer CA & DBT release',
+          icon: Landmark,
+          iconColor: '#d97706',
+          bgColor: '#fffbeb',
+        },
+        {
+          id: 'FINANCING',
+          name: 'Solar Loan & EMI Planner',
+          desc: '7% concessional bank EMI vs electricity bill savings planner',
+          icon: Banknote,
+          iconColor: '#7c3aed',
+          bgColor: '#f5f3ff',
+        },
+      ],
+    },
+    {
+      title: 'DISCOM & INVOICING',
+      modules: [
+        {
+          id: 'DISCOM',
+          name: 'DISCOM Net-Metering',
+          desc: 'MSEDCL, Tata Power & state discom meter synchronization',
+          icon: Zap,
+          iconColor: '#0d9488',
+          bgColor: '#f0fdfa',
+        },
+        {
+          id: 'FINANCE',
+          name: 'Finance & Invoicing',
+          desc: 'Milestone billing (20/60/15/5), tax invoices & payment status',
+          icon: Receipt,
+          iconColor: '#059669',
+          bgColor: '#ecfdf5',
+        },
+      ],
+    },
+    {
+      title: 'OPERATIONS & AMC',
+      modules: [
+        {
+          id: 'PROCUREMENT',
+          name: 'Procurement & Stock',
+          desc: 'DCR modules, grid-tie inverters, ACDB/DCDB & material dispatch',
+          icon: Truck,
+          iconColor: '#db2777',
+          bgColor: '#fdf2f8',
+        },
+        {
+          id: 'AMC',
+          name: 'AMC & Support',
+          desc: 'Preventive maintenance agreements & post-commissioning service',
+          icon: ShieldCheck,
+          iconColor: '#e11d48',
+          bgColor: '#fff1f2',
+        },
+      ],
+    },
+  ];
+
   return (
     <View style={styles.container}>
       <Header
-        title="Solar Enterprise Hub"
-        subtitle="Turnkey modules, compliance, financing & statutory packs"
+        title="Solar Hub"
+        subtitle="Turnkey modules, statutory compliance & financing tools"
       />
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
-        {/* GROUP 1: SALES & ESTIMATION */}
-        <Text style={styles.groupTitle}>SALES & ESTIMATION</Text>
-        <View style={styles.modulesGrid}>
-          <TouchableOpacity
-            style={styles.moduleCard}
-            onPress={() => handleOpenModule('QUOTES')}
-            activeOpacity={0.8}
-          >
-            <View style={[styles.moduleIconBox, { backgroundColor: '#eff6ff' }]}>
-              <Text style={{ fontSize: 24 }}>📄</Text>
+        {MODULE_CATEGORIES.map((cat, idx) => (
+          <View key={idx} style={styles.categorySection}>
+            <Text style={styles.categoryTitle}>{cat.title}</Text>
+            <View style={styles.categoryGrid}>
+              {cat.modules.map((m) => {
+                const Icon = m.icon;
+                return (
+                  <TouchableOpacity
+                    key={m.id}
+                    style={styles.moduleTile}
+                    onPress={() => handleOpenModule(m.id)}
+                    activeOpacity={0.8}
+                  >
+                    <View style={[styles.moduleIconBox, { backgroundColor: m.bgColor }]}>
+                      <Icon size={20} color={m.iconColor} strokeWidth={2.2} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.moduleTileName}>{m.name}</Text>
+                      <Text style={styles.moduleTileDesc}>{m.desc}</Text>
+                    </View>
+                    <ChevronRight size={16} color="#cbd5e1" />
+                  </TouchableOpacity>
+                );
+              })}
             </View>
-            <Text style={styles.moduleName}>Quotations Engine</Text>
-            <Text style={styles.moduleDesc}>60s quotes, PM Surya Ghar CFA calculations & proposal dispatch</Text>
-          </TouchableOpacity>
+          </View>
+        ))}
 
-          <TouchableOpacity
-            style={styles.moduleCard}
-            onPress={() => handleOpenModule('SURVEYS')}
-            activeOpacity={0.8}
-          >
-            <View style={[styles.moduleIconBox, { backgroundColor: '#ecfdf5' }]}>
-              <Text style={{ fontSize: 24 }}>📐</Text>
-            </View>
-            <Text style={styles.moduleName}>Site Surveys</Text>
-            <Text style={styles.moduleDesc}>Rooftop measurements, shadow analysis & technical feasibility</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* GROUP 2: FINANCING & PM SURYA GHAR COMPLIANCE */}
-        <Text style={styles.groupTitle}>FINANCING & PM SURYA GHAR</Text>
-        <View style={styles.modulesGrid}>
-          <TouchableOpacity
-            style={styles.moduleCard}
-            onPress={() => handleOpenModule('SUBSIDY')}
-            activeOpacity={0.8}
-          >
-            <View style={[styles.moduleIconBox, { backgroundColor: '#fef3c7' }]}>
-              <Text style={{ fontSize: 24 }}>🏛️</Text>
-            </View>
-            <Text style={styles.moduleName}>PM Surya Ghar Studio</Text>
-            <Text style={styles.moduleDesc}>7-stage national portal tracking, consumer CA & DBT release</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.moduleCard}
-            onPress={() => handleOpenModule('FINANCING')}
-            activeOpacity={0.8}
-          >
-            <View style={[styles.moduleIconBox, { backgroundColor: '#f5f3ff' }]}>
-              <Text style={{ fontSize: 24 }}>🧮</Text>
-            </View>
-            <Text style={styles.moduleName}>Solar Loan & EMI Planner</Text>
-            <Text style={styles.moduleDesc}>7% concessional bank EMI vs electricity bill savings calculator</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* GROUP 3: DISCOM & BILLING */}
-        <Text style={styles.groupTitle}>DISCOM & INVOICING</Text>
-        <View style={styles.modulesGrid}>
-          <TouchableOpacity
-            style={styles.moduleCard}
-            onPress={() => handleOpenModule('DISCOM')}
-            activeOpacity={0.8}
-          >
-            <View style={[styles.moduleIconBox, { backgroundColor: '#f0fdfa' }]}>
-              <Text style={{ fontSize: 24 }}>🔌</Text>
-            </View>
-            <Text style={styles.moduleName}>DISCOM Net-Metering</Text>
-            <Text style={styles.moduleDesc}>MSEDCL, Tata Power & state discom meter synchronization</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.moduleCard}
-            onPress={() => handleOpenModule('FINANCE')}
-            activeOpacity={0.8}
-          >
-            <View style={[styles.moduleIconBox, { backgroundColor: '#eef2ff' }]}>
-              <Text style={{ fontSize: 24 }}>💰</Text>
-            </View>
-            <Text style={styles.moduleName}>Finance & Invoicing</Text>
-            <Text style={styles.moduleDesc}>Milestone billing (20/60/15/5), tax invoices & payment status</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* GROUP 4: OPERATIONS & MAINTENANCE */}
-        <Text style={styles.groupTitle}>PROCUREMENT & AMC</Text>
-        <View style={styles.modulesGrid}>
-          <TouchableOpacity
-            style={styles.moduleCard}
-            onPress={() => handleOpenModule('PROCUREMENT')}
-            activeOpacity={0.8}
-          >
-            <View style={[styles.moduleIconBox, { backgroundColor: '#fdf2f8' }]}>
-              <Text style={{ fontSize: 24 }}>📦</Text>
-            </View>
-            <Text style={styles.moduleName}>Procurement & Stock</Text>
-            <Text style={styles.moduleDesc}>DCR modules, grid-tie inverters, ACDB/DCDB & material dispatch</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.moduleCard}
-            onPress={() => handleOpenModule('AMC')}
-            activeOpacity={0.8}
-          >
-            <View style={[styles.moduleIconBox, { backgroundColor: '#fff1f2' }]}>
-              <Text style={{ fontSize: 24 }}>🛠️</Text>
-            </View>
-            <Text style={styles.moduleName}>AMC & Support</Text>
-            <Text style={styles.moduleDesc}>Preventive maintenance agreements & post-commissioning service</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* GROUP 5: SUPER ADMIN GOVERNANCE */}
         {user?.role === 'SUPER_ADMIN' && (
-          <>
-            <Text style={styles.groupTitle}>PLATFORM GOVERNANCE</Text>
-            <View style={styles.modulesGrid}>
-              <TouchableOpacity
-                style={styles.moduleCard}
-                onPress={() => handleOpenModule('SUPER_ADMIN')}
-                activeOpacity={0.8}
-              >
-                <View style={[styles.moduleIconBox, { backgroundColor: '#fdf4ff' }]}>
-                  <Text style={{ fontSize: 24 }}>👑</Text>
-                </View>
-                <Text style={styles.moduleName}>Platform Super Admin</Text>
-                <Text style={styles.moduleDesc}>Global tenant roster, provisioning & platform telemetry</Text>
-              </TouchableOpacity>
-            </View>
-          </>
+          <View style={styles.categorySection}>
+            <Text style={styles.categoryTitle}>PLATFORM GOVERNANCE</Text>
+            <TouchableOpacity
+              style={styles.moduleTile}
+              onPress={() => handleOpenModule('SUPER_ADMIN')}
+              activeOpacity={0.8}
+            >
+              <View style={[styles.moduleIconBox, { backgroundColor: '#faf5ff' }]}>
+                <Layers size={20} color="#9333ea" strokeWidth={2.2} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.moduleTileName}>Super Admin Platform</Text>
+                <Text style={styles.moduleTileDesc}>Multi-tenant management & platform telemetry</Text>
+              </View>
+              <ChevronRight size={16} color="#cbd5e1" />
+            </TouchableOpacity>
+          </View>
         )}
       </ScrollView>
 
@@ -561,11 +582,11 @@ Let's schedule your 3D roof survey!`;
               style={styles.closeSubModalBtn}
               onPress={() => setActiveSubModule(null)}
             >
-              <Text style={styles.closeSubModalText}>✕ Close</Text>
+              <X size={18} color="#0f172a" />
             </TouchableOpacity>
           </View>
 
-          <ScrollView style={{ flex: 1, padding: 16 }}>
+          <ScrollView style={{ flex: 1, padding: 20 }}>
             {/* 1. QUOTATIONS ENGINE */}
             {activeSubModule === 'QUOTES' && (
               <View>
@@ -577,6 +598,7 @@ Let's schedule your 3D roof survey!`;
                     value={customerNameInput}
                     onChangeText={setCustomerNameInput}
                     placeholder="e.g. Surendra Sharma"
+                    placeholderTextColor="#94a3b8"
                   />
 
                   <Text style={styles.inputLabel}>RECOMMENDED CAPACITY (kWp)</Text>
@@ -586,6 +608,7 @@ Let's schedule your 3D roof survey!`;
                     value={capacityInput}
                     onChangeText={setCapacityInput}
                     placeholder="3.3"
+                    placeholderTextColor="#94a3b8"
                   />
 
                   <Text style={styles.inputLabel}>PV MODULE SPECIFICATION</Text>
@@ -621,33 +644,33 @@ Let's schedule your 3D roof survey!`;
                   {/* FINANCIAL BREAKDOWN */}
                   <View style={styles.calcBreakdown}>
                     <View style={styles.breakdownRow}>
-                      <Text style={styles.breakdownLabel}>Gross Solar System Cost:</Text>
+                      <Text style={styles.breakdownLabel}>Gross Solar System Cost</Text>
                       <Text style={styles.breakdownVal}>₹{grossTotal.toLocaleString('en-IN')}</Text>
                     </View>
                     <View style={styles.breakdownRow}>
-                      <Text style={[styles.breakdownLabel, { color: '#047857', fontWeight: '700' }]}>
-                        Govt. CFA Subsidy (Surya Ghar):
+                      <Text style={[styles.breakdownLabel, { color: '#059669', fontWeight: '700' }]}>
+                        Govt. CFA Subsidy (Surya Ghar)
                       </Text>
-                      <Text style={[styles.breakdownVal, { color: '#047857', fontWeight: '800' }]}>
+                      <Text style={[styles.breakdownVal, { color: '#059669', fontWeight: '800' }]}>
                         -₹{subsidy.toLocaleString('en-IN')}
                       </Text>
                     </View>
-                    <View style={[styles.breakdownRow, { borderTopWidth: 1, borderTopColor: '#e2e8f0', paddingTop: 8 }]}>
-                      <Text style={styles.netLabel}>Customer Net Investment:</Text>
+                    <View style={[styles.breakdownRow, { borderTopWidth: 1, borderTopColor: '#e2e8f0', paddingTop: 10 }]}>
+                      <Text style={styles.netLabel}>Customer Net Payable</Text>
                       <Text style={styles.netVal}>₹{netPayable.toLocaleString('en-IN')}</Text>
                     </View>
                     <View style={styles.breakdownRow}>
-                      <Text style={styles.breakdownLabel}>Monthly Solar Power Produced:</Text>
+                      <Text style={styles.breakdownLabel}>Estimated Monthly Power</Text>
                       <Text style={styles.breakdownVal}>~{monthlyUnits} Units/mo</Text>
                     </View>
                     <View style={styles.breakdownRow}>
-                      <Text style={styles.breakdownLabel}>Monthly Electricity Savings:</Text>
+                      <Text style={styles.breakdownLabel}>Estimated Monthly Savings</Text>
                       <Text style={[styles.breakdownVal, { color: '#2563eb' }]}>
                         ~₹{monthlySavings.toLocaleString('en-IN')}/mo
                       </Text>
                     </View>
                     <View style={styles.breakdownRow}>
-                      <Text style={styles.breakdownLabel}>Estimated Payback Period:</Text>
+                      <Text style={styles.breakdownLabel}>Estimated Payback Period</Text>
                       <Text style={styles.breakdownBold}>{paybackYears} Years</Text>
                     </View>
                   </View>
@@ -657,24 +680,31 @@ Let's schedule your 3D roof survey!`;
                       style={styles.saveQuoteBtn}
                       onPress={handleSaveQuotation}
                       disabled={savingQuote}
+                      activeOpacity={0.85}
                     >
+                      <Check size={16} color="#ffffff" style={{ marginRight: 6 }} />
                       <Text style={styles.saveQuoteBtnText}>
-                        {savingQuote ? 'Saving...' : '💾 Save Quotation'}
+                        {savingQuote ? 'Saving...' : 'Save Quote'}
                       </Text>
                     </TouchableOpacity>
 
-                    <TouchableOpacity style={styles.whatsappBtn} onPress={handleShareWhatsApp}>
-                      <Text style={styles.whatsappBtnText}>💬 WhatsApp Proposal</Text>
+                    <TouchableOpacity
+                      style={styles.whatsappBtn}
+                      onPress={handleShareWhatsApp}
+                      activeOpacity={0.85}
+                    >
+                      <MessageCircle size={16} color="#ffffff" style={{ marginRight: 6 }} />
+                      <Text style={styles.whatsappBtnText}>WhatsApp</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
 
-                {/* RECENT QUOTATIONS REPOSITORY */}
+                {/* SAVED QUOTATIONS */}
                 <Text style={[styles.cardSectionHeader, { marginTop: 24 }]}>
                   Saved Quotations ({quotations.length})
                 </Text>
                 {loadingQuotes ? (
-                  <ActivityIndicator size="small" color={colors.primary} style={{ marginVertical: 14 }} />
+                  <ActivityIndicator size="small" color="#059669" style={{ marginVertical: 20 }} />
                 ) : quotations.length === 0 ? (
                   <View style={styles.emptyCard}>
                     <Text style={styles.emptyText}>No saved quotations yet.</Text>
@@ -686,13 +716,13 @@ Let's schedule your 3D roof survey!`;
                         <Text style={styles.quoteNumber}>{q.qNumber}</Text>
                         <Text style={styles.quoteCustomer}>{q.customer?.name || q.lead?.name || 'Solar Prospect'}</Text>
                       </View>
-                      <View style={{ alignItems: 'flex-end', gap: 4 }}>
+                      <View style={{ alignItems: 'flex-end', gap: 6 }}>
                         <Text style={styles.quoteTotal}>₹{(q.total || 0).toLocaleString('en-IN')}</Text>
                         <TouchableOpacity
                           style={styles.convertQuoteSmallBtn}
                           onPress={() => handleConvertQuotationToProject(q.id)}
                         >
-                          <Text style={styles.convertQuoteSmallBtnText}>Convert →</Text>
+                          <Text style={styles.convertQuoteSmallBtnText}>Convert to Project</Text>
                         </TouchableOpacity>
                       </View>
                     </View>
@@ -710,15 +740,16 @@ Let's schedule your 3D roof survey!`;
                     style={styles.addSmallBtn}
                     onPress={() => setScheduleSurveyModal(true)}
                   >
-                    <Text style={styles.addSmallBtnText}>+ Schedule Survey</Text>
+                    <Plus size={14} color="#ffffff" style={{ marginRight: 4 }} />
+                    <Text style={styles.addSmallBtnText}>Book Survey</Text>
                   </TouchableOpacity>
                 </View>
 
                 {loadingSurveys ? (
-                  <ActivityIndicator size="small" color={colors.primary} style={{ marginVertical: 14 }} />
+                  <ActivityIndicator size="small" color="#059669" style={{ marginVertical: 20 }} />
                 ) : surveys.length === 0 ? (
                   <View style={styles.emptyCard}>
-                    <Text style={styles.emptyIcon}>📐</Text>
+                    <MapPin size={28} color="#94a3b8" />
                     <Text style={styles.emptyTitle}>No Surveys Scheduled</Text>
                     <Text style={styles.emptyText}>
                       Schedule site visits to evaluate shadow profiles, roof orientations, and electrical panels.
@@ -726,14 +757,14 @@ Let's schedule your 3D roof survey!`;
                   </View>
                 ) : (
                   surveys.map((s) => (
-                    <View key={s.id} style={styles.surveyCard}>
+                    <View key={s.id} style={styles.quoteCard}>
                       <View style={{ flex: 1 }}>
-                        <Text style={styles.surveyCustName}>{s.customer?.name || s.lead?.name || 'Customer'}</Text>
-                        <Text style={styles.surveyAddress}>
-                          📍 {s.customer?.address || s.customer?.city || 'Site Address'}
+                        <Text style={styles.quoteNumber}>{s.customer?.name || s.lead?.name || 'Customer'}</Text>
+                        <Text style={styles.quoteCustomer}>
+                          {s.customer?.address || s.customer?.city || 'Site Address'}
                         </Text>
                         <Text style={styles.surveyDate}>
-                          📅 Date: {s.surveyDate ? new Date(s.surveyDate).toLocaleDateString() : 'Scheduled'} • Cap: {s.proposedCap || 3.3} kW
+                          {s.surveyDate ? new Date(s.surveyDate).toLocaleDateString() : 'Scheduled'} • Cap: {s.proposedCap || 3.3} kW
                         </Text>
                       </View>
                       <View style={styles.surveyStatusPill}>
@@ -748,24 +779,24 @@ Let's schedule your 3D roof survey!`;
             {/* 3. PM SURYA GHAR SUBSIDY */}
             {activeSubModule === 'SUBSIDY' && (
               <View>
-                <Text style={styles.cardSectionHeader}>PM Surya Ghar CFA National Portal Studio</Text>
+                <Text style={styles.cardSectionHeader}>PM Surya Ghar CFA National Portal Track</Text>
                 
                 {/* SLAB CARDS */}
                 <View style={styles.subsidySlabRow}>
                   <View style={styles.slabBox}>
                     <Text style={styles.slabTitle}>1 kW System</Text>
                     <Text style={styles.slabAmount}>₹30,000</Text>
-                    <Text style={styles.slabDesc}>CFA Direct Credit</Text>
+                    <Text style={styles.slabDesc}>CFA Credit</Text>
                   </View>
                   <View style={styles.slabBox}>
                     <Text style={styles.slabTitle}>2 kW System</Text>
                     <Text style={styles.slabAmount}>₹60,000</Text>
-                    <Text style={styles.slabDesc}>CFA Direct Credit</Text>
+                    <Text style={styles.slabDesc}>CFA Credit</Text>
                   </View>
                   <View style={[styles.slabBox, { borderColor: '#10b981', backgroundColor: '#ecfdf5' }]}>
                     <Text style={[styles.slabTitle, { color: '#047857' }]}>3 kW+ System</Text>
                     <Text style={[styles.slabAmount, { color: '#047857' }]}>₹78,000</Text>
-                    <Text style={styles.slabDesc}>Max Central Subsidy</Text>
+                    <Text style={styles.slabDesc}>Max Subsidy</Text>
                   </View>
                 </View>
 
@@ -783,7 +814,11 @@ Let's schedule your 3D roof survey!`;
                   ].map((st) => (
                     <View key={st.step} style={styles.trackItemRow}>
                       <View style={[styles.trackCircle, st.done && styles.trackCircleDone]}>
-                        <Text style={[styles.trackCircleText, st.done && { color: '#fff' }]}>{st.step}</Text>
+                        {st.done ? (
+                          <Check size={12} color="#ffffff" strokeWidth={3} />
+                        ) : (
+                          <Text style={styles.trackCircleText}>{st.step}</Text>
+                        )}
                       </View>
                       <View style={{ flex: 1 }}>
                         <Text style={styles.trackItemTitle}>{st.title}</Text>
@@ -792,40 +827,6 @@ Let's schedule your 3D roof survey!`;
                     </View>
                   ))}
                 </View>
-
-                {/* REAL SUBSIDY APPLICATIONS FROM BACKEND */}
-                <Text style={[styles.cardSectionHeader, { marginTop: 20 }]}>
-                  Live Portal Applications ({subsidies.length})
-                </Text>
-                {loadingSubsidies ? (
-                  <ActivityIndicator size="small" color={colors.primary} style={{ marginVertical: 14 }} />
-                ) : subsidies.length === 0 ? (
-                  <View style={styles.emptyCard}>
-                    <Text style={styles.emptyIcon}>🏛️</Text>
-                    <Text style={styles.emptyTitle}>No Portal Applications Yet</Text>
-                    <Text style={styles.emptyText}>
-                      When a solar project reaches the subsidy stage, it will appear here with national portal tracking.
-                    </Text>
-                  </View>
-                ) : (
-                  subsidies.map((sub) => (
-                    <View key={sub.id} style={styles.quoteCard}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.quoteNumber}>{sub.nationalPortalAppNo || 'PMSG-MH-2026'}</Text>
-                        <Text style={styles.quoteCustomer}>{sub.customerName || 'Solar Consumer'}</Text>
-                        <Text style={styles.surveyAddress}>
-                          CA: {sub.consumerNumber || 'N/A'} • {sub.discomName || 'MSEDCL'}
-                        </Text>
-                      </View>
-                      <View style={{ alignItems: 'flex-end' }}>
-                        <Text style={styles.quoteTotal}>₹{(sub.cfaAmount || 78000).toLocaleString('en-IN')}</Text>
-                        <View style={styles.surveyStatusPill}>
-                          <Text style={styles.surveyStatusText}>{sub.status || 'FEASIBILITY_APPROVED'}</Text>
-                        </View>
-                      </View>
-                    </View>
-                  ))
-                )}
               </View>
             )}
 
@@ -841,6 +842,7 @@ Let's schedule your 3D roof survey!`;
                     value={loanCapInput}
                     onChangeText={setLoanCapInput}
                     placeholder="3.3"
+                    placeholderTextColor="#94a3b8"
                   />
 
                   <Text style={styles.inputLabel}>CUSTOMER DOWN PAYMENT (₹)</Text>
@@ -850,6 +852,7 @@ Let's schedule your 3D roof survey!`;
                     value={downPaymentInput}
                     onChangeText={setDownPaymentInput}
                     placeholder="20000"
+                    placeholderTextColor="#94a3b8"
                   />
 
                   <Text style={styles.inputLabel}>LOAN TENURE (YEARS)</Text>
@@ -869,58 +872,59 @@ Let's schedule your 3D roof survey!`;
 
                   <View style={styles.calcBreakdown}>
                     <View style={styles.breakdownRow}>
-                      <Text style={styles.breakdownLabel}>Gross Solar Cost:</Text>
+                      <Text style={styles.breakdownLabel}>Gross Solar Cost</Text>
                       <Text style={styles.breakdownVal}>₹{loanGross.toLocaleString('en-IN')}</Text>
                     </View>
                     <View style={styles.breakdownRow}>
-                      <Text style={[styles.breakdownLabel, { color: '#047857' }]}>PM Surya Ghar Subsidy:</Text>
-                      <Text style={[styles.breakdownVal, { color: '#047857', fontWeight: '800' }]}>
+                      <Text style={[styles.breakdownLabel, { color: '#059669' }]}>PM Surya Ghar Subsidy</Text>
+                      <Text style={[styles.breakdownVal, { color: '#059669', fontWeight: '800' }]}>
                         -₹{loanSub.toLocaleString('en-IN')}
                       </Text>
                     </View>
                     <View style={styles.breakdownRow}>
-                      <Text style={styles.breakdownLabel}>Net System Payable:</Text>
+                      <Text style={styles.breakdownLabel}>Net System Payable</Text>
                       <Text style={styles.breakdownVal}>₹{loanNetInvestment.toLocaleString('en-IN')}</Text>
                     </View>
                     <View style={styles.breakdownRow}>
-                      <Text style={styles.breakdownLabel}>Down Payment:</Text>
+                      <Text style={styles.breakdownLabel}>Down Payment</Text>
                       <Text style={styles.breakdownVal}>-₹{downPay.toLocaleString('en-IN')}</Text>
                     </View>
-                    <View style={[styles.breakdownRow, { borderTopWidth: 1, borderTopColor: '#e2e8f0', paddingTop: 8 }]}>
-                      <Text style={styles.netLabel}>Bank Loan Principal:</Text>
+                    <View style={[styles.breakdownRow, { borderTopWidth: 1, borderTopColor: '#e2e8f0', paddingTop: 10 }]}>
+                      <Text style={styles.netLabel}>Bank Loan Principal</Text>
                       <Text style={styles.netVal}>₹{principal.toLocaleString('en-IN')}</Text>
                     </View>
                     <View style={styles.breakdownRow}>
-                      <Text style={styles.breakdownLabel}>Interest Rate (Govt. Surcharge):</Text>
+                      <Text style={styles.breakdownLabel}>Interest Rate (Govt. Surcharge)</Text>
                       <Text style={styles.breakdownBold}>{loanInterestRate}% p.a.</Text>
                     </View>
                     <View style={styles.breakdownRow}>
-                      <Text style={[styles.breakdownLabel, { fontWeight: '800', color: '#b45309' }]}>
-                        Monthly Bank EMI:
+                      <Text style={[styles.breakdownLabel, { fontWeight: '700', color: '#b45309' }]}>
+                        Monthly Bank EMI
                       </Text>
                       <Text style={[styles.breakdownVal, { fontWeight: '900', color: '#b45309', fontSize: 16 }]}>
                         ₹{monthlyEmi.toLocaleString('en-IN')} / mo
                       </Text>
                     </View>
                     <View style={styles.breakdownRow}>
-                      <Text style={styles.breakdownLabel}>Monthly Electricity Bill Savings:</Text>
+                      <Text style={styles.breakdownLabel}>Monthly Bill Savings</Text>
                       <Text style={[styles.breakdownVal, { color: '#2563eb', fontWeight: '800' }]}>
                         +₹{loanMonthlySavings.toLocaleString('en-IN')} / mo
                       </Text>
                     </View>
 
-                    <View style={[styles.breakdownRow, { backgroundColor: '#ecfdf5', padding: 10, borderRadius: 8, marginTop: 8 }]}>
-                      <Text style={{ fontSize: 12, fontWeight: '800', color: '#047857' }}>
-                        NET MONTHLY PROFIT:
+                    <View style={[styles.breakdownRow, { backgroundColor: '#ecfdf5', padding: 12, borderRadius: 10, marginTop: 8 }]}>
+                      <Text style={{ fontSize: 13, fontWeight: '800', color: '#047857' }}>
+                        NET MONTHLY PROFIT
                       </Text>
-                      <Text style={{ fontSize: 14, fontWeight: '900', color: '#047857' }}>
+                      <Text style={{ fontSize: 15, fontWeight: '900', color: '#047857' }}>
                         +₹{netMonthlyCashBenefit.toLocaleString('en-IN')} / mo
                       </Text>
                     </View>
                   </View>
 
                   <TouchableOpacity style={styles.whatsappBtn} onPress={handleShareLoanWhatsApp}>
-                    <Text style={styles.whatsappBtnText}>💬 Share Loan Financing on WhatsApp</Text>
+                    <MessageCircle size={16} color="#ffffff" style={{ marginRight: 6 }} />
+                    <Text style={styles.whatsappBtnText}>Share Financing on WhatsApp</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -930,29 +934,20 @@ Let's schedule your 3D roof survey!`;
             {activeSubModule === 'DISCOM' && (
               <View>
                 <Text style={styles.cardSectionHeader}>DISCOM Net-Metering Tracker</Text>
-                <View style={styles.infoBanner}>
-                  <Text style={styles.infoTitle}>Grid Interconnection & Bi-directional Metering</Text>
-                  <Text style={styles.infoText}>
-                    Track consumer net-metering applications across MSEDCL, Tata Power, BESCOM, Adani Electricity and state utilities.
-                  </Text>
-                </View>
-
                 {discomList.map((disc) => (
                   <View key={disc.id} style={styles.quoteCard}>
                     <View style={{ flex: 1 }}>
                       <Text style={styles.quoteNumber}>{disc.appNo}</Text>
                       <Text style={styles.quoteCustomer}>{disc.consumerName}</Text>
-                      <Text style={styles.surveyAddress}>
-                        Consumer #: {disc.consumerNumber} • {disc.discomName} ({disc.division})
+                      <Text style={styles.surveyDate}>
+                        Consumer #: {disc.consumerNumber} • {disc.discomName}
                       </Text>
                       <Text style={styles.surveyDate}>
                         Meter Serial: {disc.meterSerial} • Sanction: {disc.sanctionedLoadKw} kW
                       </Text>
                     </View>
-                    <View style={{ alignItems: 'flex-end' }}>
-                      <View style={[styles.surveyStatusPill, { backgroundColor: '#f0fdfa' }]}>
-                        <Text style={[styles.surveyStatusText, { color: '#0d9488' }]}>{disc.status}</Text>
-                      </View>
+                    <View style={[styles.surveyStatusPill, { backgroundColor: '#f0fdfa' }]}>
+                      <Text style={[styles.surveyStatusText, { color: '#0d9488' }]}>{disc.status}</Text>
                     </View>
                   </View>
                 ))}
@@ -962,13 +957,13 @@ Let's schedule your 3D roof survey!`;
             {/* 6. FINANCE & INVOICING */}
             {activeSubModule === 'FINANCE' && (
               <View>
-                <Text style={styles.cardSectionHeader}>Financial & Milestone Billing Overview</Text>
+                <Text style={styles.cardSectionHeader}>Financial & Milestone Billing</Text>
                 {loadingFinance ? (
-                  <ActivityIndicator size="small" color={colors.primary} style={{ marginVertical: 14 }} />
+                  <ActivityIndicator size="small" color="#059669" style={{ marginVertical: 20 }} />
                 ) : (
                   <View style={styles.financeMetricsRow}>
-                    <View style={[styles.financeMetricCard, { backgroundColor: colors.slate900 }]}>
-                      <Text style={styles.financeMetricLabel}>TOTAL REVENUE BOOKED</Text>
+                    <View style={[styles.financeMetricCard, { backgroundColor: '#0f172a' }]}>
+                      <Text style={styles.financeMetricLabel}>TOTAL REVENUE</Text>
                       <Text style={styles.financeMetricVal}>
                         ₹{financeData.totalRevenue.toLocaleString('en-IN')}
                       </Text>
@@ -1011,44 +1006,30 @@ Let's schedule your 3D roof survey!`;
             {/* 7. PROCUREMENT & STOCK */}
             {activeSubModule === 'PROCUREMENT' && (
               <View>
-                <Text style={styles.cardSectionHeader}>Procurement & Material Logistics</Text>
-                {loadingProcurement ? (
-                  <ActivityIndicator size="small" color={colors.primary} style={{ marginVertical: 14 }} />
-                ) : purchaseOrders.length === 0 ? (
-                  <View style={{ gap: 10 }}>
-                    <View style={styles.inventoryItem}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.invTitle}>Waaree 550Wp Mono PERC PV Modules (DCR Compliant)</Text>
-                        <Text style={styles.invCategory}>Supplier: Waaree Solar • Status: In Stock</Text>
-                      </View>
-                      <Text style={styles.invStock}>48 Units</Text>
+                <Text style={styles.cardSectionHeader}>Procurement & Stock Status</Text>
+                <View style={{ gap: 10 }}>
+                  <View style={styles.inventoryItem}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.invTitle}>Waaree 550Wp Mono PERC PV Modules (DCR Compliant)</Text>
+                      <Text style={styles.invCategory}>Supplier: Waaree Solar • Status: In Stock</Text>
                     </View>
-                    <View style={styles.inventoryItem}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.invTitle}>Growatt 3.3kW & 5kW Dual-MPPT Inverters</Text>
-                        <Text style={styles.invCategory}>Supplier: Growatt New Energy • Status: In Stock</Text>
-                      </View>
-                      <Text style={styles.invStock}>6 Units</Text>
-                    </View>
-                    <View style={styles.inventoryItem}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.invTitle}>HDG Elevated Rooftop Structure Kits (60-80 Micron)</Text>
-                        <Text style={styles.invCategory}>Supplier: Metalkraft Infra • Status: In Transit</Text>
-                      </View>
-                      <Text style={styles.invStock}>4 Kits</Text>
-                    </View>
+                    <Text style={styles.invStock}>48 Units</Text>
                   </View>
-                ) : (
-                  purchaseOrders.map((po) => (
-                    <View key={po.id} style={styles.quoteCard}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.quoteNumber}>{po.poNumber || 'PO-2026'}</Text>
-                        <Text style={styles.quoteCustomer}>{po.supplierName || 'Solar Vendor'}</Text>
-                      </View>
-                      <Text style={styles.quoteStatus}>{po.status || 'ORDERED'}</Text>
+                  <View style={styles.inventoryItem}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.invTitle}>Growatt 3.3kW & 5kW Dual-MPPT Inverters</Text>
+                      <Text style={styles.invCategory}>Supplier: Growatt New Energy • Status: In Stock</Text>
                     </View>
-                  ))
-                )}
+                    <Text style={styles.invStock}>6 Units</Text>
+                  </View>
+                  <View style={styles.inventoryItem}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.invTitle}>HDG Elevated Rooftop Structure Kits (60-80μ)</Text>
+                      <Text style={styles.invCategory}>Supplier: Metalkraft Infra • Status: In Transit</Text>
+                    </View>
+                    <Text style={styles.invStock}>4 Kits</Text>
+                  </View>
+                </View>
               </View>
             )}
 
@@ -1057,23 +1038,24 @@ Let's schedule your 3D roof survey!`;
               <View>
                 <Text style={styles.cardSectionHeader}>Active Maintenance Contracts & Service</Text>
                 {loadingAmcs ? (
-                  <ActivityIndicator size="small" color={colors.primary} style={{ marginVertical: 14 }} />
+                  <ActivityIndicator size="small" color="#059669" style={{ marginVertical: 20 }} />
                 ) : amcs.length === 0 ? (
                   <View style={styles.emptyCard}>
+                    <ShieldCheck size={28} color="#94a3b8" />
+                    <Text style={styles.emptyTitle}>No Active AMCs</Text>
                     <Text style={styles.emptyText}>
-                      No active AMC agreements yet. Solar maintenance packages will appear here once registered.
+                      Solar maintenance packages will appear here once registered.
                     </Text>
                   </View>
                 ) : (
                   amcs.map((amc: any) => (
-                    <View key={amc.id} style={styles.amcCard}>
+                    <View key={amc.id} style={styles.quoteCard}>
                       <View style={{ flex: 1 }}>
-                        <Text style={styles.amcTitle}>{amc.planName || 'Comprehensive Solar AMC'}</Text>
-                        <Text style={styles.amcClient}>{amc.customer?.name || 'Customer'}</Text>
-                        <Text style={styles.amcDate}>Status: {amc.status}</Text>
+                        <Text style={styles.quoteNumber}>{amc.planName || 'Comprehensive Solar AMC'}</Text>
+                        <Text style={styles.quoteCustomer}>{amc.customer?.name || 'Customer'}</Text>
                       </View>
-                      <View style={styles.amcBadge}>
-                        <Text style={styles.amcBadgeText}>{amc.status || 'ACTIVE'}</Text>
+                      <View style={styles.surveyStatusPill}>
+                        <Text style={styles.surveyStatusText}>{amc.status || 'ACTIVE'}</Text>
                       </View>
                     </View>
                   ))
@@ -1081,28 +1063,25 @@ Let's schedule your 3D roof survey!`;
               </View>
             )}
 
-            {/* 9. SUPER ADMIN TENANTS */}
+            {/* 9. SUPER ADMIN */}
             {activeSubModule === 'SUPER_ADMIN' && user?.role === 'SUPER_ADMIN' && (
               <View>
-                <Text style={styles.cardSectionHeader}>Platform Tenants Management</Text>
+                <Text style={styles.cardSectionHeader}>Registered Tenants</Text>
                 {loadingTenants ? (
-                  <ActivityIndicator size="small" color={colors.primary} style={{ marginVertical: 14 }} />
+                  <ActivityIndicator size="small" color="#059669" style={{ marginVertical: 20 }} />
                 ) : tenants.length === 0 ? (
                   <View style={styles.emptyCard}>
                     <Text style={styles.emptyText}>No registered tenants found.</Text>
                   </View>
                 ) : (
                   tenants.map((t) => (
-                    <View key={t.id} style={styles.tenantCard}>
+                    <View key={t.id} style={styles.quoteCard}>
                       <View style={{ flex: 1 }}>
-                        <Text style={styles.tenantName}>{t.name}</Text>
-                        <Text style={styles.tenantMeta}>
-                          📍 {t.city || 'India'} • 📞 {t.phone || 'N/A'}
-                        </Text>
-                        <Text style={styles.tenantEmail}>✉️ {t.email}</Text>
+                        <Text style={styles.quoteNumber}>{t.name}</Text>
+                        <Text style={styles.quoteCustomer}>{t.email} • {t.city || 'India'}</Text>
                       </View>
-                      <View style={styles.tenantStatusBadge}>
-                        <Text style={styles.tenantStatusText}>{t.status || 'ACTIVE'}</Text>
+                      <View style={styles.surveyStatusPill}>
+                        <Text style={styles.surveyStatusText}>{t.status || 'ACTIVE'}</Text>
                       </View>
                     </View>
                   ))
@@ -1117,23 +1096,26 @@ Let's schedule your 3D roof survey!`;
       <Modal visible={scheduleSurveyModal} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContentBox}>
+            <View style={styles.modalDragHandle} />
+
             <View style={styles.subModalHeader}>
               <View>
                 <Text style={styles.modalTitle}>Schedule Site Survey</Text>
                 <Text style={styles.modalSubtitle}>Dispatch technical evaluation team</Text>
               </View>
               <TouchableOpacity onPress={() => setScheduleSurveyModal(false)}>
-                <Text style={styles.closeSubModalText}>✕</Text>
+                <X size={18} color="#64748b" />
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={{ maxHeight: 400 }}>
+            <ScrollView style={{ maxHeight: 400 }} showsVerticalScrollIndicator={false}>
               <Text style={styles.inputLabel}>CUSTOMER NAME *</Text>
               <TextInput
                 style={styles.calcInput}
                 value={surveyForm.customerName}
                 onChangeText={(t) => setSurveyForm({ ...surveyForm, customerName: t })}
                 placeholder="e.g. Surendra Sharma"
+                placeholderTextColor="#94a3b8"
               />
 
               <Text style={styles.inputLabel}>MOBILE NUMBER *</Text>
@@ -1143,6 +1125,7 @@ Let's schedule your 3D roof survey!`;
                 value={surveyForm.phone}
                 onChangeText={(t) => setSurveyForm({ ...surveyForm, phone: t })}
                 placeholder="9876543210"
+                placeholderTextColor="#94a3b8"
               />
 
               <Text style={styles.inputLabel}>SITE ADDRESS</Text>
@@ -1151,30 +1134,17 @@ Let's schedule your 3D roof survey!`;
                 value={surveyForm.address}
                 onChangeText={(t) => setSurveyForm({ ...surveyForm, address: t })}
                 placeholder="Rooftop location address"
+                placeholderTextColor="#94a3b8"
               />
-
-              <Text style={styles.inputLabel}>ROOF TYPE</Text>
-              <View style={styles.chipRow}>
-                {['RCC Flat Roof', 'Metal Shed', 'High-Rise Elevated'].map((r) => (
-                  <TouchableOpacity
-                    key={r}
-                    style={[styles.smallChip, surveyForm.roofType === r && styles.smallChipSelected]}
-                    onPress={() => setSurveyForm({ ...surveyForm, roofType: r })}
-                  >
-                    <Text style={[styles.smallChipText, surveyForm.roofType === r && styles.smallChipTextSelected]}>
-                      {r}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
 
               <TouchableOpacity
                 style={styles.saveQuoteBtn}
                 onPress={handleScheduleSurveySubmit}
                 disabled={savingSurvey}
+                activeOpacity={0.85}
               >
                 <Text style={styles.saveQuoteBtnText}>
-                  {savingSurvey ? 'Scheduling...' : 'Confirm Survey Appointment'}
+                  {savingSurvey ? 'Scheduling...' : 'Confirm Appointment'}
                 </Text>
               </TouchableOpacity>
             </ScrollView>
@@ -1194,54 +1164,55 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    padding: 16,
+    padding: 20,
     paddingBottom: 40,
   },
-  groupTitle: {
+  categorySection: {
+    marginBottom: 20,
+  },
+  categoryTitle: {
     fontSize: 11,
     fontWeight: '800',
-    color: colors.slate400,
+    color: '#94a3b8',
     letterSpacing: 0.8,
-    marginTop: 14,
-    marginBottom: 8,
-  },
-  modulesGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
     marginBottom: 10,
   },
-  moduleCard: {
-    width: '48.5%',
-    backgroundColor: colors.white,
-    borderRadius: 16,
-    padding: 14,
+  categoryGrid: {
+    gap: 10,
+  },
+  moduleTile: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    borderRadius: 18,
+    padding: 16,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
-    shadowColor: '#000',
+    borderColor: '#f1f5f9',
+    shadowColor: '#0f172a',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.03,
-    shadowRadius: 3,
-    elevation: 2,
+    shadowOpacity: 0.02,
+    shadowRadius: 6,
+    elevation: 1,
   },
   moduleIconBox: {
-    width: 44,
-    height: 44,
+    width: 42,
+    height: 42,
     borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 10,
+    marginRight: 14,
   },
-  moduleName: {
-    fontSize: 13,
+  moduleTileName: {
+    fontSize: 14,
     fontWeight: '800',
-    color: colors.slate900,
-    marginBottom: 4,
+    color: '#0f172a',
+    marginBottom: 2,
   },
-  moduleDesc: {
-    fontSize: 10,
-    color: colors.slate500,
-    lineHeight: 14,
+  moduleTileDesc: {
+    fontSize: 11,
+    color: '#64748b',
+    fontWeight: '500',
+    lineHeight: 15,
   },
   subModalContainer: {
     flex: 1,
@@ -1251,99 +1222,89 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
-    backgroundColor: colors.white,
+    padding: 20,
+    backgroundColor: '#ffffff',
     borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
+    borderBottomColor: '#f1f5f9',
   },
   subModalTitle: {
     fontSize: 16,
-    fontWeight: '900',
-    color: colors.slate900,
+    fontWeight: '800',
+    color: '#0f172a',
   },
   subModalSubtitle: {
-    fontSize: 11,
-    color: colors.slate500,
+    fontSize: 12,
+    color: '#64748b',
     marginTop: 2,
   },
   closeSubModalBtn: {
-    backgroundColor: '#f1f5f9',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-  },
-  closeSubModalText: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: colors.slate700,
+    padding: 6,
   },
   cardSectionHeader: {
     fontSize: 14,
     fontWeight: '800',
-    color: colors.slate800,
+    color: '#0f172a',
     marginBottom: 12,
   },
   calcBox: {
-    backgroundColor: colors.white,
-    padding: 16,
-    borderRadius: 16,
+    backgroundColor: '#ffffff',
+    padding: 18,
+    borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: '#f1f5f9',
   },
   inputLabel: {
     fontSize: 10,
     fontWeight: '800',
-    color: colors.slate400,
+    color: '#94a3b8',
     letterSpacing: 0.5,
-    marginTop: 10,
+    marginTop: 12,
     marginBottom: 4,
   },
   calcInput: {
     backgroundColor: '#f8fafc',
     borderWidth: 1,
     borderColor: '#e2e8f0',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
     fontSize: 14,
-    fontWeight: '600',
-    color: colors.slate800,
+    fontWeight: '500',
+    color: '#0f172a',
   },
   chipRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 6,
+    gap: 8,
     marginTop: 4,
   },
   smallChip: {
-    backgroundColor: '#f1f5f9',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
+    backgroundColor: '#f8fafc',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: '#e2e8f0',
   },
   smallChipSelected: {
     backgroundColor: '#ecfdf5',
-    borderColor: '#10b981',
+    borderColor: '#059669',
   },
   smallChipText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '600',
-    color: colors.slate600,
+    color: '#64748b',
   },
   smallChipTextSelected: {
     color: '#059669',
-    fontWeight: '800',
+    fontWeight: '700',
   },
   calcBreakdown: {
-    marginTop: 14,
+    marginTop: 16,
     backgroundColor: '#f8fafc',
-    borderRadius: 12,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    gap: 6,
+    borderRadius: 14,
+    padding: 14,
+    gap: 8,
   },
   breakdownRow: {
     flexDirection: 'row',
@@ -1352,23 +1313,23 @@ const styles = StyleSheet.create({
   },
   breakdownLabel: {
     fontSize: 12,
-    color: colors.slate600,
+    color: '#64748b',
     fontWeight: '500',
   },
   breakdownVal: {
     fontSize: 12,
     fontWeight: '700',
-    color: colors.slate900,
+    color: '#0f172a',
   },
   breakdownBold: {
     fontSize: 12,
     fontWeight: '800',
-    color: colors.slate900,
+    color: '#0f172a',
   },
   netLabel: {
     fontSize: 13,
     fontWeight: '800',
-    color: colors.slate900,
+    color: '#0f172a',
   },
   netVal: {
     fontSize: 16,
@@ -1377,125 +1338,109 @@ const styles = StyleSheet.create({
   },
   quoteActionButtonsRow: {
     flexDirection: 'row',
-    gap: 8,
-    marginTop: 14,
+    gap: 10,
+    marginTop: 16,
   },
   saveQuoteBtn: {
     flex: 1,
-    backgroundColor: colors.slate900,
-    paddingVertical: 12,
-    borderRadius: 10,
+    flexDirection: 'row',
+    justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#0f172a',
+    paddingVertical: 12,
+    borderRadius: 12,
   },
   saveQuoteBtnText: {
-    color: colors.white,
-    fontWeight: '800',
+    color: '#ffffff',
+    fontWeight: '700',
     fontSize: 13,
   },
   whatsappBtn: {
     flex: 1,
-    backgroundColor: '#25d366',
-    paddingVertical: 12,
-    borderRadius: 10,
+    flexDirection: 'row',
+    justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#059669',
+    paddingVertical: 12,
+    borderRadius: 12,
   },
   whatsappBtnText: {
-    color: colors.white,
-    fontWeight: '800',
-    fontSize: 12,
+    color: '#ffffff',
+    fontWeight: '700',
+    fontSize: 13,
   },
   quoteCard: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: colors.white,
-    padding: 14,
-    borderRadius: 12,
+    backgroundColor: '#ffffff',
+    padding: 16,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
-    marginBottom: 8,
+    borderColor: '#f1f5f9',
+    marginBottom: 10,
   },
   quoteNumber: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '800',
-    color: colors.slate900,
+    color: '#0f172a',
   },
   quoteCustomer: {
-    fontSize: 11,
-    color: colors.slate500,
+    fontSize: 12,
+    color: '#64748b',
     marginTop: 2,
+    fontWeight: '500',
   },
   quoteTotal: {
     fontSize: 14,
-    fontWeight: '900',
-    color: colors.slate900,
+    fontWeight: '800',
+    color: '#0f172a',
   },
   quoteStatus: {
-    fontSize: 10,
-    fontWeight: '800',
+    fontSize: 11,
+    fontWeight: '700',
     color: '#2563eb',
   },
   convertQuoteSmallBtn: {
     backgroundColor: '#ecfdf5',
-    paddingHorizontal: 8,
+    paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#a7f3d0',
+    borderRadius: 8,
   },
   convertQuoteSmallBtnText: {
-    fontSize: 10,
-    fontWeight: '800',
+    fontSize: 11,
+    fontWeight: '700',
     color: '#059669',
   },
   sectionTitleWithAction: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 14,
   },
   addSmallBtn: {
-    backgroundColor: colors.primary,
-    paddingHorizontal: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#059669',
+    paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 8,
+    borderRadius: 10,
   },
   addSmallBtnText: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: colors.white,
-  },
-  surveyCard: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: colors.white,
-    padding: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    marginBottom: 8,
-  },
-  surveyCustName: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: colors.slate900,
-  },
-  surveyAddress: {
-    fontSize: 11,
-    color: colors.slate500,
-    marginTop: 2,
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#ffffff',
   },
   surveyDate: {
-    fontSize: 10,
-    color: colors.slate400,
-    marginTop: 2,
+    fontSize: 11,
+    color: '#94a3b8',
+    marginTop: 3,
   },
   surveyStatusPill: {
     backgroundColor: '#eff6ff',
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 6,
+    borderRadius: 8,
   },
   surveyStatusText: {
     fontSize: 10,
@@ -1503,87 +1448,66 @@ const styles = StyleSheet.create({
     color: '#2563eb',
   },
   emptyCard: {
-    backgroundColor: colors.white,
-    borderRadius: 14,
-    padding: 24,
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    padding: 30,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  emptyIcon: {
-    fontSize: 32,
-    marginBottom: 8,
+    borderColor: '#f1f5f9',
   },
   emptyTitle: {
     fontSize: 14,
     fontWeight: '800',
-    color: colors.slate800,
+    color: '#0f172a',
+    marginTop: 8,
     marginBottom: 4,
   },
   emptyText: {
-    fontSize: 11,
-    color: colors.slate500,
-    textAlign: 'center',
-  },
-  infoBanner: {
-    backgroundColor: '#eff6ff',
-    padding: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#bfdbfe',
-    marginBottom: 14,
-  },
-  infoTitle: {
     fontSize: 12,
-    fontWeight: '800',
-    color: '#1e40af',
-    marginBottom: 2,
-  },
-  infoText: {
-    fontSize: 11,
-    color: '#3b82f6',
-    lineHeight: 15,
+    color: '#64748b',
+    textAlign: 'center',
+    lineHeight: 18,
   },
   subsidySlabRow: {
     flexDirection: 'row',
     gap: 8,
-    marginBottom: 12,
+    marginBottom: 14,
   },
   slabBox: {
     flex: 1,
-    backgroundColor: colors.white,
-    borderRadius: 12,
-    padding: 10,
+    backgroundColor: '#ffffff',
+    borderRadius: 14,
+    padding: 12,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: '#f1f5f9',
     alignItems: 'center',
   },
   slabTitle: {
     fontSize: 10,
-    fontWeight: '800',
-    color: colors.slate600,
+    fontWeight: '700',
+    color: '#64748b',
   },
   slabAmount: {
     fontSize: 14,
     fontWeight: '900',
-    color: colors.slate900,
-    marginVertical: 2,
+    color: '#0f172a',
+    marginVertical: 4,
   },
   slabDesc: {
-    fontSize: 8,
-    color: colors.slate400,
+    fontSize: 9,
+    color: '#94a3b8',
   },
   stageTrackBox: {
-    backgroundColor: colors.white,
-    borderRadius: 14,
-    padding: 14,
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 16,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: '#f1f5f9',
     gap: 12,
   },
   trackItemRow: {
     flexDirection: 'row',
-    gap: 10,
+    gap: 12,
     alignItems: 'center',
   },
   trackCircle: {
@@ -1595,162 +1519,97 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   trackCircleDone: {
-    backgroundColor: '#10b981',
+    backgroundColor: '#059669',
   },
   trackCircleText: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: colors.slate600,
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#64748b',
   },
   trackItemTitle: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: colors.slate800,
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#0f172a',
   },
   trackItemDesc: {
-    fontSize: 10,
-    color: colors.slate500,
+    fontSize: 11,
+    color: '#64748b',
   },
   financeMetricsRow: {
     flexDirection: 'row',
-    gap: 10,
-    marginBottom: 12,
+    gap: 12,
+    marginBottom: 14,
   },
   financeMetricCard: {
     flex: 1,
-    borderRadius: 14,
-    padding: 14,
+    borderRadius: 16,
+    padding: 16,
   },
   financeMetricLabel: {
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: '800',
     color: 'rgba(255, 255, 255, 0.7)',
     letterSpacing: 0.5,
   },
   financeMetricVal: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '900',
-    color: colors.white,
+    color: '#ffffff',
     marginTop: 4,
   },
   inventoryItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: colors.white,
-    padding: 14,
-    borderRadius: 12,
+    backgroundColor: '#ffffff',
+    padding: 16,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: '#f1f5f9',
   },
   invTitle: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: colors.slate900,
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#0f172a',
   },
   invCategory: {
-    fontSize: 10,
-    color: colors.slate500,
+    fontSize: 11,
+    color: '#64748b',
     marginTop: 2,
   },
   invStock: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#059669',
-  },
-  amcCard: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: colors.white,
-    padding: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    marginBottom: 8,
-  },
-  amcTitle: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: colors.slate900,
-  },
-  amcClient: {
-    fontSize: 11,
-    color: colors.slate500,
-    marginTop: 2,
-  },
-  amcDate: {
-    fontSize: 10,
-    color: colors.slate400,
-    marginTop: 2,
-  },
-  amcBadge: {
-    backgroundColor: '#ecfdf5',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  amcBadgeText: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#059669',
-  },
-  tenantCard: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: colors.white,
-    padding: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    marginBottom: 8,
-  },
-  tenantName: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: colors.slate900,
-  },
-  tenantMeta: {
-    fontSize: 11,
-    color: colors.slate500,
-    marginTop: 2,
-  },
-  tenantEmail: {
-    fontSize: 10,
-    color: colors.slate400,
-    marginTop: 2,
-  },
-  tenantStatusBadge: {
-    backgroundColor: '#ecfdf5',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  tenantStatusText: {
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: '800',
     color: '#059669',
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.6)',
-    justifyContent: 'center',
-    padding: 16,
+    backgroundColor: 'rgba(15, 23, 42, 0.4)',
+    justifyContent: 'flex-end',
   },
   modalContentBox: {
-    backgroundColor: colors.white,
-    borderRadius: 20,
-    padding: 16,
+    backgroundColor: '#ffffff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+    paddingBottom: 40,
+  },
+  modalDragHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#e2e8f0',
+    alignSelf: 'center',
+    marginBottom: 16,
   },
   modalTitle: {
     fontSize: 16,
-    fontWeight: '900',
-    color: colors.slate900,
+    fontWeight: '800',
+    color: '#0f172a',
   },
   modalSubtitle: {
-    fontSize: 11,
-    color: colors.slate500,
+    fontSize: 12,
+    color: '#64748b',
     marginTop: 2,
   },
 });

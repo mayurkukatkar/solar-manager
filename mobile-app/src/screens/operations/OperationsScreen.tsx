@@ -12,8 +12,21 @@ import {
   RefreshControl,
   ActivityIndicator,
 } from 'react-native';
+import {
+  ShieldCheck,
+  Phone,
+  Navigation,
+  ClipboardCheck,
+  QrCode,
+  Camera,
+  CheckCircle2,
+  X,
+  Check,
+  MapPin,
+  Clock,
+  Layers,
+} from 'lucide-react-native';
 import { Header } from '../../components/Header';
-import { colors } from '../../theme/colors';
 import { installationsApi } from '../../api/endpoints';
 import { InstallationJob } from '../../types';
 
@@ -33,7 +46,7 @@ export const OperationsScreen: React.FC = () => {
   const [activeJob, setActiveJob] = useState<InstallationJob | null>(null);
   const [activeTab, setActiveTab] = useState<'CHECKLIST' | 'BARCODES' | 'PHOTOS' | 'SIGNOFF'>('CHECKLIST');
 
-  // Interactive Checklist
+  // Interactive Technical Checklist
   const [checklist, setChecklist] = useState([
     { id: 'chk-1', title: 'Mounting Structure: Bolted with anti-corrosion coating & South orientation', completed: true },
     { id: 'chk-2', title: 'PV Modules: Clamped tightly without micro-cracks (Adani 535Wp)', completed: true },
@@ -93,7 +106,7 @@ export const OperationsScreen: React.FC = () => {
           phone: item.customer?.mobile || '',
           address: item.installationAddress || 'Site Address',
           city: item.city || item.project?.city || 'Site Location',
-          capacityKw: item.project?.capacity || 3.0,
+          capacityKw: item.project?.capacity || 3.3,
           panelBrand: item.project?.panelBrand || 'Tier-1 Mono Perc',
           inverterBrand: item.project?.inverterBrand || 'Grid-Tie Inverter',
           status: item.status || 'SCHEDULED',
@@ -172,22 +185,22 @@ export const OperationsScreen: React.FC = () => {
   return (
     <View style={styles.container}>
       <Header
-        title="Field Operations & QA"
+        title="Field QA & Operations"
         subtitle="On-site execution, checklists & PM Surya Ghar inspections"
       />
 
-      {/* KPIS ROW (CONVERTED FROM WEB APP) */}
+      {/* KPIS ROW */}
       <View style={styles.kpiRow}>
-        <View style={[styles.kpiCard, { borderTopColor: '#3b82f6' }]}>
+        <View style={styles.kpiCard}>
           <Text style={styles.kpiVal}>{dashboardKpis.scheduledToday || jobs.length}</Text>
           <Text style={styles.kpiLbl}>Scheduled</Text>
         </View>
-        <View style={[styles.kpiCard, { borderTopColor: '#f59e0b' }]}>
+        <View style={styles.kpiCard}>
           <Text style={[styles.kpiVal, { color: '#d97706' }]}>{dashboardKpis.inProgress}</Text>
           <Text style={styles.kpiLbl}>In Progress</Text>
         </View>
-        <View style={[styles.kpiCard, { borderTopColor: '#10b981' }]}>
-          <Text style={[styles.kpiVal, { color: '#047857' }]}>{dashboardKpis.completedToday}</Text>
+        <View style={styles.kpiCard}>
+          <Text style={[styles.kpiVal, { color: '#059669' }]}>{dashboardKpis.completedToday}</Text>
           <Text style={styles.kpiLbl}>Completed</Text>
         </View>
       </View>
@@ -199,14 +212,14 @@ export const OperationsScreen: React.FC = () => {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
         <View style={styles.sectionTitleRow}>
-          <Text style={styles.sectionTitle}>Installation Job Queue ({jobs.length})</Text>
+          <Text style={styles.sectionTitle}>INSTALLATION QUEUE ({jobs.length})</Text>
         </View>
 
         {loading ? (
-          <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 24 }} />
+          <ActivityIndicator size="small" color="#059669" style={{ marginVertical: 30 }} />
         ) : jobs.length === 0 ? (
           <View style={styles.emptyCard}>
-            <Text style={{ fontSize: 32, marginBottom: 8 }}>⚡</Text>
+            <ShieldCheck size={32} color="#94a3b8" />
             <Text style={styles.emptyTitle}>No Scheduled Installations</Text>
             <Text style={styles.emptyText}>
               On-site jobs will be dispatched here once solar projects reach the installation stage.
@@ -219,7 +232,10 @@ export const OperationsScreen: React.FC = () => {
                 <View style={{ flex: 1 }}>
                   <Text style={styles.jobId}>{job.jobId || 'INS-2026'}</Text>
                   <Text style={styles.customerName}>{job.customerName}</Text>
-                  <Text style={styles.addressText}>📍 {job.address}, {job.city}</Text>
+                  <View style={styles.addressRow}>
+                    <MapPin size={12} color="#94a3b8" />
+                    <Text style={styles.addressText}>{job.address}, {job.city}</Text>
+                  </View>
                 </View>
                 <View
                   style={[
@@ -235,46 +251,52 @@ export const OperationsScreen: React.FC = () => {
 
               <View style={styles.specBox}>
                 <View style={styles.specItem}>
-                  <Text style={styles.specLabel}>CAPACITY</Text>
+                  <Text style={styles.specLabel}>Capacity</Text>
                   <Text style={styles.specVal}>{job.capacityKw} kWp</Text>
                 </View>
                 <View style={styles.specItem}>
-                  <Text style={styles.specLabel}>PANELS</Text>
+                  <Text style={styles.specLabel}>Panels</Text>
                   <Text style={styles.specVal}>{job.panelBrand.split(' ')[0]}</Text>
                 </View>
                 <View style={styles.specItem}>
-                  <Text style={styles.specLabel}>INVERTER</Text>
+                  <Text style={styles.specLabel}>Inverter</Text>
                   <Text style={styles.specVal}>{job.inverterBrand.split(' ')[0]}</Text>
                 </View>
               </View>
 
               <View style={styles.buttonRow}>
-                <TouchableOpacity
-                  style={styles.callBtn}
-                  onPress={() => Linking.openURL(`tel:${job.phone}`)}
-                >
-                  <Text style={styles.callBtnText}>📞 Call Client</Text>
-                </TouchableOpacity>
+                <View style={styles.contactButtons}>
+                  <TouchableOpacity
+                    style={styles.iconCircleBtn}
+                    onPress={() => Linking.openURL(`tel:${job.phone}`)}
+                    activeOpacity={0.8}
+                  >
+                    <Phone size={15} color="#0f172a" strokeWidth={2.2} />
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.iconCircleBtn}
+                    onPress={() =>
+                      Linking.openURL(`https://maps.google.com/?q=${encodeURIComponent(job.address)}`)
+                    }
+                    activeOpacity={0.8}
+                  >
+                    <Navigation size={15} color="#0f172a" strokeWidth={2.2} />
+                  </TouchableOpacity>
+                </View>
 
                 <TouchableOpacity
-                  style={styles.navBtn}
-                  onPress={() =>
-                    Linking.openURL(`https://maps.google.com/?q=${encodeURIComponent(job.address)}`)
-                  }
+                  style={styles.executeBtn}
+                  onPress={() => {
+                    setActiveJob(job);
+                    setActiveTab('CHECKLIST');
+                  }}
+                  activeOpacity={0.85}
                 >
-                  <Text style={styles.navBtnText}>🧭 Navigate</Text>
+                  <ClipboardCheck size={15} color="#ffffff" style={{ marginRight: 6 }} />
+                  <Text style={styles.executeBtnText}>QA Dossier</Text>
                 </TouchableOpacity>
               </View>
-
-              <TouchableOpacity
-                style={styles.executeBtn}
-                onPress={() => {
-                  setActiveJob(job);
-                  setActiveTab('CHECKLIST');
-                }}
-              >
-                <Text style={styles.executeBtnText}>⚡ Open Field Checklist & QA Dossier</Text>
-              </TouchableOpacity>
             </View>
           ))
         )}
@@ -284,7 +306,7 @@ export const OperationsScreen: React.FC = () => {
           <Modal visible={!!activeJob} animationType="slide">
             <View style={styles.modalContainer}>
               <View style={styles.modalHeader}>
-                <View>
+                <View style={{ flex: 1 }}>
                   <Text style={styles.modalJobId}>{activeJob.jobId || 'INS-2026'}</Text>
                   <Text style={styles.modalCustomer}>{activeJob.customerName}</Text>
                 </View>
@@ -292,7 +314,7 @@ export const OperationsScreen: React.FC = () => {
                   style={styles.modalCloseBtn}
                   onPress={() => setActiveJob(null)}
                 >
-                  <Text style={styles.modalCloseText}>✕ Close</Text>
+                  <X size={18} color="#0f172a" />
                 </TouchableOpacity>
               </View>
 
@@ -335,7 +357,7 @@ export const OperationsScreen: React.FC = () => {
                 </TouchableOpacity>
               </View>
 
-              <ScrollView style={{ flex: 1, padding: 16 }}>
+              <ScrollView style={{ flex: 1, padding: 20 }}>
                 {/* 1. CHECKLIST */}
                 {activeTab === 'CHECKLIST' && (
                   <View>
@@ -349,9 +371,10 @@ export const OperationsScreen: React.FC = () => {
                         key={item.id}
                         style={[styles.checklistItem, item.completed && styles.checklistItemDone]}
                         onPress={() => toggleChecklist(item.id)}
+                        activeOpacity={0.8}
                       >
                         <View style={[styles.checkCircle, item.completed && styles.checkCircleDone]}>
-                          {item.completed && <Text style={{ color: '#fff', fontWeight: '900' }}>✓</Text>}
+                          {item.completed && <Check size={12} color="#ffffff" strokeWidth={3} />}
                         </View>
                         <Text style={[styles.checklistText, item.completed && styles.checklistTextDone]}>
                           {item.title}
@@ -369,14 +392,16 @@ export const OperationsScreen: React.FC = () => {
                       Scanned serial numbers are auto-submitted for DCR & PM Surya Ghar Subsidy Verification.
                     </Text>
 
-                    <TouchableOpacity style={styles.scanBtn} onPress={handleSimulateScan}>
-                      <Text style={styles.scanBtnText}>📸 Scan PV Module QR Code</Text>
+                    <TouchableOpacity style={styles.scanBtn} onPress={handleSimulateScan} activeOpacity={0.85}>
+                      <QrCode size={18} color="#ffffff" style={{ marginRight: 8 }} />
+                      <Text style={styles.scanBtnText}>Scan PV Module QR Code</Text>
                     </TouchableOpacity>
 
                     <View style={styles.manualSerialRow}>
                       <TextInput
                         style={styles.manualInput}
-                        placeholder="Or type module serial..."
+                        placeholder="Or enter serial number..."
+                        placeholderTextColor="#94a3b8"
                         value={manualSerialInput}
                         onChangeText={setManualSerialInput}
                       />
@@ -400,18 +425,18 @@ export const OperationsScreen: React.FC = () => {
                       <View key={idx} style={styles.serialBadge}>
                         <Text style={styles.serialIndex}>#{idx + 1}</Text>
                         <Text style={styles.serialCode}>{s}</Text>
-                        <Text style={styles.serialVerified}>✓ DCR VERIFIED</Text>
+                        <Text style={styles.serialVerified}>✓ DCR Linked</Text>
                       </View>
                     ))}
                   </View>
                 )}
 
-                {/* 3. GEO PHOTOS */}
+                {/* 3. 5-GEO PHOTOS */}
                 {activeTab === 'PHOTOS' && (
                   <View>
-                    <Text style={styles.tabSectionTitle}>5 PM Surya Ghar Mandatory Geo-Photos</Text>
+                    <Text style={styles.tabSectionTitle}>PM Surya Ghar 5 Mandatory Photos</Text>
                     <Text style={styles.tabSectionSub}>
-                      Geo-tagged photos with GPS timestamps required by Discom inspectors.
+                      DISCOM net-metering portal requires geo-tagged & timestamped roof proofs.
                     </Text>
 
                     {geoPhotos.map((photo) => (
@@ -420,19 +445,20 @@ export const OperationsScreen: React.FC = () => {
                           <Text style={styles.photoName}>{photo.name}</Text>
                           {photo.captured ? (
                             <Text style={styles.geoTag}>
-                              📍 21.1458° N, 79.0882° E • {photo.time}
+                              ✓ Recorded at {photo.time}
                             </Text>
                           ) : (
-                            <Text style={styles.geoPending}>⚠️ Mandatory Inspection Photo Pending</Text>
+                            <Text style={styles.geoPending}>⏳ Pending capture</Text>
                           )}
                         </View>
-
                         <TouchableOpacity
                           style={[styles.captureBtn, photo.captured && styles.recaptureBtn]}
                           onPress={() => handleCapturePhoto(photo.slot)}
+                          activeOpacity={0.85}
                         >
+                          <Camera size={14} color="#ffffff" style={{ marginRight: 6 }} />
                           <Text style={styles.captureBtnText}>
-                            {photo.captured ? '✓ Retake' : '📷 Capture'}
+                            {photo.captured ? 'Retake' : 'Capture'}
                           </Text>
                         </TouchableOpacity>
                       </View>
@@ -440,47 +466,44 @@ export const OperationsScreen: React.FC = () => {
                   </View>
                 )}
 
-                {/* 4. DIGITAL SIGN OFF */}
+                {/* 4. SIGNOFF */}
                 {activeTab === 'SIGNOFF' && (
                   <View>
-                    <Text style={styles.tabSectionTitle}>Customer Digital Handover & Sign-Off</Text>
+                    <Text style={styles.tabSectionTitle}>Customer Digital Sign-Off</Text>
                     <Text style={styles.tabSectionSub}>
-                      Customer authorizes installation commissioning and receives warranty booklet.
+                      Verify client satisfaction on-site before grid energization.
                     </Text>
 
                     <View style={styles.signatureBox}>
-                      {customerSigned ? (
-                        <View style={styles.signedContent}>
-                          <Text style={{ fontSize: 32 }}>✍️</Text>
-                          <Text style={styles.signedName}>{activeJob.customerName}</Text>
-                          <Text style={styles.signedTime}>
-                            Digitally signed on {new Date().toLocaleDateString()}
-                          </Text>
-                          <Text style={styles.signedHash}>SHA-256: 8f3a9e...bc412</Text>
-                        </View>
-                      ) : (
+                      {!customerSigned ? (
                         <TouchableOpacity
                           style={styles.touchSignArea}
-                          onPress={() => setCustomerSigned(true)}
+                          onPress={() => {
+                            setCustomerSigned(true);
+                            Alert.alert('Signed', 'Customer digital sign-off verified.');
+                          }}
                         >
-                          <Text style={styles.touchSignPrompt}>
-                            Tap here to record customer touch sign-off
-                          </Text>
+                          <Text style={styles.touchSignPrompt}>✍️ Tap to Sign Customer Handover</Text>
                         </TouchableOpacity>
+                      ) : (
+                        <View style={styles.signedContent}>
+                          <CheckCircle2 size={32} color="#059669" />
+                          <Text style={styles.signedName}>{activeJob.customerName}</Text>
+                          <Text style={styles.signedTime}>Signed at {new Date().toLocaleTimeString()}</Text>
+                          <Text style={styles.signedHash}>SHA256: 8f9b...3c1a (Verified)</Text>
+                        </View>
                       )}
                     </View>
 
                     <TouchableOpacity
-                      style={[styles.completeJobBtn, !customerSigned && { opacity: 0.6 }]}
+                      style={styles.completeJobBtn}
                       onPress={() => {
                         handleUpdateStatus(activeJob.id, 'COMPLETED');
                         setActiveJob(null);
                       }}
-                      disabled={!customerSigned}
+                      activeOpacity={0.85}
                     >
-                      <Text style={styles.completeJobBtnText}>
-                        🚀 Commission System & Submit Dossier to Cloud ERP
-                      </Text>
+                      <Text style={styles.completeJobBtnText}>Complete & Submit Handover Dossier</Text>
                     </TouchableOpacity>
                   </View>
                 )}
@@ -500,82 +523,90 @@ const styles = StyleSheet.create({
   },
   kpiRow: {
     flexDirection: 'row',
-    gap: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: colors.white,
+    backgroundColor: '#ffffff',
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    gap: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
+    borderBottomColor: '#f1f5f9',
   },
   kpiCard: {
     flex: 1,
-    backgroundColor: colors.white,
-    paddingVertical: 10,
+    backgroundColor: '#f8fafc',
     borderRadius: 14,
+    padding: 12,
     alignItems: 'center',
-    borderTopWidth: 3,
     borderWidth: 1,
     borderColor: '#e2e8f0',
   },
   kpiVal: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '900',
-    color: colors.slate900,
+    color: '#0f172a',
   },
   kpiLbl: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: colors.slate500,
+    fontSize: 11,
+    color: '#64748b',
+    fontWeight: '600',
     marginTop: 2,
   },
   scroll: {
     flex: 1,
   },
   scrollContent: {
-    padding: 16,
-    paddingBottom: 32,
+    padding: 20,
+    paddingBottom: 40,
   },
   sectionTitleRow: {
-    marginBottom: 10,
+    marginBottom: 12,
   },
   sectionTitle: {
-    fontSize: 15,
-    fontWeight: '900',
-    color: colors.slate900,
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#94a3b8',
+    letterSpacing: 0.8,
   },
   jobCard: {
-    backgroundColor: colors.white,
-    borderRadius: 18,
-    padding: 16,
-    marginBottom: 12,
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    padding: 18,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
-    shadowColor: '#000',
+    borderColor: '#f1f5f9',
+    marginBottom: 14,
+    shadowColor: '#0f172a',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowOpacity: 0.02,
+    shadowRadius: 6,
+    elevation: 1,
   },
   jobHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
+    marginBottom: 12,
   },
   jobId: {
     fontSize: 11,
     fontWeight: '800',
-    color: colors.primary,
+    color: '#059669',
+    letterSpacing: 0.5,
   },
   customerName: {
     fontSize: 16,
-    fontWeight: '900',
-    color: colors.slate900,
-    marginTop: 1,
+    fontWeight: '800',
+    color: '#0f172a',
+    marginTop: 2,
+  },
+  addressRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+    gap: 4,
   },
   addressText: {
     fontSize: 12,
-    color: colors.slate500,
-    marginTop: 2,
+    color: '#64748b',
+    fontWeight: '500',
   },
   statusPill: {
     paddingHorizontal: 8,
@@ -583,164 +614,168 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   statusOnSite: {
-    backgroundColor: '#ecfdf5',
-    borderWidth: 1,
-    borderColor: '#a7f3d0',
+    backgroundColor: '#fffbeb',
   },
   statusAssigned: {
     backgroundColor: '#eff6ff',
-    borderWidth: 1,
-    borderColor: '#bfdbfe',
   },
   statusPillText: {
     fontSize: 10,
     fontWeight: '800',
-    color: colors.slate800,
+    color: '#0f172a',
   },
   specBox: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     backgroundColor: '#f8fafc',
     borderRadius: 12,
-    padding: 10,
-    marginTop: 12,
-    justifyContent: 'space-between',
+    padding: 12,
+    marginVertical: 12,
   },
   specItem: {
-    alignItems: 'center',
+    flex: 1,
   },
   specLabel: {
-    fontSize: 9,
-    fontWeight: '800',
-    color: colors.slate400,
+    fontSize: 10,
+    color: '#94a3b8',
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   specVal: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '800',
-    color: colors.slate900,
+    color: '#0f172a',
     marginTop: 2,
   },
   buttonRow: {
     flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  contactButtons: {
+    flexDirection: 'row',
     gap: 8,
-    marginTop: 12,
   },
-  callBtn: {
-    flex: 1,
-    backgroundColor: colors.slate100,
-    paddingVertical: 10,
-    borderRadius: 12,
+  iconCircleBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    justifyContent: 'center',
     alignItems: 'center',
-  },
-  callBtnText: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: colors.slate800,
-  },
-  navBtn: {
-    flex: 1,
-    backgroundColor: colors.slate100,
-    paddingVertical: 10,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  navBtnText: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: colors.slate800,
   },
   executeBtn: {
-    backgroundColor: colors.primary,
-    paddingVertical: 12,
-    borderRadius: 14,
+    flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 10,
+    backgroundColor: '#0f172a',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
   },
   executeBtnText: {
-    color: colors.white,
     fontSize: 13,
+    fontWeight: '700',
+    color: '#ffffff',
+  },
+  emptyCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    padding: 30,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#f1f5f9',
+    marginTop: 10,
+  },
+  emptyTitle: {
+    fontSize: 15,
     fontWeight: '800',
+    color: '#0f172a',
+    marginTop: 10,
+    marginBottom: 4,
+  },
+  emptyText: {
+    fontSize: 12,
+    color: '#64748b',
+    textAlign: 'center',
+    lineHeight: 18,
   },
   modalContainer: {
     flex: 1,
-    backgroundColor: colors.white,
-    paddingTop: 50,
+    backgroundColor: '#f8fafc',
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingBottom: 16,
+    padding: 20,
+    backgroundColor: '#ffffff',
     borderBottomWidth: 1,
     borderBottomColor: '#f1f5f9',
   },
   modalJobId: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '800',
-    color: colors.primary,
+    color: '#059669',
+    letterSpacing: 0.5,
   },
   modalCustomer: {
-    fontSize: 18,
-    fontWeight: '900',
-    color: colors.slate900,
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#0f172a',
+    marginTop: 2,
   },
   modalCloseBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    backgroundColor: colors.slate100,
-    borderRadius: 10,
-  },
-  modalCloseText: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: colors.slate700,
+    padding: 6,
   },
   tabsRow: {
     flexDirection: 'row',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 20,
     borderBottomWidth: 1,
     borderBottomColor: '#f1f5f9',
-    gap: 6,
   },
   tabBtn: {
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    borderRadius: 10,
+    paddingVertical: 12,
+    marginRight: 16,
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
   },
   tabBtnActive: {
-    backgroundColor: colors.primaryMuted,
+    borderBottomColor: '#059669',
   },
   tabBtnText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: colors.slate500,
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#64748b',
   },
   tabBtnTextActive: {
-    color: colors.primary,
-    fontWeight: '900',
+    color: '#059669',
+    fontWeight: '800',
   },
   tabSectionTitle: {
-    fontSize: 16,
-    fontWeight: '900',
-    color: colors.slate900,
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#0f172a',
+    marginBottom: 4,
   },
   tabSectionSub: {
     fontSize: 12,
-    color: colors.slate500,
-    marginTop: 3,
+    color: '#64748b',
     marginBottom: 16,
     lineHeight: 16,
   },
   checklistItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
-    borderRadius: 12,
-    backgroundColor: '#f8fafc',
-    marginBottom: 8,
+    backgroundColor: '#ffffff',
+    padding: 14,
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: '#f1f5f9',
+    marginBottom: 10,
   },
   checklistItemDone: {
     backgroundColor: '#ecfdf5',
@@ -751,142 +786,150 @@ const styles = StyleSheet.create({
     height: 22,
     borderRadius: 11,
     borderWidth: 2,
-    borderColor: colors.slate300,
-    marginRight: 10,
-    alignItems: 'center',
+    borderColor: '#cbd5e1',
     justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
   },
   checkCircleDone: {
-    backgroundColor: '#10b981',
-    borderColor: '#10b981',
+    backgroundColor: '#059669',
+    borderColor: '#059669',
   },
   checklistText: {
     flex: 1,
-    fontSize: 12,
-    fontWeight: '700',
-    color: colors.slate800,
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#334155',
   },
   checklistTextDone: {
-    color: '#065f46',
+    color: '#047857',
+    fontWeight: '600',
   },
   scanBtn: {
-    backgroundColor: colors.slate900,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#059669',
     paddingVertical: 14,
     borderRadius: 14,
-    alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 16,
   },
   scanBtnText: {
-    color: colors.white,
-    fontSize: 13,
-    fontWeight: '800',
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '700',
   },
   manualSerialRow: {
     flexDirection: 'row',
     gap: 8,
+    marginBottom: 16,
   },
   manualInput: {
     flex: 1,
-    backgroundColor: '#f8fafc',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    backgroundColor: '#ffffff',
     borderWidth: 1,
     borderColor: '#e2e8f0',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
     fontSize: 13,
+    color: '#0f172a',
   },
   addSerialBtn: {
-    backgroundColor: colors.primary,
-    paddingHorizontal: 16,
+    backgroundColor: '#0f172a',
+    paddingHorizontal: 18,
     borderRadius: 12,
     justifyContent: 'center',
   },
   addSerialText: {
-    color: colors.white,
-    fontWeight: '800',
+    color: '#ffffff',
+    fontWeight: '700',
+    fontSize: 13,
   },
   inputLabel: {
     fontSize: 10,
     fontWeight: '800',
-    color: colors.slate400,
+    color: '#94a3b8',
     letterSpacing: 0.5,
     marginBottom: 8,
   },
   serialBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 10,
-    borderRadius: 10,
-    backgroundColor: '#f8fafc',
-    marginBottom: 6,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: '#ffffff',
+    marginBottom: 8,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: '#f1f5f9',
   },
   serialIndex: {
     fontSize: 11,
     fontWeight: '800',
-    color: colors.slate400,
-    width: 30,
+    color: '#94a3b8',
+    width: 32,
   },
   serialCode: {
     flex: 1,
     fontSize: 13,
-    fontWeight: '800',
-    color: colors.slate900,
+    fontWeight: '700',
+    color: '#0f172a',
   },
   serialVerified: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#047857',
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#059669',
   },
   photoCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
+    padding: 14,
     borderRadius: 14,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#ffffff',
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: '#f1f5f9',
   },
   photoName: {
     fontSize: 13,
-    fontWeight: '800',
-    color: colors.slate900,
+    fontWeight: '700',
+    color: '#0f172a',
   },
   geoTag: {
     fontSize: 11,
-    color: '#047857',
-    fontWeight: '700',
+    color: '#059669',
+    fontWeight: '600',
     marginTop: 2,
   },
   geoPending: {
     fontSize: 11,
     color: '#d97706',
-    fontWeight: '700',
+    fontWeight: '600',
     marginTop: 2,
   },
   captureBtn: {
-    backgroundColor: colors.slate900,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#0f172a',
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 10,
   },
   recaptureBtn: {
-    backgroundColor: '#047857',
+    backgroundColor: '#059669',
   },
   captureBtnText: {
-    color: colors.white,
+    color: '#ffffff',
     fontSize: 11,
-    fontWeight: '800',
+    fontWeight: '700',
   },
   signatureBox: {
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#ffffff',
     borderRadius: 16,
     borderWidth: 1.5,
     borderStyle: 'dashed',
     borderColor: '#cbd5e1',
-    minHeight: 180,
+    minHeight: 160,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
@@ -898,60 +941,38 @@ const styles = StyleSheet.create({
   touchSignPrompt: {
     fontSize: 13,
     fontWeight: '700',
-    color: colors.slate400,
+    color: '#64748b',
   },
   signedContent: {
     alignItems: 'center',
   },
   signedName: {
     fontSize: 16,
-    fontWeight: '900',
-    color: colors.slate900,
+    fontWeight: '800',
+    color: '#0f172a',
     marginTop: 6,
   },
   signedTime: {
     fontSize: 11,
-    color: colors.slate500,
+    color: '#64748b',
     marginTop: 2,
   },
   signedHash: {
     fontSize: 10,
-    color: colors.slate400,
+    color: '#94a3b8',
     marginTop: 4,
   },
   completeJobBtn: {
-    backgroundColor: colors.primary,
-    paddingVertical: 16,
-    borderRadius: 16,
+    backgroundColor: '#059669',
+    paddingVertical: 14,
+    borderRadius: 14,
     alignItems: 'center',
     marginTop: 10,
     marginBottom: 40,
   },
   completeJobBtnText: {
-    color: colors.white,
+    color: '#ffffff',
     fontSize: 14,
-    fontWeight: '900',
-    textAlign: 'center',
-  },
-  emptyCard: {
-    backgroundColor: colors.white,
-    borderRadius: 16,
-    padding: 28,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    marginTop: 10,
-  },
-  emptyTitle: {
-    fontSize: 15,
     fontWeight: '800',
-    color: colors.slate800,
-    marginBottom: 6,
-  },
-  emptyText: {
-    fontSize: 12,
-    color: colors.slate500,
-    textAlign: 'center',
-    lineHeight: 18,
   },
 });

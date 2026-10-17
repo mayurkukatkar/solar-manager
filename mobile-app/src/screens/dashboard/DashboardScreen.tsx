@@ -9,8 +9,23 @@ import {
   ActivityIndicator,
   Modal,
 } from 'react-native';
+import {
+  FileText,
+  UserPlus,
+  MapPin,
+  Landmark,
+  Briefcase,
+  Users,
+  CreditCard,
+  ChevronRight,
+  TrendingUp,
+  Info,
+  X,
+  Zap,
+  Package,
+  ShieldCheck,
+} from 'lucide-react-native';
 import { Header } from '../../components/Header';
-import { colors } from '../../theme/colors';
 import { tenantApi, crmApi } from '../../api/endpoints';
 import { useAuth } from '../../context/AuthContext';
 import { DashboardData, Project } from '../../types';
@@ -35,7 +50,7 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [pipelineModalVisible, setPipelineModalVisible] = useState(false);
+  const [guideVisible, setGuideVisible] = useState(false);
 
   useEffect(() => {
     loadDashboard();
@@ -86,101 +101,80 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
     loadDashboard();
   };
 
-  const getGreeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return 'Good Morning';
-    if (hour < 17) return 'Good Afternoon';
-    return 'Good Evening';
-  };
-
-  const PIPELINE_STEPS = [
+  const PIPELINE_STAGES = [
     {
-      num: '01',
+      id: '1',
       title: 'Lead CRM',
-      desc: 'Inquiry & Bill',
-      icon: '🎯',
+      subtitle: 'Inquiry & Sizing',
       route: 'Leads',
       params: { stage: 'NEW' },
       badge: `${data.totalLeads} Leads`,
-      color: '#10b981',
+      icon: Users,
+      iconColor: '#059669',
+      bgColor: '#ecfdf5',
     },
     {
-      num: '02',
+      id: '2',
       title: 'Site Survey',
-      desc: 'Roof & Shadow',
-      icon: '📐',
+      subtitle: 'Roof Evaluation',
       route: 'Modules',
       params: { screen: 'SURVEYS' },
-      badge: 'Evaluation',
-      color: '#06b6d4',
+      badge: 'Feasibility',
+      icon: MapPin,
+      iconColor: '#0284c7',
+      bgColor: '#f0f9ff',
     },
     {
-      num: '03',
-      title: '60s Proposal',
-      desc: 'Sizing & CFA',
-      icon: '⚡',
+      id: '3',
+      title: '60s Quote',
+      subtitle: 'Proposal & BOM',
       route: 'Modules',
       params: { screen: 'QUOTES', openQuote: true },
-      badge: 'Turnkey BOM',
-      color: '#f59e0b',
+      badge: 'Turnkey',
+      icon: FileText,
+      iconColor: '#d97706',
+      bgColor: '#fffbeb',
     },
     {
-      num: '04',
-      title: 'Contract',
-      desc: 'Convert & Sign',
-      icon: '🤝',
+      id: '4',
+      title: 'Project',
+      subtitle: 'Contract & Exec',
       route: 'Projects',
       params: { stage: 'ALL' },
-      badge: `${data.totalProjects} Projects`,
-      color: '#3b82f6',
+      badge: `${data.totalProjects} Active`,
+      icon: Briefcase,
+      iconColor: '#2563eb',
+      bgColor: '#eff6ff',
     },
     {
-      num: '05',
-      title: 'Procurement',
-      desc: 'Panels & BOS',
-      icon: '📦',
-      route: 'Modules',
-      params: { screen: 'PROCUREMENT' },
-      badge: 'Dispatch',
-      color: '#8b5cf6',
-    },
-    {
-      num: '06',
+      id: '5',
       title: 'Field QA',
-      desc: 'Install & Barcodes',
-      icon: '🛠️',
+      subtitle: 'Mounting & DCR',
       route: 'Operations',
       params: {},
-      badge: 'Geo-Photos',
-      color: '#ec4899',
+      badge: 'Inspection',
+      icon: ShieldCheck,
+      iconColor: '#7c3aed',
+      bgColor: '#f5f3ff',
     },
     {
-      num: '07',
-      title: 'DISCOM',
-      desc: 'Net-Metering Sync',
-      icon: '🔌',
-      route: 'Modules',
-      params: { screen: 'DISCOM' },
-      badge: 'Grid Testing',
-      color: '#14b8a6',
-    },
-    {
-      num: '08',
+      id: '6',
       title: 'PM Subsidy',
-      desc: 'DBT Release',
-      icon: '🏛️',
+      subtitle: 'National Portal',
       route: 'Modules',
       params: { screen: 'SUBSIDY' },
-      badge: '₹78k Release',
-      color: '#059669',
+      badge: '₹78k DBT',
+      icon: Landmark,
+      iconColor: '#059669',
+      bgColor: '#ecfdf5',
     },
   ];
 
   return (
     <View style={styles.container}>
       <Header
-        title={`${getGreeting()}, ${user?.name ? user.name.split(' ')[0] : 'Partner'}`}
-        subtitle="Solar business pipeline & operational telemetry"
+        title="Overview"
+        subtitle="Solar business operations & project pipeline"
       />
 
       <ScrollView
@@ -188,319 +182,265 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
         contentContainerStyle={styles.scrollContent}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
-        {/* INTERACTIVE WORKFLOW PIPELINE BANNER */}
-        <View style={styles.workflowSection}>
-          <View style={styles.workflowHeaderRow}>
-            <View>
-              <Text style={styles.sectionHeaderTitle}>SOLAR EPC LIFECYCLE PIPELINE</Text>
-              <Text style={styles.pipelineSub}>8-Stage Delivery Pipeline • Tap any stage to launch</Text>
-            </View>
-            <TouchableOpacity
-              onPress={() => setPipelineModalVisible(true)}
-              style={styles.guideBadge}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.guideBadgeText}>Workflow Guide ⓘ</Text>
-            </TouchableOpacity>
-          </View>
-
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.pipelineScroll}
-          >
-            {PIPELINE_STEPS.map((step, idx) => (
-              <React.Fragment key={step.num}>
-                <TouchableOpacity
-                  style={[styles.pipelineCard, { borderTopColor: step.color }]}
-                  onPress={() => navigation.navigate(step.route, step.params)}
-                  activeOpacity={0.85}
-                >
-                  <View style={styles.pipelineTopRow}>
-                    <Text style={[styles.stepNumText, { color: step.color }]}>{step.num}</Text>
-                    <View style={styles.pipelineIconBox}>
-                      <Text style={styles.pipelineIcon}>{step.icon}</Text>
-                    </View>
-                  </View>
-                  <Text style={styles.pipelineStepTitle}>{step.title}</Text>
-                  <Text style={styles.pipelineDescText}>{step.desc}</Text>
-                  <View style={styles.pipelineBadge}>
-                    <Text style={styles.pipelineBadgeText}>{step.badge}</Text>
-                  </View>
-                </TouchableOpacity>
-                {idx < PIPELINE_STEPS.length - 1 && (
-                  <View style={styles.pipelineConnector}>
-                    <Text style={styles.connectorArrow}>→</Text>
-                  </View>
-                )}
-              </React.Fragment>
-            ))}
-          </ScrollView>
-        </View>
-
-        {/* QUICK 1-TAP SPEED DIAL ACTION BAR */}
-        <View style={styles.speedDialSection}>
-          <Text style={styles.speedDialTitle}>QUICK ACTIONS</Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.speedDialScroll}
-          >
-            <TouchableOpacity
-              style={styles.speedDialBtn}
-              onPress={() => navigation.navigate('Leads', { openAdd: true })}
-              activeOpacity={0.8}
-            >
-              <View style={[styles.speedDialIconCircle, { backgroundColor: '#ecfdf5' }]}>
-                <Text style={{ fontSize: 18 }}>+👤</Text>
-              </View>
-              <Text style={styles.speedDialLabel}>Add Lead</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.speedDialBtn}
-              onPress={() => navigation.navigate('Modules', { screen: 'QUOTES', openQuote: true })}
-              activeOpacity={0.8}
-            >
-              <View style={[styles.speedDialIconCircle, { backgroundColor: '#fffbeb' }]}>
-                <Text style={{ fontSize: 18 }}>⚡</Text>
-              </View>
-              <Text style={styles.speedDialLabel}>60s Quote</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.speedDialBtn}
-              onPress={() => navigation.navigate('Modules', { screen: 'SURVEYS' })}
-              activeOpacity={0.8}
-            >
-              <View style={[styles.speedDialIconCircle, { backgroundColor: '#eff6ff' }]}>
-                <Text style={{ fontSize: 18 }}>📐</Text>
-              </View>
-              <Text style={styles.speedDialLabel}>Site Survey</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.speedDialBtn}
-              onPress={() => navigation.navigate('Modules', { screen: 'SUBSIDY' })}
-              activeOpacity={0.8}
-            >
-              <View style={[styles.speedDialIconCircle, { backgroundColor: '#ecfdf5' }]}>
-                <Text style={{ fontSize: 18 }}>🏛️</Text>
-              </View>
-              <Text style={styles.speedDialLabel}>PM Subsidy</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.speedDialBtn}
-              onPress={() => navigation.navigate('Modules', { screen: 'DISCOM' })}
-              activeOpacity={0.8}
-            >
-              <View style={[styles.speedDialIconCircle, { backgroundColor: '#f0fdfa' }]}>
-                <Text style={{ fontSize: 18 }}>🔌</Text>
-              </View>
-              <Text style={styles.speedDialLabel}>DISCOM</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.speedDialBtn}
-              onPress={() => navigation.navigate('Modules', { screen: 'FINANCING' })}
-              activeOpacity={0.8}
-            >
-              <View style={[styles.speedDialIconCircle, { backgroundColor: '#f5f3ff' }]}>
-                <Text style={{ fontSize: 18 }}>🧮</Text>
-              </View>
-              <Text style={styles.speedDialLabel}>EMI Loans</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.speedDialBtn}
-              onPress={() => navigation.navigate('Operations')}
-              activeOpacity={0.8}
-            >
-              <View style={[styles.speedDialIconCircle, { backgroundColor: '#fdf2f8' }]}>
-                <Text style={{ fontSize: 18 }}>📸</Text>
-              </View>
-              <Text style={styles.speedDialLabel}>Field QA</Text>
-            </TouchableOpacity>
-          </ScrollView>
-        </View>
-
-        {/* FINANCIAL REVENUE OVERVIEW CARD */}
+        {/* HERO REVENUE CARD */}
         <View style={styles.revenueCard}>
-          <View style={styles.revenueHeader}>
-            <View>
-              <Text style={styles.revenueTitle}>SETTLED REVENUE (YTD)</Text>
-              <Text style={styles.revenueSubtitle}>Audited solar project collections</Text>
-            </View>
-            <View style={styles.revenueBadge}>
-              <Text style={styles.revenueBadgeText}>● Live Audited</Text>
+          <View style={styles.revenueTopRow}>
+            <Text style={styles.revenueLabel}>TOTAL REVENUE COLLECTED</Text>
+            <View style={styles.liveBadge}>
+              <View style={styles.liveDot} />
+              <Text style={styles.liveText}>Live Audited</Text>
             </View>
           </View>
 
-          <Text style={styles.revenueAmount}>
+          <Text style={styles.revenueValue}>
             ₹{(data.totalRevenue || 0).toLocaleString('en-IN')}
           </Text>
 
-          <View style={styles.financialStatsRow}>
-            <View>
-              <Text style={styles.statLabel}>OUTSTANDING DUES</Text>
-              <Text style={styles.statValYellow}>
+          <View style={styles.revenueFooter}>
+            <View style={styles.revSubItem}>
+              <Text style={styles.revSubLabel}>Outstanding</Text>
+              <Text style={styles.revSubVal}>
                 ₹{(data.outstanding || 0).toLocaleString('en-IN')}
               </Text>
             </View>
-            <View style={{ alignItems: 'center' }}>
-              <Text style={styles.statLabel}>WIN RATE</Text>
-              <Text style={styles.statValGreen}>
+            <View style={styles.revDivider} />
+            <View style={styles.revSubItem}>
+              <Text style={styles.revSubLabel}>Win Rate</Text>
+              <Text style={[styles.revSubVal, { color: '#34d399' }]}>
                 {leadMetrics.conversionRate}
               </Text>
             </View>
-            <View style={{ alignItems: 'flex-end' }}>
-              <Text style={styles.statLabel}>OPEN TICKETS</Text>
-              <Text style={styles.statValBlue}>
-                {data.openTickets}
-              </Text>
+            <View style={styles.revDivider} />
+            <View style={styles.revSubItem}>
+              <Text style={styles.revSubLabel}>Open Tickets</Text>
+              <Text style={styles.revSubVal}>{data.openTickets}</Text>
             </View>
           </View>
         </View>
 
-        {/* ACTIVE PIPELINE METRICS GRID */}
-        <View style={styles.section}>
-          <Text style={styles.sectionHeaderTitle}>EXECUTIVE OPERATIONAL RADAR</Text>
-          <View style={styles.funnelGrid}>
-            <TouchableOpacity
-              style={[styles.funnelCard, { borderLeftColor: '#10b981' }]}
-              onPress={() => navigation.navigate('Leads')}
-              activeOpacity={0.8}
-            >
-              <View style={[styles.funnelIconBox, { backgroundColor: '#ecfdf5' }]}>
-                <Text style={{ fontSize: 18 }}>🎯</Text>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.funnelCount}>{data.totalLeads}</Text>
-                <Text style={styles.funnelLabel}>Total CRM Inquiries ({leadMetrics.newLeads} New)</Text>
-              </View>
-              <Text style={styles.chevron}>›</Text>
-            </TouchableOpacity>
+        {/* QUICK ACTIONS 2X2 GRID */}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>QUICK ACTIONS</Text>
+        </View>
 
+        <View style={styles.actionGrid}>
+          <TouchableOpacity
+            style={styles.actionTile}
+            onPress={() => navigation.navigate('Modules', { screen: 'QUOTES', openQuote: true })}
+            activeOpacity={0.8}
+          >
+            <View style={[styles.actionIconBox, { backgroundColor: '#ecfdf5' }]}>
+              <FileText size={20} color="#059669" strokeWidth={2.2} />
+            </View>
+            <Text style={styles.actionTitle}>60s Proposal</Text>
+            <Text style={styles.actionDesc}>Generate Solar Quote</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.actionTile}
+            onPress={() => navigation.navigate('Leads', { openAdd: true })}
+            activeOpacity={0.8}
+          >
+            <View style={[styles.actionIconBox, { backgroundColor: '#eff6ff' }]}>
+              <UserPlus size={20} color="#2563eb" strokeWidth={2.2} />
+            </View>
+            <Text style={styles.actionTitle}>Add Lead</Text>
+            <Text style={styles.actionDesc}>Capture New Prospect</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.actionTile}
+            onPress={() => navigation.navigate('Modules', { screen: 'SURVEYS' })}
+            activeOpacity={0.8}
+          >
+            <View style={[styles.actionIconBox, { backgroundColor: '#fffbeb' }]}>
+              <MapPin size={20} color="#d97706" strokeWidth={2.2} />
+            </View>
+            <Text style={styles.actionTitle}>Site Survey</Text>
+            <Text style={styles.actionDesc}>Schedule Evaluation</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.actionTile}
+            onPress={() => navigation.navigate('Modules', { screen: 'SUBSIDY' })}
+            activeOpacity={0.8}
+          >
+            <View style={[styles.actionIconBox, { backgroundColor: '#f5f3ff' }]}>
+              <Landmark size={20} color="#7c3aed" strokeWidth={2.2} />
+            </View>
+            <Text style={styles.actionTitle}>PM Subsidy</Text>
+            <Text style={styles.actionDesc}>National Portal Track</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* WORKFLOW PIPELINE TRACK */}
+        <View style={styles.sectionHeaderRow}>
+          <Text style={styles.sectionTitle}>SOLAR EPC PIPELINE</Text>
+          <TouchableOpacity
+            onPress={() => setGuideVisible(true)}
+            style={styles.guideLink}
+            activeOpacity={0.7}
+          >
+            <Info size={14} color="#059669" style={{ marginRight: 4 }} />
+            <Text style={styles.guideLinkText}>Guide</Text>
+          </TouchableOpacity>
+        </View>
+
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.pipelineScroll}
+        >
+          {PIPELINE_STAGES.map((s, idx) => {
+            const Icon = s.icon;
+            return (
+              <TouchableOpacity
+                key={s.id}
+                style={styles.pipelineCard}
+                onPress={() => navigation.navigate(s.route, s.params)}
+                activeOpacity={0.8}
+              >
+                <View style={styles.pipelineCardHeader}>
+                  <View style={[styles.pipelineIconBox, { backgroundColor: s.bgColor }]}>
+                    <Icon size={18} color={s.iconColor} strokeWidth={2.2} />
+                  </View>
+                  <Text style={styles.pipelineStepNum}>{`0${idx + 1}`}</Text>
+                </View>
+                <Text style={styles.pipelineCardTitle}>{s.title}</Text>
+                <Text style={styles.pipelineCardSub}>{s.subtitle}</Text>
+                <View style={[styles.pipelineBadge, { backgroundColor: s.bgColor }]}>
+                  <Text style={[styles.pipelineBadgeText, { color: s.iconColor }]}>
+                    {s.badge}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+
+        {/* OPERATIONAL RADAR */}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>KEY METRICS</Text>
+        </View>
+
+        <View style={styles.metricsRow}>
+          <TouchableOpacity
+            style={styles.metricCard}
+            onPress={() => navigation.navigate('Leads')}
+            activeOpacity={0.8}
+          >
+            <View style={styles.metricCardTop}>
+              <Users size={18} color="#059669" />
+              <ChevronRight size={16} color="#94a3b8" />
+            </View>
+            <Text style={styles.metricNumber}>{data.totalLeads}</Text>
+            <Text style={styles.metricLabel}>Total Inquiries</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.metricCard}
+            onPress={() => navigation.navigate('Projects')}
+            activeOpacity={0.8}
+          >
+            <View style={styles.metricCardTop}>
+              <Briefcase size={18} color="#2563eb" />
+              <ChevronRight size={16} color="#94a3b8" />
+            </View>
+            <Text style={styles.metricNumber}>{data.totalProjects}</Text>
+            <Text style={styles.metricLabel}>Active Projects</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.metricCard}
+            onPress={() => navigation.navigate('Modules', { screen: 'FINANCE' })}
+            activeOpacity={0.8}
+          >
+            <View style={styles.metricCardTop}>
+              <CreditCard size={18} color="#d97706" />
+              <ChevronRight size={16} color="#94a3b8" />
+            </View>
+            <Text style={styles.metricNumber}>{data.pendingInvoices}</Text>
+            <Text style={styles.metricLabel}>Due Invoices</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* RECENT PROJECTS */}
+        <View style={styles.sectionHeaderRow}>
+          <Text style={styles.sectionTitle}>ACTIVE PROJECTS</Text>
+          <TouchableOpacity onPress={() => navigation.navigate('Projects')}>
+            <Text style={styles.seeAllText}>View All ({projects.length})</Text>
+          </TouchableOpacity>
+        </View>
+
+        {loading ? (
+          <ActivityIndicator size="small" color="#059669" style={{ marginVertical: 20 }} />
+        ) : projects.length === 0 ? (
+          <View style={styles.emptyCard}>
+            <Briefcase size={28} color="#94a3b8" />
+            <Text style={styles.emptyTitle}>No Active Projects</Text>
+            <Text style={styles.emptyText}>
+              Convert won leads from CRM to automatically provision solar execution projects.
+            </Text>
+          </View>
+        ) : (
+          projects.slice(0, 3).map((prj) => (
             <TouchableOpacity
-              style={[styles.funnelCard, { borderLeftColor: '#3b82f6' }]}
+              key={prj.id}
+              style={styles.projectCard}
               onPress={() => navigation.navigate('Projects')}
               activeOpacity={0.8}
             >
-              <View style={[styles.funnelIconBox, { backgroundColor: '#eff6ff' }]}>
-                <Text style={{ fontSize: 18 }}>📁</Text>
-              </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.funnelCount}>{data.totalProjects}</Text>
-                <Text style={styles.funnelLabel}>Active EPC Projects</Text>
+                <Text style={styles.projectName}>{prj.name}</Text>
+                <Text style={styles.projectCustomer}>
+                  {prj.customer?.name || 'Customer'}{' '}
+                  {prj.capacity ? `• ${prj.capacity} kWp` : ''}
+                </Text>
               </View>
-              <Text style={styles.chevron}>›</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.funnelCard, { borderLeftColor: '#f59e0b' }]}
-              onPress={() => navigation.navigate('Modules', { screen: 'FINANCE' })}
-              activeOpacity={0.8}
-            >
-              <View style={[styles.funnelIconBox, { backgroundColor: '#fffbeb' }]}>
-                <Text style={{ fontSize: 18 }}>💳</Text>
+              <View style={styles.projectStagePill}>
+                <Text style={styles.projectStageText}>{prj.currentStage || 'Planning'}</Text>
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.funnelCount}>{data.pendingInvoices}</Text>
-                <Text style={styles.funnelLabel}>Pending Invoices & Milestones</Text>
-              </View>
-              <Text style={styles.chevron}>›</Text>
+              <ChevronRight size={16} color="#cbd5e1" style={{ marginLeft: 8 }} />
             </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* RECENT PROJECTS PIPELINE HIGHLIGHTS */}
-        <View style={styles.section}>
-          <View style={styles.sectionTitleRow}>
-            <Text style={styles.sectionHeaderTitle}>ACTIVE EXECUTION PROJECTS</Text>
-            <TouchableOpacity onPress={() => navigation.navigate('Projects')}>
-              <Text style={styles.seeAllText}>View All ({projects.length}) →</Text>
-            </TouchableOpacity>
-          </View>
-
-          {loading ? (
-            <ActivityIndicator size="small" color={colors.primary} style={{ marginVertical: 14 }} />
-          ) : projects.length === 0 ? (
-            <View style={styles.emptyCard}>
-              <Text style={styles.emptyIcon}>📁</Text>
-              <Text style={styles.emptyTitle}>No Active Projects Yet</Text>
-              <Text style={styles.emptyText}>
-                Qualified leads converted to Won will automatically appear here with turnkey milestones.
-              </Text>
-              <TouchableOpacity
-                style={styles.emptyActionBtn}
-                onPress={() => navigation.navigate('Leads')}
-              >
-                <Text style={styles.emptyActionText}>Go to CRM Leads →</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            projects.slice(0, 4).map((prj) => (
-              <TouchableOpacity
-                key={prj.id}
-                style={styles.projectItemCard}
-                onPress={() => navigation.navigate('Projects')}
-                activeOpacity={0.8}
-              >
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.projectName}>{prj.name}</Text>
-                  <Text style={styles.projectSub}>
-                    {prj.customer?.name || 'Customer'}{' '}
-                    {prj.capacity ? `• ${prj.capacity} kWp` : ''}
-                  </Text>
-                </View>
-                <View style={styles.projectStagePill}>
-                  <Text style={styles.projectStageText}>{prj.currentStage || 'Planning'}</Text>
-                </View>
-              </TouchableOpacity>
-            ))
-          )}
-        </View>
+          ))
+        )}
       </ScrollView>
 
-      {/* WORKFLOW PIPELINE GUIDE MODAL */}
-      <Modal visible={pipelineModalVisible} transparent animationType="slide">
+      {/* WORKFLOW BLUEPRINT MODAL */}
+      <Modal visible={guideVisible} transparent animationType="slide">
         <View style={styles.modalOverlay}>
-          <View style={styles.guideModalContainer}>
-            <View style={styles.guideModalHeader}>
-              <View>
-                <Text style={styles.guideModalTitle}>Solar EPC Workflow Blueprint</Text>
-                <Text style={styles.guideModalSub}>Standardized Indian Solar EPC Delivery Lifecycle</Text>
-              </View>
-              <TouchableOpacity
-                onPress={() => setPipelineModalVisible(false)}
-                style={styles.closeBtn}
-              >
-                <Text style={styles.closeBtnText}>✕</Text>
+          <View style={styles.guideContainer}>
+            <View style={styles.guideHeader}>
+              <Text style={styles.guideTitle}>Solar EPC Workflow Blueprint</Text>
+              <TouchableOpacity onPress={() => setGuideVisible(false)} style={styles.closeBtn}>
+                <X size={18} color="#64748b" />
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={{ padding: 18 }}>
-              {PIPELINE_STEPS.map((s) => (
-                <View key={s.num} style={styles.guideRow}>
-                  <View style={[styles.guideNumBadge, { backgroundColor: s.color }]}>
-                    <Text style={styles.guideNumText}>{s.num}</Text>
+            <ScrollView style={{ padding: 20 }}>
+              {PIPELINE_STAGES.map((s, idx) => {
+                const Icon = s.icon;
+                return (
+                  <View key={s.id} style={styles.guideStepRow}>
+                    <View style={[styles.guideStepBadge, { backgroundColor: s.bgColor }]}>
+                      <Icon size={16} color={s.iconColor} strokeWidth={2.2} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.guideStepTitle}>
+                        {`0${idx + 1}. ${s.title}`}
+                      </Text>
+                      <Text style={styles.guideStepText}>
+                        {s.id === '1' && 'Capture prospective customer, electricity bill consumption & sanctioned load.'}
+                        {s.id === '2' && 'Conduct shadow analysis, roof measurements (RCC/Tin/Elevated) & structural review.'}
+                        {s.id === '3' && 'Calculate system sizing, Tier-1 Mono PERC BOM & PM Surya Ghar ₹78,000 CFA.'}
+                        {s.id === '4' && 'Sign client agreement, issue advance milestone bill & create project workspace.'}
+                        {s.id === '5' && 'Inspect mounting, wiring, earthing pits, scan DCR barcodes & capture 5 geo-photos.'}
+                        {s.id === '6' && 'Sanction subsidy voucher & release DBT direct benefit into consumer Aadhaar account.'}
+                      </Text>
+                    </View>
                   </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.guideStepName}>{s.title} ({s.icon})</Text>
-                    <Text style={styles.guideStepDesc}>
-                      {s.num === '01' && 'Capture lead, electricity bill (kWh), consumer CA number & sanctioned load.'}
-                      {s.num === '02' && 'Shadow analysis, roof structure (RCC/Tin/Elevated), cable run & orientation.'}
-                      {s.num === '03' && '60-second system sizing, Tier-1 Mono PERC BOM & PM Surya Ghar ₹78,000 CFA deduction.'}
-                      {s.num === '04' && 'Customer contract agreement, advance milestone invoice & project provisioning.'}
-                      {s.num === '05' && 'Panels, inverters, structure, ACDB/DCDB & earthing kit dispatch tracking.'}
-                      {s.num === '06' && '7-point quality checklist, DCR module serial QR scanning & 5 geo-tagged photos.'}
-                      {s.num === '07' && 'DISCOM Net-metering application, inspection, bidirectional meter & grid sync.'}
-                      {s.num === '08' && 'Direct Benefit Transfer (DBT) subsidy release into customer Aadhaar bank account.'}
-                    </Text>
-                  </View>
-                </View>
-              ))}
+                );
+              })}
             </ScrollView>
           </View>
         </View>
@@ -518,426 +458,353 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    padding: 16,
+    padding: 20,
     paddingBottom: 40,
   },
-  workflowSection: {
-    marginBottom: 16,
-  },
-  workflowHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  sectionHeaderTitle: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: colors.slate400,
-    letterSpacing: 0.8,
-  },
-  pipelineSub: {
-    fontSize: 10,
-    color: colors.slate500,
-    marginTop: 2,
-  },
-  guideBadge: {
-    backgroundColor: '#eff6ff',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#bfdbfe',
-  },
-  guideBadgeText: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#2563eb',
-  },
-  pipelineScroll: {
-    paddingVertical: 4,
-    alignItems: 'center',
-    gap: 8,
-  },
-  pipelineCard: {
-    backgroundColor: colors.white,
-    borderRadius: 16,
-    padding: 12,
-    width: 112,
-    borderTopWidth: 4,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  pipelineTopRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    width: '100%',
-    marginBottom: 6,
-  },
-  stepNumText: {
-    fontSize: 11,
-    fontWeight: '900',
-    letterSpacing: 0.5,
-  },
-  pipelineIconBox: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#f1f5f9',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  pipelineIcon: {
-    fontSize: 14,
-  },
-  pipelineStepTitle: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: colors.slate900,
-  },
-  pipelineDescText: {
-    fontSize: 9,
-    color: colors.slate500,
-    marginTop: 2,
-    fontWeight: '500',
-  },
-  pipelineBadge: {
-    backgroundColor: '#ecfdf5',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-    marginTop: 8,
-    alignSelf: 'flex-start',
-  },
-  pipelineBadgeText: {
-    fontSize: 9,
-    fontWeight: '800',
-    color: '#059669',
-  },
-  pipelineConnector: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 1,
-  },
-  connectorArrow: {
-    fontSize: 14,
-    color: colors.slate300,
-    fontWeight: '900',
-  },
-  speedDialSection: {
-    marginBottom: 18,
-  },
-  speedDialTitle: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: colors.slate400,
-    letterSpacing: 0.8,
-    marginBottom: 8,
-  },
-  speedDialScroll: {
-    gap: 10,
-    paddingVertical: 2,
-  },
-  speedDialBtn: {
-    backgroundColor: colors.white,
-    borderRadius: 14,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    minWidth: 76,
-  },
-  speedDialIconCircle: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 6,
-  },
-  speedDialLabel: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: colors.slate700,
-  },
   revenueCard: {
-    backgroundColor: colors.slate900,
-    borderRadius: 22,
-    padding: 22,
-    marginBottom: 20,
-    shadowColor: '#000',
+    backgroundColor: '#0f172a',
+    borderRadius: 24,
+    padding: 24,
+    marginBottom: 24,
+    shadowColor: '#0f172a',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.25,
-    shadowRadius: 14,
-    elevation: 8,
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    elevation: 4,
   },
-  revenueHeader: {
+  revenueTopRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     marginBottom: 8,
   },
-  revenueTitle: {
-    fontSize: 10,
+  revenueLabel: {
+    fontSize: 11,
     fontWeight: '800',
-    color: colors.slate400,
+    color: '#94a3b8',
     letterSpacing: 0.8,
   },
-  revenueSubtitle: {
-    fontSize: 11,
-    color: colors.slate400,
-    marginTop: 2,
-  },
-  revenueBadge: {
-    backgroundColor: 'rgba(16, 185, 129, 0.2)',
+  liveBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
     paddingHorizontal: 8,
     paddingVertical: 3,
-    borderRadius: 8,
+    borderRadius: 12,
   },
-  revenueBadgeText: {
+  liveDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#34d399',
+    marginRight: 5,
+  },
+  liveText: {
     fontSize: 10,
-    fontWeight: '800',
+    fontWeight: '700',
     color: '#34d399',
   },
-  revenueAmount: {
-    fontSize: 32,
+  revenueValue: {
+    fontSize: 34,
     fontWeight: '900',
-    color: colors.white,
-    marginBottom: 16,
+    color: '#ffffff',
+    letterSpacing: -0.5,
+    marginVertical: 10,
   },
-  financialStatsRow: {
+  revenueFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingTop: 14,
+    paddingTop: 16,
     borderTopWidth: 1,
     borderTopColor: 'rgba(255, 255, 255, 0.1)',
   },
-  statLabel: {
-    fontSize: 9,
+  revSubItem: {
+    flex: 1,
+  },
+  revSubLabel: {
+    fontSize: 11,
+    color: '#94a3b8',
+    fontWeight: '500',
+    marginBottom: 2,
+  },
+  revSubVal: {
+    fontSize: 14,
     fontWeight: '800',
-    color: colors.slate400,
-    letterSpacing: 0.5,
-    marginBottom: 3,
+    color: '#ffffff',
   },
-  statValYellow: {
-    fontSize: 14,
-    fontWeight: '900',
-    color: '#fbbf24',
+  revDivider: {
+    width: 1,
+    height: '80%',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    marginHorizontal: 10,
+    alignSelf: 'center',
   },
-  statValGreen: {
-    fontSize: 14,
-    fontWeight: '900',
-    color: '#34d399',
+  sectionHeader: {
+    marginBottom: 12,
   },
-  statValBlue: {
-    fontSize: 14,
-    fontWeight: '900',
-    color: '#60a5fa',
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 24,
+    marginBottom: 12,
   },
-  section: {
-    marginBottom: 20,
+  sectionTitle: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#94a3b8',
+    letterSpacing: 0.8,
   },
-  funnelGrid: {
-    gap: 8,
-    marginTop: 8,
-  },
-  funnelCard: {
+  guideLink: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.white,
-    padding: 14,
-    borderRadius: 16,
-    borderLeftWidth: 4,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.03,
-    shadowRadius: 3,
-    elevation: 2,
   },
-  funnelIconBox: {
+  guideLinkText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#059669',
+  },
+  actionGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  actionTile: {
+    width: '48%',
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#f1f5f9',
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.02,
+    shadowRadius: 6,
+    elevation: 1,
+  },
+  actionIconBox: {
     width: 40,
     height: 40,
     borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginBottom: 12,
   },
-  funnelCount: {
-    fontSize: 18,
-    fontWeight: '900',
-    color: colors.slate900,
+  actionTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#0f172a',
+    marginBottom: 2,
   },
-  funnelLabel: {
+  actionDesc: {
     fontSize: 11,
-    color: colors.slate500,
-    fontWeight: '600',
-    marginTop: 1,
+    color: '#64748b',
+    fontWeight: '500',
   },
-  chevron: {
-    fontSize: 20,
-    color: colors.slate400,
-    fontWeight: '700',
-    paddingHorizontal: 4,
+  pipelineScroll: {
+    gap: 12,
+    paddingVertical: 4,
   },
-  sectionTitleRow: {
+  pipelineCard: {
+    width: 140,
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#f1f5f9',
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.02,
+    shadowRadius: 6,
+    elevation: 1,
+  },
+  pipelineCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  pipelineIconBox: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  pipelineStepNum: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#cbd5e1',
+  },
+  pipelineCardTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#0f172a',
+  },
+  pipelineCardSub: {
+    fontSize: 11,
+    color: '#64748b',
+    marginTop: 2,
+    fontWeight: '500',
+  },
+  pipelineBadge: {
+    marginTop: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    alignSelf: 'flex-start',
+  },
+  pipelineBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  metricsRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  metricCard: {
+    flex: 1,
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#f1f5f9',
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.02,
+    shadowRadius: 6,
+    elevation: 1,
+  },
+  metricCardTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 10,
   },
-  seeAllText: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: colors.primary,
+  metricNumber: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: '#0f172a',
   },
-  projectItemCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: colors.white,
-    padding: 14,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    marginBottom: 8,
-  },
-  projectName: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: colors.slate900,
-  },
-  projectSub: {
+  metricLabel: {
     fontSize: 11,
-    color: colors.slate500,
+    fontWeight: '600',
+    color: '#64748b',
     marginTop: 2,
   },
+  seeAllText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#059669',
+  },
+  projectCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    borderRadius: 18,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#f1f5f9',
+    marginBottom: 10,
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.02,
+    shadowRadius: 6,
+    elevation: 1,
+  },
+  projectName: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#0f172a',
+  },
+  projectCustomer: {
+    fontSize: 12,
+    color: '#64748b',
+    marginTop: 2,
+    fontWeight: '500',
+  },
   projectStagePill: {
-    backgroundColor: '#eff6ff',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
+    backgroundColor: '#f1f5f9',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 10,
   },
   projectStageText: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#2563eb',
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#475569',
   },
   emptyCard: {
-    backgroundColor: colors.white,
-    borderRadius: 16,
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
     padding: 24,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  emptyIcon: {
-    fontSize: 32,
-    marginBottom: 8,
+    borderColor: '#f1f5f9',
   },
   emptyTitle: {
     fontSize: 14,
     fontWeight: '800',
-    color: colors.slate800,
+    color: '#0f172a',
+    marginTop: 8,
     marginBottom: 4,
   },
   emptyText: {
     fontSize: 12,
-    color: colors.slate500,
+    color: '#64748b',
     textAlign: 'center',
-    marginBottom: 12,
-  },
-  emptyActionBtn: {
-    backgroundColor: '#ecfdf5',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#a7f3d0',
-  },
-  emptyActionText: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#059669',
+    lineHeight: 18,
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.6)',
+    backgroundColor: 'rgba(15, 23, 42, 0.4)',
     justifyContent: 'flex-end',
   },
-  guideModalContainer: {
-    backgroundColor: colors.white,
+  guideContainer: {
+    backgroundColor: '#ffffff',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     maxHeight: '80%',
+    paddingBottom: 30,
   },
-  guideModalHeader: {
+  guideHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 18,
+    padding: 20,
     borderBottomWidth: 1,
     borderBottomColor: '#f1f5f9',
   },
-  guideModalTitle: {
+  guideTitle: {
     fontSize: 16,
-    fontWeight: '900',
-    color: colors.slate900,
-  },
-  guideModalSub: {
-    fontSize: 11,
-    color: colors.slate500,
-    marginTop: 2,
+    fontWeight: '800',
+    color: '#0f172a',
   },
   closeBtn: {
+    padding: 6,
+  },
+  guideStepRow: {
+    flexDirection: 'row',
+    gap: 14,
+    marginBottom: 18,
+  },
+  guideStepBadge: {
     width: 32,
     height: 32,
-    borderRadius: 16,
-    backgroundColor: '#f1f5f9',
+    borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
+    marginTop: 2,
   },
-  closeBtnText: {
+  guideStepTitle: {
     fontSize: 14,
     fontWeight: '800',
-    color: colors.slate600,
+    color: '#0f172a',
   },
-  guideRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 16,
-    alignItems: 'flex-start',
-  },
-  guideNumBadge: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 2,
-  },
-  guideNumText: {
-    fontSize: 11,
-    fontWeight: '900',
-    color: colors.white,
-  },
-  guideStepName: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: colors.slate900,
-  },
-  guideStepDesc: {
-    fontSize: 11,
-    color: colors.slate600,
-    lineHeight: 16,
-    marginTop: 2,
+  guideStepText: {
+    fontSize: 12,
+    color: '#64748b',
+    marginTop: 3,
+    lineHeight: 18,
   },
 });

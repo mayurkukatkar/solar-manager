@@ -1,8 +1,9 @@
 import React from 'react';
-import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, StyleSheet, ActivityIndicator } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { LayoutDashboard, Users, Briefcase, ShieldCheck, Layers } from 'lucide-react-native';
 import { useAuth } from '../context/AuthContext';
 import { LoginScreen } from '../screens/auth/LoginScreen';
 import { DashboardScreen } from '../screens/dashboard/DashboardScreen';
@@ -30,9 +31,9 @@ const MainTabNavigator: React.FC = () => {
         name="Dashboard"
         component={DashboardScreen}
         options={{
-          tabBarLabel: 'Dashboard',
-          tabBarIcon: ({ color }) => (
-            <Text style={{ fontSize: 20 }}>📊</Text>
+          tabBarLabel: 'Overview',
+          tabBarIcon: ({ color, size }) => (
+            <LayoutDashboard size={22} color={color} strokeWidth={2.2} />
           ),
         }}
       />
@@ -41,8 +42,8 @@ const MainTabNavigator: React.FC = () => {
         component={LeadsScreen}
         options={{
           tabBarLabel: 'CRM',
-          tabBarIcon: ({ color }) => (
-            <Text style={{ fontSize: 20 }}>👥</Text>
+          tabBarIcon: ({ color, size }) => (
+            <Users size={22} color={color} strokeWidth={2.2} />
           ),
         }}
       />
@@ -51,8 +52,8 @@ const MainTabNavigator: React.FC = () => {
         component={ProjectsScreen}
         options={{
           tabBarLabel: 'Projects',
-          tabBarIcon: ({ color }) => (
-            <Text style={{ fontSize: 20 }}>📁</Text>
+          tabBarIcon: ({ color, size }) => (
+            <Briefcase size={22} color={color} strokeWidth={2.2} />
           ),
         }}
       />
@@ -61,8 +62,8 @@ const MainTabNavigator: React.FC = () => {
         component={OperationsScreen}
         options={{
           tabBarLabel: 'Field QA',
-          tabBarIcon: ({ color }) => (
-            <Text style={{ fontSize: 20 }}>⚡</Text>
+          tabBarIcon: ({ color, size }) => (
+            <ShieldCheck size={22} color={color} strokeWidth={2.2} />
           ),
         }}
       />
@@ -70,9 +71,9 @@ const MainTabNavigator: React.FC = () => {
         name="Modules"
         component={ModulesScreen}
         options={{
-          tabBarLabel: 'ERP Hub',
-          tabBarIcon: ({ color }) => (
-            <Text style={{ fontSize: 20 }}>📑</Text>
+          tabBarLabel: 'Hub',
+          tabBarIcon: ({ color, size }) => (
+            <Layers size={22} color={color} strokeWidth={2.2} />
           ),
         }}
       />
@@ -109,24 +110,24 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: colors.slate900,
+    backgroundColor: '#0f172a',
   },
   tabBar: {
-    backgroundColor: colors.white,
+    backgroundColor: '#ffffff',
     borderTopWidth: 1,
-    borderTopColor: '#e2e8f0',
-    height: 64,
-    paddingBottom: 8,
-    paddingTop: 6,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 8,
+    borderTopColor: '#f1f5f9',
+    height: 68,
+    paddingBottom: 10,
+    paddingTop: 8,
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.03,
+    shadowRadius: 10,
+    elevation: 4,
   },
   tabLabel: {
-    fontSize: 10,
-    fontWeight: '800',
+    fontSize: 11,
+    fontWeight: '700',
     marginTop: 2,
   },
 });

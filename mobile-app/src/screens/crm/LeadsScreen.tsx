@@ -12,8 +12,20 @@ import {
   RefreshControl,
   ActivityIndicator,
 } from 'react-native';
+import {
+  Phone,
+  MessageCircle,
+  FileText,
+  ArrowRight,
+  Plus,
+  Users,
+  CheckCircle2,
+  Building2,
+  MapPin,
+  X,
+  Zap,
+} from 'lucide-react-native';
 import { Header } from '../../components/Header';
-import { colors } from '../../theme/colors';
 import { crmApi } from '../../api/endpoints';
 import { Lead } from '../../types';
 
@@ -25,7 +37,6 @@ const STAGES = [
   { id: 'SITE_SURVEY', label: 'Survey' },
   { id: 'PROPOSAL_SENT', label: 'Proposal' },
   { id: 'WON', label: 'Won' },
-  { id: 'LOST', label: 'Lost' },
 ];
 
 export const LeadsScreen: React.FC<{ route?: any; navigation?: any }> = ({ route, navigation }) => {
@@ -51,7 +62,7 @@ export const LeadsScreen: React.FC<{ route?: any; navigation?: any }> = ({ route
     email: '',
     company: '',
     city: '',
-    estimatedCap: '3',
+    estimatedCap: '3.3',
     monthlyBill: '3500',
   });
 
@@ -79,9 +90,9 @@ export const LeadsScreen: React.FC<{ route?: any; navigation?: any }> = ({ route
           email: l.email || undefined,
           company: l.company || undefined,
           city: l.city || 'Site Location',
-          recommendedKw: l.estimatedCap || 3,
-          estimatedCost: l.estimatedValue || (l.estimatedCap ? l.estimatedCap * 60000 : 180000),
-          subsidyAmount: (l.estimatedCap || 3) >= 3 ? 78000 : (l.estimatedCap || 3) >= 2 ? 60000 : 30000,
+          recommendedKw: l.estimatedCap || 3.3,
+          estimatedCost: l.estimatedValue || (l.estimatedCap ? l.estimatedCap * 60000 : 198000),
+          subsidyAmount: (l.estimatedCap || 3.3) >= 3 ? 78000 : (l.estimatedCap || 3.3) >= 2 ? 60000 : 30000,
           stage: l.status || 'NEW',
           status: l.status || 'NEW',
           createdAt: l.createdAt ? new Date(l.createdAt).toLocaleDateString() : 'Recent',
@@ -125,10 +136,10 @@ export const LeadsScreen: React.FC<{ route?: any; navigation?: any }> = ({ route
         email: newLeadForm.email ? newLeadForm.email.trim() : undefined,
         company: newLeadForm.company ? newLeadForm.company.trim() : undefined,
         source: 'Mobile App',
-        estimatedCap: parseFloat(newLeadForm.estimatedCap) || 3,
+        estimatedCap: parseFloat(newLeadForm.estimatedCap) || 3.3,
       });
 
-      Alert.alert('Lead Created', `Customer "${newLeadForm.name}" saved to Central CRM!`);
+      Alert.alert('Lead Created', `Customer "${newLeadForm.name}" has been registered.`);
       setAddModalVisible(false);
       setNewLeadForm({
         name: '',
@@ -136,7 +147,7 @@ export const LeadsScreen: React.FC<{ route?: any; navigation?: any }> = ({ route
         email: '',
         company: '',
         city: '',
-        estimatedCap: '3',
+        estimatedCap: '3.3',
         monthlyBill: '3500',
       });
       fetchLeads();
@@ -156,7 +167,6 @@ export const LeadsScreen: React.FC<{ route?: any; navigation?: any }> = ({ route
       if (selectedLead && selectedLead.id === leadId) {
         setSelectedLead({ ...selectedLead, stage: nextStage, status: nextStage });
       }
-      Alert.alert('Stage Updated', `Lead moved to "${nextStage}".`);
     } catch (err: any) {
       Alert.alert('Error', err.message || 'Failed to update lead stage');
     }
@@ -167,8 +177,8 @@ export const LeadsScreen: React.FC<{ route?: any; navigation?: any }> = ({ route
     try {
       await crmApi.convertLead(lead.id);
       Alert.alert(
-        'Lead Converted! 🎉',
-        `Customer "${lead.name}" has been converted to an active Project. A Site Survey has been automatically scheduled.`
+        'Lead Converted',
+        `Customer "${lead.name}" converted to an active Project with a Site Survey scheduled.`
       );
       setSelectedLead(null);
       fetchLeads();
@@ -180,18 +190,18 @@ export const LeadsScreen: React.FC<{ route?: any; navigation?: any }> = ({ route
   };
 
   const handleWhatsApp = (name: string, phone?: string, kw?: number) => {
-    const targetKw = kw || 3;
+    const targetKw = kw || 3.3;
     const gross = targetKw * 60000;
-    const sub = targetKw >= 3 ? 78000 : targetKw === 2 ? 60000 : 30000;
+    const sub = targetKw >= 3 ? 78000 : targetKw >= 2 ? 60000 : 30000;
     const net = gross - sub;
 
     const text = `☀️ *PM Surya Ghar Solar Proposal*
 Dear ${name},
-Here is your customized Rooftop Solar System estimate:
-⚡ Recommended Capacity: ${targetKw} kWp Grid-Tied Solar
-💰 Gross Cost: ₹${gross.toLocaleString('en-IN')}
-🏛️ Govt. Subsidy (CFA): -₹${sub.toLocaleString('en-IN')}
-✅ Net Investment Payable: ₹${net.toLocaleString('en-IN')}
+Here is your customized Rooftop Solar estimate:
+⚡ System Capacity: ${targetKw} kWp Grid-Tied Solar
+💰 Turnkey Cost: ₹${gross.toLocaleString('en-IN')}
+🏛️ PM Surya Ghar Subsidy: -₹${sub.toLocaleString('en-IN')}
+✅ Net Investment: ₹${net.toLocaleString('en-IN')}
 
 Let's schedule your 3D site survey today!`;
 
@@ -230,71 +240,68 @@ Let's schedule your 3D site survey today!`;
       case 'SITE_SURVEY':
         return { bg: '#e0e7ff', text: '#4338ca' };
       case 'PROPOSAL_SENT':
-        return { bg: '#fef2f2', text: '#dc2626' };
+        return { bg: '#ecfdf5', text: '#059669' };
       case 'WON':
         return { bg: '#ecfdf5', text: '#059669' };
-      case 'LOST':
-        return { bg: '#f1f5f9', text: '#64748b' };
       default:
-        return { bg: '#f8fafc', text: '#475569' };
+        return { bg: '#f8fafc', text: '#64748b' };
     }
   };
 
   return (
     <View style={styles.container}>
       <Header
-        title="CRM & Leads Pipeline"
-        subtitle="Customer acquisition, conversion & proposal dispatch"
+        title="CRM & Leads"
+        subtitle="Manage inquiries, send proposals & track conversions"
         showSearch
         onSearch={setSearchQuery}
       />
 
-      {/* METRICS STRIP */}
-      <View style={styles.metricsStrip}>
+      {/* METRICS ROW */}
+      <View style={styles.metricsBar}>
         <View style={styles.metricItem}>
           <Text style={styles.metricNumber}>{metrics.totalLeads}</Text>
-          <Text style={styles.metricTitle}>Total</Text>
+          <Text style={styles.metricLabel}>Total</Text>
         </View>
         <View style={styles.metricDivider} />
         <View style={styles.metricItem}>
           <Text style={[styles.metricNumber, { color: '#2563eb' }]}>{metrics.newLeads}</Text>
-          <Text style={styles.metricTitle}>New</Text>
+          <Text style={styles.metricLabel}>New</Text>
         </View>
         <View style={styles.metricDivider} />
         <View style={styles.metricItem}>
           <Text style={[styles.metricNumber, { color: '#7c3aed' }]}>{metrics.qualifiedLeads}</Text>
-          <Text style={styles.metricTitle}>Qualified</Text>
+          <Text style={styles.metricLabel}>Qualified</Text>
         </View>
         <View style={styles.metricDivider} />
         <View style={styles.metricItem}>
           <Text style={[styles.metricNumber, { color: '#059669' }]}>{metrics.wonLeads}</Text>
-          <Text style={styles.metricTitle}>Won</Text>
-        </View>
-        <View style={styles.metricDivider} />
-        <View style={styles.metricItem}>
-          <Text style={[styles.metricNumber, { color: '#d97706' }]}>{metrics.conversionRate}</Text>
-          <Text style={styles.metricTitle}>Win Rate</Text>
+          <Text style={styles.metricLabel}>Won</Text>
         </View>
       </View>
 
-      {/* HORIZONTAL STAGE SELECTOR */}
-      <View style={styles.stageTabsContainer}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.stageTabsContent}>
+      {/* STAGE SELECTOR TABS */}
+      <View style={styles.stageTabsWrapper}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.stageTabsContent}
+        >
           {STAGES.map((s) => {
             const count = s.id === 'ALL' ? leads.length : leads.filter((l) => (l.status || l.stage) === s.id).length;
             const isActive = activeStage === s.id;
             return (
               <TouchableOpacity
                 key={s.id}
-                style={[styles.stageTab, isActive && styles.stageTabActive]}
+                style={[styles.stagePill, isActive && styles.stagePillActive]}
                 onPress={() => setActiveStage(s.id)}
                 activeOpacity={0.8}
               >
-                <Text style={[styles.stageTabText, isActive && styles.stageTabTextActive]}>
+                <Text style={[styles.stagePillLabel, isActive && styles.stagePillLabelActive]}>
                   {s.label}
                 </Text>
-                <View style={[styles.stageTabCount, isActive && styles.stageTabCountActive]}>
-                  <Text style={[styles.stageTabCountText, isActive && styles.stageTabCountTextActive]}>
+                <View style={[styles.countBadge, isActive && styles.countBadgeActive]}>
+                  <Text style={[styles.countBadgeText, isActive && styles.countBadgeTextActive]}>
                     {count}
                   </Text>
                 </View>
@@ -310,25 +317,26 @@ Let's schedule your 3D site survey today!`;
         contentContainerStyle={styles.scrollContent}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
-        <View style={styles.listHeaderRow}>
-          <Text style={styles.listHeaderTitle}>
-            Showing {filteredLeads.length} {activeStage === 'ALL' ? 'Total' : activeStage} Leads
+        <View style={styles.listHeader}>
+          <Text style={styles.listCountText}>
+            {filteredLeads.length} {activeStage === 'ALL' ? 'Total' : activeStage} Prospects
           </Text>
           <TouchableOpacity
-            style={styles.addLeadTopBtn}
+            style={styles.newLeadBtn}
             onPress={() => setAddModalVisible(true)}
-            activeOpacity={0.8}
+            activeOpacity={0.85}
           >
-            <Text style={styles.addLeadTopBtnText}>+ New Lead</Text>
+            <Plus size={14} color="#ffffff" style={{ marginRight: 4 }} />
+            <Text style={styles.newLeadBtnText}>New Lead</Text>
           </TouchableOpacity>
         </View>
 
         {loading ? (
-          <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 32 }} />
+          <ActivityIndicator size="small" color="#059669" style={{ marginVertical: 30 }} />
         ) : filteredLeads.length === 0 ? (
           <View style={styles.emptyCard}>
-            <Text style={styles.emptyIcon}>🎯</Text>
-            <Text style={styles.emptyTitle}>No Leads in this Stage</Text>
+            <Users size={32} color="#94a3b8" />
+            <Text style={styles.emptyTitle}>No Prospects Found</Text>
             <Text style={styles.emptyText}>
               Add prospective customers to build your solar pipeline and send 60s proposals.
             </Text>
@@ -337,28 +345,27 @@ Let's schedule your 3D site survey today!`;
               onPress={() => setAddModalVisible(true)}
               activeOpacity={0.85}
             >
-              <Text style={styles.emptyAddBtnText}>+ Create New Lead</Text>
+              <Text style={styles.emptyAddBtnText}>+ Add Prospect</Text>
             </TouchableOpacity>
           </View>
         ) : (
           filteredLeads.map((lead) => {
             const badge = getStageBadgeColor(lead.stage || 'NEW');
             const isWon = (lead.stage || lead.status) === 'WON';
+            const netInvestment = Math.max(0, (lead.estimatedCost || 198000) - (lead.subsidyAmount || 78000));
 
             return (
-              <TouchableOpacity
-                key={lead.id}
-                style={styles.leadCard}
-                onPress={() => setSelectedLead(lead)}
-                activeOpacity={0.9}
-              >
-                {/* TOP ROW: NAME & STAGE PILL */}
-                <View style={styles.leadCardHeader}>
+              <View key={lead.id} style={styles.leadCard}>
+                {/* CARD HEADER */}
+                <View style={styles.cardHeaderRow}>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.leadName}>{lead.name}</Text>
-                    <Text style={styles.leadLocation}>
-                      📍 {lead.city || 'Site Location'} {lead.company ? `• ${lead.company}` : ''}
-                    </Text>
+                    <View style={styles.locationRow}>
+                      <MapPin size={12} color="#94a3b8" />
+                      <Text style={styles.leadCity}>
+                        {lead.city || 'Site Location'} {lead.company ? `• ${lead.company}` : ''}
+                      </Text>
+                    </View>
                   </View>
                   <View style={[styles.stageBadge, { backgroundColor: badge.bg }]}>
                     <Text style={[styles.stageBadgeText, { color: badge.text }]}>
@@ -367,90 +374,79 @@ Let's schedule your 3D site survey today!`;
                   </View>
                 </View>
 
-                {/* CAPACITY & ESTIMATED ECONOMICS */}
-                <View style={styles.economicsRow}>
-                  <View style={styles.econItem}>
-                    <Text style={styles.econLabel}>CAPACITY</Text>
-                    <Text style={styles.econVal}>{lead.recommendedKw || 3} kWp</Text>
+                {/* CAPACITY & NET INVESTMENT HIGHLIGHT */}
+                <View style={styles.specsRow}>
+                  <View style={styles.specBox}>
+                    <Text style={styles.specLabel}>Capacity</Text>
+                    <Text style={styles.specVal}>{lead.recommendedKw || 3.3} kWp</Text>
                   </View>
-                  <View style={styles.econItem}>
-                    <Text style={styles.econLabel}>EST. COST</Text>
-                    <Text style={styles.econVal}>₹{(lead.estimatedCost || 180000).toLocaleString('en-IN')}</Text>
-                  </View>
-                  <View style={styles.econItem}>
-                    <Text style={styles.econLabel}>CFA SUBSIDY</Text>
-                    <Text style={[styles.econVal, { color: '#059669' }]}>
+                  <View style={styles.specBox}>
+                    <Text style={styles.specLabel}>CFA Subsidy</Text>
+                    <Text style={[styles.specVal, { color: '#059669' }]}>
                       -₹{(lead.subsidyAmount || 78000).toLocaleString('en-IN')}
+                    </Text>
+                  </View>
+                  <View style={styles.specBox}>
+                    <Text style={styles.specLabel}>Net Payable</Text>
+                    <Text style={[styles.specVal, { color: '#0f172a' }]}>
+                      ₹{netInvestment.toLocaleString('en-IN')}
                     </Text>
                   </View>
                 </View>
 
-                {/* ACTION BUTTONS ROW */}
-                <View style={styles.actionsBar}>
-                  <TouchableOpacity
-                    style={styles.actionPill}
-                    onPress={() => Linking.openURL(`tel:${lead.phone || lead.mobile}`)}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={styles.actionPillText}>📞 Call</Text>
-                  </TouchableOpacity>
+                {/* TWO-ZONE ACTION BAR */}
+                <View style={styles.actionRow}>
+                  {/* Quick Contact Buttons */}
+                  <View style={styles.contactButtons}>
+                    <TouchableOpacity
+                      style={styles.iconCircleBtn}
+                      onPress={() => Linking.openURL(`tel:${lead.phone || lead.mobile}`)}
+                      activeOpacity={0.8}
+                    >
+                      <Phone size={16} color="#0f172a" strokeWidth={2.2} />
+                    </TouchableOpacity>
 
-                  <TouchableOpacity
-                    style={[styles.actionPill, { backgroundColor: '#ecfdf5', borderColor: '#a7f3d0' }]}
-                    onPress={() => handleWhatsApp(lead.name, lead.phone || lead.mobile, lead.recommendedKw)}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={[styles.actionPillText, { color: '#047857' }]}>💬 WhatsApp</Text>
-                  </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.iconCircleBtn, { backgroundColor: '#ecfdf5', borderColor: '#a7f3d0' }]}
+                      onPress={() => handleWhatsApp(lead.name, lead.phone || lead.mobile, lead.recommendedKw)}
+                      activeOpacity={0.8}
+                    >
+                      <MessageCircle size={16} color="#059669" strokeWidth={2.2} />
+                    </TouchableOpacity>
+                  </View>
 
-                  <TouchableOpacity
-                    style={[styles.actionPill, { backgroundColor: '#eff6ff', borderColor: '#bfdbfe' }]}
-                    onPress={() => {
-                      if (navigation) {
-                        navigation.navigate('Modules', {
-                          openQuote: true,
-                          leadName: lead.name,
-                          capacity: lead.recommendedKw || 3,
-                        });
-                      }
-                    }}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={[styles.actionPillText, { color: '#1d4ed8' }]}>📄 60s Quote</Text>
-                  </TouchableOpacity>
-
+                  {/* Primary Workflow Button */}
                   {isWon ? (
                     <TouchableOpacity
-                      style={styles.convertBtn}
+                      style={styles.primaryActionBtn}
                       onPress={() => handleConvertLeadToProject(lead)}
                       disabled={converting}
                       activeOpacity={0.85}
                     >
-                      <Text style={styles.convertBtnText}>🚀 Convert</Text>
+                      <CheckCircle2 size={15} color="#ffffff" style={{ marginRight: 6 }} />
+                      <Text style={styles.primaryActionBtnText}>Convert to Project</Text>
                     </TouchableOpacity>
                   ) : (
                     <TouchableOpacity
-                      style={styles.advanceBtn}
+                      style={styles.primaryActionBtn}
                       onPress={() => {
-                        const next =
-                          lead.stage === 'NEW'
-                            ? 'CONTACTED'
-                            : lead.stage === 'CONTACTED'
-                            ? 'QUALIFIED'
-                            : lead.stage === 'QUALIFIED'
-                            ? 'SITE_SURVEY'
-                            : lead.stage === 'SITE_SURVEY'
-                            ? 'PROPOSAL_SENT'
-                            : 'WON';
-                        handleAdvanceStage(lead.id, next);
+                        if (navigation) {
+                          navigation.navigate('Modules', {
+                            screen: 'QUOTES',
+                            openQuote: true,
+                            leadName: lead.name,
+                            capacity: lead.recommendedKw || 3.3,
+                          });
+                        }
                       }}
                       activeOpacity={0.85}
                     >
-                      <Text style={styles.advanceBtnText}>⚡ Advance</Text>
+                      <FileText size={15} color="#ffffff" style={{ marginRight: 6 }} />
+                      <Text style={styles.primaryActionBtnText}>Create 60s Quote</Text>
                     </TouchableOpacity>
                   )}
                 </View>
-              </TouchableOpacity>
+              </View>
             );
           })
         )}
@@ -459,185 +455,75 @@ Let's schedule your 3D site survey today!`;
       {/* ADD LEAD MODAL */}
       <Modal visible={addModalVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <View style={styles.addModalContent}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalDragHandle} />
+
             <View style={styles.modalHeaderRow}>
               <View>
-                <Text style={styles.modalTitle}>New Customer Lead</Text>
-                <Text style={styles.modalSubtitle}>Register rooftop solar prospect</Text>
+                <Text style={styles.modalTitle}>Add Prospective Customer</Text>
+                <Text style={styles.modalSubtitle}>Register rooftop prospect into Central CRM</Text>
               </View>
-              <TouchableOpacity onPress={() => setAddModalVisible(false)} style={styles.closeModalBtn}>
-                <Text style={styles.closeModalText}>✕</Text>
+              <TouchableOpacity onPress={() => setAddModalVisible(false)} style={styles.modalCloseBtn}>
+                <X size={18} color="#64748b" />
               </TouchableOpacity>
             </View>
 
             <ScrollView style={{ maxHeight: 420 }} showsVerticalScrollIndicator={false}>
               <Text style={styles.inputLabel}>CUSTOMER FULL NAME *</Text>
               <TextInput
-                style={styles.input}
+                style={styles.textInput}
                 placeholder="e.g. Ramesh Sharma"
+                placeholderTextColor="#94a3b8"
                 value={newLeadForm.name}
                 onChangeText={(t) => setNewLeadForm({ ...newLeadForm, name: t })}
               />
 
               <Text style={styles.inputLabel}>MOBILE NUMBER (10 DIGITS) *</Text>
               <TextInput
-                style={styles.input}
+                style={styles.textInput}
                 placeholder="9876543210"
+                placeholderTextColor="#94a3b8"
                 keyboardType="phone-pad"
                 value={newLeadForm.mobile}
                 onChangeText={(t) => setNewLeadForm({ ...newLeadForm, mobile: t })}
               />
 
-              <View style={styles.inputRow}>
+              <View style={{ flexDirection: 'row', gap: 12 }}>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.inputLabel}>SYSTEM CAPACITY (kWp)</Text>
+                  <Text style={styles.inputLabel}>ESTIMATED CAPACITY (kWp)</Text>
                   <TextInput
-                    style={styles.input}
-                    placeholder="3"
+                    style={styles.textInput}
+                    placeholder="3.3"
+                    placeholderTextColor="#94a3b8"
                     keyboardType="numeric"
                     value={newLeadForm.estimatedCap}
                     onChangeText={(t) => setNewLeadForm({ ...newLeadForm, estimatedCap: t })}
                   />
                 </View>
+
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.inputLabel}>MONTHLY BILL (₹)</Text>
+                  <Text style={styles.inputLabel}>CITY / REGION</Text>
                   <TextInput
-                    style={styles.input}
-                    placeholder="3500"
-                    keyboardType="numeric"
-                    value={newLeadForm.monthlyBill}
-                    onChangeText={(t) => setNewLeadForm({ ...newLeadForm, monthlyBill: t })}
+                    style={styles.textInput}
+                    placeholder="Pune"
+                    placeholderTextColor="#94a3b8"
+                    value={newLeadForm.city}
+                    onChangeText={(t) => setNewLeadForm({ ...newLeadForm, city: t })}
                   />
                 </View>
               </View>
 
-              <Text style={styles.inputLabel}>CITY / REGION</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="e.g. Mumbai, Pune, Nagpur"
-                value={newLeadForm.city}
-                onChangeText={(t) => setNewLeadForm({ ...newLeadForm, city: t })}
-              />
-
-              <Text style={styles.inputLabel}>EMAIL ADDRESS (OPTIONAL)</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="customer@gmail.com"
-                keyboardType="email-address"
-                autoCapitalize="none"
-                value={newLeadForm.email}
-                onChangeText={(t) => setNewLeadForm({ ...newLeadForm, email: t })}
-              />
-
               <TouchableOpacity
-                style={styles.saveLeadBtn}
+                style={styles.submitModalBtn}
                 onPress={handleAddLeadSubmit}
                 disabled={savingLead}
                 activeOpacity={0.85}
               >
-                {savingLead ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <Text style={styles.saveLeadBtnText}>Save & Add to Pipeline</Text>
-                )}
+                <Text style={styles.submitModalBtnText}>
+                  {savingLead ? 'Registering...' : 'Register Customer'}
+                </Text>
               </TouchableOpacity>
             </ScrollView>
-          </View>
-        </View>
-      </Modal>
-
-      {/* LEAD DETAIL & CONVERSION MODAL */}
-      <Modal visible={!!selectedLead} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={styles.detailModalContent}>
-            {selectedLead && (
-              <>
-                <View style={styles.modalHeaderRow}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.detailName}>{selectedLead.name}</Text>
-                    <Text style={styles.detailSub}>
-                      {selectedLead.city} • Registered {selectedLead.createdAt}
-                    </Text>
-                  </View>
-                  <TouchableOpacity onPress={() => setSelectedLead(null)} style={styles.closeModalBtn}>
-                    <Text style={styles.closeModalText}>✕</Text>
-                  </TouchableOpacity>
-                </View>
-
-                <View style={styles.detailSpecsGrid}>
-                  <View style={styles.detailSpecBox}>
-                    <Text style={styles.detailSpecLabel}>CAPACITY</Text>
-                    <Text style={styles.detailSpecVal}>{selectedLead.recommendedKw} kWp</Text>
-                  </View>
-                  <View style={styles.detailSpecBox}>
-                    <Text style={styles.detailSpecLabel}>GROSS ESTIMATE</Text>
-                    <Text style={styles.detailSpecVal}>₹{(selectedLead.estimatedCost || 180000).toLocaleString('en-IN')}</Text>
-                  </View>
-                  <View style={styles.detailSpecBox}>
-                    <Text style={styles.detailSpecLabel}>CFA SUBSIDY</Text>
-                    <Text style={[styles.detailSpecVal, { color: '#059669' }]}>
-                      -₹{(selectedLead.subsidyAmount || 78000).toLocaleString('en-IN')}
-                    </Text>
-                  </View>
-                  <View style={styles.detailSpecBox}>
-                    <Text style={styles.detailSpecLabel}>CURRENT STAGE</Text>
-                    <Text style={[styles.detailSpecVal, { color: colors.primary }]}>{selectedLead.stage}</Text>
-                  </View>
-                </View>
-
-                {/* STAGE SELECTOR IN MODAL */}
-                <Text style={[styles.inputLabel, { marginTop: 12 }]}>UPDATE PIPELINE STAGE:</Text>
-                <View style={styles.stageChipsRow}>
-                  {STAGES.filter((s) => s.id !== 'ALL').map((s) => {
-                    const isSelected = selectedLead.stage === s.id;
-                    return (
-                      <TouchableOpacity
-                        key={s.id}
-                        style={[styles.stageChip, isSelected && styles.stageChipSelected]}
-                        onPress={() => handleAdvanceStage(selectedLead.id, s.id)}
-                      >
-                        <Text style={[styles.stageChipText, isSelected && styles.stageChipTextSelected]}>
-                          {s.label}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-
-                {/* CONVERT BUTTON IF WON */}
-                {selectedLead.stage === 'WON' && (
-                  <TouchableOpacity
-                    style={styles.convertBigBtn}
-                    onPress={() => handleConvertLeadToProject(selectedLead)}
-                    disabled={converting}
-                    activeOpacity={0.85}
-                  >
-                    {converting ? (
-                      <ActivityIndicator size="small" color="#fff" />
-                    ) : (
-                      <Text style={styles.convertBigBtnText}>
-                        🚀 Convert to Active Project & Site Survey
-                      </Text>
-                    )}
-                  </TouchableOpacity>
-                )}
-
-                <View style={styles.detailModalActions}>
-                  <TouchableOpacity
-                    style={styles.detailCallBtn}
-                    onPress={() => Linking.openURL(`tel:${selectedLead.phone || selectedLead.mobile}`)}
-                  >
-                    <Text style={styles.detailCallBtnText}>📞 Call</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.detailWhatsappBtn}
-                    onPress={() => handleWhatsApp(selectedLead.name, selectedLead.phone || selectedLead.mobile, selectedLead.recommendedKw)}
-                  >
-                    <Text style={styles.detailWhatsappBtnText}>💬 WhatsApp</Text>
-                  </TouchableOpacity>
-                </View>
-              </>
-            )}
           </View>
         </View>
       </Modal>
@@ -650,146 +536,158 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f8fafc',
   },
-  scroll: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: 16,
-    paddingBottom: 40,
-  },
-  metricsStrip: {
+  metricsBar: {
     flexDirection: 'row',
-    backgroundColor: colors.white,
-    paddingVertical: 14,
-    paddingHorizontal: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
     alignItems: 'center',
-    justifyContent: 'space-around',
+    backgroundColor: '#ffffff',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
   },
   metricItem: {
+    flex: 1,
     alignItems: 'center',
   },
   metricNumber: {
     fontSize: 16,
-    fontWeight: '900',
-    color: colors.slate900,
+    fontWeight: '800',
+    color: '#0f172a',
   },
-  metricTitle: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: colors.slate500,
+  metricLabel: {
+    fontSize: 11,
+    color: '#64748b',
     marginTop: 2,
+    fontWeight: '500',
   },
   metricDivider: {
     width: 1,
     height: 24,
-    backgroundColor: '#e2e8f0',
+    backgroundColor: '#f1f5f9',
   },
-  stageTabsContainer: {
-    backgroundColor: colors.white,
+  stageTabsWrapper: {
+    backgroundColor: '#ffffff',
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
+    borderBottomColor: '#f1f5f9',
   },
   stageTabsContent: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     gap: 8,
   },
-  stageTab: {
+  stagePill: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 6,
+    backgroundColor: '#f8fafc',
     paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: 20,
-    backgroundColor: '#f1f5f9',
-    gap: 6,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
   },
-  stageTabActive: {
-    backgroundColor: colors.primary,
+  stagePillActive: {
+    backgroundColor: '#059669',
+    borderColor: '#059669',
   },
-  stageTabText: {
+  stagePillLabel: {
     fontSize: 12,
+    fontWeight: '600',
+    color: '#64748b',
+  },
+  stagePillLabelActive: {
+    color: '#ffffff',
     fontWeight: '700',
-    color: colors.slate600,
   },
-  stageTabTextActive: {
-    color: colors.white,
-    fontWeight: '800',
-  },
-  stageTabCount: {
+  countBadge: {
     backgroundColor: '#e2e8f0',
     paddingHorizontal: 6,
-    paddingVertical: 1,
+    paddingVertical: 2,
     borderRadius: 10,
+    marginLeft: 6,
   },
-  stageTabCountActive: {
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+  countBadgeActive: {
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
   },
-  stageTabCountText: {
+  countBadgeText: {
     fontSize: 10,
-    fontWeight: '800',
-    color: colors.slate700,
+    fontWeight: '700',
+    color: '#475569',
   },
-  stageTabCountTextActive: {
-    color: colors.white,
+  countBadgeTextActive: {
+    color: '#ffffff',
   },
-  listHeaderRow: {
+  scroll: {
+    flex: 1,
+  },
+  scrollContent: {
+    padding: 20,
+    paddingBottom: 40,
+  },
+  listHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 14,
   },
-  listHeaderTitle: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: colors.slate500,
-    textTransform: 'uppercase',
+  listCountText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#94a3b8',
     letterSpacing: 0.5,
+    textTransform: 'uppercase',
   },
-  addLeadTopBtn: {
-    backgroundColor: colors.primary,
-    paddingVertical: 6,
+  newLeadBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#059669',
     paddingHorizontal: 12,
-    borderRadius: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
   },
-  addLeadTopBtnText: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: colors.white,
+  newLeadBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#ffffff',
   },
   leadCard: {
-    backgroundColor: colors.white,
-    borderRadius: 18,
-    padding: 16,
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    padding: 18,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
-    marginBottom: 12,
-    shadowColor: '#000',
+    borderColor: '#f1f5f9',
+    marginBottom: 14,
+    shadowColor: '#0f172a',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowOpacity: 0.02,
+    shadowRadius: 6,
+    elevation: 1,
   },
-  leadCardHeader: {
+  cardHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     marginBottom: 12,
   },
   leadName: {
-    fontSize: 15,
-    fontWeight: '900',
-    color: colors.slate900,
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#0f172a',
+    letterSpacing: -0.3,
   },
-  leadLocation: {
-    fontSize: 11,
-    color: colors.slate500,
-    marginTop: 2,
+  locationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+    gap: 4,
+  },
+  leadCity: {
+    fontSize: 12,
+    color: '#64748b',
+    fontWeight: '500',
   },
   stageBadge: {
     paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingVertical: 4,
     borderRadius: 8,
   },
   stageBadgeText: {
@@ -797,290 +695,164 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 0.5,
   },
-  economicsRow: {
+  specsRow: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     backgroundColor: '#f8fafc',
     borderRadius: 12,
-    padding: 10,
-    justifyContent: 'space-between',
+    padding: 12,
     marginBottom: 14,
-    borderWidth: 1,
-    borderColor: '#f1f5f9',
   },
-  econItem: {
-    alignItems: 'center',
+  specBox: {
+    flex: 1,
   },
-  econLabel: {
-    fontSize: 9,
-    fontWeight: '800',
-    color: colors.slate400,
+  specLabel: {
+    fontSize: 10,
+    color: '#94a3b8',
+    fontWeight: '600',
+    textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
-  econVal: {
-    fontSize: 12,
+  specVal: {
+    fontSize: 13,
     fontWeight: '800',
-    color: colors.slate900,
+    color: '#0f172a',
     marginTop: 2,
   },
-  actionsBar: {
+  actionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  contactButtons: {
     flexDirection: 'row',
     gap: 8,
-    alignItems: 'center',
   },
-  actionPill: {
-    flex: 1,
-    paddingVertical: 8,
-    borderRadius: 10,
+  iconCircleBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     backgroundColor: '#f8fafc',
     borderWidth: 1,
     borderColor: '#e2e8f0',
+    justifyContent: 'center',
     alignItems: 'center',
   },
-  actionPillText: {
-    fontSize: 11,
+  primaryActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#0f172a',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
+  },
+  primaryActionBtnText: {
+    fontSize: 13,
     fontWeight: '700',
-    color: colors.slate700,
-  },
-  advanceBtn: {
-    flex: 1.1,
-    backgroundColor: colors.slate900,
-    paddingVertical: 8,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  advanceBtnText: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: colors.white,
-  },
-  convertBtn: {
-    flex: 1.1,
-    backgroundColor: colors.primary,
-    paddingVertical: 8,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  convertBtnText: {
-    fontSize: 11,
-    fontWeight: '900',
-    color: colors.white,
+    color: '#ffffff',
   },
   emptyCard: {
-    backgroundColor: colors.white,
-    borderRadius: 18,
-    padding: 32,
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    padding: 30,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#e2e8f0',
-    marginTop: 20,
-  },
-  emptyIcon: {
-    fontSize: 40,
-    marginBottom: 10,
+    borderColor: '#f1f5f9',
+    marginTop: 10,
   },
   emptyTitle: {
-    fontSize: 16,
-    fontWeight: '900',
-    color: colors.slate900,
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#0f172a',
+    marginTop: 10,
     marginBottom: 4,
   },
   emptyText: {
     fontSize: 12,
-    color: colors.slate500,
+    color: '#64748b',
     textAlign: 'center',
     lineHeight: 18,
     marginBottom: 16,
   },
   emptyAddBtn: {
-    backgroundColor: colors.primary,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 12,
+    backgroundColor: '#ecfdf5',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 10,
   },
   emptyAddBtnText: {
-    color: colors.white,
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '800',
+    color: '#059669',
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.65)',
+    backgroundColor: 'rgba(15, 23, 42, 0.4)',
     justifyContent: 'flex-end',
   },
-  addModalContent: {
-    backgroundColor: colors.white,
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
+  modalContent: {
+    backgroundColor: '#ffffff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
     padding: 24,
-    paddingBottom: 36,
+    paddingBottom: 40,
   },
-  detailModalContent: {
-    backgroundColor: colors.white,
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    padding: 24,
-    paddingBottom: 36,
+  modalDragHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#e2e8f0',
+    alignSelf: 'center',
+    marginBottom: 20,
   },
   modalHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 20,
   },
   modalTitle: {
-    fontSize: 18,
-    fontWeight: '900',
-    color: colors.slate900,
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#0f172a',
   },
   modalSubtitle: {
     fontSize: 12,
-    color: colors.slate500,
+    color: '#64748b',
     marginTop: 2,
   },
-  closeModalBtn: {
-    padding: 6,
-    backgroundColor: '#f1f5f9',
-    borderRadius: 12,
-  },
-  closeModalText: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: colors.slate500,
+  modalCloseBtn: {
+    padding: 4,
   },
   inputLabel: {
     fontSize: 10,
     fontWeight: '800',
-    color: colors.slate500,
+    color: '#94a3b8',
     letterSpacing: 0.5,
+    marginTop: 12,
     marginBottom: 4,
   },
-  input: {
+  textInput: {
     backgroundColor: '#f8fafc',
-    borderWidth: 1.5,
-    borderColor: '#e2e8f0',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 13,
-    color: colors.slate900,
-    marginBottom: 12,
-  },
-  inputRow: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  saveLeadBtn: {
-    backgroundColor: colors.primary,
-    paddingVertical: 14,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  saveLeadBtnText: {
-    color: colors.white,
-    fontSize: 14,
-    fontWeight: '800',
-  },
-  detailName: {
-    fontSize: 18,
-    fontWeight: '900',
-    color: colors.slate900,
-  },
-  detailSub: {
-    fontSize: 11,
-    color: colors.slate500,
-    marginTop: 2,
-  },
-  detailSpecsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginVertical: 14,
-  },
-  detailSpecBox: {
-    flex: 1,
-    minWidth: '45%',
-    backgroundColor: '#f8fafc',
-    padding: 12,
-    borderRadius: 12,
     borderWidth: 1,
     borderColor: '#e2e8f0',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#0f172a',
   },
-  detailSpecLabel: {
-    fontSize: 9,
-    fontWeight: '800',
-    color: colors.slate400,
-    letterSpacing: 0.5,
-  },
-  detailSpecVal: {
-    fontSize: 13,
-    fontWeight: '900',
-    color: colors.slate900,
-    marginTop: 2,
-  },
-  stageChipsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    marginVertical: 10,
-  },
-  stageChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-    backgroundColor: '#f1f5f9',
-  },
-  stageChipSelected: {
-    backgroundColor: colors.primary,
-  },
-  stageChipText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: colors.slate600,
-  },
-  stageChipTextSelected: {
-    color: colors.white,
-    fontWeight: '800',
-  },
-  convertBigBtn: {
-    backgroundColor: colors.primary,
+  submitModalBtn: {
+    backgroundColor: '#059669',
     paddingVertical: 14,
     borderRadius: 14,
     alignItems: 'center',
-    marginTop: 12,
+    marginTop: 24,
   },
-  convertBigBtnText: {
-    color: colors.white,
-    fontSize: 13,
-    fontWeight: '900',
-  },
-  detailModalActions: {
-    flexDirection: 'row',
-    gap: 10,
-    marginTop: 14,
-  },
-  detailCallBtn: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 12,
-    backgroundColor: '#f1f5f9',
-    alignItems: 'center',
-  },
-  detailCallBtnText: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: colors.slate800,
-  },
-  detailWhatsappBtn: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 12,
-    backgroundColor: '#10b981',
-    alignItems: 'center',
-  },
-  detailWhatsappBtnText: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: colors.white,
+  submitModalBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#ffffff',
   },
 });
