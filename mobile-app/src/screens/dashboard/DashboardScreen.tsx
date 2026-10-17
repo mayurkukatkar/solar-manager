@@ -7,14 +7,15 @@ import {
   TouchableOpacity,
   RefreshControl,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
 import { Header } from '../../components/Header';
 import { colors } from '../../theme/colors';
 import { tenantApi } from '../../api/endpoints';
+import { useAuth } from '../../context/AuthContext';
 import { DashboardData, Project } from '../../types';
 
 export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
+  const { user } = useAuth();
   const [data, setData] = useState<DashboardData>({
     totalLeads: 0,
     totalCustomers: 0,
@@ -41,13 +42,13 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
 
       if (dashRes) {
         setData({
-          totalLeads: dashRes.totalLeads ?? 4,
-          totalCustomers: dashRes.totalCustomers ?? 3,
-          totalProjects: dashRes.totalProjects ?? 4,
-          pendingInvoices: dashRes.pendingInvoices ?? 5,
-          openTickets: dashRes.openTickets ?? 0,
-          totalRevenue: dashRes.totalRevenue ?? 743526,
-          outstanding: dashRes.outstanding ?? 6252220,
+          totalLeads: dashRes.totalLeads || 0,
+          totalCustomers: dashRes.totalCustomers || 0,
+          totalProjects: dashRes.totalProjects || 0,
+          pendingInvoices: dashRes.pendingInvoices || 0,
+          openTickets: dashRes.openTickets || 0,
+          totalRevenue: dashRes.totalRevenue || 0,
+          outstanding: dashRes.outstanding || 0,
         });
       }
 
@@ -67,11 +68,18 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
     loadDashboard();
   };
 
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good Morning';
+    if (hour < 17) return 'Good Afternoon';
+    return 'Good Evening';
+  };
+
   return (
     <View style={styles.container}>
       <Header
-        title="Command Center"
-        subtitle="Solar business pipeline & executive telemetry"
+        title={`${getGreeting()}, ${user?.name ? user.name.split(' ')[0] : 'Partner'}`}
+        subtitle="Solar business pipeline & operational telemetry"
       />
 
       <ScrollView
@@ -79,7 +87,7 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
         contentContainerStyle={styles.scrollContent}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
-        {/* PIPELINE FUNNEL (CONVERTED FROM WEB APP) */}
+        {/* PIPELINE FUNNEL */}
         <View style={styles.section}>
           <Text style={styles.sectionHeaderTitle}>ACTIVE PIPELINE</Text>
           <View style={styles.funnelGrid}>
@@ -145,29 +153,31 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
           </View>
         </View>
 
-        {/* FINANCIAL REVENUE CARD (CONVERTED FROM WEB APP) */}
+        {/* FINANCIAL REVENUE CARD */}
         <View style={styles.revenueCard}>
           <View style={styles.revenueHeader}>
-            <Text style={styles.revenueTitle}>TOTAL REVENUE (YTD)</Text>
+            <Text style={styles.revenueTitle}>TOTAL REVENUE (BOOKED)</Text>
             <View style={styles.revenueBadge}>
-              <Text style={styles.revenueBadgeText}>Booked</Text>
+              <Text style={styles.revenueBadgeText}>Settled</Text>
             </View>
           </View>
 
           <Text style={styles.revenueAmount}>
-            ₹{(data.totalRevenue || 743526).toLocaleString('en-IN')}
+            ₹{(data.totalRevenue || 0).toLocaleString('en-IN')}
           </Text>
 
           <View style={styles.financialStatsRow}>
             <View>
-              <Text style={styles.statLabel}>OUTSTANDING</Text>
+              <Text style={styles.statLabel}>OUTSTANDING DUES</Text>
               <Text style={styles.statValYellow}>
-                ₹{(data.outstanding || 6252220).toLocaleString('en-IN')}
+                ₹{(data.outstanding || 0).toLocaleString('en-IN')}
               </Text>
             </View>
             <View style={{ alignItems: 'flex-end' }}>
-              <Text style={styles.statLabel}>DBT SUBSIDY CLAIMS</Text>
-              <Text style={styles.statValGreen}>₹1,84,000</Text>
+              <Text style={styles.statLabel}>OPEN TICKETS</Text>
+              <Text style={styles.statValGreen}>
+                {data.openTickets || 0} Tickets
+              </Text>
             </View>
           </View>
         </View>
@@ -221,7 +231,7 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
         {/* LIVE PROJECTS PIPELINE HIGHLIGHTS */}
         <View style={styles.section}>
           <View style={styles.sectionTitleRow}>
-            <Text style={styles.sectionHeaderTitle}>ACTIVE PROJECTS</Text>
+            <Text style={styles.sectionHeaderTitle}>RECENT PROJECTS</Text>
             <TouchableOpacity onPress={() => navigation.navigate('Projects')}>
               <Text style={styles.seeAllText}>View All ({projects.length}) →</Text>
             </TouchableOpacity>
@@ -231,10 +241,14 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
             <ActivityIndicator size="small" color={colors.primary} style={{ marginVertical: 12 }} />
           ) : projects.length === 0 ? (
             <View style={styles.emptyCard}>
-              <Text style={styles.emptyText}>No active projects found.</Text>
+              <Text style={styles.emptyIcon}>📁</Text>
+              <Text style={styles.emptyTitle}>No Active Projects</Text>
+              <Text style={styles.emptyText}>
+                Qualified leads converted to won will appear here automatically.
+              </Text>
             </View>
           ) : (
-            projects.slice(0, 3).map((prj) => (
+            projects.slice(0, 4).map((prj) => (
               <TouchableOpacity
                 key={prj.id}
                 style={styles.projectItemCard}
@@ -248,8 +262,8 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
                     {prj.capacity ? `• ${prj.capacity} kWp` : ''}
                   </Text>
                 </View>
-                <View style={styles.stageTag}>
-                  <Text style={styles.stageTagText}>{prj.currentStage || prj.status || 'Planning'}</Text>
+                <View style={styles.projectStagePill}>
+                  <Text style={styles.projectStageText}>{prj.currentStage || 'Planning'}</Text>
                 </View>
               </TouchableOpacity>
             ))
@@ -270,7 +284,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 16,
-    paddingBottom: 32,
+    paddingBottom: 40,
   },
   section: {
     marginBottom: 20,
@@ -282,17 +296,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.8,
     marginBottom: 10,
   },
-  sectionTitleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  seeAllText: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: colors.primary,
-  },
   funnelGrid: {
     gap: 8,
   },
@@ -301,7 +304,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: colors.white,
     padding: 12,
-    borderRadius: 16,
+    borderRadius: 14,
     borderLeftWidth: 4,
     borderWidth: 1,
     borderColor: '#e2e8f0',
@@ -314,10 +317,10 @@ const styles = StyleSheet.create({
   funnelIconBox: {
     width: 38,
     height: 38,
-    borderRadius: 12,
+    borderRadius: 10,
     backgroundColor: '#ecfdf5',
-    alignItems: 'center',
     justifyContent: 'center',
+    alignItems: 'center',
     marginRight: 12,
   },
   funnelCount: {
@@ -327,33 +330,35 @@ const styles = StyleSheet.create({
   },
   funnelLabel: {
     fontSize: 11,
-    fontWeight: '700',
     color: colors.slate500,
+    fontWeight: '600',
     marginTop: 1,
   },
   chevron: {
-    fontSize: 22,
-    color: colors.slate300,
+    fontSize: 20,
+    color: colors.slate400,
     fontWeight: '700',
+    paddingHorizontal: 4,
   },
   revenueCard: {
     backgroundColor: colors.slate900,
-    borderRadius: 22,
+    borderRadius: 20,
     padding: 20,
     marginBottom: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.15,
+    shadowOpacity: 0.2,
     shadowRadius: 10,
-    elevation: 5,
+    elevation: 6,
   },
   revenueHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: 8,
   },
   revenueTitle: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '800',
     color: colors.slate400,
     letterSpacing: 0.8,
@@ -365,16 +370,15 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   revenueBadgeText: {
-    color: '#34d399',
     fontSize: 10,
     fontWeight: '800',
+    color: '#34d399',
   },
   revenueAmount: {
-    fontSize: 30,
+    fontSize: 32,
     fontWeight: '900',
     color: colors.white,
-    marginVertical: 10,
-    letterSpacing: -0.5,
+    marginBottom: 16,
   },
   financialStatsRow: {
     flexDirection: 'row',
@@ -388,58 +392,69 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: colors.slate400,
     letterSpacing: 0.5,
+    marginBottom: 3,
   },
   statValYellow: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '900',
     color: '#fbbf24',
-    marginTop: 2,
   },
   statValGreen: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '900',
     color: '#34d399',
-    marginTop: 2,
   },
   quickActionsGrid: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     gap: 8,
   },
   quickActionBtn: {
     flex: 1,
     backgroundColor: colors.white,
-    paddingVertical: 12,
     borderRadius: 16,
+    paddingVertical: 14,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#e2e8f0',
   },
   actionCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     justifyContent: 'center',
-    marginBottom: 6,
+    alignItems: 'center',
+    marginBottom: 8,
   },
   actionBtnLabel: {
     fontSize: 11,
     fontWeight: '800',
-    color: colors.slate800,
+    color: colors.slate700,
   },
-  projectItemCard: {
+  sectionTitleRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: 10,
+  },
+  seeAllText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: colors.primary,
+  },
+  projectItemCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     backgroundColor: colors.white,
     padding: 14,
-    borderRadius: 16,
-    marginBottom: 8,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: '#e2e8f0',
+    marginBottom: 8,
   },
   projectName: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '800',
     color: colors.slate900,
   },
@@ -448,27 +463,38 @@ const styles = StyleSheet.create({
     color: colors.slate500,
     marginTop: 2,
   },
-  stageTag: {
+  projectStagePill: {
     backgroundColor: '#eff6ff',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#bfdbfe',
   },
-  stageTagText: {
+  projectStageText: {
     fontSize: 10,
     fontWeight: '800',
-    color: '#1d4ed8',
+    color: '#2563eb',
   },
   emptyCard: {
     backgroundColor: colors.white,
-    padding: 20,
     borderRadius: 14,
+    padding: 24,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  emptyIcon: {
+    fontSize: 32,
+    marginBottom: 8,
+  },
+  emptyTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: colors.slate800,
+    marginBottom: 4,
   },
   emptyText: {
-    color: colors.slate500,
     fontSize: 12,
+    color: colors.slate500,
+    textAlign: 'center',
   },
 });

@@ -93,6 +93,10 @@ export const crmApi = {
     const res = await apiClient.delete(`/api/tenant/leads/${id}`);
     return res.data;
   },
+  advanceLeadStage: async (id: string, stage: string) => {
+    const res = await apiClient.patch(`/api/tenant/leads/${id}/stage`, { stage });
+    return res.data;
+  },
 };
 
 // ==========================================
@@ -190,7 +194,48 @@ export const superAdminApi = {
   },
 };
 
+// ==========================================
+// 8. FINANCE & INVOICING SERVICE
+// ==========================================
+export const financeApi = {
+  getInvoices: async () => {
+    const res = await apiClient.get('/api/tenant/finance');
+    return res.data; // { finance: [...] }
+  },
+  getInvoiceDetails: async (id: string) => {
+    const res = await apiClient.get(`/api/tenant/finance/${id}`);
+    return res.data;
+  },
+};
+
+// ==========================================
+// 9. AMC & MAINTENANCE SERVICE
+// ==========================================
+export const amcApi = {
+  getAmcs: async (params?: { status?: string; customerId?: string }) => {
+    let query = '';
+    const parts: string[] = [];
+    if (params?.status) parts.push(`status=${params.status}`);
+    if (params?.customerId) parts.push(`customerId=${params.customerId}`);
+    if (parts.length > 0) query = '?' + parts.join('&');
+    const res = await apiClient.get(`/api/tenant/amcs${query}`);
+    return res.data; // { amcs: [...], metrics: {...} }
+  },
+};
+
+// ==========================================
+// 10. PROCUREMENT SERVICE
+// ==========================================
+export const procurementApi = {
+  getPurchaseOrders: async (projectId?: string) => {
+    const url = projectId ? `/api/tenant/procurement/pos?projectId=${projectId}` : '/api/tenant/procurement/pos';
+    const res = await apiClient.get(url);
+    return res.data; // { purchaseOrders: [...] }
+  },
+};
+
 // Backward-compatible aliases
 export const ownerApi = tenantApi;
 export const salesApi = crmApi;
 export const techApi = installationsApi;
+

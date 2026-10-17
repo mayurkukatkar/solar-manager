@@ -79,7 +79,7 @@ export const ProjectsScreen: React.FC = () => {
       setProjects((prev) =>
         prev.map((p) => (p.id === selectedProject.id ? { ...p, currentStage: targetStage } : p))
       );
-      Alert.alert('Stage Advanced', `Project advanced to "${targetStage}". Synced to Vercel.`);
+      Alert.alert('Stage Advanced', `Project successfully advanced to "${targetStage}".`);
       setSelectedProject(null);
     } catch (err: any) {
       // Optimistic update
@@ -196,13 +196,13 @@ export const ProjectsScreen: React.FC = () => {
                   <View>
                     <Text style={styles.metaLabel}>CONTRACT VALUE</Text>
                     <Text style={styles.metaVal}>
-                      ₹{prj.estimatedValue ? prj.estimatedValue.toLocaleString('en-IN') : '1,83,526'}
+                      ₹{prj.estimatedValue ? prj.estimatedValue.toLocaleString('en-IN') : prj.capacity ? (prj.capacity * 60000).toLocaleString('en-IN') : 'Pending'}
                     </Text>
                   </View>
 
                   <View style={{ alignItems: 'flex-end' }}>
                     <Text style={styles.metaLabel}>LOCATION</Text>
-                    <Text style={styles.metaVal}>{prj.city || 'Nagpur, MH'}</Text>
+                    <Text style={styles.metaVal}>{prj.city || prj.address || 'Site Location'}</Text>
                   </View>
                 </View>
 

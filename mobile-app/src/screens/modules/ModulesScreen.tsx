@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { Header } from '../../components/Header';
 import { colors } from '../../theme/colors';
-import { quotationsApi, superAdminApi } from '../../api/endpoints';
+import { quotationsApi, superAdminApi, tenantApi, financeApi, amcApi } from '../../api/endpoints';
 import { useAuth } from '../../context/AuthContext';
 import { Quotation, Tenant } from '../../types';
 
@@ -26,9 +26,25 @@ export const ModulesScreen: React.FC<{ route?: any; navigation?: any }> = ({ rou
   );
 
   // 60-Second Quotation Calculator State
-  const [monthlyUnits, setMonthlyUnits] = useState('420');
+  const [monthlyUnits, setMonthlyUnits] = useState('400');
   const [quotations, setQuotations] = useState<Quotation[]>([]);
   const [loadingQuotes, setLoadingQuotes] = useState(false);
+
+  // Finance State
+  const [financeData, setFinanceData] = useState<{
+    totalRevenue: number;
+    outstanding: number;
+    invoices: any[];
+  }>({
+    totalRevenue: 0,
+    outstanding: 0,
+    invoices: [],
+  });
+  const [loadingFinance, setLoadingFinance] = useState(false);
+
+  // AMC State
+  const [amcs, setAmcs] = useState<any[]>([]);
+  const [loadingAmcs, setLoadingAmcs] = useState(false);
 
   // Super Admin Tenants State
   const [tenants, setTenants] = useState<Tenant[]>([]);
@@ -63,6 +79,39 @@ export const ModulesScreen: React.FC<{ route?: any; navigation?: any }> = ({ rou
     }
   };
 
+  const fetchFinance = async () => {
+    setLoadingFinance(true);
+    try {
+      const [dash, fin] = await Promise.all([
+        tenantApi.getDashboard().catch(() => null),
+        financeApi.getInvoices().catch(() => null),
+      ]);
+      setFinanceData({
+        totalRevenue: dash?.totalRevenue || 0,
+        outstanding: dash?.outstanding || 0,
+        invoices: fin?.finance || [],
+      });
+    } catch (err: any) {
+      console.warn('Finance error:', err.message);
+    } finally {
+      setLoadingFinance(false);
+    }
+  };
+
+  const fetchAmcs = async () => {
+    setLoadingAmcs(true);
+    try {
+      const res = await amcApi.getAmcs();
+      if (res && Array.isArray(res.amcs)) {
+        setAmcs(res.amcs);
+      }
+    } catch (err: any) {
+      console.warn('AMC error:', err.message);
+    } finally {
+      setLoadingAmcs(false);
+    }
+  };
+
   const fetchTenants = async () => {
     setLoadingTenants(true);
     try {
@@ -80,6 +129,8 @@ export const ModulesScreen: React.FC<{ route?: any; navigation?: any }> = ({ rou
   const handleOpenModule = (id: string) => {
     setActiveSubModule(id);
     if (id === 'QUOTES') fetchQuotations();
+    if (id === 'FINANCE') fetchFinance();
+    if (id === 'AMC') fetchAmcs();
     if (id === 'SUPER_ADMIN') fetchTenants();
   };
 
@@ -95,7 +146,7 @@ Customer Estimate from *${user?.tenantName || 'Solar ERP'}*:
 📈 *Monthly Electricity Savings:* ~₹${monthlySavings.toLocaleString('en-IN')}/month
 ⏱️ *Full Payback Period:* ~${paybackYears} Years (Free solar power thereafter for 25 Years!)
 
-Contact us to schedule a 3D Site Survey!`;
+Contact us to schedule a site survey!`;
 
     Linking.openURL(`whatsapp://send?text=${encodeURIComponent(text)}`).catch(() => {
       Alert.alert('Notice', 'Unable to launch WhatsApp directly.');
@@ -138,7 +189,7 @@ Contact us to schedule a 3D Site Survey!`;
           </TouchableOpacity>
         </View>
 
-        {/* GROUP 2: FINANCE & INVENTORY */}
+        {/* GROUP 2: FINANCE & SUPPLY CHAIN */}
         <Text style={styles.groupTitle}>FINANCE & SUPPLY CHAIN</Text>
         <View style={styles.modulesGrid}>
           <TouchableOpacity
@@ -161,8 +212,8 @@ Contact us to schedule a 3D Site Survey!`;
             <View style={[styles.moduleIconBox, { backgroundColor: '#eef2ff' }]}>
               <Text style={{ fontSize: 24 }}>📦</Text>
             </View>
-            <Text style={styles.moduleName}>Inventory & Stock</Text>
-            <Text style={styles.moduleDesc}>PV modules, inverters, cables & warehouse levels</Text>
+            <Text style={styles.moduleName}>Inventory & Materials</Text>
+            <Text style={styles.moduleDesc}>PV modules, inverters, cabling & balance of system</Text>
           </TouchableOpacity>
         </View>
 
@@ -178,7 +229,7 @@ Contact us to schedule a 3D Site Survey!`;
               <Text style={{ fontSize: 24 }}>🛠️</Text>
             </View>
             <Text style={styles.moduleName}>AMC & Support</Text>
-            <Text style={styles.moduleDesc}>Preventive maintenance visits & service tickets</Text>
+            <Text style={styles.moduleDesc}>Preventive maintenance visits & service contracts</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -189,29 +240,33 @@ Contact us to schedule a 3D Site Survey!`;
             <View style={[styles.moduleIconBox, { backgroundColor: '#f3e8ff' }]}>
               <Text style={{ fontSize: 24 }}>📂</Text>
             </View>
-            <Text style={styles.moduleName}>Documents</Text>
+            <Text style={styles.moduleName}>Documents & Compliance</Text>
             <Text style={styles.moduleDesc}>Aadhaar, electricity bills, test reports & sign-offs</Text>
           </TouchableOpacity>
         </View>
 
-        {/* GROUP 4: PLATFORM SUPER ADMIN (AVAILABLE TO ALL OR SUPER ADMIN) */}
-        <Text style={styles.groupTitle}>PLATFORM ADMINISTRATION</Text>
-        <View style={styles.modulesGrid}>
-          <TouchableOpacity
-            style={styles.moduleCard}
-            onPress={() => handleOpenModule('SUPER_ADMIN')}
-            activeOpacity={0.8}
-          >
-            <View style={[styles.moduleIconBox, { backgroundColor: '#fdf4ff' }]}>
-              <Text style={{ fontSize: 24 }}>🏢</Text>
+        {/* GROUP 4: PLATFORM SUPER ADMIN (VISIBLE ONLY TO SUPER ADMIN USERS) */}
+        {user?.role === 'SUPER_ADMIN' && (
+          <>
+            <Text style={styles.groupTitle}>PLATFORM GOVERNANCE</Text>
+            <View style={styles.modulesGrid}>
+              <TouchableOpacity
+                style={styles.moduleCard}
+                onPress={() => handleOpenModule('SUPER_ADMIN')}
+                activeOpacity={0.8}
+              >
+                <View style={[styles.moduleIconBox, { backgroundColor: '#fdf4ff' }]}>
+                  <Text style={{ fontSize: 24 }}>👑</Text>
+                </View>
+                <Text style={styles.moduleName}>Platform Super Admin</Text>
+                <Text style={styles.moduleDesc}>Global tenant roster, provisioning & platform telemetry</Text>
+              </TouchableOpacity>
             </View>
-            <Text style={styles.moduleName}>Tenants & Platform</Text>
-            <Text style={styles.moduleDesc}>Multi-tenant ERP management & subscriptions</Text>
-          </TouchableOpacity>
-        </View>
+          </>
+        )}
       </ScrollView>
 
-      {/* SUB-MODULE MODAL */}
+      {/* SUB-MODULE DETAIL MODAL */}
       <Modal visible={!!activeSubModule} animationType="slide">
         <View style={styles.subModalContainer}>
           <View style={styles.subModalHeader}>
@@ -220,8 +275,8 @@ Contact us to schedule a 3D Site Survey!`;
                 {activeSubModule === 'QUOTES' && 'Quotations & Proposal Engine'}
                 {activeSubModule === 'SUBSIDY' && 'PM Surya Ghar DBT Subsidy'}
                 {activeSubModule === 'FINANCE' && 'Finance & Billing Telemetry'}
-                {activeSubModule === 'INVENTORY' && 'Inventory & Warehousing'}
-                {activeSubModule === 'AMC' && 'AMC & Service Tickets'}
+                {activeSubModule === 'INVENTORY' && 'Inventory & Materials'}
+                {activeSubModule === 'AMC' && 'AMC & Service Agreements'}
                 {activeSubModule === 'DOCUMENTS' && 'Document Repository & Verification'}
                 {activeSubModule === 'SUPER_ADMIN' && 'Platform Administration (Super Admin)'}
               </Text>
@@ -328,17 +383,17 @@ Contact us to schedule a 3D Site Survey!`;
 
                 <View style={styles.subsidyStageCard}>
                   <Text style={styles.subsidyStageTitle}>1. Consumer Registration & Sanction</Text>
-                  <Text style={styles.subsidyStageStatus}>✓ Verified with Mahavitaran / MSEDCL</Text>
+                  <Text style={styles.subsidyStageStatus}>✓ Verified with State DISCOM</Text>
                 </View>
 
                 <View style={styles.subsidyStageCard}>
                   <Text style={styles.subsidyStageTitle}>2. Technical Feasibility & Approval</Text>
-                  <Text style={styles.subsidyStageStatus}>✓ Approved for Grid Sync</Text>
+                  <Text style={styles.subsidyStageStatus}>✓ Approved for Grid Synchronization</Text>
                 </View>
 
                 <View style={styles.subsidyStageCard}>
                   <Text style={styles.subsidyStageTitle}>3. Installation & DCR Verification</Text>
-                  <Text style={styles.subsidyStageStatus}>⚡ In Progress (Modules scanned)</Text>
+                  <Text style={styles.subsidyStageStatus}>⚡ In Progress (Domestic Content Verified)</Text>
                 </View>
 
                 <View style={styles.subsidyStageCard}>
@@ -357,30 +412,46 @@ Contact us to schedule a 3D Site Survey!`;
             {activeSubModule === 'FINANCE' && (
               <View>
                 <Text style={styles.cardSectionHeader}>Financial & Milestone Billing Overview</Text>
-                <View style={styles.financeMetricsRow}>
-                  <View style={[styles.financeMetricCard, { backgroundColor: colors.slate900 }]}>
-                    <Text style={styles.financeMetricLabel}>TOTAL REVENUE YTD</Text>
-                    <Text style={styles.financeMetricVal}>₹7,43,526</Text>
+                {loadingFinance ? (
+                  <ActivityIndicator size="small" color={colors.primary} style={{ marginVertical: 12 }} />
+                ) : (
+                  <View style={styles.financeMetricsRow}>
+                    <View style={[styles.financeMetricCard, { backgroundColor: colors.slate900 }]}>
+                      <Text style={styles.financeMetricLabel}>TOTAL REVENUE BOOKED</Text>
+                      <Text style={styles.financeMetricVal}>
+                        ₹{financeData.totalRevenue.toLocaleString('en-IN')}
+                      </Text>
+                    </View>
+                    <View style={[styles.financeMetricCard, { backgroundColor: '#d97706' }]}>
+                      <Text style={styles.financeMetricLabel}>OUTSTANDING DUES</Text>
+                      <Text style={styles.financeMetricVal}>
+                        ₹{financeData.outstanding.toLocaleString('en-IN')}
+                      </Text>
+                    </View>
                   </View>
-                  <View style={[styles.financeMetricCard, { backgroundColor: '#d97706' }]}>
-                    <Text style={styles.financeMetricLabel}>OUTSTANDING</Text>
-                    <Text style={styles.financeMetricVal}>₹62,52,220</Text>
-                  </View>
-                </View>
+                )}
 
-                <Text style={[styles.cardSectionHeader, { marginTop: 20 }]}>Payment Milestones Template</Text>
-                <View style={styles.milestoneItem}>
-                  <Text style={styles.milestoneTitle}>1. Advance Booking (10%)</Text>
-                  <Text style={styles.milestoneSub}>Upon signing solar proposal</Text>
-                </View>
-                <View style={styles.milestoneItem}>
-                  <Text style={styles.milestoneTitle}>2. Material Dispatch (70%)</Text>
-                  <Text style={styles.milestoneSub}>Delivery of PV modules, inverter & structure</Text>
-                </View>
-                <View style={styles.milestoneItem}>
-                  <Text style={styles.milestoneTitle}>3. Testing & Commissioning (20%)</Text>
-                  <Text style={styles.milestoneSub}>Net-meter installation & Discom energization</Text>
-                </View>
+                <Text style={[styles.cardSectionHeader, { marginTop: 20 }]}>Invoices ({financeData.invoices.length})</Text>
+                {financeData.invoices.length === 0 ? (
+                  <View style={styles.emptyCard}>
+                    <Text style={styles.emptyText}>No invoices issued yet.</Text>
+                  </View>
+                ) : (
+                  financeData.invoices.map((inv: any) => (
+                    <View key={inv.id} style={styles.quoteCard}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.quoteNumber}>{inv.invoiceNumber || 'INV-2026'}</Text>
+                        <Text style={styles.quoteCustomer}>{inv.customer?.name || 'Customer'}</Text>
+                      </View>
+                      <View style={{ alignItems: 'flex-end' }}>
+                        <Text style={styles.quoteTotal}>₹{(inv.amount || 0).toLocaleString('en-IN')}</Text>
+                        <Text style={[styles.quoteStatus, inv.status === 'PAID' && { color: '#059669' }]}>
+                          {inv.status || 'UNPAID'}
+                        </Text>
+                      </View>
+                    </View>
+                  ))
+                )}
               </View>
             )}
 
@@ -388,36 +459,43 @@ Contact us to schedule a 3D Site Survey!`;
             {activeSubModule === 'INVENTORY' && (
               <View>
                 <Text style={styles.cardSectionHeader}>Stock & Materials Management</Text>
-                <View style={styles.inventoryItem}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.invTitle}>Adani Solar Bifacial 540Wp</Text>
-                    <Text style={styles.invCategory}>Category: PV Module (DCR)</Text>
-                  </View>
-                  <Text style={styles.invStock}>48 in stock</Text>
+                <View style={styles.infoBanner}>
+                  <Text style={styles.infoTitle}>Warehouse Stock & Logistics</Text>
+                  <Text style={styles.infoText}>
+                    Track tier-1 DCR solar panels, grid-tie inverters, DC cables, and mounting structures.
+                  </Text>
                 </View>
 
                 <View style={styles.inventoryItem}>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.invTitle}>Polycab 3.3kW On-Grid Inverter</Text>
-                    <Text style={styles.invCategory}>Category: Solar Inverter</Text>
+                    <Text style={styles.invTitle}>Monocrystalline Bifacial PV Modules</Text>
+                    <Text style={styles.invCategory}>Category: DCR Solar Panels</Text>
                   </View>
-                  <Text style={styles.invStock}>12 in stock</Text>
+                  <Text style={styles.invStock}>Active Stock</Text>
                 </View>
 
                 <View style={styles.inventoryItem}>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.invTitle}>4 sq.mm UV Solar DC Cable (Red/Black)</Text>
+                    <Text style={styles.invTitle}>Grid-Tied Solar Inverters (Single/Three Phase)</Text>
+                    <Text style={styles.invCategory}>Category: Power Electronics</Text>
+                  </View>
+                  <Text style={styles.invStock}>Active Stock</Text>
+                </View>
+
+                <View style={styles.inventoryItem}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.invTitle}>4 sq.mm UV-Resistant Solar DC Cable</Text>
                     <Text style={styles.invCategory}>Category: Balance of System</Text>
                   </View>
-                  <Text style={styles.invStock}>850 meters</Text>
+                  <Text style={styles.invStock}>Active Stock</Text>
                 </View>
 
                 <View style={styles.inventoryItem}>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.invTitle}>Chemical Earthing Compound (25kg)</Text>
-                    <Text style={styles.invCategory}>Category: Earthing & Safety</Text>
+                    <Text style={styles.invTitle}>Chemical Earthing Compound & Electrodes</Text>
+                    <Text style={styles.invCategory}>Category: Safety & Grounding</Text>
                   </View>
-                  <Text style={styles.invStock}>24 bags</Text>
+                  <Text style={styles.invStock}>Active Stock</Text>
                 </View>
               </View>
             )}
@@ -426,27 +504,28 @@ Contact us to schedule a 3D Site Survey!`;
             {activeSubModule === 'AMC' && (
               <View>
                 <Text style={styles.cardSectionHeader}>Active Maintenance Contracts & Service</Text>
-                <View style={styles.amcCard}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.amcTitle}>Comprehensive AMC (5 Years)</Text>
-                    <Text style={styles.amcClient}>Kawale Residence (5 kWp System)</Text>
-                    <Text style={styles.amcDate}>Next Scheduled Cleaning: 25 Oct 2026</Text>
+                {loadingAmcs ? (
+                  <ActivityIndicator size="small" color={colors.primary} style={{ marginVertical: 12 }} />
+                ) : amcs.length === 0 ? (
+                  <View style={styles.emptyCard}>
+                    <Text style={styles.emptyText}>
+                      No active AMC agreements yet. Solar maintenance packages will appear here once registered.
+                    </Text>
                   </View>
-                  <View style={styles.amcBadge}>
-                    <Text style={styles.amcBadgeText}>ACTIVE</Text>
-                  </View>
-                </View>
-
-                <View style={styles.amcCard}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.amcTitle}>Standard Inverter Warranty AMC</Text>
-                    <Text style={styles.amcClient}>Thakre Rooftop (3.3 kWp System)</Text>
-                    <Text style={styles.amcDate}>Health Check: Bi-Annual</Text>
-                  </View>
-                  <View style={styles.amcBadge}>
-                    <Text style={styles.amcBadgeText}>ACTIVE</Text>
-                  </View>
-                </View>
+                ) : (
+                  amcs.map((amc: any) => (
+                    <View key={amc.id} style={styles.amcCard}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.amcTitle}>{amc.planName || 'Comprehensive Solar AMC'}</Text>
+                        <Text style={styles.amcClient}>{amc.customer?.name || 'Customer'}</Text>
+                        <Text style={styles.amcDate}>Status: {amc.status}</Text>
+                      </View>
+                      <View style={styles.amcBadge}>
+                        <Text style={styles.amcBadgeText}>{amc.status || 'ACTIVE'}</Text>
+                      </View>
+                    </View>
+                  ))
+                )}
               </View>
             )}
 
@@ -456,36 +535,36 @@ Contact us to schedule a 3D Site Survey!`;
                 <Text style={styles.cardSectionHeader}>Document Verification & Readiness</Text>
                 <View style={styles.docItem}>
                   <Text style={styles.docName}>📄 Customer Aadhaar Card</Text>
-                  <Text style={styles.docStatus}>✓ Verified</Text>
+                  <Text style={styles.docStatus}>Mandatory</Text>
                 </View>
                 <View style={styles.docItem}>
-                  <Text style={styles.docName}>📄 Latest Electricity Bill (MSEDCL)</Text>
-                  <Text style={styles.docStatus}>✓ Verified</Text>
+                  <Text style={styles.docName}>📄 Latest Electricity Bill</Text>
+                  <Text style={styles.docStatus}>Mandatory</Text>
                 </View>
                 <View style={styles.docItem}>
-                  <Text style={styles.docName}>📄 Property Tax Receipt / Index II</Text>
-                  <Text style={styles.docStatus}>✓ Verified</Text>
+                  <Text style={styles.docName}>📄 Property Tax Receipt / Ownership Proof</Text>
+                  <Text style={styles.docStatus}>Mandatory</Text>
                 </View>
                 <View style={styles.docItem}>
-                  <Text style={styles.docName}>📄 Customer Cancelled Cheque (DBT Subsidy)</Text>
-                  <Text style={styles.docStatus}>✓ Verified</Text>
+                  <Text style={styles.docName}>📄 Cancelled Bank Cheque (CFA Subsidy)</Text>
+                  <Text style={styles.docStatus}>Mandatory</Text>
                 </View>
                 <View style={styles.docItem}>
-                  <Text style={styles.docName}>📄 Work Completion Report (WCR)</Text>
-                  <Text style={[styles.docStatus, { color: '#f59e0b' }]}>⏳ Pending Inspection</Text>
+                  <Text style={styles.docName}>📄 Work Completion & Commissioning Report</Text>
+                  <Text style={[styles.docStatus, { color: '#f59e0b' }]}>Post-Install</Text>
                 </View>
               </View>
             )}
 
             {/* 7. SUPER ADMIN TENANTS */}
-            {activeSubModule === 'SUPER_ADMIN' && (
+            {activeSubModule === 'SUPER_ADMIN' && user?.role === 'SUPER_ADMIN' && (
               <View>
                 <Text style={styles.cardSectionHeader}>Platform Tenants Management</Text>
                 {loadingTenants ? (
                   <ActivityIndicator size="small" color={colors.primary} style={{ marginVertical: 12 }} />
                 ) : tenants.length === 0 ? (
                   <View style={styles.emptyCard}>
-                    <Text style={styles.emptyText}>No registered tenants.</Text>
+                    <Text style={styles.emptyText}>No registered tenants found.</Text>
                   </View>
                 ) : (
                   tenants.map((t) => (
@@ -604,7 +683,7 @@ const styles = StyleSheet.create({
     color: colors.slate700,
   },
   cardSectionHeader: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '900',
     color: colors.slate900,
     marginBottom: 12,
@@ -612,14 +691,14 @@ const styles = StyleSheet.create({
   calcBox: {
     backgroundColor: colors.white,
     borderRadius: 18,
-    padding: 16,
+    padding: 18,
     borderWidth: 1,
     borderColor: '#e2e8f0',
   },
   inputLabel: {
     fontSize: 10,
     fontWeight: '800',
-    color: colors.slate400,
+    color: colors.slate500,
     letterSpacing: 0.5,
     marginBottom: 6,
   },
@@ -628,9 +707,10 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: '#e2e8f0',
     borderRadius: 12,
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
     paddingVertical: 10,
-    fontSize: 14,
+    fontSize: 16,
+    fontWeight: '800',
     color: colors.slate900,
     marginBottom: 14,
   },
@@ -639,13 +719,12 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 14,
     gap: 8,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
     marginBottom: 14,
   },
   breakdownRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
   },
   breakdownLabel: {
     fontSize: 12,
@@ -653,28 +732,28 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   breakdownVal: {
-    fontSize: 12,
-    fontWeight: '700',
+    fontSize: 13,
+    fontWeight: '800',
     color: colors.slate900,
   },
   breakdownBold: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '900',
     color: colors.slate900,
   },
   netLabel: {
     fontSize: 13,
     fontWeight: '900',
-    color: colors.primary,
+    color: colors.slate900,
   },
   netVal: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '900',
     color: colors.primary,
   },
   whatsappBtn: {
-    backgroundColor: '#25D366',
-    paddingVertical: 12,
+    backgroundColor: '#10b981',
+    paddingVertical: 14,
     borderRadius: 12,
     alignItems: 'center',
   },
@@ -690,18 +769,18 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
     padding: 14,
     borderRadius: 14,
-    marginBottom: 8,
     borderWidth: 1,
     borderColor: '#e2e8f0',
+    marginBottom: 8,
   },
   quoteNumber: {
     fontSize: 13,
-    fontWeight: '800',
-    color: colors.primary,
+    fontWeight: '900',
+    color: colors.slate900,
   },
   quoteCustomer: {
-    fontSize: 12,
-    color: colors.slate600,
+    fontSize: 11,
+    color: colors.slate500,
     marginTop: 2,
   },
   quoteTotal: {
@@ -712,46 +791,46 @@ const styles = StyleSheet.create({
   quoteStatus: {
     fontSize: 10,
     fontWeight: '800',
-    color: '#047857',
+    color: colors.slate500,
     marginTop: 2,
   },
   infoBanner: {
     backgroundColor: '#eff6ff',
     borderRadius: 14,
     padding: 14,
-    marginBottom: 14,
     borderWidth: 1,
     borderColor: '#bfdbfe',
+    marginBottom: 14,
   },
   infoTitle: {
     fontSize: 13,
-    fontWeight: '800',
-    color: '#1d4ed8',
+    fontWeight: '900',
+    color: '#1e40af',
+    marginBottom: 4,
   },
   infoText: {
     fontSize: 11,
-    color: '#3b82f6',
-    marginTop: 3,
+    color: '#1e3a8a',
     lineHeight: 16,
   },
   subsidyStageCard: {
     backgroundColor: colors.white,
     borderRadius: 14,
     padding: 14,
-    marginBottom: 8,
     borderWidth: 1,
     borderColor: '#e2e8f0',
+    marginBottom: 8,
   },
   subsidyStageTitle: {
     fontSize: 13,
     fontWeight: '800',
     color: colors.slate900,
+    marginBottom: 4,
   },
   subsidyStageStatus: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#047857',
-    marginTop: 4,
+    color: '#059669',
   },
   financeMetricsRow: {
     flexDirection: 'row',
@@ -760,38 +839,20 @@ const styles = StyleSheet.create({
   },
   financeMetricCard: {
     flex: 1,
-    padding: 16,
-    borderRadius: 16,
+    borderRadius: 14,
+    padding: 14,
   },
   financeMetricLabel: {
     fontSize: 9,
     fontWeight: '800',
-    color: 'rgba(255,255,255,0.7)',
+    color: 'rgba(255, 255, 255, 0.7)',
     letterSpacing: 0.5,
+    marginBottom: 4,
   },
   financeMetricVal: {
     fontSize: 18,
     fontWeight: '900',
     color: colors.white,
-    marginTop: 4,
-  },
-  milestoneItem: {
-    backgroundColor: colors.white,
-    padding: 12,
-    borderRadius: 12,
-    marginBottom: 6,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  milestoneTitle: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: colors.slate900,
-  },
-  milestoneSub: {
-    fontSize: 11,
-    color: colors.slate500,
-    marginTop: 2,
   },
   inventoryItem: {
     flexDirection: 'row',
@@ -800,9 +861,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
     padding: 14,
     borderRadius: 14,
-    marginBottom: 8,
     borderWidth: 1,
     borderColor: '#e2e8f0',
+    marginBottom: 8,
   },
   invTitle: {
     fontSize: 13,
@@ -810,14 +871,18 @@ const styles = StyleSheet.create({
     color: colors.slate900,
   },
   invCategory: {
-    fontSize: 11,
+    fontSize: 10,
     color: colors.slate500,
     marginTop: 2,
   },
   invStock: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '800',
-    color: colors.primary,
+    color: '#059669',
+    backgroundColor: '#ecfdf5',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
   },
   amcCard: {
     flexDirection: 'row',
@@ -826,9 +891,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
     padding: 14,
     borderRadius: 14,
-    marginBottom: 8,
     borderWidth: 1,
     borderColor: '#e2e8f0',
+    marginBottom: 8,
   },
   amcTitle: {
     fontSize: 13,
@@ -837,13 +902,12 @@ const styles = StyleSheet.create({
   },
   amcClient: {
     fontSize: 11,
-    color: colors.slate600,
+    color: colors.slate500,
     marginTop: 2,
   },
   amcDate: {
     fontSize: 10,
-    color: colors.primary,
-    fontWeight: '700',
+    color: colors.slate400,
     marginTop: 2,
   },
   amcBadge: {
@@ -855,7 +919,7 @@ const styles = StyleSheet.create({
   amcBadgeText: {
     fontSize: 10,
     fontWeight: '800',
-    color: '#047857',
+    color: '#059669',
   },
   docItem: {
     flexDirection: 'row',
@@ -863,20 +927,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: colors.white,
     padding: 14,
-    borderRadius: 12,
-    marginBottom: 6,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: '#e2e8f0',
+    marginBottom: 8,
   },
   docName: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: colors.slate800,
+    fontSize: 13,
+    fontWeight: '800',
+    color: colors.slate900,
   },
   docStatus: {
     fontSize: 11,
     fontWeight: '800',
-    color: '#047857',
+    color: colors.slate600,
   },
   tenantCard: {
     flexDirection: 'row',
@@ -885,13 +949,13 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
     padding: 14,
     borderRadius: 14,
-    marginBottom: 8,
     borderWidth: 1,
     borderColor: '#e2e8f0',
+    marginBottom: 8,
   },
   tenantName: {
     fontSize: 14,
-    fontWeight: '800',
+    fontWeight: '900',
     color: colors.slate900,
   },
   tenantMeta: {
@@ -900,7 +964,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   tenantEmail: {
-    fontSize: 11,
+    fontSize: 10,
     color: colors.slate400,
     marginTop: 1,
   },
@@ -913,16 +977,19 @@ const styles = StyleSheet.create({
   tenantStatusText: {
     fontSize: 10,
     fontWeight: '800',
-    color: '#047857',
+    color: '#059669',
   },
   emptyCard: {
     backgroundColor: colors.white,
-    padding: 20,
     borderRadius: 14,
+    padding: 24,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
   },
   emptyText: {
-    color: colors.slate500,
     fontSize: 12,
+    color: colors.slate500,
+    textAlign: 'center',
   },
 });

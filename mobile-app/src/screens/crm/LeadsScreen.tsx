@@ -50,7 +50,7 @@ export const LeadsScreen: React.FC<{ route?: any }> = ({ route }) => {
     mobile: '',
     email: '',
     company: '',
-    city: 'Nagpur',
+    city: '',
     estimatedCap: '3',
     monthlyBill: '3500',
   });
@@ -74,10 +74,10 @@ export const LeadsScreen: React.FC<{ route?: any }> = ({ route }) => {
           mobile: l.mobile,
           email: l.email || undefined,
           company: l.company || undefined,
-          city: l.city || 'Nagpur',
+          city: l.city || 'Site Location',
           recommendedKw: l.estimatedCap || 3,
           estimatedCost: l.estimatedValue || (l.estimatedCap ? l.estimatedCap * 60000 : 180000),
-          subsidyAmount: (l.estimatedCap || 3) >= 3 ? 78000 : 60000,
+          subsidyAmount: (l.estimatedCap || 3) >= 3 ? 78000 : (l.estimatedCap || 3) >= 2 ? 60000 : 30000,
           stage: l.status || 'NEW',
           status: l.status || 'NEW',
           createdAt: l.createdAt ? new Date(l.createdAt).toLocaleDateString() : 'Recent',
@@ -131,7 +131,7 @@ export const LeadsScreen: React.FC<{ route?: any }> = ({ route }) => {
         mobile: '',
         email: '',
         company: '',
-        city: 'Nagpur',
+        city: '',
         estimatedCap: '3',
         monthlyBill: '3500',
       });
@@ -361,7 +361,7 @@ Let's schedule your site survey today!`;
                 <Text style={styles.inputLabel}>CITY</Text>
                 <TextInput
                   style={styles.input}
-                  placeholder="Nagpur"
+                  placeholder="e.g. Mumbai, Pune"
                   value={newLeadForm.city}
                   onChangeText={(t) => setNewLeadForm({ ...newLeadForm, city: t })}
                 />

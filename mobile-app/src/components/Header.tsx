@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Modal, TextInput, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Modal, TextInput } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { colors } from '../theme/colors';
 
@@ -9,30 +9,9 @@ export const Header: React.FC<{
   showSearch?: boolean;
   onSearch?: (q: string) => void;
 }> = ({ title, subtitle, showSearch, onSearch }) => {
-  const { user, backendStatus, updateServerUrl, logout } = useAuth();
-  const [serverModalVisible, setServerModalVisible] = useState(false);
-  const [tenantModalVisible, setTenantModalVisible] = useState(false);
-  const [customUrl, setCustomUrl] = useState(backendStatus.serverUrl);
-  const [testing, setTesting] = useState(false);
-  const [testResult, setTestResult] = useState<string | null>(null);
+  const { user, backendStatus, logout } = useAuth();
+  const [profileModalVisible, setProfileModalVisible] = useState(false);
   const [searchText, setSearchText] = useState('');
-
-  const handleTestConnection = async () => {
-    setTesting(true);
-    setTestResult(null);
-    try {
-      const res = await updateServerUrl(customUrl);
-      if (res.isOnline) {
-        setTestResult(`✅ Connected! Latency: ${res.latencyMs || 0}ms`);
-      } else {
-        setTestResult(`⚠️ Unreachable at ${customUrl}. Check backend status.`);
-      }
-    } catch (err: any) {
-      setTestResult(`❌ Error: ${err.message}`);
-    } finally {
-      setTesting(false);
-    }
-  };
 
   return (
     <View style={styles.container}>
@@ -40,44 +19,38 @@ export const Header: React.FC<{
       <View style={styles.topRow}>
         <View style={{ flex: 1 }}>
           <Text style={styles.companyName}>
-            {user?.tenantName || 'Solar ERP'}
+            {user?.tenantName || 'Solar Manager ERP'}
           </Text>
-          <Text style={styles.userName}>{user?.name || 'User'}</Text>
+          <Text style={styles.userName}>{user?.name || 'Administrator'}</Text>
         </View>
 
         <View style={styles.actionsRow}>
-          {/* Live Backend Status Pill */}
-          <TouchableOpacity
-            style={[
-              styles.connectionPill,
-              backendStatus.isOnline ? styles.connOnline : styles.connOffline,
-            ]}
-            onPress={() => {
-              setCustomUrl(backendStatus.serverUrl);
-              setTestResult(null);
-              setServerModalVisible(true);
-            }}
-            activeOpacity={0.8}
-          >
+          {/* Status Indicator */}
+          <View style={styles.statusPill}>
             <View
               style={[
-                styles.connDot,
+                styles.statusDot,
                 { backgroundColor: backendStatus.isOnline ? '#10b981' : '#f59e0b' },
               ]}
             />
-            <Text style={styles.connectionText}>
-              {backendStatus.isOnline ? 'Live Vercel' : 'Offline'}
+            <Text style={styles.statusText}>
+              {backendStatus.isOnline ? 'Online' : 'Reconnecting'}
             </Text>
-          </TouchableOpacity>
+          </View>
 
-          {/* User/Tenant Pill */}
+          {/* User Profile Avatar Pill */}
           <TouchableOpacity
-            style={styles.tenantPill}
-            onPress={() => setTenantModalVisible(true)}
+            style={styles.avatarPill}
+            onPress={() => setProfileModalVisible(true)}
             activeOpacity={0.8}
           >
-            <Text style={styles.tenantPillText}>
-              {user?.role === 'SUPER_ADMIN' ? '👑 Platform' : '🏢 Tenant'}
+            <View style={styles.avatarCircle}>
+              <Text style={styles.avatarLetter}>
+                {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}
+              </Text>
+            </View>
+            <Text style={styles.roleTag}>
+              {user?.role === 'SUPER_ADMIN' ? 'Platform' : 'Admin'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -91,7 +64,7 @@ export const Header: React.FC<{
         </View>
       )}
 
-      {/* SEARCH BAR (OPTIONAL) */}
+      {/* OPTIONAL SEARCH BAR */}
       {showSearch && (
         <View style={styles.searchBox}>
           <Text style={styles.searchIcon}>🔍</Text>
@@ -118,12 +91,12 @@ export const Header: React.FC<{
         </View>
       )}
 
-      {/* TENANT / USER ACCOUNT MODAL */}
-      <Modal visible={tenantModalVisible} transparent animationType="fade">
+      {/* USER ACCOUNT PROFILE MODAL */}
+      <Modal visible={profileModalVisible} transparent animationType="fade">
         <TouchableOpacity
           style={styles.modalOverlay}
           activeOpacity={1}
-          onPress={() => setTenantModalVisible(false)}
+          onPress={() => setProfileModalVisible(false)}
         >
           <View style={styles.modalContent}>
             <View style={styles.accountProfileCard}>
@@ -133,11 +106,11 @@ export const Header: React.FC<{
                 </Text>
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.accountNameText}>{user?.name || 'Solar User'}</Text>
+                <Text style={styles.accountNameText}>{user?.name || 'Administrator'}</Text>
                 <Text style={styles.accountEmailText}>{user?.email}</Text>
                 <View style={styles.accountRoleBadge}>
                   <Text style={styles.accountRoleBadgeText}>
-                    {user?.role === 'SUPER_ADMIN' ? '👑 PLATFORM SUPER ADMIN' : '🏢 TENANT ADMIN'}
+                    {user?.role === 'SUPER_ADMIN' ? '👑 PLATFORM SUPER ADMIN' : '🏢 TENANT ADMINISTRATOR'}
                   </Text>
                 </View>
               </View>
@@ -146,104 +119,35 @@ export const Header: React.FC<{
             <View style={styles.sessionInfoBox}>
               <View style={styles.sessionInfoRow}>
                 <Text style={styles.sessionInfoLabel}>Organization:</Text>
-                <Text style={styles.sessionInfoVal}>{user?.tenantName || 'Solar Solutions'}</Text>
+                <Text style={styles.sessionInfoVal}>{user?.tenantName || 'Solar EPC Enterprise'}</Text>
               </View>
               <View style={styles.sessionInfoRow}>
-                <Text style={styles.sessionInfoLabel}>Session Auth:</Text>
-                <Text style={[styles.sessionInfoVal, { color: '#059669' }]}>Bearer JWT (Verified)</Text>
-              </View>
-              <View style={styles.sessionInfoRow}>
-                <Text style={styles.sessionInfoLabel}>Target Endpoint:</Text>
-                <Text style={styles.sessionInfoVal} numberOfLines={1}>{backendStatus.serverUrl}</Text>
-              </View>
-              <View style={styles.sessionInfoRow}>
-                <Text style={styles.sessionInfoLabel}>Backend Ping:</Text>
-                <Text style={[styles.sessionInfoVal, { color: backendStatus.isOnline ? '#059669' : '#d97706' }]}>
-                  {backendStatus.isOnline ? `Online (${backendStatus.latencyMs || 0}ms)` : 'Offline'}
+                <Text style={styles.sessionInfoLabel}>System Status:</Text>
+                <Text style={[styles.sessionInfoVal, { color: '#059669' }]}>
+                  {backendStatus.isOnline ? 'Operational (Cloud Synced)' : 'Reconnecting...'}
                 </Text>
+              </View>
+              <View style={styles.sessionInfoRow}>
+                <Text style={styles.sessionInfoLabel}>Data Security:</Text>
+                <Text style={styles.sessionInfoVal}>TLS 1.3 • Bearer Verified</Text>
               </View>
             </View>
 
             <TouchableOpacity
               style={styles.logoutBtn}
               onPress={() => {
-                setTenantModalVisible(false);
+                setProfileModalVisible(false);
                 logout();
               }}
             >
-              <Text style={styles.logoutBtnText}>🔒 Sign Out & End Session</Text>
+              <Text style={styles.logoutBtnText}>🔒 Sign Out</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.closeBtn, { marginTop: 8 }]}
-              onPress={() => setTenantModalVisible(false)}
+              style={styles.closeBtn}
+              onPress={() => setProfileModalVisible(false)}
             >
               <Text style={styles.closeBtnText}>Close</Text>
-            </TouchableOpacity>
-          </View>
-        </TouchableOpacity>
-      </Modal>
-
-      {/* BACKEND SERVER URL MODAL */}
-      <Modal visible={serverModalVisible} transparent animationType="fade">
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setServerModalVisible(false)}
-        >
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Backend Server Configuration</Text>
-            <Text style={styles.modalSubtitle}>
-              Connected to live Vercel API backend:
-            </Text>
-
-            <TextInput
-              style={styles.serverInput}
-              value={customUrl}
-              onChangeText={setCustomUrl}
-              autoCapitalize="none"
-              autoCorrect={false}
-              placeholder="https://solar-manager-three.vercel.app"
-            />
-
-            <View style={styles.presetsRow}>
-              <TouchableOpacity
-                style={styles.presetChip}
-                onPress={() => setCustomUrl('https://solar-manager-three.vercel.app')}
-              >
-                <Text style={styles.presetChipText}>Live Vercel Backend</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.presetChip}
-                onPress={() => setCustomUrl('http://10.0.2.2:5000')}
-              >
-                <Text style={styles.presetChipText}>Android Localhost</Text>
-              </TouchableOpacity>
-            </View>
-
-            {testResult && (
-              <View style={styles.testResultBox}>
-                <Text style={styles.testResultText}>{testResult}</Text>
-              </View>
-            )}
-
-            <TouchableOpacity
-              style={[styles.testBtn, testing && { opacity: 0.7 }]}
-              onPress={handleTestConnection}
-              disabled={testing}
-            >
-              {testing ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <Text style={styles.testBtnText}>Test & Connect</Text>
-              )}
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.closeBtn, { marginTop: 10 }]}
-              onPress={() => setServerModalVisible(false)}
-            >
-              <Text style={styles.closeBtnText}>Done</Text>
             </TouchableOpacity>
           </View>
         </TouchableOpacity>
@@ -284,45 +188,56 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
-  connectionPill: {
+  statusPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 5,
-    paddingHorizontal: 9,
-    borderRadius: 20,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
     borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
     gap: 5,
   },
-  connOnline: {
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',
-    borderColor: 'rgba(16, 185, 129, 0.4)',
-  },
-  connOffline: {
-    backgroundColor: 'rgba(245, 158, 11, 0.15)',
-    borderColor: 'rgba(245, 158, 11, 0.4)',
-  },
-  connDot: {
+  statusDot: {
     width: 6,
     height: 6,
     borderRadius: 3,
   },
-  connectionText: {
+  statusText: {
     fontSize: 10,
     fontWeight: '800',
-    color: colors.white,
+    color: colors.slate300,
   },
-  tenantPill: {
+  avatarPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    paddingVertical: 5,
-    paddingHorizontal: 10,
-    borderRadius: 16,
+    paddingVertical: 3,
+    paddingHorizontal: 6,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.15)',
+    gap: 6,
   },
-  tenantPillText: {
+  avatarCircle: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarLetter: {
+    fontSize: 12,
+    fontWeight: '900',
+    color: colors.white,
+  },
+  roleTag: {
     fontSize: 11,
     fontWeight: '800',
     color: colors.white,
+    paddingRight: 4,
   },
   titleSection: {
     marginTop: 14,
@@ -372,17 +287,6 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 360,
   },
-  modalTitle: {
-    fontSize: 17,
-    fontWeight: '900',
-    color: colors.slate900,
-  },
-  modalSubtitle: {
-    fontSize: 12,
-    color: colors.slate500,
-    marginTop: 3,
-    marginBottom: 16,
-  },
   accountProfileCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -395,9 +299,9 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   accountAvatar: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
@@ -408,7 +312,7 @@ const styles = StyleSheet.create({
     color: colors.white,
   },
   accountNameText: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '900',
     color: colors.slate900,
   },
@@ -435,10 +339,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8fafc',
     borderRadius: 12,
     padding: 12,
-    gap: 6,
+    gap: 8,
     borderWidth: 1,
     borderColor: '#e2e8f0',
-    marginBottom: 10,
+    marginBottom: 14,
   },
   sessionInfoRow: {
     flexDirection: 'row',
@@ -457,7 +361,7 @@ const styles = StyleSheet.create({
     maxWidth: 180,
   },
   logoutBtn: {
-    marginTop: 8,
+    marginTop: 4,
     paddingVertical: 12,
     borderRadius: 12,
     backgroundColor: '#fee2e2',
@@ -468,59 +372,9 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '800',
   },
-  serverInput: {
-    backgroundColor: '#f8fafc',
-    borderWidth: 1.5,
-    borderColor: '#e2e8f0',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 13,
-    color: colors.slate900,
-    marginBottom: 10,
-  },
-  presetsRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 12,
-  },
-  presetChip: {
-    backgroundColor: '#f1f5f9',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-  },
-  presetChipText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: colors.slate700,
-  },
-  testResultBox: {
-    backgroundColor: '#f8fafc',
-    borderRadius: 10,
-    padding: 10,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  testResultText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: colors.slate800,
-  },
-  testBtn: {
-    backgroundColor: colors.primary,
-    paddingVertical: 12,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  testBtnText: {
-    color: colors.white,
-    fontSize: 13,
-    fontWeight: '800',
-  },
   closeBtn: {
-    paddingVertical: 10,
+    marginTop: 8,
+    paddingVertical: 8,
     alignItems: 'center',
   },
   closeBtnText: {

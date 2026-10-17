@@ -21,20 +21,12 @@ export const LoginScreen: React.FC = () => {
     forceResetPassword,
     sessionExpired,
     clearSessionExpired,
-    backendStatus,
-    updateServerUrl,
   } = useAuth();
 
-  const [email, setEmail] = useState('mayurkukatkar43@gmail.com');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-
-  // Server Modal State
-  const [serverModalVisible, setServerModalVisible] = useState(false);
-  const [customUrl, setCustomUrl] = useState(backendStatus.serverUrl);
-  const [testing, setTesting] = useState(false);
-  const [testResult, setTestResult] = useState<string | null>(null);
 
   // First-Time Password Reset Modal State
   const [resetModalVisible, setResetModalVisible] = useState(false);
@@ -45,21 +37,22 @@ export const LoginScreen: React.FC = () => {
   const [resetLoading, setResetLoading] = useState(false);
 
   const handleSignIn = async () => {
-    if (!email.trim()) {
-      Alert.alert('Required', 'Please enter your corporate email address.');
+    const cleanEmail = email.trim();
+    if (!cleanEmail) {
+      Alert.alert('Required Field', 'Please enter your work email address.');
       return;
     }
     if (!password) {
-      Alert.alert('Required', 'Please enter your password.');
+      Alert.alert('Required Field', 'Please enter your password.');
       return;
     }
 
     setLoading(true);
-    const res = await login(email.trim(), password);
+    const res = await login(cleanEmail, password);
     setLoading(false);
 
     if (res.requiresPasswordReset) {
-      setResetEmail(res.email || email.trim());
+      setResetEmail(res.email || cleanEmail);
       setTempPassword(password);
       setNewPassword('');
       setConfirmPassword('');
@@ -68,7 +61,7 @@ export const LoginScreen: React.FC = () => {
     }
 
     if (!res.success && res.error) {
-      Alert.alert('Authentication Failed', res.error);
+      Alert.alert('Authentication Failed', res.error || 'Invalid email or password. Please verify your credentials.');
     }
   };
 
@@ -78,7 +71,7 @@ export const LoginScreen: React.FC = () => {
       return;
     }
     if (newPassword !== confirmPassword) {
-      Alert.alert('Mismatch', 'New password and confirmation do not match.');
+      Alert.alert('Mismatch', 'New password and confirmation password do not match.');
       return;
     }
 
@@ -88,26 +81,9 @@ export const LoginScreen: React.FC = () => {
 
     if (res.success) {
       setResetModalVisible(false);
-      Alert.alert('Security Setup Complete', 'Your permanent password has been saved. Logging in...');
+      Alert.alert('Security Initialized', 'Your permanent password has been saved. Logging in...');
     } else {
-      Alert.alert('Reset Failed', res.error || 'Failed to update temporary password.');
-    }
-  };
-
-  const handleTestServer = async () => {
-    setTesting(true);
-    setTestResult(null);
-    try {
-      const res = await updateServerUrl(customUrl);
-      if (res.isOnline) {
-        setTestResult(`✅ Connected! Latency: ${res.latencyMs || 0}ms`);
-      } else {
-        setTestResult(`⚠️ Unreachable at ${customUrl}. Check backend deployment.`);
-      }
-    } catch (err: any) {
-      setTestResult(`❌ Error: ${err.message}`);
-    } finally {
-      setTesting(false);
+      Alert.alert('Reset Failed', res.error || 'Failed to update temporary password. Please try again.');
     }
   };
 
@@ -120,7 +96,7 @@ export const LoginScreen: React.FC = () => {
         contentContainerStyle={styles.scrollContainer}
         keyboardShouldPersistTaps="handled"
       >
-        {/* BRANDING HEADER */}
+        {/* ENTERPRISE BRANDING */}
         <View style={styles.brandBox}>
           <View style={styles.logoBadge}>
             <Text style={styles.logoSun}>☀️</Text>
@@ -129,13 +105,13 @@ export const LoginScreen: React.FC = () => {
           <Text style={styles.appTagline}>Enterprise Solar EPC & Asset Management</Text>
         </View>
 
-        {/* SESSION EXPIRED BANNER */}
+        {/* SESSION TIMEOUT BANNER */}
         {sessionExpired && (
           <View style={styles.sessionBanner}>
             <View style={{ flex: 1 }}>
               <Text style={styles.sessionBannerTitle}>⚠️ Session Expired</Text>
               <Text style={styles.sessionBannerText}>
-                Your authentication token expired or was revoked. Please sign in again.
+                Your session has timed out. For security, please enter your credentials again.
               </Text>
             </View>
             <TouchableOpacity onPress={clearSessionExpired} style={styles.sessionBannerClose}>
@@ -147,38 +123,15 @@ export const LoginScreen: React.FC = () => {
         {/* LOGIN CARD */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
-            <View>
-              <Text style={styles.cardTitle}>Platform Control</Text>
-              <Text style={styles.cardSubtitle}>Verified cloud authentication</Text>
-            </View>
-            <TouchableOpacity
-              style={[
-                styles.backendStatusPill,
-                backendStatus.isOnline ? styles.backendOnline : styles.backendOffline,
-              ]}
-              onPress={() => {
-                setCustomUrl(backendStatus.serverUrl);
-                setTestResult(null);
-                setServerModalVisible(true);
-              }}
-            >
-              <View
-                style={[
-                  styles.dot,
-                  { backgroundColor: backendStatus.isOnline ? '#10b981' : '#f59e0b' },
-                ]}
-              />
-              <Text style={styles.backendStatusText}>
-                {backendStatus.isOnline ? 'Live Vercel' : 'Offline'}
-              </Text>
-            </TouchableOpacity>
+            <Text style={styles.cardTitle}>Platform Access</Text>
+            <Text style={styles.cardSubtitle}>Sign in to access your organization workspace</Text>
           </View>
 
           {/* EMAIL INPUT */}
-          <Text style={styles.inputLabel}>CORPORATE EMAIL</Text>
+          <Text style={styles.inputLabel}>WORK EMAIL</Text>
           <TextInput
             style={styles.input}
-            placeholder="platform@whereready.com"
+            placeholder="name@solarcompany.com"
             placeholderTextColor="#94a3b8"
             value={email}
             onChangeText={setEmail}
@@ -192,7 +145,7 @@ export const LoginScreen: React.FC = () => {
           <View style={styles.passwordInputContainer}>
             <TextInput
               style={styles.passwordInput}
-              placeholder="Enter your password"
+              placeholder="••••••••"
               placeholderTextColor="#94a3b8"
               value={password}
               onChangeText={setPassword}
@@ -213,62 +166,25 @@ export const LoginScreen: React.FC = () => {
             style={styles.loginBtn}
             onPress={handleSignIn}
             disabled={loading}
+            activeOpacity={0.85}
           >
             {loading ? (
               <ActivityIndicator size="small" color="#fff" />
             ) : (
-              <Text style={styles.loginBtnText}>Authenticate & Access</Text>
+              <Text style={styles.loginBtnText}>Sign In</Text>
             )}
           </TouchableOpacity>
 
-          {/* TARGET SERVER LINK */}
-          <TouchableOpacity
-            style={styles.configServerLink}
-            onPress={() => {
-              setCustomUrl(backendStatus.serverUrl);
-              setTestResult(null);
-              setServerModalVisible(true);
-            }}
-          >
-            <Text style={styles.configServerText}>
-              🔒 Target: {backendStatus.serverUrl}
+          {/* SUPPORT / FORGOT NOTICE */}
+          <View style={styles.supportBox}>
+            <Text style={styles.supportText}>
+              Need access or forgot password? Contact your company system administrator.
             </Text>
-          </TouchableOpacity>
-
-          <View style={styles.divider}>
-            <View style={styles.line} />
-            <Text style={styles.dividerText}>QUICK EMAIL PRESETS</Text>
-            <View style={styles.line} />
-          </View>
-
-          {/* QUICK EMAIL PREFILL CHIPS (SECURE: DOES NOT BYPASS PASSWORD) */}
-          <View style={styles.presetAccountsGrid}>
-            <TouchableOpacity
-              style={styles.presetAccountBtn}
-              onPress={() => setEmail('mayurkukatkar43@gmail.com')}
-            >
-              <Text style={styles.presetAccountEmoji}>🏢</Text>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.presetAccountTitle}>WhereReady IT Solutions</Text>
-                <Text style={styles.presetAccountSub}>mayurkukatkar43@gmail.com</Text>
-              </View>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.presetAccountBtn}
-              onPress={() => setEmail('platform@whereready.com')}
-            >
-              <Text style={styles.presetAccountEmoji}>👑</Text>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.presetAccountTitle}>Platform Super Admin</Text>
-                <Text style={styles.presetAccountSub}>platform@whereready.com</Text>
-              </View>
-            </TouchableOpacity>
           </View>
 
           <View style={styles.securityFooter}>
             <Text style={styles.securityFooterText}>
-              🛡️ End-to-end encrypted with TLS 1.3 & Bearer JWT Token Verification
+              🛡️ 256-bit TLS Encrypted • Certified Solar ERP Protocol
             </Text>
           </View>
         </View>
@@ -334,7 +250,7 @@ export const LoginScreen: React.FC = () => {
                 {resetLoading ? (
                   <ActivityIndicator size="small" color="#fff" />
                 ) : (
-                  <Text style={styles.resetSubmitBtnText}>Save Password & Enter</Text>
+                  <Text style={styles.resetSubmitBtnText}>Save Password & Sign In</Text>
                 )}
               </TouchableOpacity>
 
@@ -344,67 +260,6 @@ export const LoginScreen: React.FC = () => {
                 disabled={resetLoading}
               >
                 <Text style={styles.closeBtnText}>Cancel</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </Modal>
-
-        {/* BACKEND SERVER URL MODAL */}
-        <Modal visible={serverModalVisible} transparent animationType="fade">
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>Backend API Endpoint</Text>
-              <Text style={styles.modalSubtitle}>
-                Production live backend endpoint:
-              </Text>
-
-              <TextInput
-                style={styles.serverInput}
-                value={customUrl}
-                onChangeText={setCustomUrl}
-                autoCapitalize="none"
-                autoCorrect={false}
-                placeholder="https://solar-manager-three.vercel.app"
-              />
-
-              <View style={styles.presetsRow}>
-                <TouchableOpacity
-                  style={styles.presetChip}
-                  onPress={() => setCustomUrl('https://solar-manager-three.vercel.app')}
-                >
-                  <Text style={styles.presetChipText}>Live Vercel Backend</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.presetChip}
-                  onPress={() => setCustomUrl('http://10.0.2.2:5000')}
-                >
-                  <Text style={styles.presetChipText}>Android Localhost</Text>
-                </TouchableOpacity>
-              </View>
-
-              {testResult && (
-                <View style={styles.testResultBox}>
-                  <Text style={styles.testResultText}>{testResult}</Text>
-                </View>
-              )}
-
-              <TouchableOpacity
-                style={styles.testBtn}
-                onPress={handleTestServer}
-                disabled={testing}
-              >
-                {testing ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <Text style={styles.testBtnText}>Test & Connect</Text>
-                )}
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.closeBtn}
-                onPress={() => setServerModalVisible(false)}
-              >
-                <Text style={styles.closeBtnText}>Done</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -419,35 +274,35 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     backgroundColor: colors.slate900,
     justifyContent: 'center',
-    padding: 20,
-    paddingVertical: 36,
+    padding: 22,
+    paddingVertical: 44,
   },
   brandBox: {
     alignItems: 'center',
-    marginBottom: 18,
+    marginBottom: 24,
   },
   logoBadge: {
-    width: 58,
-    height: 58,
-    borderRadius: 29,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 12,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.15)',
   },
   logoSun: {
-    fontSize: 28,
+    fontSize: 30,
   },
   appName: {
-    fontSize: 21,
+    fontSize: 22,
     fontWeight: '900',
     color: colors.white,
     letterSpacing: 1.5,
   },
   appTagline: {
-    fontSize: 11,
+    fontSize: 12,
     color: colors.slate400,
     marginTop: 4,
   },
@@ -483,7 +338,7 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.white,
     borderRadius: 24,
-    padding: 22,
+    padding: 24,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.3,
@@ -491,66 +346,35 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 14,
+    marginBottom: 20,
   },
   cardTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '900',
     color: colors.slate900,
   },
   cardSubtitle: {
-    fontSize: 11,
+    fontSize: 12,
     color: colors.slate500,
-    marginTop: 2,
-  },
-  backendStatusPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    gap: 4,
-  },
-  backendOnline: {
-    backgroundColor: '#ecfdf5',
-    borderWidth: 1,
-    borderColor: '#a7f3d0',
-  },
-  backendOffline: {
-    backgroundColor: '#fef3c7',
-    borderWidth: 1,
-    borderColor: '#fde68a',
-  },
-  dot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  backendStatusText: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: colors.slate700,
+    marginTop: 3,
   },
   inputLabel: {
     fontSize: 10,
     fontWeight: '800',
     color: colors.slate500,
-    letterSpacing: 0.5,
-    marginBottom: 4,
+    letterSpacing: 0.6,
+    marginBottom: 6,
   },
   input: {
     backgroundColor: '#f8fafc',
     borderWidth: 1.5,
     borderColor: '#e2e8f0',
     borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 13,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 14,
     color: colors.slate900,
-    marginBottom: 10,
+    marginBottom: 14,
   },
   passwordInputContainer: {
     flexDirection: 'row',
@@ -559,97 +383,55 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: '#e2e8f0',
     borderRadius: 12,
-    marginBottom: 12,
+    marginBottom: 18,
   },
   passwordInput: {
     flex: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 13,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 14,
     color: colors.slate900,
   },
   showPasswordBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
   },
   showPasswordText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
     color: colors.slate600,
   },
   loginBtn: {
     backgroundColor: colors.slate900,
-    paddingVertical: 14,
+    paddingVertical: 15,
     borderRadius: 12,
     alignItems: 'center',
     marginTop: 4,
   },
   loginBtnText: {
     color: colors.white,
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '800',
   },
-  configServerLink: {
+  supportBox: {
+    marginTop: 18,
     alignItems: 'center',
-    marginTop: 10,
   },
-  configServerText: {
-    fontSize: 10,
+  supportText: {
+    fontSize: 11,
     color: colors.slate400,
-    fontWeight: '600',
-  },
-  divider: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 14,
-  },
-  line: {
-    flex: 1,
-    height: 1,
-    backgroundColor: colors.slate200,
-  },
-  dividerText: {
-    fontSize: 9,
-    fontWeight: '800',
-    color: colors.slate400,
-    marginHorizontal: 8,
-    letterSpacing: 0.5,
-  },
-  presetAccountsGrid: {
-    gap: 8,
-  },
-  presetAccountBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 10,
-    borderRadius: 12,
-    borderWidth: 1.2,
-    borderColor: '#e2e8f0',
-    backgroundColor: '#f8fafc',
-  },
-  presetAccountEmoji: {
-    fontSize: 18,
-    marginRight: 10,
-  },
-  presetAccountTitle: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: colors.slate900,
-  },
-  presetAccountSub: {
-    fontSize: 10,
-    color: colors.slate500,
-    marginTop: 1,
+    textAlign: 'center',
+    lineHeight: 16,
   },
   securityFooter: {
-    marginTop: 14,
-    paddingTop: 10,
+    marginTop: 18,
+    paddingTop: 14,
     borderTopWidth: 1,
     borderTopColor: '#f1f5f9',
     alignItems: 'center',
   },
   securityFooterText: {
-    fontSize: 9,
+    fontSize: 10,
     color: colors.slate400,
     textAlign: 'center',
     fontWeight: '600',
@@ -700,57 +482,6 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   resetSubmitBtnText: {
-    color: colors.white,
-    fontSize: 13,
-    fontWeight: '800',
-  },
-  serverInput: {
-    backgroundColor: '#f8fafc',
-    borderWidth: 1.5,
-    borderColor: '#e2e8f0',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 13,
-    color: colors.slate900,
-    marginBottom: 10,
-  },
-  presetsRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 12,
-  },
-  presetChip: {
-    backgroundColor: '#f1f5f9',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-  },
-  presetChipText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: colors.slate700,
-  },
-  testResultBox: {
-    backgroundColor: '#f8fafc',
-    borderRadius: 10,
-    padding: 10,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  testResultText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: colors.slate800,
-  },
-  testBtn: {
-    backgroundColor: colors.primary,
-    paddingVertical: 12,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  testBtnText: {
     color: colors.white,
     fontSize: 13,
     fontWeight: '800',

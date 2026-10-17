@@ -22,8 +22,8 @@ export const OperationsScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [dashboardKpis, setDashboardKpis] = useState({
-    scheduledToday: 1,
-    inProgress: 1,
+    scheduledToday: 0,
+    inProgress: 0,
     pendingReview: 0,
     delayed: 0,
     completedToday: 0,
@@ -90,12 +90,12 @@ export const OperationsScreen: React.FC = () => {
           jobId: item.jobId,
           projectNumber: item.project?.name || item.jobId,
           customerName: item.customer?.name || 'Solar Customer',
-          phone: item.customer?.mobile || '9881255560',
+          phone: item.customer?.mobile || '',
           address: item.installationAddress || 'Site Address',
-          city: item.city || 'Nagpur',
-          capacityKw: item.project?.capacity || 3.3,
-          panelBrand: 'Adani Solar (535 Wp)',
-          inverterBrand: 'Polycab 3.3kW Single Phase',
+          city: item.city || item.project?.city || 'Site Location',
+          capacityKw: item.project?.capacity || 3.0,
+          panelBrand: item.project?.panelBrand || 'Tier-1 Mono Perc',
+          inverterBrand: item.project?.inverterBrand || 'Grid-Tie Inverter',
           status: item.status || 'SCHEDULED',
           scheduledDate: item.scheduledDate ? new Date(item.scheduledDate).toLocaleDateString() : 'Today',
           moduleSerialNumbers: scannedSerials,
@@ -106,47 +106,7 @@ export const OperationsScreen: React.FC = () => {
         }));
         setJobs(mapped);
       } else {
-        // Fallback realistic jobs
-        setJobs([
-          {
-            id: 'ins-001',
-            jobId: 'INS-2026-0001',
-            projectNumber: 'PRJ-QT-202610-3012: Kawale Rooftop',
-            customerName: 'Ravi Dodkuji Kawale',
-            phone: '9881255560',
-            address: 'Plot 87, Butibori Road',
-            city: 'Nagpur',
-            capacityKw: 3.0,
-            panelBrand: 'Adani Solar (535 Wp)',
-            inverterBrand: 'Polycab 3.3kW Single Phase',
-            status: 'IN_PROGRESS',
-            scheduledDate: 'Today, 9:30 AM',
-            moduleSerialNumbers: scannedSerials,
-            geoPhotos: [],
-            checklist: [],
-            progressPercent: 45,
-            priority: 'HIGH',
-          },
-          {
-            id: 'ins-002',
-            jobId: 'INS-2026-0002',
-            projectNumber: 'PRJ-00012: Thakre Solar System',
-            customerName: 'Surendra Thakre',
-            phone: '9422114455',
-            address: 'Navin Nagar, Likklyan Society',
-            city: 'Nagpur',
-            capacityKw: 5.0,
-            panelBrand: 'Adani Bifacial 540 Wp',
-            inverterBrand: 'Sungrow 5kW On-Grid',
-            status: 'SCHEDULED',
-            scheduledDate: 'Tomorrow, 10:00 AM',
-            moduleSerialNumbers: [],
-            geoPhotos: [],
-            checklist: [],
-            progressPercent: 0,
-            priority: 'NORMAL',
-          },
-        ]);
+        setJobs([]);
       }
     } catch (err: any) {
       console.warn('Operations fetch error:', err.message);
@@ -174,20 +134,21 @@ export const OperationsScreen: React.FC = () => {
   };
 
   const handleCapturePhoto = (slot: number) => {
+    const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     setGeoPhotos((prev) =>
       prev.map((p) =>
         p.slot === slot
           ? {
               ...p,
               captured: true,
-              lat: 21.1458 as any,
-              lng: 79.0882 as any,
-              time: 'Just now' as any,
+              lat: null,
+              lng: null,
+              time: timestamp as any,
             }
           : p
       )
     );
-    Alert.alert('Geo-Photo Captured', `Slot ${slot} tagged with GPS: 21.1458° N, 79.0882° E.`);
+    Alert.alert('Inspection Photo Recorded', `Slot ${slot} photo recorded with timestamp ${timestamp}.`);
   };
 
   const handleUpdateStatus = async (jobId: string, newStatus: string) => {
@@ -199,12 +160,12 @@ export const OperationsScreen: React.FC = () => {
       if (activeJob && activeJob.id === jobId) {
         setActiveJob({ ...activeJob, status: newStatus as any });
       }
-      Alert.alert('Status Updated', `Job marked as "${newStatus}". Synced to Vercel.`);
+      Alert.alert('Status Updated', `Installation job marked as "${newStatus}".`);
     } catch (err: any) {
       setJobs((prev) =>
         prev.map((j) => (j.id === jobId ? { ...j, status: newStatus as any } : j))
       );
-      Alert.alert('Status Updated', `Job status saved.`);
+      Alert.alert('Status Updated', `Installation job status saved.`);
     }
   };
 
@@ -243,6 +204,14 @@ export const OperationsScreen: React.FC = () => {
 
         {loading ? (
           <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 24 }} />
+        ) : jobs.length === 0 ? (
+          <View style={styles.emptyCard}>
+            <Text style={{ fontSize: 32, marginBottom: 8 }}>⚡</Text>
+            <Text style={styles.emptyTitle}>No Scheduled Installations</Text>
+            <Text style={styles.emptyText}>
+              On-site jobs will be dispatched here once solar projects reach the installation stage.
+            </Text>
+          </View>
         ) : (
           jobs.map((job) => (
             <View key={job.id} style={styles.jobCard}>
@@ -963,5 +932,26 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '900',
     textAlign: 'center',
+  },
+  emptyCard: {
+    backgroundColor: colors.white,
+    borderRadius: 16,
+    padding: 28,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    marginTop: 10,
+  },
+  emptyTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: colors.slate800,
+    marginBottom: 6,
+  },
+  emptyText: {
+    fontSize: 12,
+    color: colors.slate500,
+    textAlign: 'center',
+    lineHeight: 18,
   },
 });
