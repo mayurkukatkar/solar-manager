@@ -67,6 +67,37 @@ router.post('/force-reset-password', async (req, res) => {
   }
 });
 
+router.get('/me', async (req, res) => {
+  const token = req.cookies.tenant_token || req.cookies.super_admin_token || (req.headers.authorization?.startsWith('Bearer ') ? req.headers.authorization.split(' ')[1] : null);
+  if (!token) return res.status(401).json({ error: 'Not authenticated' });
+  try {
+    const payload = jwt.verify(token, JWT_SECRET);
+    const user = await prisma.user.findUnique({
+      where: { id: payload.userId },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        tenantId: true,
+        tenant: {
+          select: {
+            id: true,
+            name: true,
+            city: true,
+            state: true,
+            logoUrl: true
+          }
+        }
+      }
+    });
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    res.json({ user });
+  } catch (err) {
+    res.status(401).json({ error: 'Invalid session' });
+  }
+});
+
 router.post('/logout', (req, res) => {
   res.clearCookie('super_admin_token');
   res.clearCookie('tenant_token');
@@ -74,3 +105,4 @@ router.post('/logout', (req, res) => {
 });
 
 module.exports = router;
+

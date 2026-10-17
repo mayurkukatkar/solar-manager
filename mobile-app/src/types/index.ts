@@ -8,21 +8,29 @@ export interface UserProfile {
   tenantName: string;
   tenantId: string;
   avatarUrl?: string;
+  backendRole?: string;
 }
 
 export interface Lead {
   id: string;
   name: string;
   phone: string;
+  mobile?: string;
   email?: string;
+  company?: string;
   city: string;
-  address: string;
+  address?: string;
   monthlyBillUnits?: number;
   sanctionedLoadKw?: number;
   recommendedKw?: number;
+  estimatedCap?: number;
   estimatedCost?: number;
+  estimatedValue?: number;
   subsidyAmount?: number;
-  stage: 'NEW' | 'CONTACTED' | 'SURVEY_SCHEDULED' | 'QUOTATION_SENT' | 'WON' | 'LOST';
+  source?: string;
+  stage: 'NEW' | 'CONTACTED' | 'QUALIFIED' | 'SITE_SURVEY' | 'SURVEY_SCHEDULED' | 'QUOTATION_SENT' | 'PROPOSAL_SENT' | 'WON' | 'LOST';
+  status?: string;
+  notes?: string;
   createdAt: string;
 }
 
@@ -38,8 +46,25 @@ export interface QuotationCalculation {
   paybackYears: number;
 }
 
+export interface Project {
+  id: string;
+  name: string;
+  status: string;
+  currentStage?: string;
+  capacity?: number;
+  estimatedValue?: number;
+  customerId?: string;
+  customer?: {
+    name: string;
+    mobile?: string;
+    email?: string;
+  };
+  createdAt?: string;
+}
+
 export interface InstallationJob {
   id: string;
+  jobId?: string;
   projectNumber: string;
   customerName: string;
   phone: string;
@@ -48,8 +73,12 @@ export interface InstallationJob {
   capacityKw: number;
   panelBrand: string;
   inverterBrand: string;
-  status: 'ASSIGNED' | 'EN_ROUTE' | 'ON_SITE' | 'CHECKLIST_DONE' | 'COMPLETED';
+  status: 'SCHEDULED' | 'ASSIGNED' | 'EN_ROUTE' | 'ON_SITE' | 'IN_PROGRESS' | 'CHECKLIST_DONE' | 'TESTING' | 'PENDING_REVIEW' | 'COMPLETED' | 'DELAYED';
   scheduledDate: string;
+  scheduledStartTime?: string;
+  estimatedDuration?: number;
+  progressPercent?: number;
+  priority?: 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT';
   moduleSerialNumbers: string[];
   geoPhotos: {
     slot: number;
@@ -74,4 +103,14 @@ export interface OwnerKPIs {
   pendingSubsidies: number;
   leadsWonCount: number;
   pendingApprovalsCount: number;
+  totalLeads?: number;
+  totalCustomers?: number;
+  totalProjects?: number;
+}
+
+export interface BackendConnectionStatus {
+  isOnline: boolean;
+  serverUrl: string;
+  latencyMs?: number;
+  lastChecked?: string;
 }

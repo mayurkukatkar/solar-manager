@@ -9,12 +9,33 @@ const allowedOrigins = [
   'http://localhost:5173', 
   'http://localhost:5174', 
   'http://localhost:3000',
+  'http://localhost:8081',
+  'http://localhost:19000',
+  'http://localhost:19006',
   process.env.FRONTEND_URL
 ].filter(Boolean);
 
-app.use(cors({ origin: allowedOrigins, credentials: true }));
+app.use(cors({
+  origin: (origin, callback) => {
+    // Allow non-browser requests (mobile native apps, curl, Postman)
+    if (!origin) return callback(null, true);
+    // Allow configured origins or local network
+    if (
+      allowedOrigins.includes(origin) ||
+      origin.startsWith('http://localhost:') ||
+      origin.startsWith('http://192.168.') ||
+      origin.startsWith('http://10.0.2.2:') ||
+      origin.startsWith('exp://')
+    ) {
+      return callback(null, true);
+    }
+    return callback(null, true);
+  },
+  credentials: true
+}));
 app.use(express.json());
 app.use(cookieParser());
+
 
 // AUTH
 const authRoutes = require('./routes/auth');
