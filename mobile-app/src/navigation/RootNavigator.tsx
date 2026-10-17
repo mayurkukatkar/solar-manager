@@ -3,14 +3,18 @@ import { View, StyleSheet, ActivityIndicator } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { LayoutDashboard, Users, Briefcase, ShieldCheck, Layers } from 'lucide-react-native';
+import {
+  Layers,
+  Briefcase,
+  Zap,
+  User,
+} from 'lucide-react-native';
 import { useAuth } from '../context/AuthContext';
 import { LoginScreen } from '../screens/auth/LoginScreen';
-import { DashboardScreen } from '../screens/dashboard/DashboardScreen';
-import { LeadsScreen } from '../screens/crm/LeadsScreen';
-import { ProjectsScreen } from '../screens/projects/ProjectsScreen';
-import { OperationsScreen } from '../screens/operations/OperationsScreen';
-import { ModulesScreen } from '../screens/modules/ModulesScreen';
+import { PipelineScreen } from '../screens/crm/PipelineScreen';
+import { FieldProjectsScreen } from '../screens/projects/FieldProjectsScreen';
+import { QuickQuoteScreen } from '../screens/crm/QuickQuoteScreen';
+import { FieldProfileScreen } from '../screens/profile/FieldProfileScreen';
 import { colors } from '../theme/colors';
 
 const Stack = createNativeStackNavigator();
@@ -28,28 +32,18 @@ const MainTabNavigator: React.FC = () => {
       }}
     >
       <Tab.Screen
-        name="Dashboard"
-        component={DashboardScreen}
+        name="Pipeline"
+        component={PipelineScreen}
         options={{
-          tabBarLabel: 'Overview',
+          tabBarLabel: 'Pipeline',
           tabBarIcon: ({ color, size }) => (
-            <LayoutDashboard size={22} color={color} strokeWidth={2.2} />
-          ),
-        }}
-      />
-      <Tab.Screen
-        name="Leads"
-        component={LeadsScreen}
-        options={{
-          tabBarLabel: 'CRM',
-          tabBarIcon: ({ color, size }) => (
-            <Users size={22} color={color} strokeWidth={2.2} />
+            <Layers size={22} color={color} strokeWidth={2.2} />
           ),
         }}
       />
       <Tab.Screen
         name="Projects"
-        component={ProjectsScreen}
+        component={FieldProjectsScreen}
         options={{
           tabBarLabel: 'Projects',
           tabBarIcon: ({ color, size }) => (
@@ -58,22 +52,22 @@ const MainTabNavigator: React.FC = () => {
         }}
       />
       <Tab.Screen
-        name="Operations"
-        component={OperationsScreen}
+        name="QuickQuote"
+        component={QuickQuoteScreen}
         options={{
-          tabBarLabel: 'Field QA',
+          tabBarLabel: 'Quick Quote',
           tabBarIcon: ({ color, size }) => (
-            <ShieldCheck size={22} color={color} strokeWidth={2.2} />
+            <Zap size={22} color={color} strokeWidth={2.2} />
           ),
         }}
       />
       <Tab.Screen
-        name="Modules"
-        component={ModulesScreen}
+        name="Profile"
+        component={FieldProfileScreen}
         options={{
-          tabBarLabel: 'Hub',
+          tabBarLabel: 'Profile',
           tabBarIcon: ({ color, size }) => (
-            <Layers size={22} color={color} strokeWidth={2.2} />
+            <User size={22} color={color} strokeWidth={2.2} />
           ),
         }}
       />
