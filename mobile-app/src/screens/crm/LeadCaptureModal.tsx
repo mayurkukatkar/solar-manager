@@ -79,9 +79,11 @@ export const LeadCaptureModal: React.FC<LeadCaptureModalProps> = ({
   const [billMediaUri, setBillMediaUri] = useState<string | null>(null);
 
   // Live Barcode / QR Scanner State
+  const cameraRef = React.useRef<any>(null);
   const [cameraScannerVisible, setCameraScannerVisible] = useState(false);
   const [torchOn, setTorchOn] = useState(false);
   const [isBarcodeProcessing, setIsBarcodeProcessing] = useState(false);
+  const [isCapturingPhoto, setIsCapturingPhoto] = useState(false);
 
   // Utility Fetch State
   const [fetchingUtility, setFetchingUtility] = useState(false);
@@ -165,7 +167,7 @@ export const LeadCaptureModal: React.FC<LeadCaptureModalProps> = ({
   /**
    * Instant DISCOM Utility Fetch by Consumer Number (Zero OCR Errors)
    */
-  const handleFetchFromUtility = async (targetConsumerNo?: string, targetBu?: string) => {
+  const handleFetchFromUtility = async (targetConsumerNo?: string, targetBu?: string, targetBillAmount?: number) => {
     const num = (targetConsumerNo || consumerNumber).replace(/[^0-9]/g, '');
     if (num.length < 10) {
       Alert.alert('Invalid Consumer No', 'Please enter a valid 10-12 digit Consumer Account Number.');
@@ -174,7 +176,7 @@ export const LeadCaptureModal: React.FC<LeadCaptureModalProps> = ({
 
     setFetchingUtility(true);
     try {
-      const res = await ocrApi.fetchConsumer(num, targetBu || billingUnit);
+      const res = await ocrApi.fetchConsumer(num, targetBu || billingUnit, targetBillAmount || (monthlyBill ? Number(monthlyBill) : undefined));
       if (res && res.success && res.data) {
         const d = res.data;
         if (d.consumerName) setName(d.consumerName);
@@ -193,28 +195,100 @@ export const LeadCaptureModal: React.FC<LeadCaptureModalProps> = ({
         const filledMap: Record<string, boolean> = {
           consumerNumber: true,
           billingUnit: true,
-          name: !!d.consumerName,
-          sanctionedLoad: !!d.sanctionedLoadKw,
           monthlyBill: !!d.monthlyBillAmount,
           monthlyUnits: !!d.monthlyUnitsKwh,
-          address: !!d.address,
-          city: !!d.city,
-          pincode: !!d.pincode,
         };
+        if (d.consumerName) filledMap['name'] = true;
+        if (d.sanctionedLoadKw) filledMap['sanctionedLoad'] = true;
+        if (d.address) filledMap['address'] = true;
+        if (d.city) filledMap['city'] = true;
+        if (d.pincode) filledMap['pincode'] = true;
         setAutoFilledFields(filledMap);
 
-        setScanSummary({
-          visible: true,
-          confidence: 100,
-          count: Object.values(filledMap).filter(Boolean).length,
-          recommendedKw: d.recommendedKw || 3.0,
-          source: res.source === 'MSEDCL_UTILITY_GATEWAY' ? 'Official MSEDCL Gateway' : 'MSEDCL Live Directory',
-        });
+        if (!d.consumerName) {
+          Alert.alert(
+            '⚡ QR Code Verified',
+            `Consumer Account (${d.consumerNumber}) and Bill Amount (₹${d.monthlyBillAmount || monthlyBill || '0'}) are verified!\n\nNote: UPI QR codes only contain payment numbers. Please type the Customer Name below or tap "Scan Bill" -> "Snap Entire Bill" to auto-read the printed name header.`,
+            [{ text: 'Got it' }]
+          );
+        } else {
+          setScanSummary({
+            visible: true,
+            confidence: 100,
+            count: Object.values(filledMap).filter(Boolean).length,
+            recommendedKw: d.recommendedKw || 3.0,
+            source: res.source === 'MSEDCL_UTILITY_GATEWAY' ? 'Official MSEDCL Gateway' : 'MSEDCL Live Directory',
+          });
+        }
       }
     } catch (err: any) {
       Alert.alert('Utility Fetch Notice', err.message || 'Could not fetch details. Please verify number or fill manually.');
     } finally {
       setFetchingUtility(false);
+    }
+  };
+
+  /**
+   * Snaps a full photo of the bill to auto-extract Name, Address, Load & Units via OCR
+   */
+  const handleSnapBillPhoto = async () => {
+    if (!cameraRef.current || isCapturingPhoto) return;
+    setIsCapturingPhoto(true);
+    try {
+      const photo = await cameraRef.current.takePictureAsync({
+        quality: 0.85,
+        base64: true,
+      });
+
+      setCameraScannerVisible(false);
+      setIsBarcodeProcessing(false);
+
+      if (photo && photo.base64) {
+        setIsScanning(true);
+        setScanStatusText('Extracting Legal Name, Address & Load from Bill...');
+        setScanProgressPercent(35);
+
+        const res = await ocrApi.scanBill({
+          fileBase64: photo.base64,
+          filename: 'bill_snap.jpg',
+        });
+
+        setScanProgressPercent(90);
+
+        if (res && res.success && res.data) {
+          const d = res.data;
+          const recKw = Number(d.recommendedKw || 3.0);
+          const reviewData: ExtractedBillData = {
+            consumerNumber: d.consumerNumber || consumerNumber,
+            billingUnit: d.billingUnit || billingUnit,
+            consumerName: d.consumerName || name,
+            mobile: d.mobile || mobile,
+            sanctionedLoad: d.sanctionedLoadKw ? String(d.sanctionedLoadKw) : sanctionedLoad,
+            monthlyBill: d.monthlyBillAmount ? String(d.monthlyBillAmount) : monthlyBill,
+            monthlyUnits: d.monthlyUnitsKwh ? String(d.monthlyUnitsKwh) : monthlyUnits,
+            discomName: d.discomName || discomName,
+            address: d.address || address,
+            city: d.city || city,
+            pincode: d.pincode || pincode,
+            recommendedKw: recKw,
+            estimatedAnnualGen: Number(d.estimatedAnnualGen || Math.round(recKw * 1460)),
+            estimatedMonthlySavings: Number(d.estimatedMonthlySavings || Math.round(recKw * 120 * 8.5)),
+            subsidyAmount: Number(d.subsidyAmount || (recKw >= 3 ? 78000 : recKw >= 2 ? 60000 : 30000)),
+            confidenceScore: Number(d.confidenceScore || 0.95),
+            extractedFields: Array.isArray(d.extractedFields) ? d.extractedFields : ['consumerNumber', 'name'],
+          };
+          setStagedExtractedData(reviewData);
+          setReviewModalVisible(true);
+        } else {
+          Alert.alert('Scan Completed', 'Extracted available details. Please verify the fields.');
+        }
+      }
+    } catch (err: any) {
+      console.warn('Error snapping bill photo:', err);
+      Alert.alert('Camera Error', 'Could not process bill photo. Please try again or type details.');
+    } finally {
+      setIsCapturingPhoto(false);
+      setIsScanning(false);
     }
   };
 
@@ -235,7 +309,7 @@ export const LeadCaptureModal: React.FC<LeadCaptureModalProps> = ({
         if (decoded.billAmount) setMonthlyBill(String(decoded.billAmount));
 
         // Auto-fetch full consumer profile immediately from utility
-        await handleFetchFromUtility(decoded.consumerNumber, decoded.billingUnit);
+        await handleFetchFromUtility(decoded.consumerNumber, decoded.billingUnit, decoded.billAmount);
       } else {
         Alert.alert(
           'Code Detected',
@@ -878,6 +952,7 @@ export const LeadCaptureModal: React.FC<LeadCaptureModalProps> = ({
         >
           <View style={styles.cameraContainer}>
             <CameraView
+              ref={cameraRef}
               style={StyleSheet.absoluteFill}
               facing="back"
               enableTorch={torchOn}
@@ -918,15 +993,34 @@ export const LeadCaptureModal: React.FC<LeadCaptureModalProps> = ({
                 <View style={styles.scanLaserBeam} />
               </View>
               <Text style={styles.cameraInstruction}>
-                Align camera over the QR code (top-right) or bottom Barcode on bill
+                Auto-reads QR/Barcode, or tap the button below to snap the entire bill
               </Text>
             </View>
 
-            {/* Bottom Hints */}
+            {/* Bottom Shutter & Controls */}
             <View style={styles.cameraBottomBar}>
+              <TouchableOpacity
+                style={styles.shutterBtnContainer}
+                onPress={handleSnapBillPhoto}
+                disabled={isCapturingPhoto}
+                activeOpacity={0.85}
+              >
+                {isCapturingPhoto ? (
+                  <ActivityIndicator size="small" color="#0f172a" />
+                ) : (
+                  <View style={styles.shutterInnerCircle}>
+                    <Camera size={26} color="#0f172a" />
+                  </View>
+                )}
+              </TouchableOpacity>
+
+              <Text style={styles.shutterLabel}>
+                {isCapturingPhoto ? 'Reading Bill Document...' : '📸 Snap Entire Bill (Auto-Extracts Name & Address)'}
+              </Text>
+
               <View style={styles.hintPill}>
                 <ShieldCheck size={14} color="#4ade80" />
-                <Text style={styles.hintPillText}>Instant 0.1s Parity Verified • Zero OCR Lag</Text>
+                <Text style={styles.hintPillText}>0.1s QR Detection + Full Document AI OCR</Text>
               </View>
             </View>
           </View>
@@ -1649,9 +1743,35 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   cameraBottomBar: {
-    paddingBottom: 40,
+    paddingBottom: 36,
     paddingHorizontal: 20,
     alignItems: 'center',
+  },
+  shutterBtnContainer: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    borderWidth: 4,
+    borderColor: '#ffffff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+  },
+  shutterInnerCircle: {
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: '#ffffff',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  shutterLabel: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '700',
+    marginBottom: 12,
+    textAlign: 'center',
   },
   hintPill: {
     flexDirection: 'row',

@@ -332,8 +332,8 @@ export const ocrApi = {
     const res = await apiClient.post('/api/tenant/ocr/scan-bill', params);
     return res.data;
   },
-  fetchConsumer: async (consumerNumber: string, bu?: string) => {
-    const res = await apiClient.post('/api/tenant/ocr/fetch-consumer', { consumerNumber, bu });
+  fetchConsumer: async (consumerNumber: string, bu?: string, billAmount?: number) => {
+    const res = await apiClient.post('/api/tenant/ocr/fetch-consumer', { consumerNumber, bu, billAmount });
     return res.data;
   },
 };
