@@ -40,13 +40,9 @@ export const SafeStorage = {
   },
 };
 
-// Default Backend URL based on runtime environment
-// Android emulator uses 10.0.2.2 to reach host machine's localhost
-export const DEFAULT_API_URL = Platform.select({
-  android: 'http://10.0.2.2:5000',
-  ios: 'http://localhost:5000',
-  default: 'http://localhost:5000',
-});
+// Live Backend URL provided by user
+export const DEFAULT_API_URL = 'https://solar-manager-three.vercel.app';
+
 
 const STORAGE_API_URL_KEY = '@solar_api_base_url';
 const STORAGE_AUTH_TOKEN_KEY = '@solar_user_token';

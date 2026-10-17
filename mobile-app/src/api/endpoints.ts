@@ -8,7 +8,7 @@ export const authApi = {
   login: async (email: string, password?: string) => {
     const res = await apiClient.post('/api/auth/login', {
       email,
-      password: password || 'Test@123',
+      password: password || 'password123',
     });
     return res.data;
   },
@@ -23,12 +23,12 @@ export const authApi = {
 };
 
 // ==========================================
-// 2. OWNER / EXECUTIVE TELEMETRY SERVICE
+// 2. TENANT DASHBOARD & PROJECTS SERVICE
 // ==========================================
-export const ownerApi = {
+export const tenantApi = {
   getDashboard: async () => {
     const res = await apiClient.get('/api/tenant/dashboard');
-    return res.data; // { totalLeads, totalProjects, totalCustomers }
+    return res.data; // { totalLeads, totalCustomers, totalProjects, pendingInvoices, openTickets, totalRevenue, outstanding }
   },
   getProjects: async (status?: string): Promise<{ projects: Project[]; metrics?: any }> => {
     const url = status && status !== 'ALL' ? `/api/tenant/projects?status=${status}` : '/api/tenant/projects';
@@ -38,7 +38,7 @@ export const ownerApi = {
   advanceProjectStage: async (projectId: string, stage: string, note?: string) => {
     const res = await apiClient.patch(`/api/tenant/projects/${projectId}/stage`, {
       stage,
-      note: note || `Approved stage advancement to ${stage} via Mobile Executive app`,
+      note: note || `Approved stage advancement to ${stage} via Mobile ERP App`,
     });
     return res.data;
   },
@@ -51,9 +51,9 @@ export const ownerApi = {
 };
 
 // ==========================================
-// 3. SALES CRM & INSTANT QUOTATION SERVICE
+// 3. CRM & LEADS SERVICE
 // ==========================================
-export const salesApi = {
+export const crmApi = {
   getLeads: async (params?: { status?: string; search?: string; all?: boolean }) => {
     let query = '';
     const parts: string[] = [];
@@ -80,8 +80,24 @@ export const salesApi = {
     const res = await apiClient.post('/api/tenant/leads', data);
     return res.data;
   },
-  getQuotations: async () => {
-    const res = await apiClient.get('/api/tenant/quotations');
+  deleteLead: async (id: string) => {
+    const res = await apiClient.delete(`/api/tenant/leads/${id}`);
+    return res.data;
+  },
+};
+
+// ==========================================
+// 4. QUOTATIONS & PROPOSALS SERVICE
+// ==========================================
+export const quotationsApi = {
+  getQuotations: async (params?: { status?: string; search?: string }) => {
+    let query = '';
+    const parts: string[] = [];
+    if (params?.status && params.status !== 'ALL') parts.push(`status=${params.status}`);
+    if (params?.search) parts.push(`search=${encodeURIComponent(params.search)}`);
+    if (parts.length > 0) query = '?' + parts.join('&');
+
+    const res = await apiClient.get(`/api/tenant/quotations${query}`);
     return res.data;
   },
   createQuotation: async (data: any) => {
@@ -91,9 +107,23 @@ export const salesApi = {
 };
 
 // ==========================================
-// 4. FIELD TECHNICIAN OPERATIONS SERVICE
+// 5. SITE SURVEYS SERVICE
 // ==========================================
-export const techApi = {
+export const surveysApi = {
+  getSurveys: async () => {
+    const res = await apiClient.get('/api/tenant/surveys');
+    return res.data;
+  },
+  createSurvey: async (data: any) => {
+    const res = await apiClient.post('/api/tenant/surveys', data);
+    return res.data;
+  },
+};
+
+// ==========================================
+// 6. INSTALLATIONS & OPERATIONS SERVICE
+// ==========================================
+export const installationsApi = {
   getDashboard: async () => {
     const res = await apiClient.get('/api/tenant/installations/dashboard');
     return res.data; // { scheduledToday, inProgress, pendingAssignment, pendingReview, completedToday, delayed, thisMonth }
@@ -132,3 +162,26 @@ export const techApi = {
     return res.data;
   },
 };
+
+// ==========================================
+// 7. SUPER ADMIN PLATFORM SERVICE
+// ==========================================
+export const superAdminApi = {
+  getKpis: async () => {
+    const res = await apiClient.get('/api/super-admin/kpis');
+    return res.data;
+  },
+  getTenants: async () => {
+    const res = await apiClient.get('/api/super-admin/tenants');
+    return res.data;
+  },
+  getPlans: async () => {
+    const res = await apiClient.get('/api/super-admin/plans');
+    return res.data;
+  },
+};
+
+// Backward-compatible aliases
+export const ownerApi = tenantApi;
+export const salesApi = crmApi;
+export const techApi = installationsApi;

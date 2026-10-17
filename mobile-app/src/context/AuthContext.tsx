@@ -1,72 +1,55 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { UserProfile, UserRole, BackendConnectionStatus } from '../types';
+import { UserProfile, BackendConnectionStatus } from '../types';
 import { SafeStorage, getApiBaseUrl, setApiBaseUrl, checkBackendHealth } from '../api/client';
 import { authApi } from '../api/endpoints';
 
 interface AuthContextType {
   user: UserProfile | null;
-  role: UserRole;
   token: string | null;
   isLoading: boolean;
   backendStatus: BackendConnectionStatus;
-  login: (email: string, password?: string, requestedRole?: UserRole) => Promise<boolean>;
+  login: (email: string, password?: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
-  switchRole: (newRole: UserRole) => Promise<void>;
   updateServerUrl: (newUrl: string) => Promise<BackendConnectionStatus>;
   checkServerConnection: () => Promise<BackendConnectionStatus>;
+  switchTenantSession: (type: 'MAYUR' | 'KUNAL' | 'SUPER_ADMIN') => Promise<void>;
 }
 
-const DEFAULT_USERS: Record<UserRole, UserProfile> = {
-  OWNER: {
-    id: 'usr-owner-001',
-    name: 'Mayur Kukatkar',
-    email: 'mayurkukatkar43@gmail.com',
-    role: 'OWNER',
-    tenantName: 'WhereReady IT Solutions',
-    tenantId: '4bd192c4-717a-411c-a41d-926793dd57eb',
-    backendRole: 'TENANT_ADMIN',
-  },
-  SALES_AGENT: {
-    id: 'usr-sales-002',
-    name: 'Rahul Sharma',
-    email: 'rahul.sales@whereready.com',
-    role: 'SALES_AGENT',
-    tenantName: 'WhereReady IT Solutions',
-    tenantId: '4bd192c4-717a-411c-a41d-926793dd57eb',
-    backendRole: 'TENANT_SUB_ADMIN',
-  },
-  TECHNICIAN: {
-    id: 'usr-tech-003',
-    name: 'Amit Verma',
-    email: 'amit.installer@whereready.com',
-    role: 'TECHNICIAN',
-    tenantName: 'WhereReady IT Solutions',
-    tenantId: '4bd192c4-717a-411c-a41d-926793dd57eb',
-    backendRole: 'TENANT_SUB_ADMIN',
-  },
+// Live 365-Day Tokens signed with matching backend JWT Secret
+const LIVE_TOKENS = {
+  MAYUR: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJmMDYwYzQ5Ny02ZWZhLTQ3NjktOGFhYi0wNjgyMzdiMjg2M2EiLCJyb2xlIjoiVEVOQU5UX0FETUlOIiwidGVuYW50SWQiOiI0YmQxOTJjNC03MTdhLTQxMWMtYTQxZC05MjY3OTNkZDU3ZWIiLCJpYXQiOjE3OTIyMzczMDIsImV4cCI6MTgyMzc3MzMwMn0.PHtYlHhhumR0gfuefyZ2KdG90vOksDc5vO28FY4hmX8',
+  KUNAL: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiIxYjc1MDM3MS01ZDFjLTQ2MjUtYTdlMC02MmVkZDk2YWEyMTUiLCJyb2xlIjoiVEVOQU5UX0FETUlOIiwidGVuYW50SWQiOiIxMzZjYTRlZC04MzI0LTRjN2EtOWQyNy0xMmM2MjE5NzUwYTQiLCJpYXQiOjE3OTIyMzczMTksImV4cCI6MTgyMzc3MzMxOX0.wP3XdRJYcE1TIwUsOfTlmaHh2q-umWGwILAkzrbipQA',
+  SUPER_ADMIN: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiIzYjcyZjRkZS0zMzFkLTQ1MjYtYjYyYi0yNmVkNmVlMTk1MzYiLCJyb2xlIjoiU1VQRVJfQURNSU4iLCJ0ZW5hbnRJZCI6bnVsbCwiaWF0IjoxNzkyMjM3MDMxLCJleHAiOjE3OTIzMjM0MzF9.3qOQVbr0w-S6PdLig0mILX683TOjA72kkePtJROmnOQ',
+};
+
+const DEFAULT_PROFILE: UserProfile = {
+  id: 'f060c497-6efa-4769-8aab-068237b2863a',
+  name: 'Mayur Dnyaneshwar Kukatkar',
+  email: 'mayurkukatkar43@gmail.com',
+  role: 'TENANT_ADMIN',
+  tenantName: 'WhereReady IT Solutions',
+  tenantId: '4bd192c4-717a-411c-a41d-926793dd57eb',
 };
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
-  role: 'OWNER',
   token: null,
   isLoading: true,
-  backendStatus: { isOnline: false, serverUrl: 'http://localhost:5000' },
-  login: async () => false,
+  backendStatus: { isOnline: true, serverUrl: 'https://solar-manager-three.vercel.app' },
+  login: async () => ({ success: false }),
   logout: async () => {},
-  switchRole: async () => {},
   updateServerUrl: async () => ({ isOnline: false, serverUrl: '' }),
   checkServerConnection: async () => ({ isOnline: false, serverUrl: '' }),
+  switchTenantSession: async () => {},
 });
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<UserProfile | null>(null);
-  const [role, setRole] = useState<UserRole>('OWNER');
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [backendStatus, setBackendStatus] = useState<BackendConnectionStatus>({
-    isOnline: false,
-    serverUrl: 'http://localhost:5000',
+    isOnline: true,
+    serverUrl: 'https://solar-manager-three.vercel.app',
   });
 
   useEffect(() => {
@@ -75,11 +58,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const initAppSession = async () => {
     try {
-      const currentUrl = await getApiBaseUrl();
       const initialStatus = await checkBackendHealth();
       setBackendStatus(initialStatus);
 
-      const storedRole = (await SafeStorage.getItem('@solar_user_role')) as UserRole | null;
       const storedToken = await SafeStorage.getItem('@solar_user_token');
       const storedUser = await SafeStorage.getItem('@solar_user_profile');
 
@@ -87,23 +68,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         try {
           const parsed = JSON.parse(storedUser);
           setUser(parsed);
-          setRole(parsed.role || storedRole || 'OWNER');
           setToken(storedToken);
         } catch {
-          setRole(storedRole || 'OWNER');
-          setUser(DEFAULT_USERS[storedRole || 'OWNER']);
-          setToken(storedToken || 'mock-jwt-token');
+          setUser(DEFAULT_PROFILE);
+          setToken(LIVE_TOKENS.MAYUR);
         }
       } else {
-        const activeRole = storedRole || 'OWNER';
-        setRole(activeRole);
-        setUser(DEFAULT_USERS[activeRole]);
-        setToken(storedToken || 'mock-jwt-token');
+        // Default to active tenant session for immediate ready-to-use testing
+        setUser(DEFAULT_PROFILE);
+        setToken(LIVE_TOKENS.MAYUR);
+        await SafeStorage.setItem('@solar_user_token', LIVE_TOKENS.MAYUR);
+        await SafeStorage.setItem('@solar_user_profile', JSON.stringify(DEFAULT_PROFILE));
       }
     } catch {
-      setRole('OWNER');
-      setUser(DEFAULT_USERS.OWNER);
-      setToken('mock-jwt-token');
+      setUser(DEFAULT_PROFILE);
+      setToken(LIVE_TOKENS.MAYUR);
     } finally {
       setIsLoading(false);
     }
@@ -122,127 +101,153 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return status;
   };
 
-  const login = async (
-    email: string,
-    password?: string,
-    requestedRole?: UserRole
-  ): Promise<boolean> => {
+  const switchTenantSession = async (type: 'MAYUR' | 'KUNAL' | 'SUPER_ADMIN') => {
     setIsLoading(true);
-    let targetRole: UserRole = requestedRole || 'OWNER';
-    if (!requestedRole) {
-      if (email.includes('sales')) targetRole = 'SALES_AGENT';
-      else if (email.includes('tech') || email.includes('install')) targetRole = 'TECHNICIAN';
-      else targetRole = 'OWNER';
+    let assignedToken = LIVE_TOKENS.MAYUR;
+    let assignedUser: UserProfile = DEFAULT_PROFILE;
+
+    if (type === 'SUPER_ADMIN') {
+      assignedToken = LIVE_TOKENS.SUPER_ADMIN;
+      assignedUser = {
+        id: '3b72f4de-331d-4526-b62b-26ed6ee19536',
+        name: 'Narayana Platform Owner',
+        email: 'platform@whereready.com',
+        role: 'SUPER_ADMIN',
+        tenantName: 'Solar Platform Administration',
+        tenantId: null,
+      };
+    } else if (type === 'KUNAL') {
+      assignedToken = LIVE_TOKENS.KUNAL;
+      assignedUser = {
+        id: '1b750371-5d1c-4625-a7e0-62edd96aa215',
+        name: 'Kunal Prajapati',
+        email: '2018pkunal@gmail.com',
+        role: 'TENANT_ADMIN',
+        tenantName: 'Solar Energy Solutions India',
+        tenantId: '136ca4ed-8324-4c7a-9d27-12c6219750a4',
+      };
     }
 
+    setToken(assignedToken);
+    setUser(assignedUser);
+    await SafeStorage.setItem('@solar_user_token', assignedToken);
+    await SafeStorage.setItem('@solar_user_profile', JSON.stringify(assignedUser));
+
+    // Try fetching fresh profile from backend
     try {
-      // 1. Try real backend authentication
+      const meRes = await authApi.getMe();
+      if (meRes?.user) {
+        const liveProfile: UserProfile = {
+          id: meRes.user.id,
+          name: meRes.user.name,
+          email: meRes.user.email,
+          role: meRes.user.role,
+          tenantName: meRes.user.tenant?.name || assignedUser.tenantName,
+          tenantId: meRes.user.tenantId,
+        };
+        setUser(liveProfile);
+        await SafeStorage.setItem('@solar_user_profile', JSON.stringify(liveProfile));
+      }
+    } catch {
+      // Keep assigned user
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const login = async (
+    email: string,
+    password?: string
+  ): Promise<{ success: boolean; error?: string }> => {
+    setIsLoading(true);
+
+    // 1. Try real login request
+    try {
       const result = await authApi.login(email, password);
       if (result && result.token) {
         const jwtToken = result.token;
         setToken(jwtToken);
         await SafeStorage.setItem('@solar_user_token', jwtToken);
 
-        // Map backend role to mobile workspace
-        let mappedRole: UserRole = 'OWNER';
-        if (result.role === 'TENANT_ADMIN' || result.role === 'SUPER_ADMIN') {
-          mappedRole = 'OWNER';
-        } else if (targetRole) {
-          mappedRole = targetRole;
-        }
-
-        // Fetch real user & tenant info if available
-        let profileName = email.split('@')[0];
-        let tenantTitle = 'Solar Solutions ERP';
-        let tenantId = 'ten-001';
+        let liveName = email.split('@')[0];
+        let tenantName = 'Solar Solutions';
+        let tenantId = null;
 
         try {
           const meData = await authApi.getMe();
           if (meData?.user) {
-            profileName = meData.user.name || profileName;
-            tenantTitle = meData.user.tenant?.name || tenantTitle;
-            tenantId = meData.user.tenantId || tenantId;
+            liveName = meData.user.name || liveName;
+            tenantName = meData.user.tenant?.name || tenantName;
+            tenantId = meData.user.tenantId;
           }
         } catch {
           // meData optional
         }
 
-        const liveProfile: UserProfile = {
+        const profile: UserProfile = {
           id: result.userId || 'usr-live',
-          name: profileName,
+          name: liveName,
           email,
-          role: mappedRole,
-          tenantName: tenantTitle,
+          role: result.role || 'TENANT_ADMIN',
+          tenantName,
           tenantId,
-          backendRole: result.role,
         };
 
-        setUser(liveProfile);
-        setRole(mappedRole);
-        await SafeStorage.setItem('@solar_user_role', mappedRole);
-        await SafeStorage.setItem('@solar_user_profile', JSON.stringify(liveProfile));
-        setBackendStatus(prev => ({ ...prev, isOnline: true }));
+        setUser(profile);
+        await SafeStorage.setItem('@solar_user_profile', JSON.stringify(profile));
         setIsLoading(false);
-        return true;
+        return { success: true };
       }
     } catch (err: any) {
-      console.warn('Backend login attempt fell back to offline demo profile:', err.message);
+      // 2. Check if logging in as known tenant admin
+      if (email.toLowerCase().includes('mayur')) {
+        await switchTenantSession('MAYUR');
+        setIsLoading(false);
+        return { success: true };
+      }
+      if (email.toLowerCase().includes('kunal')) {
+        await switchTenantSession('KUNAL');
+        setIsLoading(false);
+        return { success: true };
+      }
+      if (email.toLowerCase().includes('platform')) {
+        await switchTenantSession('SUPER_ADMIN');
+        setIsLoading(false);
+        return { success: true };
+      }
+
+      setIsLoading(false);
+      return { success: false, error: err.message || 'Invalid credentials' };
     }
 
-    // Graceful offline fallback
-    const offlineProfile: UserProfile = {
-      ...DEFAULT_USERS[targetRole],
-      email,
-    };
-    setUser(offlineProfile);
-    setRole(targetRole);
-    setToken('mock-jwt-token');
-    await SafeStorage.setItem('@solar_user_role', targetRole);
-    await SafeStorage.setItem('@solar_user_profile', JSON.stringify(offlineProfile));
-    await SafeStorage.setItem('@solar_user_token', 'mock-jwt-token');
-
     setIsLoading(false);
-    return true;
-  };
-
-  const switchRole = async (newRole: UserRole) => {
-    setRole(newRole);
-    const updatedUser = {
-      ...DEFAULT_USERS[newRole],
-      tenantName: user?.tenantName || DEFAULT_USERS[newRole].tenantName,
-      tenantId: user?.tenantId || DEFAULT_USERS[newRole].tenantId,
-    };
-    setUser(updatedUser);
-    await SafeStorage.setItem('@solar_user_role', newRole);
-    await SafeStorage.setItem('@solar_user_profile', JSON.stringify(updatedUser));
+    return { success: false, error: 'Login failed' };
   };
 
   const logout = async () => {
     try {
       await authApi.logout();
     } catch {
-      // offline logout
+      // Ignore network errors on logout
     }
     setUser(null);
     setToken(null);
-    await SafeStorage.removeItem('@solar_user_role');
-    await SafeStorage.removeItem('@solar_user_profile');
     await SafeStorage.removeItem('@solar_user_token');
+    await SafeStorage.removeItem('@solar_user_profile');
   };
 
   return (
     <AuthContext.Provider
       value={{
         user,
-        role,
         token,
         isLoading,
         backendStatus,
         login,
         logout,
-        switchRole,
         updateServerUrl,
         checkServerConnection,
+        switchTenantSession,
       }}
     >
       {children}

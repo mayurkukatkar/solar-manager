@@ -1,14 +1,24 @@
-export type UserRole = 'OWNER' | 'SALES_AGENT' | 'TECHNICIAN';
+export type UserRole = 'SUPER_ADMIN' | 'TENANT_ADMIN' | 'OWNER' | 'SALES_AGENT' | 'TECHNICIAN';
 
 export interface UserProfile {
   id: string;
   name: string;
   email: string;
-  role: UserRole;
+  role: string;
   tenantName: string;
-  tenantId: string;
+  tenantId?: string | null;
   avatarUrl?: string;
   backendRole?: string;
+}
+
+export interface DashboardData {
+  totalLeads: number;
+  totalCustomers: number;
+  totalProjects: number;
+  pendingInvoices: number;
+  openTickets: number;
+  totalRevenue: number;
+  outstanding: number;
 }
 
 export interface Lead {
@@ -18,8 +28,11 @@ export interface Lead {
   mobile?: string;
   email?: string;
   company?: string;
+  customerType?: string;
   city: string;
+  state?: string;
   address?: string;
+  monthlyBill?: number;
   monthlyBillUnits?: number;
   sanctionedLoadKw?: number;
   recommendedKw?: number;
@@ -28,9 +41,42 @@ export interface Lead {
   estimatedValue?: number;
   subsidyAmount?: number;
   source?: string;
-  stage: 'NEW' | 'CONTACTED' | 'QUALIFIED' | 'SITE_SURVEY' | 'SURVEY_SCHEDULED' | 'QUOTATION_SENT' | 'PROPOSAL_SENT' | 'WON' | 'LOST';
+  stage: string;
   status?: string;
   notes?: string;
+  createdAt: string;
+}
+
+export interface Project {
+  id: string;
+  name: string;
+  status: string;
+  currentStage?: string;
+  capacity?: number;
+  systemCapacity?: number;
+  estimatedValue?: number;
+  address?: string;
+  city?: string;
+  state?: string;
+  customerId?: string;
+  customer?: {
+    name: string;
+    mobile?: string;
+    email?: string;
+  };
+  createdAt?: string;
+}
+
+export interface Quotation {
+  id: string;
+  qNumber: string;
+  status: string;
+  subtotal: number;
+  tax: number;
+  discount: number;
+  total: number;
+  customer?: { name: string; email?: string; mobile?: string };
+  lead?: { name: string; email?: string; mobile?: string };
   createdAt: string;
 }
 
@@ -44,22 +90,6 @@ export interface QuotationCalculation {
   monthlyUnitsGenerated: number;
   monthlySavingsRs: number;
   paybackYears: number;
-}
-
-export interface Project {
-  id: string;
-  name: string;
-  status: string;
-  currentStage?: string;
-  capacity?: number;
-  estimatedValue?: number;
-  customerId?: string;
-  customer?: {
-    name: string;
-    mobile?: string;
-    email?: string;
-  };
-  createdAt?: string;
 }
 
 export interface InstallationJob {
@@ -83,6 +113,7 @@ export interface InstallationJob {
   geoPhotos: {
     slot: number;
     title: string;
+    category?: string;
     uri?: string;
     timestamp?: string;
     coords?: { lat: number; lng: number };
@@ -96,16 +127,16 @@ export interface InstallationJob {
   customerSignature?: string;
 }
 
-export interface OwnerKPIs {
-  monthlyRevenue: number;
-  activeProjects: number;
-  todayInstallations: number;
-  pendingSubsidies: number;
-  leadsWonCount: number;
-  pendingApprovalsCount: number;
-  totalLeads?: number;
-  totalCustomers?: number;
-  totalProjects?: number;
+export interface Tenant {
+  id: string;
+  name: string;
+  legalName?: string;
+  email?: string;
+  phone?: string;
+  city?: string;
+  state?: string;
+  status?: string;
+  createdAt?: string;
 }
 
 export interface BackendConnectionStatus {

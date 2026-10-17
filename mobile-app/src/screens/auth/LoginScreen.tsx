@@ -11,15 +11,14 @@ import {
 } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import { colors } from '../../theme/colors';
-import { UserRole } from '../../types';
 
 export const LoginScreen: React.FC = () => {
-  const { login, backendStatus, updateServerUrl } = useAuth();
+  const { login, backendStatus, updateServerUrl, switchTenantSession } = useAuth();
   const [email, setEmail] = useState('mayurkukatkar43@gmail.com');
-  const [password, setPassword] = useState('Tejshree43@');
+  const [password, setPassword] = useState('password123');
   const [loading, setLoading] = useState(false);
   const [serverModalVisible, setServerModalVisible] = useState(false);
-  const [customUrl, setCustomUrl] = useState(backendStatus.serverUrl || 'http://localhost:5000');
+  const [customUrl, setCustomUrl] = useState(backendStatus.serverUrl);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<string | null>(null);
 
@@ -29,15 +28,11 @@ export const LoginScreen: React.FC = () => {
       return;
     }
     setLoading(true);
-    await login(email, password);
+    const res = await login(email, password);
     setLoading(false);
-  };
-
-  const handleQuickLogin = async (selectedRole: UserRole, defaultEmail: string) => {
-    setEmail(defaultEmail);
-    setLoading(true);
-    await login(defaultEmail, password, selectedRole);
-    setLoading(false);
+    if (!res.success && res.error) {
+      Alert.alert('Authentication Failed', res.error);
+    }
   };
 
   const handleTestServer = async () => {
@@ -59,19 +54,20 @@ export const LoginScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
+      {/* BRANDING MATCHING LIVE WEB FRONTEND */}
       <View style={styles.brandBox}>
         <View style={styles.logoBadge}>
           <Text style={styles.logoSun}>☀️</Text>
         </View>
-        <Text style={styles.appName}>SOLAR MANAGER</Text>
-        <Text style={styles.appTagline}>Field Operations & Executive Mobile Suite</Text>
+        <Text style={styles.appName}>SOLAR MANAGER ERP</Text>
+        <Text style={styles.appTagline}>Enterprise Solar EPC & Asset Management</Text>
       </View>
 
       <View style={styles.card}>
         <View style={styles.cardHeader}>
           <View>
-            <Text style={styles.cardTitle}>Sign In to Your Workspace</Text>
-            <Text style={styles.cardSubtitle}>Production ERP Connected Client</Text>
+            <Text style={styles.cardTitle}>Platform Control</Text>
+            <Text style={styles.cardSubtitle}>Enter your credentials to access workspace</Text>
           </View>
           <TouchableOpacity
             style={[
@@ -91,23 +87,27 @@ export const LoginScreen: React.FC = () => {
               ]}
             />
             <Text style={styles.backendStatusText}>
-              {backendStatus.isOnline ? 'Online' : 'Offline'}
+              {backendStatus.isOnline ? 'Live Vercel' : 'Offline'}
             </Text>
           </TouchableOpacity>
         </View>
 
+        <Text style={styles.inputLabel}>EMAIL ADDRESS</Text>
         <TextInput
           style={styles.input}
-          placeholder="Email address"
+          placeholder="platform@whereready.com"
+          placeholderTextColor="#94a3b8"
           value={email}
           onChangeText={setEmail}
           autoCapitalize="none"
           keyboardType="email-address"
         />
 
+        <Text style={styles.inputLabel}>PASSWORD</Text>
         <TextInput
           style={styles.input}
-          placeholder="Password"
+          placeholder="••••••••"
+          placeholderTextColor="#94a3b8"
           value={password}
           onChangeText={setPassword}
           secureTextEntry
@@ -134,47 +134,47 @@ export const LoginScreen: React.FC = () => {
           }}
         >
           <Text style={styles.configServerText}>
-            ⚙️ Server: {backendStatus.serverUrl} (Tap to change)
+            ⚙️ Target: {backendStatus.serverUrl}
           </Text>
         </TouchableOpacity>
 
         <View style={styles.divider}>
           <View style={styles.line} />
-          <Text style={styles.dividerText}>OR 1-TAP ROLE LOGIN</Text>
+          <Text style={styles.dividerText}>1-TAP INSTANT ACCESS</Text>
           <View style={styles.line} />
         </View>
 
-        {/* 1-Tap Quick Role Selectors */}
+        {/* 1-Tap Quick Tenants */}
         <TouchableOpacity
           style={[styles.quickRoleBtn, { borderColor: '#a7f3d0' }]}
-          onPress={() => handleQuickLogin('OWNER', 'mayurkukatkar43@gmail.com')}
+          onPress={() => switchTenantSession('MAYUR')}
         >
-          <Text style={styles.quickRoleEmoji}>👔</Text>
-          <View>
-            <Text style={styles.quickRoleTitle}>Login as Owner / Executive</Text>
-            <Text style={styles.quickRoleDesc}>Full telemetry, pipeline & stage approvals</Text>
+          <Text style={styles.quickRoleEmoji}>🏢</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.quickRoleTitle}>WhereReady IT Solutions</Text>
+            <Text style={styles.quickRoleDesc}>Tenant Admin • Mayur Kukatkar (Nagpur)</Text>
           </View>
         </TouchableOpacity>
 
         <TouchableOpacity
           style={[styles.quickRoleBtn, { borderColor: '#bfdbfe' }]}
-          onPress={() => handleQuickLogin('SALES_AGENT', 'rahul.sales@whereready.com')}
+          onPress={() => switchTenantSession('KUNAL')}
         >
-          <Text style={styles.quickRoleEmoji}>🤝</Text>
-          <View>
-            <Text style={styles.quickRoleTitle}>Login as Sales Representative</Text>
-            <Text style={styles.quickRoleDesc}>60s quote builder & field CRM leads</Text>
+          <Text style={styles.quickRoleEmoji}>☀️</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.quickRoleTitle}>Solar Energy Solutions India</Text>
+            <Text style={styles.quickRoleDesc}>Tenant Admin • Kunal Prajapati (Mumbai)</Text>
           </View>
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.quickRoleBtn, { borderColor: '#fde68a' }]}
-          onPress={() => handleQuickLogin('TECHNICIAN', 'amit.installer@whereready.com')}
+          style={[styles.quickRoleBtn, { borderColor: '#e9d5ff' }]}
+          onPress={() => switchTenantSession('SUPER_ADMIN')}
         >
-          <Text style={styles.quickRoleEmoji}>⚡</Text>
-          <View>
-            <Text style={styles.quickRoleTitle}>Login as Field Technician</Text>
-            <Text style={styles.quickRoleDesc}>On-site checklist, barcodes & geo-photos</Text>
+          <Text style={styles.quickRoleEmoji}>👑</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.quickRoleTitle}>Platform Super Admin</Text>
+            <Text style={styles.quickRoleDesc}>Platform Owner • Global Telemetry</Text>
           </View>
         </TouchableOpacity>
       </View>
@@ -183,9 +183,9 @@ export const LoginScreen: React.FC = () => {
       <Modal visible={serverModalVisible} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Configure Backend API</Text>
+            <Text style={styles.modalTitle}>Backend API Target</Text>
             <Text style={styles.modalSubtitle}>
-              Target URL of your Node.js/Express backend server:
+              Live backend deployed at Vercel:
             </Text>
 
             <TextInput
@@ -194,21 +194,21 @@ export const LoginScreen: React.FC = () => {
               onChangeText={setCustomUrl}
               autoCapitalize="none"
               autoCorrect={false}
-              placeholder="http://localhost:5000"
+              placeholder="https://solar-manager-three.vercel.app"
             />
 
             <View style={styles.presetsRow}>
               <TouchableOpacity
                 style={styles.presetChip}
-                onPress={() => setCustomUrl('http://localhost:5000')}
+                onPress={() => setCustomUrl('https://solar-manager-three.vercel.app')}
               >
-                <Text style={styles.presetChipText}>Localhost:5000</Text>
+                <Text style={styles.presetChipText}>Live Vercel Backend</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.presetChip}
                 onPress={() => setCustomUrl('http://10.0.2.2:5000')}
               >
-                <Text style={styles.presetChipText}>Android (10.0.2.2)</Text>
+                <Text style={styles.presetChipText}>Android Localhost</Text>
               </TouchableOpacity>
             </View>
 
@@ -252,12 +252,12 @@ const styles = StyleSheet.create({
   },
   brandBox: {
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 20,
   },
   logoBadge: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
     justifyContent: 'center',
     alignItems: 'center',
@@ -266,23 +266,23 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.15)',
   },
   logoSun: {
-    fontSize: 28,
+    fontSize: 26,
   },
   appName: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '900',
     color: colors.white,
     letterSpacing: 1.5,
   },
   appTagline: {
-    fontSize: 12,
+    fontSize: 11,
     color: colors.slate400,
     marginTop: 4,
   },
   card: {
     backgroundColor: colors.white,
     borderRadius: 24,
-    padding: 24,
+    padding: 22,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.3,
@@ -293,15 +293,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 16,
+    marginBottom: 14,
   },
   cardTitle: {
-    fontSize: 17,
+    fontSize: 18,
     fontWeight: '900',
     color: colors.slate900,
   },
   cardSubtitle: {
-    fontSize: 12,
+    fontSize: 11,
     color: colors.slate500,
     marginTop: 2,
   },
@@ -333,21 +333,28 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: colors.slate700,
   },
+  inputLabel: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: colors.slate400,
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
   input: {
-    backgroundColor: colors.slate50,
+    backgroundColor: '#f8fafc',
     borderWidth: 1.5,
-    borderColor: colors.slate200,
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 14,
+    borderColor: '#e2e8f0',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 13,
     color: colors.slate900,
     marginBottom: 10,
   },
   loginBtn: {
-    backgroundColor: colors.primary,
+    backgroundColor: colors.slate900,
     paddingVertical: 14,
-    borderRadius: 14,
+    borderRadius: 12,
     alignItems: 'center',
     marginTop: 4,
   },
@@ -361,14 +368,14 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   configServerText: {
-    fontSize: 11,
+    fontSize: 10,
     color: colors.slate400,
     fontWeight: '600',
   },
   divider: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: 16,
+    marginVertical: 14,
   },
   line: {
     flex: 1,
@@ -376,20 +383,20 @@ const styles = StyleSheet.create({
     backgroundColor: colors.slate200,
   },
   dividerText: {
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: '800',
     color: colors.slate400,
-    marginHorizontal: 10,
+    marginHorizontal: 8,
     letterSpacing: 0.5,
   },
   quickRoleBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 10,
-    borderRadius: 14,
+    borderRadius: 12,
     borderWidth: 1.5,
-    backgroundColor: colors.slate50,
-    marginBottom: 8,
+    backgroundColor: '#f8fafc',
+    marginBottom: 6,
   },
   quickRoleEmoji: {
     fontSize: 20,
@@ -431,9 +438,9 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   serverInput: {
-    backgroundColor: colors.slate50,
+    backgroundColor: '#f8fafc',
     borderWidth: 1.5,
-    borderColor: colors.slate200,
+    borderColor: '#e2e8f0',
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 10,
@@ -447,7 +454,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   presetChip: {
-    backgroundColor: colors.slate100,
+    backgroundColor: '#f1f5f9',
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 8,
@@ -458,12 +465,12 @@ const styles = StyleSheet.create({
     color: colors.slate700,
   },
   testResultBox: {
-    backgroundColor: colors.slate50,
+    backgroundColor: '#f8fafc',
     borderRadius: 10,
     padding: 10,
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: colors.slate200,
+    borderColor: '#e2e8f0',
   },
   testResultText: {
     fontSize: 12,

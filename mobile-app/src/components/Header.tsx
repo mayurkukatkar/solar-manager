@@ -2,26 +2,20 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Modal, TextInput, ActivityIndicator } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { colors } from '../theme/colors';
-import { UserRole } from '../types';
 
-export const Header: React.FC<{ title?: string; subtitle?: string }> = ({ title, subtitle }) => {
-  const { user, role, switchRole, backendStatus, updateServerUrl, checkServerConnection } = useAuth();
-  const [roleModalVisible, setRoleModalVisible] = useState(false);
+export const Header: React.FC<{
+  title?: string;
+  subtitle?: string;
+  showSearch?: boolean;
+  onSearch?: (q: string) => void;
+}> = ({ title, subtitle, showSearch, onSearch }) => {
+  const { user, backendStatus, updateServerUrl, switchTenantSession, logout } = useAuth();
   const [serverModalVisible, setServerModalVisible] = useState(false);
-  const [customUrl, setCustomUrl] = useState(backendStatus.serverUrl || 'http://localhost:5000');
+  const [tenantModalVisible, setTenantModalVisible] = useState(false);
+  const [customUrl, setCustomUrl] = useState(backendStatus.serverUrl);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<string | null>(null);
-
-  const getRoleBadge = (r: UserRole) => {
-    switch (r) {
-      case 'OWNER':
-        return { label: '👔 Owner', bg: '#ecfdf5', text: '#047857', border: '#a7f3d0' };
-      case 'SALES_AGENT':
-        return { label: '🤝 Sales Rep', bg: '#eff6ff', text: '#1d4ed8', border: '#bfdbfe' };
-      case 'TECHNICIAN':
-        return { label: '⚡ Field Tech', bg: '#fef3c7', text: '#b45309', border: '#fde68a' };
-    }
-  };
+  const [searchText, setSearchText] = useState('');
 
   const handleTestConnection = async () => {
     setTesting(true);
@@ -31,7 +25,7 @@ export const Header: React.FC<{ title?: string; subtitle?: string }> = ({ title,
       if (res.isOnline) {
         setTestResult(`✅ Connected! Latency: ${res.latencyMs || 0}ms`);
       } else {
-        setTestResult(`⚠️ Unreachable at ${customUrl}. Check if server is running.`);
+        setTestResult(`⚠️ Unreachable at ${customUrl}. Check backend status.`);
       }
     } catch (err: any) {
       setTestResult(`❌ Error: ${err.message}`);
@@ -40,18 +34,19 @@ export const Header: React.FC<{ title?: string; subtitle?: string }> = ({ title,
     }
   };
 
-  const badge = getRoleBadge(role);
-
   return (
     <View style={styles.container}>
+      {/* TOP ROW */}
       <View style={styles.topRow}>
         <View style={{ flex: 1 }}>
-          <Text style={styles.companyName}>{user?.tenantName || 'Solar ERP'}</Text>
+          <Text style={styles.companyName}>
+            {user?.tenantName || 'Solar ERP'}
+          </Text>
           <Text style={styles.userName}>{user?.name || 'User'}</Text>
         </View>
 
         <View style={styles.actionsRow}>
-          {/* Backend Connection Indicator */}
+          {/* Live Backend Status Pill */}
           <TouchableOpacity
             style={[
               styles.connectionPill,
@@ -71,22 +66,24 @@ export const Header: React.FC<{ title?: string; subtitle?: string }> = ({ title,
               ]}
             />
             <Text style={styles.connectionText}>
-              {backendStatus.isOnline ? 'Live API' : 'Demo/Offline'}
+              {backendStatus.isOnline ? 'Live Vercel' : 'Offline'}
             </Text>
           </TouchableOpacity>
 
-          {/* Role Pill */}
+          {/* User/Tenant Pill */}
           <TouchableOpacity
-            onPress={() => setRoleModalVisible(true)}
-            style={[styles.rolePill, { backgroundColor: badge.bg, borderColor: badge.border }]}
+            style={styles.tenantPill}
+            onPress={() => setTenantModalVisible(true)}
             activeOpacity={0.8}
           >
-            <Text style={[styles.rolePillText, { color: badge.text }]}>{badge.label}</Text>
-            <Text style={styles.switchHint}>▾</Text>
+            <Text style={styles.tenantPillText}>
+              {user?.role === 'SUPER_ADMIN' ? '👑 Platform' : '🏢 Tenant'}
+            </Text>
           </TouchableOpacity>
         </View>
       </View>
 
+      {/* TITLE & SUBTITLE */}
       {title && (
         <View style={styles.titleSection}>
           <Text style={styles.titleText}>{title}</Text>
@@ -94,75 +91,102 @@ export const Header: React.FC<{ title?: string; subtitle?: string }> = ({ title,
         </View>
       )}
 
-      {/* Role Switcher Modal */}
-      <Modal visible={roleModalVisible} transparent animationType="fade">
+      {/* SEARCH BAR (OPTIONAL) */}
+      {showSearch && (
+        <View style={styles.searchBox}>
+          <Text style={styles.searchIcon}>🔍</Text>
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search leads, projects, or customers..."
+            placeholderTextColor="#94a3b8"
+            value={searchText}
+            onChangeText={(t) => {
+              setSearchText(t);
+              if (onSearch) onSearch(t);
+            }}
+          />
+          {searchText ? (
+            <TouchableOpacity
+              onPress={() => {
+                setSearchText('');
+                if (onSearch) onSearch('');
+              }}
+            >
+              <Text style={{ color: '#94a3b8', fontWeight: '800' }}>✕</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+      )}
+
+      {/* TENANT / USER ACCOUNT MODAL */}
+      <Modal visible={tenantModalVisible} transparent animationType="fade">
         <TouchableOpacity
           style={styles.modalOverlay}
           activeOpacity={1}
-          onPress={() => setRoleModalVisible(false)}
+          onPress={() => setTenantModalVisible(false)}
         >
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Switch Mobile Workspace</Text>
+            <Text style={styles.modalTitle}>User Workspace</Text>
             <Text style={styles.modalSubtitle}>
-              Experience the interconnected app tailored for each operational role:
+              Logged in as <Text style={{ fontWeight: '800', color: colors.slate900 }}>{user?.email}</Text>
             </Text>
 
             <TouchableOpacity
-              style={[styles.roleOption, role === 'OWNER' && styles.roleOptionActive]}
+              style={[styles.accountOption, user?.email === 'mayurkukatkar43@gmail.com' && styles.accountOptionActive]}
               onPress={() => {
-                switchRole('OWNER');
-                setRoleModalVisible(false);
+                switchTenantSession('MAYUR');
+                setTenantModalVisible(false);
               }}
             >
-              <Text style={styles.roleOptionEmoji}>👔</Text>
-              <View style={styles.roleOptionTextWrapper}>
-                <Text style={styles.roleOptionTitle}>Owner / Executive</Text>
-                <Text style={styles.roleOptionDesc}>Revenue KPIs, cash flow, stage & discount approvals</Text>
+              <Text style={styles.accountOptionEmoji}>🏢</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.accountOptionTitle}>WhereReady IT Solutions</Text>
+                <Text style={styles.accountOptionSub}>Tenant Admin • Mayur Kukatkar (Nagpur)</Text>
               </View>
-              {role === 'OWNER' && <Text style={styles.activeCheck}>✓</Text>}
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.roleOption, role === 'SALES_AGENT' && styles.roleOptionActive]}
+              style={[styles.accountOption, user?.email === '2018pkunal@gmail.com' && styles.accountOptionActive]}
               onPress={() => {
-                switchRole('SALES_AGENT');
-                setRoleModalVisible(false);
+                switchTenantSession('KUNAL');
+                setTenantModalVisible(false);
               }}
             >
-              <Text style={styles.roleOptionEmoji}>🤝</Text>
-              <View style={styles.roleOptionTextWrapper}>
-                <Text style={styles.roleOptionTitle}>Sales Agent / Field CRM</Text>
-                <Text style={styles.roleOptionDesc}>On-ground leads, 60s quotes & WhatsApp proposals</Text>
+              <Text style={styles.accountOptionEmoji}>☀️</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.accountOptionTitle}>Solar Energy Solutions India</Text>
+                <Text style={styles.accountOptionSub}>Tenant Admin • Kunal Prajapati (Mumbai)</Text>
               </View>
-              {role === 'SALES_AGENT' && <Text style={styles.activeCheck}>✓</Text>}
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.roleOption, role === 'TECHNICIAN' && styles.roleOptionActive]}
+              style={[styles.accountOption, user?.role === 'SUPER_ADMIN' && styles.accountOptionActive]}
               onPress={() => {
-                switchRole('TECHNICIAN');
-                setRoleModalVisible(false);
+                switchTenantSession('SUPER_ADMIN');
+                setTenantModalVisible(false);
               }}
             >
-              <Text style={styles.roleOptionEmoji}>⚡</Text>
-              <View style={styles.roleOptionTextWrapper}>
-                <Text style={styles.roleOptionTitle}>Field Technician / Installer</Text>
-                <Text style={styles.roleOptionDesc}>Job queue, checklists, serial scanning, geo-photos & e-sign</Text>
+              <Text style={styles.accountOptionEmoji}>👑</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.accountOptionTitle}>Platform Super Admin</Text>
+                <Text style={styles.accountOptionSub}>Platform Owner • Global Telemetry</Text>
               </View>
-              {role === 'TECHNICIAN' && <Text style={styles.activeCheck}>✓</Text>}
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={styles.closeButton}
-              onPress={() => setRoleModalVisible(false)}
+              style={styles.logoutBtn}
+              onPress={() => {
+                setTenantModalVisible(false);
+                logout();
+              }}
             >
-              <Text style={styles.closeButtonText}>Done</Text>
+              <Text style={styles.logoutBtnText}>🚪 Sign Out</Text>
             </TouchableOpacity>
           </View>
         </TouchableOpacity>
       </Modal>
 
-      {/* Backend Connection Modal */}
+      {/* BACKEND SERVER URL MODAL */}
       <Modal visible={serverModalVisible} transparent animationType="fade">
         <TouchableOpacity
           style={styles.modalOverlay}
@@ -170,33 +194,32 @@ export const Header: React.FC<{ title?: string; subtitle?: string }> = ({ title,
           onPress={() => setServerModalVisible(false)}
         >
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Backend Connection</Text>
+            <Text style={styles.modalTitle}>Backend Server Configuration</Text>
             <Text style={styles.modalSubtitle}>
-              Connect mobile app directly to your Node.js/Express backend ({backendStatus.serverUrl})
+              Connected to live Vercel API backend:
             </Text>
 
-            <Text style={styles.inputLabel}>SERVER API URL</Text>
             <TextInput
               style={styles.serverInput}
               value={customUrl}
               onChangeText={setCustomUrl}
               autoCapitalize="none"
               autoCorrect={false}
-              placeholder="http://localhost:5000"
+              placeholder="https://solar-manager-three.vercel.app"
             />
 
             <View style={styles.presetsRow}>
               <TouchableOpacity
                 style={styles.presetChip}
-                onPress={() => setCustomUrl('http://localhost:5000')}
+                onPress={() => setCustomUrl('https://solar-manager-three.vercel.app')}
               >
-                <Text style={styles.presetChipText}>Localhost:5000</Text>
+                <Text style={styles.presetChipText}>Live Vercel Backend</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.presetChip}
                 onPress={() => setCustomUrl('http://10.0.2.2:5000')}
               >
-                <Text style={styles.presetChipText}>Android (10.0.2.2)</Text>
+                <Text style={styles.presetChipText}>Android Localhost</Text>
               </TouchableOpacity>
             </View>
 
@@ -214,15 +237,15 @@ export const Header: React.FC<{ title?: string; subtitle?: string }> = ({ title,
               {testing ? (
                 <ActivityIndicator size="small" color="#fff" />
               ) : (
-                <Text style={styles.testBtnText}>Test & Save Server URL</Text>
+                <Text style={styles.testBtnText}>Test & Connect</Text>
               )}
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.closeButton, { marginTop: 10 }]}
+              style={[styles.closeBtn, { marginTop: 10 }]}
               onPress={() => setServerModalVisible(false)}
             >
-              <Text style={styles.closeButtonText}>Close</Text>
+              <Text style={styles.closeBtnText}>Done</Text>
             </TouchableOpacity>
           </View>
         </TouchableOpacity>
@@ -234,9 +257,9 @@ export const Header: React.FC<{ title?: string; subtitle?: string }> = ({ title,
 const styles = StyleSheet.create({
   container: {
     backgroundColor: colors.slate900,
-    paddingTop: 54,
-    paddingHorizontal: 20,
-    paddingBottom: 20,
+    paddingTop: 52,
+    paddingHorizontal: 18,
+    paddingBottom: 18,
     borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,
   },
@@ -244,11 +267,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-  },
-  actionsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
   },
   companyName: {
     fontSize: 12,
@@ -258,10 +276,15 @@ const styles = StyleSheet.create({
     letterSpacing: 0.8,
   },
   userName: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '900',
     color: colors.white,
-    marginTop: 2,
+    marginTop: 1,
+  },
+  actionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   connectionPill: {
     flexDirection: 'row',
@@ -274,42 +297,37 @@ const styles = StyleSheet.create({
   },
   connOnline: {
     backgroundColor: 'rgba(16, 185, 129, 0.15)',
-    borderColor: 'rgba(16, 185, 129, 0.35)',
+    borderColor: 'rgba(16, 185, 129, 0.4)',
   },
   connOffline: {
     backgroundColor: 'rgba(245, 158, 11, 0.15)',
-    borderColor: 'rgba(245, 158, 11, 0.35)',
+    borderColor: 'rgba(245, 158, 11, 0.4)',
   },
   connDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
   },
   connectionText: {
     fontSize: 10,
     fontWeight: '800',
     color: colors.white,
   },
-  rolePill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 6,
+  tenantPill: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    paddingVertical: 5,
     paddingHorizontal: 10,
-    borderRadius: 20,
+    borderRadius: 16,
     borderWidth: 1,
-    gap: 4,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
   },
-  rolePillText: {
-    fontSize: 12,
+  tenantPillText: {
+    fontSize: 11,
     fontWeight: '800',
-  },
-  switchHint: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: colors.slate600,
+    color: colors.white,
   },
   titleSection: {
-    marginTop: 18,
+    marginTop: 14,
   },
   titleText: {
     fontSize: 22,
@@ -319,7 +337,28 @@ const styles = StyleSheet.create({
   subtitleText: {
     fontSize: 12,
     color: colors.slate400,
-    marginTop: 4,
+    marginTop: 3,
+  },
+  searchBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginTop: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+  },
+  searchIcon: {
+    fontSize: 14,
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 13,
+    color: colors.white,
+    padding: 0,
   },
   modalOverlay: {
     flex: 1,
@@ -330,90 +369,80 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     backgroundColor: colors.white,
-    borderRadius: 28,
+    borderRadius: 24,
     padding: 24,
     width: '100%',
-    maxWidth: 380,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.25,
-    shadowRadius: 20,
-    elevation: 10,
+    maxWidth: 360,
   },
   modalTitle: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '900',
     color: colors.slate900,
   },
   modalSubtitle: {
     fontSize: 12,
     color: colors.slate500,
-    marginTop: 4,
+    marginTop: 3,
     marginBottom: 16,
-    lineHeight: 18,
   },
-  roleOption: {
+  accountOption: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 14,
-    borderRadius: 16,
-    backgroundColor: colors.slate50,
+    padding: 12,
+    borderRadius: 14,
+    backgroundColor: '#f8fafc',
+    marginBottom: 8,
     borderWidth: 1.5,
-    borderColor: colors.slate200,
-    marginBottom: 12,
+    borderColor: '#e2e8f0',
   },
-  roleOptionActive: {
+  accountOptionActive: {
     borderColor: colors.primary,
     backgroundColor: colors.primaryMuted,
   },
-  roleOptionEmoji: {
-    fontSize: 24,
-    marginRight: 12,
+  accountOptionEmoji: {
+    fontSize: 22,
+    marginRight: 10,
   },
-  roleOptionTextWrapper: {
-    flex: 1,
-  },
-  roleOptionTitle: {
-    fontSize: 14,
+  accountOptionTitle: {
+    fontSize: 13,
     fontWeight: '800',
     color: colors.slate900,
   },
-  roleOptionDesc: {
-    fontSize: 11,
+  accountOptionSub: {
+    fontSize: 10,
     color: colors.slate500,
     marginTop: 2,
   },
-  activeCheck: {
-    fontSize: 18,
-    fontWeight: '900',
-    color: colors.primary,
-    marginLeft: 8,
+  logoutBtn: {
+    marginTop: 12,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: '#fee2e2',
+    alignItems: 'center',
   },
-  inputLabel: {
-    fontSize: 11,
+  logoutBtnText: {
+    color: '#b91c1c',
+    fontSize: 13,
     fontWeight: '800',
-    color: colors.slate400,
-    letterSpacing: 0.5,
-    marginBottom: 6,
   },
   serverInput: {
-    backgroundColor: colors.slate50,
+    backgroundColor: '#f8fafc',
     borderWidth: 1.5,
-    borderColor: colors.slate200,
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 14,
+    borderColor: '#e2e8f0',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 13,
     color: colors.slate900,
-    marginBottom: 12,
+    marginBottom: 10,
   },
   presetsRow: {
     flexDirection: 'row',
     gap: 8,
-    marginBottom: 14,
+    marginBottom: 12,
   },
   presetChip: {
-    backgroundColor: colors.slate100,
+    backgroundColor: '#f1f5f9',
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 8,
@@ -424,12 +453,12 @@ const styles = StyleSheet.create({
     color: colors.slate700,
   },
   testResultBox: {
-    backgroundColor: colors.slate50,
-    borderRadius: 12,
+    backgroundColor: '#f8fafc',
+    borderRadius: 10,
     padding: 10,
-    marginBottom: 12,
+    marginBottom: 10,
     borderWidth: 1,
-    borderColor: colors.slate200,
+    borderColor: '#e2e8f0',
   },
   testResultText: {
     fontSize: 12,
@@ -438,25 +467,22 @@ const styles = StyleSheet.create({
   },
   testBtn: {
     backgroundColor: colors.primary,
-    paddingVertical: 14,
-    borderRadius: 14,
+    paddingVertical: 12,
+    borderRadius: 12,
     alignItems: 'center',
   },
   testBtnText: {
     color: colors.white,
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '800',
   },
-  closeButton: {
-    marginTop: 6,
-    paddingVertical: 12,
-    backgroundColor: colors.slate900,
-    borderRadius: 14,
+  closeBtn: {
+    paddingVertical: 10,
     alignItems: 'center',
   },
-  closeButtonText: {
-    color: colors.white,
-    fontSize: 14,
+  closeBtnText: {
+    fontSize: 12,
     fontWeight: '800',
+    color: colors.slate500,
   },
 });

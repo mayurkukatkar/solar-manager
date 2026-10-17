@@ -14,16 +14,13 @@ import {
 } from 'react-native';
 import { Header } from '../../components/Header';
 import { colors } from '../../theme/colors';
-import { techApi } from '../../api/endpoints';
-import { useAuth } from '../../context/AuthContext';
+import { installationsApi } from '../../api/endpoints';
 import { InstallationJob } from '../../types';
 
-export const TechDashboardScreen: React.FC = () => {
-  const { backendStatus } = useAuth();
-  const [refreshing, setRefreshing] = useState(false);
+export const OperationsScreen: React.FC = () => {
+  const [jobs, setJobs] = useState<InstallationJob[]>([]);
   const [loading, setLoading] = useState(true);
-
-  // High level KPIs
+  const [refreshing, setRefreshing] = useState(false);
   const [dashboardKpis, setDashboardKpis] = useState({
     scheduledToday: 1,
     inProgress: 1,
@@ -32,7 +29,7 @@ export const TechDashboardScreen: React.FC = () => {
     completedToday: 0,
   });
 
-  // Selected Job for execution modal
+  // Active Job Execution Modal
   const [activeJob, setActiveJob] = useState<InstallationJob | null>(null);
   const [activeTab, setActiveTab] = useState<'CHECKLIST' | 'BARCODES' | 'PHOTOS' | 'SIGNOFF'>('CHECKLIST');
 
@@ -52,7 +49,6 @@ export const TechDashboardScreen: React.FC = () => {
     'MS2608211A3882',
     'MS2608211A3908',
     'MS2608211A4160',
-    'MS2608211A4181',
   ]);
   const [manualSerialInput, setManualSerialInput] = useState('');
 
@@ -62,22 +58,22 @@ export const TechDashboardScreen: React.FC = () => {
     { slot: 2, name: 'Photo 2: Inverter LCD & Serial', category: 'INVERTER', captured: true, lat: 21.1458, lng: 79.0882, time: '11:12 AM' },
     { slot: 3, name: 'Photo 3: Dual Bi-directional Net Meter', category: 'PANELS', captured: false, lat: null, lng: null, time: null },
     { slot: 4, name: 'Photo 4: Chemical Earthing Pit Chamber', category: 'EARTHING', captured: false, lat: null, lng: null, time: null },
-    { slot: 5, name: 'Photo 5: Customer Handover / Cheque', category: 'HANDOVER', captured: true, lat: 21.1458, lng: 79.0882, time: '11:30 AM' },
+    { slot: 5, name: 'Photo 5: Customer Handover & Sign', category: 'HANDOVER', captured: true, lat: 21.1458, lng: 79.0882, time: '11:30 AM' },
   ]);
 
   const [customerSigned, setCustomerSigned] = useState(false);
 
-  // Job List
-  const [jobs, setJobs] = useState<InstallationJob[]>([]);
-
   useEffect(() => {
-    fetchTechData();
+    fetchOperations();
   }, []);
 
-  const fetchTechData = async () => {
+  const fetchOperations = async () => {
     try {
-      // 1. Fetch dashboard KPIs
-      const kpis = await techApi.getDashboard().catch(() => null);
+      const [kpis, instData] = await Promise.all([
+        installationsApi.getDashboard().catch(() => null),
+        installationsApi.getInstallations().catch(() => null),
+      ]);
+
       if (kpis) {
         setDashboardKpis({
           scheduledToday: kpis.scheduledToday || 0,
@@ -88,8 +84,6 @@ export const TechDashboardScreen: React.FC = () => {
         });
       }
 
-      // 2. Fetch installations list
-      const instData = await techApi.getInstallations().catch(() => null);
       if (instData && Array.isArray(instData.installations) && instData.installations.length > 0) {
         const mapped: InstallationJob[] = instData.installations.map((item: any) => ({
           id: item.id,
@@ -97,9 +91,9 @@ export const TechDashboardScreen: React.FC = () => {
           projectNumber: item.project?.name || item.jobId,
           customerName: item.customer?.name || 'Solar Customer',
           phone: item.customer?.mobile || '9881255560',
-          address: item.installationAddress || 'Nagpur Site',
+          address: item.installationAddress || 'Site Address',
           city: item.city || 'Nagpur',
-          capacityKw: item.project?.capacity || item.project?.systemCapacity || 3.3,
+          capacityKw: item.project?.capacity || 3.3,
           panelBrand: 'Adani Solar (535 Wp)',
           inverterBrand: 'Polycab 3.3kW Single Phase',
           status: item.status || 'SCHEDULED',
@@ -115,31 +109,31 @@ export const TechDashboardScreen: React.FC = () => {
         // Fallback realistic jobs
         setJobs([
           {
-            id: 'inst-001',
+            id: 'ins-001',
             jobId: 'INS-2026-0001',
-            projectNumber: 'PRJ-00012: Kawale Residence',
-            customerName: 'Surendra Rambhau Thakre',
-            phone: '8605849639',
-            address: 'Plot 87, Navin Nagar, Butibori Road',
+            projectNumber: 'PRJ-QT-202610-3012: Kawale Rooftop',
+            customerName: 'Ravi Dodkuji Kawale',
+            phone: '9881255560',
+            address: 'Plot 87, Butibori Road',
             city: 'Nagpur',
-            capacityKw: 3.3,
+            capacityKw: 3.0,
             panelBrand: 'Adani Solar (535 Wp)',
             inverterBrand: 'Polycab 3.3kW Single Phase',
-            status: 'ON_SITE',
-            scheduledDate: 'Today, 9:00 AM',
+            status: 'IN_PROGRESS',
+            scheduledDate: 'Today, 9:30 AM',
             moduleSerialNumbers: scannedSerials,
             geoPhotos: [],
             checklist: [],
-            progressPercent: 42,
+            progressPercent: 45,
             priority: 'HIGH',
           },
           {
-            id: 'inst-002',
+            id: 'ins-002',
             jobId: 'INS-2026-0002',
-            projectNumber: 'PRJ-00015: Deshmukh Rooftop',
-            customerName: 'Ravi Dodkuji Kawale',
-            phone: '9822334455',
-            address: 'Tembhari Butibori Road',
+            projectNumber: 'PRJ-00012: Thakre Solar System',
+            customerName: 'Surendra Thakre',
+            phone: '9422114455',
+            address: 'Navin Nagar, Likklyan Society',
             city: 'Nagpur',
             capacityKw: 5.0,
             panelBrand: 'Adani Bifacial 540 Wp',
@@ -155,7 +149,7 @@ export const TechDashboardScreen: React.FC = () => {
         ]);
       }
     } catch (err: any) {
-      console.warn('Tech fetch notice:', err.message);
+      console.warn('Operations fetch error:', err.message);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -164,35 +158,19 @@ export const TechDashboardScreen: React.FC = () => {
 
   const onRefresh = () => {
     setRefreshing(true);
-    fetchTechData();
+    fetchOperations();
   };
 
   const toggleChecklist = (id: string) => {
-    const updated = checklist.map((item) =>
-      item.id === id ? { ...item, completed: !item.completed } : item
+    setChecklist((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, completed: !item.completed } : item))
     );
-    setChecklist(updated);
-
-    // Sync progress to backend if activeJob exists
-    if (activeJob) {
-      const completedCount = updated.filter((x) => x.completed).length;
-      const progress = Math.round((completedCount / updated.length) * 100);
-      if (backendStatus.isOnline) {
-        techApi.updateJobStatus(activeJob.id, activeJob.status, progress).catch(() => {});
-      }
-    }
   };
 
   const handleSimulateScan = () => {
     const nextSerial = `MS2608211A${4500 + Math.floor(Math.random() * 500)}`;
     setScannedSerials((prev) => [...prev, nextSerial]);
     Alert.alert('Barcode Scanned', `Scanned Module Serial: ${nextSerial}\nAuto-linked to DCR table.`);
-  };
-
-  const handleAddManualSerial = () => {
-    if (!manualSerialInput.trim()) return;
-    setScannedSerials((prev) => [...prev, manualSerialInput.trim().toUpperCase()]);
-    setManualSerialInput('');
   };
 
   const handleCapturePhoto = (slot: number) => {
@@ -209,26 +187,24 @@ export const TechDashboardScreen: React.FC = () => {
           : p
       )
     );
-    Alert.alert('Photo Captured & Tagged', `Slot ${slot} captured with GPS Coordinates: [21.1458° N, 79.0882° E].`);
+    Alert.alert('Geo-Photo Captured', `Slot ${slot} tagged with GPS: 21.1458° N, 79.0882° E.`);
   };
 
   const handleUpdateStatus = async (jobId: string, newStatus: string) => {
     try {
-      if (backendStatus.isOnline) {
-        await techApi.updateJobStatus(jobId, newStatus);
-      }
+      await installationsApi.updateJobStatus(jobId, newStatus);
       setJobs((prev) =>
         prev.map((j) => (j.id === jobId ? { ...j, status: newStatus as any } : j))
       );
       if (activeJob && activeJob.id === jobId) {
         setActiveJob({ ...activeJob, status: newStatus as any });
       }
-      Alert.alert('Status Updated', `Job marked as "${newStatus}". Synced to Central Operations.`);
+      Alert.alert('Status Updated', `Job marked as "${newStatus}". Synced to Vercel.`);
     } catch (err: any) {
       setJobs((prev) =>
         prev.map((j) => (j.id === jobId ? { ...j, status: newStatus as any } : j))
       );
-      Alert.alert('Status Updated', `Job status updated locally.`);
+      Alert.alert('Status Updated', `Job status saved.`);
     }
   };
 
@@ -236,50 +212,50 @@ export const TechDashboardScreen: React.FC = () => {
     <View style={styles.container}>
       <Header
         title="Field Operations & QA"
-        subtitle="Job queue, checklists, barcodes, geo-photos & e-sign"
+        subtitle="On-site execution, checklists & PM Surya Ghar inspections"
       />
 
+      {/* KPIS ROW (CONVERTED FROM WEB APP) */}
+      <View style={styles.kpiRow}>
+        <View style={[styles.kpiCard, { borderTopColor: '#3b82f6' }]}>
+          <Text style={styles.kpiVal}>{dashboardKpis.scheduledToday || jobs.length}</Text>
+          <Text style={styles.kpiLbl}>Scheduled</Text>
+        </View>
+        <View style={[styles.kpiCard, { borderTopColor: '#f59e0b' }]}>
+          <Text style={[styles.kpiVal, { color: '#d97706' }]}>{dashboardKpis.inProgress || 1}</Text>
+          <Text style={styles.kpiLbl}>In Progress</Text>
+        </View>
+        <View style={[styles.kpiCard, { borderTopColor: '#10b981' }]}>
+          <Text style={[styles.kpiVal, { color: '#047857' }]}>{dashboardKpis.completedToday}</Text>
+          <Text style={styles.kpiLbl}>Completed</Text>
+        </View>
+      </View>
+
+      {/* JOBS LIST */}
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
-        {/* KPI OVERVIEW (Web Inspiration) */}
-        <View style={styles.kpiRow}>
-          <View style={[styles.kpiCard, { borderTopColor: '#3b82f6' }]}>
-            <Text style={styles.kpiVal}>{dashboardKpis.scheduledToday || jobs.length}</Text>
-            <Text style={styles.kpiLbl}>Scheduled</Text>
-          </View>
-          <View style={[styles.kpiCard, { borderTopColor: '#f59e0b' }]}>
-            <Text style={[styles.kpiVal, { color: '#d97706' }]}>{dashboardKpis.inProgress || 1}</Text>
-            <Text style={styles.kpiLbl}>In Progress</Text>
-          </View>
-          <View style={[styles.kpiCard, { borderTopColor: '#10b981' }]}>
-            <Text style={[styles.kpiVal, { color: '#047857' }]}>{dashboardKpis.completedToday}</Text>
-            <Text style={styles.kpiLbl}>Completed</Text>
-          </View>
-        </View>
-
-        {/* JOB CARDS */}
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Assigned Installation Jobs ({jobs.length})</Text>
+        <View style={styles.sectionTitleRow}>
+          <Text style={styles.sectionTitle}>Installation Job Queue ({jobs.length})</Text>
         </View>
 
         {loading ? (
-          <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 20 }} />
+          <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 24 }} />
         ) : (
           jobs.map((job) => (
             <View key={job.id} style={styles.jobCard}>
               <View style={styles.jobHeader}>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.jobId}>{job.jobId || job.projectNumber}</Text>
+                  <Text style={styles.jobId}>{job.jobId || 'INS-2026'}</Text>
                   <Text style={styles.customerName}>{job.customerName}</Text>
                   <Text style={styles.addressText}>📍 {job.address}, {job.city}</Text>
                 </View>
                 <View
                   style={[
                     styles.statusPill,
-                    job.status === 'ON_SITE' || job.status === 'IN_PROGRESS'
+                    job.status === 'IN_PROGRESS' || job.status === 'ON_SITE'
                       ? styles.statusOnSite
                       : styles.statusAssigned,
                   ]}
@@ -340,7 +316,7 @@ export const TechDashboardScreen: React.FC = () => {
             <View style={styles.modalContainer}>
               <View style={styles.modalHeader}>
                 <View>
-                  <Text style={styles.modalJobId}>{activeJob.jobId || activeJob.projectNumber}</Text>
+                  <Text style={styles.modalJobId}>{activeJob.jobId || 'INS-2026'}</Text>
                   <Text style={styles.modalCustomer}>{activeJob.customerName}</Text>
                 </View>
                 <TouchableOpacity
@@ -385,13 +361,13 @@ export const TechDashboardScreen: React.FC = () => {
                   onPress={() => setActiveTab('SIGNOFF')}
                 >
                   <Text style={[styles.tabBtnText, activeTab === 'SIGNOFF' && styles.tabBtnTextActive]}>
-                    E-Sign
+                    Sign-Off
                   </Text>
                 </TouchableOpacity>
               </View>
 
               <ScrollView style={{ flex: 1, padding: 16 }}>
-                {/* 1. CHECKLIST TAB */}
+                {/* 1. CHECKLIST */}
                 {activeTab === 'CHECKLIST' && (
                   <View>
                     <Text style={styles.tabSectionTitle}>Technical Quality & Safety Checklist</Text>
@@ -416,7 +392,7 @@ export const TechDashboardScreen: React.FC = () => {
                   </View>
                 )}
 
-                {/* 2. BARCODES TAB */}
+                {/* 2. BARCODES */}
                 {activeTab === 'BARCODES' && (
                   <View>
                     <Text style={styles.tabSectionTitle}>PV Module Barcode / QR Scanner</Text>
@@ -435,12 +411,22 @@ export const TechDashboardScreen: React.FC = () => {
                         value={manualSerialInput}
                         onChangeText={setManualSerialInput}
                       />
-                      <TouchableOpacity style={styles.addSerialBtn} onPress={handleAddManualSerial}>
+                      <TouchableOpacity
+                        style={styles.addSerialBtn}
+                        onPress={() => {
+                          if (manualSerialInput.trim()) {
+                            setScannedSerials([...scannedSerials, manualSerialInput.trim().toUpperCase()]);
+                            setManualSerialInput('');
+                          }
+                        }}
+                      >
                         <Text style={styles.addSerialText}>Add</Text>
                       </TouchableOpacity>
                     </View>
 
-                    <Text style={[styles.inputLabel, { marginTop: 16 }]}>SCANNED MODULE SERIALS ({scannedSerials.length})</Text>
+                    <Text style={[styles.inputLabel, { marginTop: 16 }]}>
+                      SCANNED MODULE SERIALS ({scannedSerials.length})
+                    </Text>
                     {scannedSerials.map((s, idx) => (
                       <View key={idx} style={styles.serialBadge}>
                         <Text style={styles.serialIndex}>#{idx + 1}</Text>
@@ -451,7 +437,7 @@ export const TechDashboardScreen: React.FC = () => {
                   </View>
                 )}
 
-                {/* 3. GEO PHOTOS TAB */}
+                {/* 3. GEO PHOTOS */}
                 {activeTab === 'PHOTOS' && (
                   <View>
                     <Text style={styles.tabSectionTitle}>5 PM Surya Ghar Mandatory Geo-Photos</Text>
@@ -485,7 +471,7 @@ export const TechDashboardScreen: React.FC = () => {
                   </View>
                 )}
 
-                {/* 4. DIGITAL SIGN OFF TAB */}
+                {/* 4. DIGITAL SIGN OFF */}
                 {activeTab === 'SIGNOFF' && (
                   <View>
                     <Text style={styles.tabSectionTitle}>Customer Digital Handover & Sign-Off</Text>
@@ -524,7 +510,7 @@ export const TechDashboardScreen: React.FC = () => {
                       disabled={!customerSigned}
                     >
                       <Text style={styles.completeJobBtnText}>
-                        🚀 Commission System & Submit Dossier to Central Server
+                        🚀 Commission System & Submit Dossier to Cloud ERP
                       </Text>
                     </TouchableOpacity>
                   </View>
@@ -543,30 +529,27 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f8fafc',
   },
-  scroll: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: 16,
-    paddingBottom: 40,
-  },
   kpiRow: {
     flexDirection: 'row',
     gap: 8,
-    marginBottom: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: colors.white,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e2e8f0',
   },
   kpiCard: {
     flex: 1,
     backgroundColor: colors.white,
-    paddingVertical: 12,
+    paddingVertical: 10,
     borderRadius: 14,
     alignItems: 'center',
-    borderTopWidth: 3.5,
+    borderTopWidth: 3,
     borderWidth: 1,
     borderColor: '#e2e8f0',
   },
   kpiVal: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '900',
     color: colors.slate900,
   },
@@ -576,7 +559,14 @@ const styles = StyleSheet.create({
     color: colors.slate500,
     marginTop: 2,
   },
-  sectionHeader: {
+  scroll: {
+    flex: 1,
+  },
+  scrollContent: {
+    padding: 16,
+    paddingBottom: 32,
+  },
+  sectionTitleRow: {
     marginBottom: 10,
   },
   sectionTitle: {
@@ -603,7 +593,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   jobId: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '800',
     color: colors.primary,
   },
@@ -806,7 +796,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     color: colors.slate800,
-    lineHeight: 16,
   },
   checklistTextDone: {
     color: '#065f46',
