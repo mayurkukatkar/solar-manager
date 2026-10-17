@@ -183,7 +183,7 @@ export const OperationsScreen: React.FC = () => {
           <Text style={styles.kpiLbl}>Scheduled</Text>
         </View>
         <View style={[styles.kpiCard, { borderTopColor: '#f59e0b' }]}>
-          <Text style={[styles.kpiVal, { color: '#d97706' }]}>{dashboardKpis.inProgress || 1}</Text>
+          <Text style={[styles.kpiVal, { color: '#d97706' }]}>{dashboardKpis.inProgress}</Text>
           <Text style={styles.kpiLbl}>In Progress</Text>
         </View>
         <View style={[styles.kpiCard, { borderTopColor: '#10b981' }]}>

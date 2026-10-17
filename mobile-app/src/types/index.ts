@@ -21,6 +21,18 @@ export interface DashboardData {
   outstanding: number;
 }
 
+export interface Customer {
+  id?: string;
+  name: string;
+  mobile?: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  consumerNumber?: string;
+}
+
 export interface Lead {
   id: string;
   name: string;
@@ -59,11 +71,15 @@ export interface Project {
   city?: string;
   state?: string;
   customerId?: string;
-  customer?: {
-    name: string;
-    mobile?: string;
-    email?: string;
-  };
+  customer?: Customer;
+  panelBrand?: string;
+  inverterBrand?: string;
+  structureType?: string;
+  discomName?: string;
+  consumerNumber?: string;
+  netMeteringAppNo?: string;
+  subsidyStatus?: string;
+  cfaAmount?: number;
   createdAt?: string;
 }
 
@@ -75,9 +91,14 @@ export interface Quotation {
   tax: number;
   discount: number;
   total: number;
-  customer?: { name: string; email?: string; mobile?: string };
-  lead?: { name: string; email?: string; mobile?: string };
+  customer?: { name: string; email?: string; mobile?: string; phone?: string };
+  lead?: { name: string; email?: string; mobile?: string; phone?: string };
   createdAt: string;
+  capacity?: number;
+  panelBrand?: string;
+  inverterBrand?: string;
+  netPayable?: number;
+  subsidyAmount?: number;
 }
 
 export interface QuotationCalculation {
@@ -144,4 +165,81 @@ export interface BackendConnectionStatus {
   serverUrl: string;
   latencyMs?: number;
   lastChecked?: string;
+}
+
+export interface SiteSurvey {
+  id: string;
+  surveyNumber?: string;
+  status: string;
+  surveyDate?: string;
+  proposedCap?: number;
+  roofType?: string;
+  notes?: string;
+  customer?: {
+    name: string;
+    mobile?: string;
+    phone?: string;
+    city?: string;
+    address?: string;
+  };
+  lead?: {
+    name: string;
+    mobile?: string;
+    phone?: string;
+    city?: string;
+  };
+}
+
+export interface Invoice {
+  id: string;
+  invoiceNumber: string;
+  amount: number;
+  status: string;
+  dueDate?: string;
+  createdAt: string;
+  customer?: { name: string; email?: string; mobile?: string; phone?: string };
+  project?: { name: string; capacity?: number };
+}
+
+export interface SubsidyApplication {
+  id: string;
+  nationalPortalAppNo?: string;
+  consumerNumber?: string;
+  customerName?: string;
+  customerMobile?: string;
+  discomName?: string;
+  proposedCapacity?: number | string;
+  status: string;
+  cfaAmount?: number;
+  dbtStatus?: string;
+  bankName?: string;
+  accountNumber?: string;
+  ifscCode?: string;
+  division?: string;
+  createdAt?: string;
+}
+
+export interface DiscomApplication {
+  id: string;
+  applicationNumber: string;
+  consumerNumber: string;
+  consumerName: string;
+  discomName: string;
+  sanctionedLoadKw: number;
+  status: 'APPLIED' | 'FEASIBILITY_CLEARED' | 'QUOTATION_PAID' | 'METER_TESTING' | 'METER_INSTALLED' | 'SYNCHRONIZED';
+  appliedDate?: string;
+  meterSerial?: string;
+  division?: string;
+}
+
+export interface SolarLoanPlan {
+  capacityKw: number;
+  systemCost: number;
+  downPayment: number;
+  loanAmount: number;
+  tenureYears: number;
+  interestRateAnnual: number;
+  monthlyEmi: number;
+  monthlySavings: number;
+  monthlyNetProfit: number;
 }

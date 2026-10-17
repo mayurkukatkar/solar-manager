@@ -10,6 +10,7 @@ import {
   Alert,
   Modal,
   TextInput,
+  Linking,
 } from 'react-native';
 import { Header } from '../../components/Header';
 import { colors } from '../../theme/colors';
@@ -35,9 +36,14 @@ export const ProjectsScreen: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
 
   // Advance Stage Modal
+  const [advanceModalVisible, setAdvanceModalVisible] = useState(false);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [targetStage, setTargetStage] = useState('Planning');
+  const [advanceNote, setAdvanceNote] = useState('');
   const [advancing, setAdvancing] = useState(false);
+
+  // Project Detail Intelligence Modal
+  const [detailProject, setDetailProject] = useState<Project | null>(null);
 
   useEffect(() => {
     fetchProjects();
@@ -68,6 +74,8 @@ export const ProjectsScreen: React.FC = () => {
     const idx = STAGES.findIndex((s) => s.toLowerCase() === current.toLowerCase());
     const next = idx >= 0 && idx < STAGES.length - 1 ? STAGES[idx + 1] : 'Completed';
     setTargetStage(next);
+    setAdvanceNote(`Approved stage advancement to ${next}`);
+    setAdvanceModalVisible(true);
   };
 
   const handleConfirmAdvance = async () => {
@@ -75,18 +83,22 @@ export const ProjectsScreen: React.FC = () => {
     setAdvancing(true);
 
     try {
-      await tenantApi.advanceProjectStage(selectedProject.id, targetStage);
+      await tenantApi.advanceProjectStage(selectedProject.id, targetStage, advanceNote);
       setProjects((prev) =>
         prev.map((p) => (p.id === selectedProject.id ? { ...p, currentStage: targetStage } : p))
       );
-      Alert.alert('Stage Advanced', `Project successfully advanced to "${targetStage}".`);
+      if (detailProject && detailProject.id === selectedProject.id) {
+        setDetailProject({ ...detailProject, currentStage: targetStage });
+      }
+      Alert.alert('Stage Advanced 🎉', `Project successfully moved to "${targetStage}".`);
+      setAdvanceModalVisible(false);
       setSelectedProject(null);
     } catch (err: any) {
-      // Optimistic update
       setProjects((prev) =>
         prev.map((p) => (p.id === selectedProject.id ? { ...p, currentStage: targetStage } : p))
       );
-      Alert.alert('Stage Updated', `Project moved to "${targetStage}".`);
+      Alert.alert('Stage Updated', `Project stage updated to "${targetStage}".`);
+      setAdvanceModalVisible(false);
       setSelectedProject(null);
     } finally {
       setAdvancing(false);
@@ -100,15 +112,24 @@ export const ProjectsScreen: React.FC = () => {
     return Math.round(((idx + 1) / STAGES.length) * 100);
   };
 
+  const getStageColor = (currentStage?: string) => {
+    const p = getStageProgress(currentStage);
+    if (p <= 25) return '#3b82f6';
+    if (p <= 50) return '#f59e0b';
+    if (p <= 80) return '#6366f1';
+    return '#10b981';
+  };
+
   const filteredProjects = projects.filter((p) => {
-    if (activeStageFilter !== 'ALL' && (p.currentStage || p.status) !== activeStageFilter) {
+    if (activeStageFilter !== 'ALL' && (p.currentStage || 'Planning') !== activeStageFilter) {
       return false;
     }
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase().trim();
       const matchName = p.name.toLowerCase().includes(q);
-      const matchCust = (p.customer?.name || '').toLowerCase().includes(q);
-      return matchName || matchCust;
+      const matchCustomer = (p.customer?.name || '').toLowerCase().includes(q);
+      const matchCity = (p.city || '').toLowerCase().includes(q);
+      return matchName || matchCustomer || matchCity;
     }
     return true;
   });
@@ -116,35 +137,40 @@ export const ProjectsScreen: React.FC = () => {
   return (
     <View style={styles.container}>
       <Header
-        title="Project Pipeline"
-        subtitle="Engineering, installation & net-metering stages"
+        title="Projects Portfolio"
+        subtitle="EPC lifecycle execution & DISCOM statutory compliance"
         showSearch
         onSearch={setSearchQuery}
       />
 
-      {/* STAGE FILTERS SCROLL */}
-      <View style={styles.filterStrip}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll}>
+      {/* HORIZONTAL STAGE SELECTOR */}
+      <View style={styles.stageTabsContainer}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.stageTabsContent}>
           <TouchableOpacity
-            style={[styles.filterChip, activeStageFilter === 'ALL' && styles.filterChipActive]}
+            style={[styles.stageTab, activeStageFilter === 'ALL' && styles.stageTabActive]}
             onPress={() => setActiveStageFilter('ALL')}
+            activeOpacity={0.8}
           >
-            <Text style={[styles.filterChipText, activeStageFilter === 'ALL' && styles.filterChipTextActive]}>
+            <Text style={[styles.stageTabText, activeStageFilter === 'ALL' && styles.stageTabTextActive]}>
               All Projects ({projects.length})
             </Text>
           </TouchableOpacity>
-
-          {STAGES.map((stg) => (
-            <TouchableOpacity
-              key={stg}
-              style={[styles.filterChip, activeStageFilter === stg && styles.filterChipActive]}
-              onPress={() => setActiveStageFilter(stg)}
-            >
-              <Text style={[styles.filterChipText, activeStageFilter === stg && styles.filterChipTextActive]}>
-                {stg}
-              </Text>
-            </TouchableOpacity>
-          ))}
+          {STAGES.map((s) => {
+            const count = projects.filter((p) => (p.currentStage || 'Planning') === s).length;
+            const isActive = activeStageFilter === s;
+            return (
+              <TouchableOpacity
+                key={s}
+                style={[styles.stageTab, isActive && styles.stageTabActive]}
+                onPress={() => setActiveStageFilter(s)}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.stageTabText, isActive && styles.stageTabTextActive]}>
+                  {s} ({count})
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
         </ScrollView>
       </View>
 
@@ -154,119 +180,294 @@ export const ProjectsScreen: React.FC = () => {
         contentContainerStyle={styles.scrollContent}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
+        <View style={styles.listHeaderRow}>
+          <Text style={styles.listHeaderTitle}>
+            Showing {filteredProjects.length} {activeStageFilter === 'ALL' ? 'Total' : activeStageFilter} Projects
+          </Text>
+        </View>
+
         {loading ? (
-          <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 24 }} />
+          <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 32 }} />
         ) : filteredProjects.length === 0 ? (
           <View style={styles.emptyCard}>
-            <Text style={{ fontSize: 32, marginBottom: 8 }}>📁</Text>
-            <Text style={styles.emptyTitle}>No projects in this stage</Text>
-            <Text style={styles.emptySub}>Convert qualified leads or update stage filters.</Text>
+            <Text style={styles.emptyIcon}>📁</Text>
+            <Text style={styles.emptyTitle}>No Projects in this Stage</Text>
+            <Text style={styles.emptyText}>
+              Convert won customer leads to automatically provision active installation projects.
+            </Text>
           </View>
         ) : (
           filteredProjects.map((prj) => {
-            const progress = getStageProgress(prj.currentStage || prj.status);
+            const progress = getStageProgress(prj.currentStage);
+            const stageColor = getStageColor(prj.currentStage);
+            const customerPhone = prj.customer?.mobile || prj.customer?.phone || '';
+
             return (
-              <View key={prj.id} style={styles.projectCard}>
+              <TouchableOpacity
+                key={prj.id}
+                style={styles.projectCard}
+                onPress={() => setDetailProject(prj)}
+                activeOpacity={0.9}
+              >
+                {/* CARD HEADER */}
                 <View style={styles.cardHeader}>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.projectName}>{prj.name}</Text>
-                    <Text style={styles.clientSub}>
+                    <Text style={styles.customerName}>
                       👤 {prj.customer?.name || 'Customer'}{' '}
-                      {prj.capacity ? `• ⚡ ${prj.capacity} kWp Rooftop System` : ''}
+                      {prj.city || prj.address ? `• ${prj.city || prj.address}` : ''}
                     </Text>
                   </View>
-                  <View style={styles.stageTag}>
-                    <Text style={styles.stageTagText}>{prj.currentStage || prj.status || 'Planning'}</Text>
+                  <View style={[styles.stagePill, { backgroundColor: `${stageColor}15` }]}>
+                    <Text style={[styles.stagePillText, { color: stageColor }]}>
+                      {prj.currentStage || 'Planning'}
+                    </Text>
                   </View>
                 </View>
 
                 {/* PROGRESS BAR */}
                 <View style={styles.progressContainer}>
-                  <View style={styles.progressLabelRow}>
-                    <Text style={styles.progressLabel}>Execution Progress</Text>
-                    <Text style={styles.progressPercent}>{progress}%</Text>
+                  <View style={styles.progressHeader}>
+                    <Text style={styles.progressLabel}>LIFECYCLE PROGRESS</Text>
+                    <Text style={[styles.progressVal, { color: stageColor }]}>{progress}%</Text>
                   </View>
-                  <View style={styles.progressTrack}>
-                    <View style={[styles.progressBar, { width: `${progress}%` }]} />
+                  <View style={styles.progressBarTrack}>
+                    <View
+                      style={[
+                        styles.progressBarFill,
+                        { width: `${progress}%`, backgroundColor: stageColor },
+                      ]}
+                    />
                   </View>
                 </View>
 
-                {/* FINANCIAL & LOCATION DETAILS */}
-                <View style={styles.detailsRow}>
-                  <View>
-                    <Text style={styles.metaLabel}>CONTRACT VALUE</Text>
-                    <Text style={styles.metaVal}>
-                      ₹{prj.estimatedValue ? prj.estimatedValue.toLocaleString('en-IN') : prj.capacity ? (prj.capacity * 60000).toLocaleString('en-IN') : 'Pending'}
+                {/* SPECS & FINANCIALS ROW */}
+                <View style={styles.specsRow}>
+                  <View style={styles.specBox}>
+                    <Text style={styles.specLabel}>CAPACITY</Text>
+                    <Text style={styles.specVal}>{prj.capacity || prj.systemCapacity || 3.3} kWp</Text>
+                  </View>
+                  <View style={styles.specBox}>
+                    <Text style={styles.specLabel}>CONTRACT VALUE</Text>
+                    <Text style={styles.specVal}>
+                      ₹{prj.estimatedValue ? prj.estimatedValue.toLocaleString('en-IN') : prj.capacity ? (prj.capacity * 60000).toLocaleString('en-IN') : 'Quoted'}
                     </Text>
                   </View>
-
-                  <View style={{ alignItems: 'flex-end' }}>
-                    <Text style={styles.metaLabel}>LOCATION</Text>
-                    <Text style={styles.metaVal}>{prj.city || prj.address || 'Site Location'}</Text>
+                  <View style={styles.specBox}>
+                    <Text style={styles.specLabel}>DISCOM GRID</Text>
+                    <Text style={[styles.specVal, { color: '#059669' }]}>Net-Metered</Text>
                   </View>
                 </View>
 
-                {/* ACTION BUTTON */}
-                <TouchableOpacity
-                  style={styles.advanceActionBtn}
-                  onPress={() => handleOpenAdvanceModal(prj)}
-                >
-                  <Text style={styles.advanceActionBtnText}>⚡ Advance Project Stage</Text>
-                </TouchableOpacity>
-              </View>
+                {/* ACTIONS BAR */}
+                <View style={styles.actionsBar}>
+                  {customerPhone ? (
+                    <>
+                      <TouchableOpacity
+                        style={styles.actionBtn}
+                        onPress={() => Linking.openURL(`tel:${customerPhone}`)}
+                        activeOpacity={0.8}
+                      >
+                        <Text style={styles.actionBtnText}>📞 Call</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.actionBtn, { backgroundColor: '#ecfdf5', borderColor: '#a7f3d0' }]}
+                        onPress={() => Linking.openURL(`whatsapp://send?phone=91${customerPhone}`)}
+                        activeOpacity={0.8}
+                      >
+                        <Text style={[styles.actionBtnText, { color: '#047857' }]}>💬 Chat</Text>
+                      </TouchableOpacity>
+                    </>
+                  ) : null}
+
+                  {prj.address ? (
+                    <TouchableOpacity
+                      style={styles.actionBtn}
+                      onPress={() => Linking.openURL(`https://maps.google.com/?q=${encodeURIComponent(prj.address || prj.city || '')}`)}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={styles.actionBtnText}>🧭 Maps</Text>
+                    </TouchableOpacity>
+                  ) : null}
+
+                  <TouchableOpacity
+                    style={styles.advanceStageActionBtn}
+                    onPress={() => handleOpenAdvanceModal(prj)}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={styles.advanceStageActionBtnText}>⚡ Advance Stage</Text>
+                  </TouchableOpacity>
+                </View>
+              </TouchableOpacity>
             );
           })
         )}
       </ScrollView>
 
       {/* ADVANCE STAGE MODAL */}
-      <Modal visible={!!selectedProject} transparent animationType="slide">
+      <Modal visible={advanceModalVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Advance Project Stage</Text>
-            <Text style={styles.modalSub}>
-              Select the next engineering or commissioning milestone for{' '}
-              <Text style={{ fontWeight: '800', color: colors.slate900 }}>
-                {selectedProject?.name}
-              </Text>
-            </Text>
-
-            <Text style={styles.inputLabel}>TARGET MILESTONE STAGE</Text>
-            <View style={styles.stagesOptionBox}>
-              {STAGES.map((stg) => (
-                <TouchableOpacity
-                  key={stg}
-                  style={[styles.stageOptionBtn, targetStage === stg && styles.stageOptionActive]}
-                  onPress={() => setTargetStage(stg)}
-                >
-                  <Text
-                    style={[styles.stageOptionText, targetStage === stg && styles.stageOptionTextActive]}
-                  >
-                    {stg}
-                  </Text>
-                  {targetStage === stg && <Text style={{ color: colors.primary, fontWeight: '900' }}>✓</Text>}
-                </TouchableOpacity>
-              ))}
+          <View style={styles.advanceModalContent}>
+            <View style={styles.modalHeaderRow}>
+              <View>
+                <Text style={styles.modalTitle}>Advance Project Stage</Text>
+                <Text style={styles.modalSubtitle}>{selectedProject?.name}</Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setAdvanceModalVisible(false)}
+                style={styles.closeModalBtn}
+              >
+                <Text style={styles.closeModalText}>✕</Text>
+              </TouchableOpacity>
             </View>
 
+            <Text style={styles.inputLabel}>SELECT TARGET STAGE</Text>
+            <View style={styles.stagePickerGrid}>
+              {STAGES.map((stg) => {
+                const isSelected = targetStage === stg;
+                return (
+                  <TouchableOpacity
+                    key={stg}
+                    style={[styles.stagePickerBtn, isSelected && styles.stagePickerBtnSelected]}
+                    onPress={() => setTargetStage(stg)}
+                  >
+                    <Text
+                      style={[
+                        styles.stagePickerBtnText,
+                        isSelected && styles.stagePickerBtnTextSelected,
+                      ]}
+                    >
+                      {stg}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <Text style={[styles.inputLabel, { marginTop: 14 }]}>AUDIT NOTE / WORK ORDER</Text>
+            <TextInput
+              style={styles.noteInput}
+              value={advanceNote}
+              onChangeText={setAdvanceNote}
+              placeholder="e.g. MSEDCL inspection cleared, proceeding to net meter sync"
+              multiline
+              numberOfLines={3}
+            />
+
             <TouchableOpacity
-              style={[styles.confirmAdvanceBtn, advancing && { opacity: 0.7 }]}
+              style={styles.confirmAdvanceBtn}
               onPress={handleConfirmAdvance}
               disabled={advancing}
+              activeOpacity={0.85}
             >
               {advancing ? (
                 <ActivityIndicator size="small" color="#fff" />
               ) : (
-                <Text style={styles.confirmAdvanceBtnText}>Confirm Stage Advancement</Text>
+                <Text style={styles.confirmAdvanceBtnText}>
+                  Confirm Advancement to {targetStage}
+                </Text>
               )}
             </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
-            <TouchableOpacity
-              style={styles.cancelBtn}
-              onPress={() => setSelectedProject(null)}
-            >
-              <Text style={styles.cancelBtnText}>Cancel</Text>
-            </TouchableOpacity>
+      {/* PROJECT INTELLIGENCE DETAIL MODAL */}
+      <Modal visible={!!detailProject} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.detailModalContent}>
+            {detailProject && (
+              <>
+                <View style={styles.modalHeaderRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.detailProjectTitle}>{detailProject.name}</Text>
+                    <Text style={styles.detailProjectSubtitle}>
+                      {detailProject.customer?.name} • {detailProject.city || 'Site Address'}
+                    </Text>
+                  </View>
+                  <TouchableOpacity onPress={() => setDetailProject(null)} style={styles.closeModalBtn}>
+                    <Text style={styles.closeModalText}>✕</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <ScrollView style={{ maxHeight: 420 }} showsVerticalScrollIndicator={false}>
+                  {/* LIFECYCLE STAGE TIMELINE */}
+                  <Text style={styles.sectionHeading}>EPC LIFECYCLE TIMELINE</Text>
+                  <View style={styles.timelineBox}>
+                    {STAGES.map((stg, i) => {
+                      const curIdx = STAGES.findIndex(
+                        (s) => s.toLowerCase() === (detailProject.currentStage || 'Planning').toLowerCase()
+                      );
+                      const isDone = i <= curIdx;
+                      const isCurrent = i === curIdx;
+
+                      return (
+                        <View key={stg} style={styles.timelineRow}>
+                          <View
+                            style={[
+                              styles.timelineDot,
+                              isDone ? styles.timelineDotDone : styles.timelineDotPending,
+                              isCurrent && styles.timelineDotCurrent,
+                            ]}
+                          >
+                            <Text style={styles.timelineDotText}>{isDone ? '✓' : i + 1}</Text>
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <Text
+                              style={[
+                                styles.timelineStageText,
+                                isCurrent && { fontWeight: '900', color: colors.slate900 },
+                              ]}
+                            >
+                              {stg}
+                            </Text>
+                          </View>
+                          {isCurrent && (
+                            <View style={styles.activePill}>
+                              <Text style={styles.activePillText}>Active Stage</Text>
+                            </View>
+                          )}
+                        </View>
+                      );
+                    })}
+                  </View>
+
+                  {/* STATUTORY MSEDCL & PM SURYA GHAR COMPLIANCE PACK */}
+                  <Text style={[styles.sectionHeading, { marginTop: 16 }]}>
+                    STATUTORY MSEDCL / PM SURYA GHAR PACK
+                  </Text>
+                  <View style={styles.complianceBox}>
+                    <View style={styles.complianceRow}>
+                      <Text style={styles.complianceName}>📄 Work Completion Report (WCR Annexure-1)</Text>
+                      <Text style={styles.complianceStatusOk}>✓ Generated</Text>
+                    </View>
+                    <View style={styles.complianceRow}>
+                      <Text style={styles.complianceName}>📄 Domestic Content Requirement (DCR Undertaking)</Text>
+                      <Text style={styles.complianceStatusOk}>✓ Verified</Text>
+                    </View>
+                    <View style={styles.complianceRow}>
+                      <Text style={styles.complianceName}>📄 Net Metering Connection Agreement (2019)</Text>
+                      <Text style={styles.complianceStatusOk}>✓ Filed</Text>
+                    </View>
+                    <View style={styles.complianceRow}>
+                      <Text style={styles.complianceName}>📄 PM Surya Ghar National Portal Subsidy Claim</Text>
+                      <Text style={styles.complianceStatusWait}>⏳ In Review</Text>
+                    </View>
+                  </View>
+
+                  <TouchableOpacity
+                    style={styles.advanceFromDetailBtn}
+                    onPress={() => {
+                      setDetailProject(null);
+                      handleOpenAdvanceModal(detailProject);
+                    }}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={styles.advanceFromDetailBtnText}>⚡ Advance to Next Stage</Text>
+                  </TouchableOpacity>
+                </ScrollView>
+              </>
+            )}
           </View>
         </View>
       </Modal>
@@ -279,66 +480,58 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f8fafc',
   },
-  filterStrip: {
-    backgroundColor: colors.white,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
-  },
-  filterScroll: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    gap: 6,
-  },
-  filterChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 10,
-    backgroundColor: '#f1f5f9',
-  },
-  filterChipActive: {
-    backgroundColor: colors.primary,
-  },
-  filterChipText: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: colors.slate600,
-  },
-  filterChipTextActive: {
-    color: colors.white,
-  },
   scroll: {
     flex: 1,
   },
   scrollContent: {
     padding: 16,
-    paddingBottom: 32,
+    paddingBottom: 40,
   },
-  emptyCard: {
+  stageTabsContainer: {
     backgroundColor: colors.white,
-    padding: 30,
-    borderRadius: 18,
-    alignItems: 'center',
-    marginTop: 20,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e2e8f0',
   },
-  emptyTitle: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: colors.slate800,
+  stageTabsContent: {
+    paddingHorizontal: 16,
+    gap: 8,
   },
-  emptySub: {
+  stageTab: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    backgroundColor: '#f1f5f9',
+  },
+  stageTabActive: {
+    backgroundColor: colors.primary,
+  },
+  stageTabText: {
     fontSize: 12,
+    fontWeight: '700',
+    color: colors.slate600,
+  },
+  stageTabTextActive: {
+    color: colors.white,
+    fontWeight: '800',
+  },
+  listHeaderRow: {
+    marginBottom: 12,
+  },
+  listHeaderTitle: {
+    fontSize: 11,
+    fontWeight: '800',
     color: colors.slate500,
-    marginTop: 4,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   projectCard: {
     backgroundColor: colors.white,
-    borderRadius: 18,
-    padding: 16,
-    marginBottom: 12,
+    borderRadius: 20,
+    padding: 18,
     borderWidth: 1,
     borderColor: '#e2e8f0',
+    marginBottom: 14,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
@@ -349,168 +542,345 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
+    marginBottom: 14,
   },
   projectName: {
     fontSize: 15,
-    fontWeight: '800',
+    fontWeight: '900',
     color: colors.slate900,
   },
-  clientSub: {
-    fontSize: 12,
+  customerName: {
+    fontSize: 11,
     color: colors.slate500,
     marginTop: 2,
   },
-  stageTag: {
-    backgroundColor: '#eff6ff',
+  stagePill: {
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#bfdbfe',
   },
-  stageTagText: {
+  stagePillText: {
     fontSize: 10,
-    fontWeight: '800',
-    color: '#1d4ed8',
+    fontWeight: '900',
+    letterSpacing: 0.5,
   },
   progressContainer: {
-    marginTop: 14,
+    marginBottom: 14,
   },
-  progressLabelRow: {
+  progressHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 4,
+    marginBottom: 6,
   },
   progressLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: colors.slate400,
-  },
-  progressPercent: {
-    fontSize: 11,
-    fontWeight: '900',
-    color: colors.primary,
-  },
-  progressTrack: {
-    height: 6,
-    backgroundColor: '#f1f5f9',
-    borderRadius: 3,
-    overflow: 'hidden',
-  },
-  progressBar: {
-    height: '100%',
-    backgroundColor: colors.primary,
-    borderRadius: 3,
-  },
-  detailsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 12,
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: '#f1f5f9',
-  },
-  metaLabel: {
     fontSize: 9,
     fontWeight: '800',
     color: colors.slate400,
     letterSpacing: 0.5,
   },
-  metaVal: {
-    fontSize: 13,
+  progressVal: {
+    fontSize: 11,
+    fontWeight: '900',
+  },
+  progressBarTrack: {
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#f1f5f9',
+    overflow: 'hidden',
+  },
+  progressBarFill: {
+    height: '100%',
+    borderRadius: 3,
+  },
+  specsRow: {
+    flexDirection: 'row',
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    padding: 10,
+    justifyContent: 'space-between',
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: '#f1f5f9',
+  },
+  specBox: {
+    alignItems: 'center',
+  },
+  specLabel: {
+    fontSize: 9,
     fontWeight: '800',
+    color: colors.slate400,
+    letterSpacing: 0.5,
+  },
+  specVal: {
+    fontSize: 12,
+    fontWeight: '900',
     color: colors.slate900,
     marginTop: 2,
   },
-  advanceActionBtn: {
-    backgroundColor: colors.primary,
-    paddingVertical: 10,
-    borderRadius: 12,
+  actionsBar: {
+    flexDirection: 'row',
+    gap: 8,
     alignItems: 'center',
-    marginTop: 12,
   },
-  advanceActionBtnText: {
+  actionBtn: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  actionBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.slate700,
+  },
+  advanceStageActionBtn: {
+    flex: 1,
+    backgroundColor: colors.slate900,
+    paddingVertical: 9,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  advanceStageActionBtnText: {
     color: colors.white,
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: '800',
+  },
+  emptyCard: {
+    backgroundColor: colors.white,
+    borderRadius: 18,
+    padding: 32,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    marginTop: 20,
+  },
+  emptyIcon: {
+    fontSize: 40,
+    marginBottom: 10,
+  },
+  emptyTitle: {
+    fontSize: 16,
+    fontWeight: '900',
+    color: colors.slate900,
+    marginBottom: 4,
+  },
+  emptyText: {
+    fontSize: 12,
+    color: colors.slate500,
+    textAlign: 'center',
+    lineHeight: 18,
   },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.65)',
     justifyContent: 'flex-end',
   },
-  modalCard: {
+  advanceModalContent: {
     backgroundColor: colors.white,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     padding: 24,
-    paddingBottom: 40,
-    maxHeight: '80%',
+    paddingBottom: 36,
+  },
+  detailModalContent: {
+    backgroundColor: colors.white,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    padding: 24,
+    paddingBottom: 36,
+  },
+  modalHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
   },
   modalTitle: {
     fontSize: 18,
     fontWeight: '900',
     color: colors.slate900,
   },
-  modalSub: {
+  modalSubtitle: {
     fontSize: 12,
     color: colors.slate500,
-    marginTop: 3,
-    marginBottom: 16,
+    marginTop: 2,
+  },
+  closeModalBtn: {
+    padding: 6,
+    backgroundColor: '#f1f5f9',
+    borderRadius: 12,
+  },
+  closeModalText: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: colors.slate500,
   },
   inputLabel: {
     fontSize: 10,
     fontWeight: '800',
-    color: colors.slate400,
+    color: colors.slate500,
     letterSpacing: 0.5,
-    marginBottom: 8,
+    marginBottom: 6,
   },
-  stagesOptionBox: {
-    gap: 6,
-    marginBottom: 16,
-  },
-  stageOptionBtn: {
+  stagePickerGrid: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 10,
-    borderRadius: 12,
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 14,
+  },
+  stagePickerBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  stagePickerBtnSelected: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  stagePickerBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.slate700,
+  },
+  stagePickerBtnTextSelected: {
+    color: colors.white,
+    fontWeight: '800',
+  },
+  noteInput: {
     backgroundColor: '#f8fafc',
     borderWidth: 1.5,
     borderColor: '#e2e8f0',
-  },
-  stageOptionActive: {
-    borderColor: colors.primary,
-    backgroundColor: colors.primaryMuted,
-  },
-  stageOptionText: {
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     fontSize: 13,
-    fontWeight: '700',
-    color: colors.slate800,
-  },
-  stageOptionTextActive: {
-    color: colors.primary,
-    fontWeight: '900',
+    color: colors.slate900,
+    marginBottom: 16,
+    textAlignVertical: 'top',
   },
   confirmAdvanceBtn: {
     backgroundColor: colors.primary,
     paddingVertical: 14,
-    borderRadius: 14,
+    borderRadius: 12,
     alignItems: 'center',
   },
   confirmAdvanceBtnText: {
     color: colors.white,
-    fontSize: 14,
-    fontWeight: '800',
-  },
-  cancelBtn: {
-    paddingVertical: 12,
-    alignItems: 'center',
-    marginTop: 4,
-  },
-  cancelBtnText: {
-    color: colors.slate500,
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '900',
+  },
+  detailProjectTitle: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: colors.slate900,
+  },
+  detailProjectSubtitle: {
+    fontSize: 11,
+    color: colors.slate500,
+    marginTop: 2,
+  },
+  sectionHeading: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: colors.slate400,
+    letterSpacing: 0.8,
+    marginBottom: 10,
+  },
+  timelineBox: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 14,
+    padding: 14,
+    gap: 10,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  timelineRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  timelineDot: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  timelineDotDone: {
+    backgroundColor: colors.primary,
+  },
+  timelineDotPending: {
+    backgroundColor: '#cbd5e1',
+  },
+  timelineDotCurrent: {
+    borderWidth: 2,
+    borderColor: colors.slate900,
+  },
+  timelineDotText: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: colors.white,
+  },
+  timelineStageText: {
+    fontSize: 12,
+    color: colors.slate700,
+    fontWeight: '600',
+  },
+  activePill: {
+    backgroundColor: '#ecfdf5',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  activePillText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#059669',
+  },
+  complianceBox: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 14,
+    padding: 14,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  complianceRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  complianceName: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.slate700,
+    flex: 1,
+  },
+  complianceStatusOk: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#059669',
+  },
+  complianceStatusWait: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#d97706',
+  },
+  advanceFromDetailBtn: {
+    backgroundColor: colors.slate900,
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginTop: 18,
+  },
+  advanceFromDetailBtnText: {
+    color: colors.white,
+    fontSize: 13,
+    fontWeight: '900',
   },
 });

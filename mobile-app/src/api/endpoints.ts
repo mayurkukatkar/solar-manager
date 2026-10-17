@@ -30,14 +30,13 @@ export const authApi = {
   },
 };
 
-
 // ==========================================
 // 2. TENANT DASHBOARD & PROJECTS SERVICE
 // ==========================================
 export const tenantApi = {
   getDashboard: async () => {
     const res = await apiClient.get('/api/tenant/dashboard');
-    return res.data; // { totalLeads, totalCustomers, totalProjects, pendingInvoices, openTickets, totalRevenue, outstanding }
+    return res.data;
   },
   getProjects: async (status?: string): Promise<{ projects: Project[]; metrics?: any }> => {
     const url = status && status !== 'ALL' ? `/api/tenant/projects?status=${status}` : '/api/tenant/projects';
@@ -57,6 +56,14 @@ export const tenantApi = {
     });
     return res.data;
   },
+  getProjectDetails: async (projectId: string) => {
+    const res = await apiClient.get(`/api/tenant/projects/${projectId}`);
+    return res.data;
+  },
+  createProject: async (data: any) => {
+    const res = await apiClient.post('/api/tenant/projects', data);
+    return res.data;
+  },
 };
 
 // ==========================================
@@ -72,11 +79,11 @@ export const crmApi = {
     if (parts.length > 0) query = '?' + parts.join('&');
 
     const res = await apiClient.get(`/api/tenant/leads${query}`);
-    return res.data; // { leads: Lead[] }
+    return res.data;
   },
   getLeadMetrics: async () => {
     const res = await apiClient.get('/api/tenant/leads/dashboard');
-    return res.data; // { dashboard: { totalLeads, newLeads, qualifiedLeads, wonLeads, lostLeads, conversionRate } }
+    return res.data;
   },
   createLead: async (data: {
     name: string;
@@ -85,6 +92,9 @@ export const crmApi = {
     company?: string;
     source?: string;
     estimatedCap?: number;
+    monthlyBill?: number;
+    address?: string;
+    city?: string;
   }) => {
     const res = await apiClient.post('/api/tenant/leads', data);
     return res.data;
@@ -95,6 +105,10 @@ export const crmApi = {
   },
   advanceLeadStage: async (id: string, stage: string) => {
     const res = await apiClient.patch(`/api/tenant/leads/${id}/stage`, { stage });
+    return res.data;
+  },
+  convertLead: async (id: string) => {
+    const res = await apiClient.post(`/api/tenant/leads/${id}/convert`);
     return res.data;
   },
 };
@@ -115,6 +129,10 @@ export const quotationsApi = {
   },
   createQuotation: async (data: any) => {
     const res = await apiClient.post('/api/tenant/quotations', data);
+    return res.data;
+  },
+  convertQuotation: async (id: string) => {
+    const res = await apiClient.post(`/api/tenant/quotations/${id}/convert`);
     return res.data;
   },
 };
@@ -139,12 +157,12 @@ export const surveysApi = {
 export const installationsApi = {
   getDashboard: async () => {
     const res = await apiClient.get('/api/tenant/installations/dashboard');
-    return res.data; // { scheduledToday, inProgress, pendingAssignment, pendingReview, completedToday, delayed, thisMonth }
+    return res.data;
   },
   getInstallations: async (status?: string) => {
     const url = status && status !== 'ALL' ? `/api/tenant/installations?status=${status}` : '/api/tenant/installations';
     const res = await apiClient.get(url);
-    return res.data; // { installations: InstallationJob[] }
+    return res.data;
   },
   getInstallationDetails: async (id: string) => {
     const res = await apiClient.get(`/api/tenant/installations/${id}`);
@@ -177,7 +195,119 @@ export const installationsApi = {
 };
 
 // ==========================================
-// 7. SUPER ADMIN PLATFORM SERVICE
+// 7. PM SURYA GHAR SUBSIDY (CFA) SERVICE
+// ==========================================
+export const subsidyApi = {
+  getSubsidies: async (params?: { portalStage?: string; search?: string; customerId?: string }) => {
+    let query = '';
+    const parts: string[] = [];
+    if (params?.portalStage && params.portalStage !== 'ALL') parts.push(`portalStage=${params.portalStage}`);
+    if (params?.search) parts.push(`search=${encodeURIComponent(params.search)}`);
+    if (params?.customerId) parts.push(`customerId=${params.customerId}`);
+    if (parts.length > 0) query = '?' + parts.join('&');
+
+    const res = await apiClient.get(`/api/tenant/subsidies${query}`);
+    return res.data; // { subsidies: [...], metrics: {...} }
+  },
+  createSubsidy: async (data: any) => {
+    const res = await apiClient.post('/api/tenant/subsidies', data);
+    return res.data;
+  },
+};
+
+// ==========================================
+// 8. DISCOM NET METERING SERVICE
+// ==========================================
+export const discomApi = {
+  getDiscom: async (projectId: string) => {
+    const res = await apiClient.get(`/api/tenant/projects/${projectId}/discom`);
+    return res.data;
+  },
+  createDiscom: async (projectId: string) => {
+    const res = await apiClient.post(`/api/tenant/projects/${projectId}/discom`);
+    return res.data;
+  },
+  updateStage: async (projectId: string, status: string, documentUrl?: string) => {
+    const res = await apiClient.patch(`/api/tenant/projects/${projectId}/discom/stage`, {
+      status,
+      documentUrl,
+    });
+    return res.data;
+  },
+};
+
+// ==========================================
+// 9. SOLAR LOANS & FINANCING SERVICE
+// ==========================================
+export const loansApi = {
+  getLoans: async (status?: string) => {
+    const url = status && status !== 'ALL' ? `/api/tenant/loans?status=${status}` : '/api/tenant/loans';
+    const res = await apiClient.get(url);
+    return res.data;
+  },
+  createLoan: async (data: any) => {
+    const res = await apiClient.post('/api/tenant/loans', data);
+    return res.data;
+  },
+};
+
+// ==========================================
+// 10. FINANCE & INVOICING SERVICE
+// ==========================================
+export const financeApi = {
+  getInvoices: async () => {
+    const res = await apiClient.get('/api/tenant/finance');
+    return res.data;
+  },
+  getInvoiceDetails: async (id: string) => {
+    const res = await apiClient.get(`/api/tenant/finance/${id}`);
+    return res.data;
+  },
+};
+
+// ==========================================
+// 11. AMC & MAINTENANCE SERVICE
+// ==========================================
+export const amcApi = {
+  getAmcs: async (params?: { status?: string; customerId?: string }) => {
+    let query = '';
+    const parts: string[] = [];
+    if (params?.status) parts.push(`status=${params.status}`);
+    if (params?.customerId) parts.push(`customerId=${params.customerId}`);
+    if (parts.length > 0) query = '?' + parts.join('&');
+    const res = await apiClient.get(`/api/tenant/amcs${query}`);
+    return res.data;
+  },
+};
+
+// ==========================================
+// 12. PROCUREMENT & PURCHASE ORDERS SERVICE
+// ==========================================
+export const procurementApi = {
+  getPurchaseOrders: async (projectId?: string) => {
+    const url = projectId ? `/api/tenant/procurement/pos?projectId=${projectId}` : '/api/tenant/procurement/pos';
+    const res = await apiClient.get(url);
+    return res.data;
+  },
+};
+
+// ==========================================
+// 13. SUPPORT TICKETS SERVICE
+// ==========================================
+export const supportApi = {
+  getTickets: async (status?: string) => {
+    const url = status && status !== 'ALL' ? `/api/tenant/tickets?status=${status}` : '/api/tenant/tickets';
+    const res = await apiClient.get(url);
+    return res.data;
+  },
+  createTicket: async (data: any) => {
+    const res = await apiClient.post('/api/tenant/tickets', data);
+    return res.data;
+  },
+};
+
+// ==========================================
+// 14. SUPER ADMIN PLATFORM SERVICE
 // ==========================================
 export const superAdminApi = {
   getKpis: async () => {
@@ -194,48 +324,7 @@ export const superAdminApi = {
   },
 };
 
-// ==========================================
-// 8. FINANCE & INVOICING SERVICE
-// ==========================================
-export const financeApi = {
-  getInvoices: async () => {
-    const res = await apiClient.get('/api/tenant/finance');
-    return res.data; // { finance: [...] }
-  },
-  getInvoiceDetails: async (id: string) => {
-    const res = await apiClient.get(`/api/tenant/finance/${id}`);
-    return res.data;
-  },
-};
-
-// ==========================================
-// 9. AMC & MAINTENANCE SERVICE
-// ==========================================
-export const amcApi = {
-  getAmcs: async (params?: { status?: string; customerId?: string }) => {
-    let query = '';
-    const parts: string[] = [];
-    if (params?.status) parts.push(`status=${params.status}`);
-    if (params?.customerId) parts.push(`customerId=${params.customerId}`);
-    if (parts.length > 0) query = '?' + parts.join('&');
-    const res = await apiClient.get(`/api/tenant/amcs${query}`);
-    return res.data; // { amcs: [...], metrics: {...} }
-  },
-};
-
-// ==========================================
-// 10. PROCUREMENT SERVICE
-// ==========================================
-export const procurementApi = {
-  getPurchaseOrders: async (projectId?: string) => {
-    const url = projectId ? `/api/tenant/procurement/pos?projectId=${projectId}` : '/api/tenant/procurement/pos';
-    const res = await apiClient.get(url);
-    return res.data; // { purchaseOrders: [...] }
-  },
-};
-
 // Backward-compatible aliases
 export const ownerApi = tenantApi;
 export const salesApi = crmApi;
 export const techApi = installationsApi;
-
