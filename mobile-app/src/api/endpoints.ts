@@ -5,10 +5,18 @@ import { Lead, Project, InstallationJob } from '../types';
 // 1. AUTHENTICATION SERVICE
 // ==========================================
 export const authApi = {
-  login: async (email: string, password?: string) => {
+  login: async (email: string, password: string) => {
     const res = await apiClient.post('/api/auth/login', {
-      email,
-      password: password || 'password123',
+      email: email.trim().toLowerCase(),
+      password,
+    });
+    return res.data;
+  },
+  forceResetPassword: async (email: string, temporaryPassword: string, newPassword: string) => {
+    const res = await apiClient.post('/api/auth/force-reset-password', {
+      email: email.trim().toLowerCase(),
+      temporaryPassword,
+      newPassword,
     });
     return res.data;
   },
@@ -21,6 +29,7 @@ export const authApi = {
     return res.data;
   },
 };
+
 
 // ==========================================
 // 2. TENANT DASHBOARD & PROJECTS SERVICE

@@ -1,9 +1,8 @@
 import axios, { AxiosInstance } from 'axios';
-import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BackendConnectionStatus } from '../types';
 
-// In-Memory fallback storage
+// In-Memory fallback storage for environments where native storage is unavailable
 const memoryStore: Record<string, string> = {};
 
 export const SafeStorage = {
@@ -14,7 +13,7 @@ export const SafeStorage = {
         if (val !== null) return val;
       }
     } catch {
-      // In-memory fallback
+      // Memory fallback
     }
     return memoryStore[key] || null;
   },
@@ -25,7 +24,7 @@ export const SafeStorage = {
         await AsyncStorage.setItem(key, value);
       }
     } catch {
-      // In-memory fallback
+      // Memory fallback
     }
   },
   removeItem: async (key: string): Promise<void> => {
@@ -35,26 +34,43 @@ export const SafeStorage = {
         await AsyncStorage.removeItem(key);
       }
     } catch {
-      // In-memory fallback
+      // Memory fallback
     }
   },
 };
 
-// Live Backend URL provided by user
+// Production Live Backend URL
 export const DEFAULT_API_URL = 'https://solar-manager-three.vercel.app';
-
 
 const STORAGE_API_URL_KEY = '@solar_api_base_url';
 const STORAGE_AUTH_TOKEN_KEY = '@solar_user_token';
 
 let currentBaseUrl = DEFAULT_API_URL;
+let unauthorizedHandler: (() => void) | null = null;
+
+export const setUnauthorizedHandler = (handler: () => void) => {
+  unauthorizedHandler = handler;
+};
+
+// Security check: validate URL structure and enforce HTTPS for external endpoints
+export const sanitizeApiUrl = (url: string): string => {
+  const cleaned = url.trim().replace(/\/+$/, '');
+  const isLocal =
+    cleaned.includes('localhost') ||
+    cleaned.includes('10.0.2.2') ||
+    cleaned.startsWith('http://192.168.');
+  if (!isLocal && cleaned.startsWith('http://')) {
+    return cleaned.replace(/^http:\/\//, 'https://');
+  }
+  return cleaned;
+};
 
 export const getApiBaseUrl = async (): Promise<string> => {
   try {
     const saved = await SafeStorage.getItem(STORAGE_API_URL_KEY);
     if (saved) {
-      currentBaseUrl = saved;
-      return saved;
+      currentBaseUrl = sanitizeApiUrl(saved);
+      return currentBaseUrl;
     }
   } catch {
     // Return default
@@ -63,31 +79,30 @@ export const getApiBaseUrl = async (): Promise<string> => {
 };
 
 export const setApiBaseUrl = async (newUrl: string): Promise<void> => {
-  const cleaned = newUrl.replace(/\/+$/, '');
-  currentBaseUrl = cleaned;
-  await SafeStorage.setItem(STORAGE_API_URL_KEY, cleaned);
-  apiClient.defaults.baseURL = cleaned;
+  const sanitized = sanitizeApiUrl(newUrl);
+  currentBaseUrl = sanitized;
+  await SafeStorage.setItem(STORAGE_API_URL_KEY, sanitized);
+  apiClient.defaults.baseURL = sanitized;
 };
 
-// Create main Axios Instance
+// Create main production Axios Instance
 export const apiClient: AxiosInstance = axios.create({
   baseURL: currentBaseUrl,
-  timeout: 10000,
+  timeout: 15000,
   headers: {
     'Content-Type': 'application/json',
     Accept: 'application/json',
   },
 });
 
-// Request Interceptor: Attach Auth Token
+// Request Interceptor: Attach Authenticated Bearer Token
 apiClient.interceptors.request.use(
   async (config) => {
-    // Sync baseUrl
     const base = await getApiBaseUrl();
     config.baseURL = base;
 
     const token = await SafeStorage.getItem(STORAGE_AUTH_TOKEN_KEY);
-    if (token && token !== 'mock-jwt-token') {
+    if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
@@ -95,15 +110,25 @@ apiClient.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Response Interceptor: Format errors gracefully
+// Response Interceptor: Handle 401 Session Expiry & Format Sanitized Errors
 apiClient.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
+    if (error.response?.status === 401) {
+      // Session expired or revoked
+      await SafeStorage.removeItem(STORAGE_AUTH_TOKEN_KEY);
+      if (unauthorizedHandler) {
+        unauthorizedHandler();
+      }
+    }
+
     const message =
       error.response?.data?.error ||
       error.response?.data?.message ||
-      error.message ||
-      'Network request failed';
+      (error.code === 'ECONNABORTED'
+        ? 'Network request timed out. Please check your internet connection.'
+        : error.message || 'Network request failed.');
+
     return Promise.reject(new Error(message));
   }
 );
@@ -113,10 +138,9 @@ export const checkBackendHealth = async (): Promise<BackendConnectionStatus> => 
   const url = await getApiBaseUrl();
   const startTime = Date.now();
   try {
-    // Attempt pinging me or root or auth
     const response = await axios.get(`${url}/api/auth/me`, {
-      timeout: 3500,
-      validateStatus: () => true, // Accept 200, 401, 403 as alive
+      timeout: 5000,
+      validateStatus: () => true, // Accept 200, 401, 403 as reachable
     });
 
     const latency = Date.now() - startTime;

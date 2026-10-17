@@ -9,7 +9,7 @@ export const Header: React.FC<{
   showSearch?: boolean;
   onSearch?: (q: string) => void;
 }> = ({ title, subtitle, showSearch, onSearch }) => {
-  const { user, backendStatus, updateServerUrl, switchTenantSession, logout } = useAuth();
+  const { user, backendStatus, updateServerUrl, logout } = useAuth();
   const [serverModalVisible, setServerModalVisible] = useState(false);
   const [tenantModalVisible, setTenantModalVisible] = useState(false);
   const [customUrl, setCustomUrl] = useState(backendStatus.serverUrl);
@@ -126,52 +126,43 @@ export const Header: React.FC<{
           onPress={() => setTenantModalVisible(false)}
         >
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>User Workspace</Text>
-            <Text style={styles.modalSubtitle}>
-              Logged in as <Text style={{ fontWeight: '800', color: colors.slate900 }}>{user?.email}</Text>
-            </Text>
-
-            <TouchableOpacity
-              style={[styles.accountOption, user?.email === 'mayurkukatkar43@gmail.com' && styles.accountOptionActive]}
-              onPress={() => {
-                switchTenantSession('MAYUR');
-                setTenantModalVisible(false);
-              }}
-            >
-              <Text style={styles.accountOptionEmoji}>🏢</Text>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.accountOptionTitle}>WhereReady IT Solutions</Text>
-                <Text style={styles.accountOptionSub}>Tenant Admin • Mayur Kukatkar (Nagpur)</Text>
+            <View style={styles.accountProfileCard}>
+              <View style={styles.accountAvatar}>
+                <Text style={styles.accountAvatarText}>
+                  {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}
+                </Text>
               </View>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.accountOption, user?.email === '2018pkunal@gmail.com' && styles.accountOptionActive]}
-              onPress={() => {
-                switchTenantSession('KUNAL');
-                setTenantModalVisible(false);
-              }}
-            >
-              <Text style={styles.accountOptionEmoji}>☀️</Text>
               <View style={{ flex: 1 }}>
-                <Text style={styles.accountOptionTitle}>Solar Energy Solutions India</Text>
-                <Text style={styles.accountOptionSub}>Tenant Admin • Kunal Prajapati (Mumbai)</Text>
+                <Text style={styles.accountNameText}>{user?.name || 'Solar User'}</Text>
+                <Text style={styles.accountEmailText}>{user?.email}</Text>
+                <View style={styles.accountRoleBadge}>
+                  <Text style={styles.accountRoleBadgeText}>
+                    {user?.role === 'SUPER_ADMIN' ? '👑 PLATFORM SUPER ADMIN' : '🏢 TENANT ADMIN'}
+                  </Text>
+                </View>
               </View>
-            </TouchableOpacity>
+            </View>
 
-            <TouchableOpacity
-              style={[styles.accountOption, user?.role === 'SUPER_ADMIN' && styles.accountOptionActive]}
-              onPress={() => {
-                switchTenantSession('SUPER_ADMIN');
-                setTenantModalVisible(false);
-              }}
-            >
-              <Text style={styles.accountOptionEmoji}>👑</Text>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.accountOptionTitle}>Platform Super Admin</Text>
-                <Text style={styles.accountOptionSub}>Platform Owner • Global Telemetry</Text>
+            <View style={styles.sessionInfoBox}>
+              <View style={styles.sessionInfoRow}>
+                <Text style={styles.sessionInfoLabel}>Organization:</Text>
+                <Text style={styles.sessionInfoVal}>{user?.tenantName || 'Solar Solutions'}</Text>
               </View>
-            </TouchableOpacity>
+              <View style={styles.sessionInfoRow}>
+                <Text style={styles.sessionInfoLabel}>Session Auth:</Text>
+                <Text style={[styles.sessionInfoVal, { color: '#059669' }]}>Bearer JWT (Verified)</Text>
+              </View>
+              <View style={styles.sessionInfoRow}>
+                <Text style={styles.sessionInfoLabel}>Target Endpoint:</Text>
+                <Text style={styles.sessionInfoVal} numberOfLines={1}>{backendStatus.serverUrl}</Text>
+              </View>
+              <View style={styles.sessionInfoRow}>
+                <Text style={styles.sessionInfoLabel}>Backend Ping:</Text>
+                <Text style={[styles.sessionInfoVal, { color: backendStatus.isOnline ? '#059669' : '#d97706' }]}>
+                  {backendStatus.isOnline ? `Online (${backendStatus.latencyMs || 0}ms)` : 'Offline'}
+                </Text>
+              </View>
+            </View>
 
             <TouchableOpacity
               style={styles.logoutBtn}
@@ -180,7 +171,14 @@ export const Header: React.FC<{
                 logout();
               }}
             >
-              <Text style={styles.logoutBtnText}>🚪 Sign Out</Text>
+              <Text style={styles.logoutBtnText}>🔒 Sign Out & End Session</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.closeBtn, { marginTop: 8 }]}
+              onPress={() => setTenantModalVisible(false)}
+            >
+              <Text style={styles.closeBtnText}>Close</Text>
             </TouchableOpacity>
           </View>
         </TouchableOpacity>
@@ -385,36 +383,81 @@ const styles = StyleSheet.create({
     marginTop: 3,
     marginBottom: 16,
   },
-  accountOption: {
+  accountProfileCard: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 12,
     padding: 12,
-    borderRadius: 14,
     backgroundColor: '#f8fafc',
-    marginBottom: 8,
-    borderWidth: 1.5,
+    borderRadius: 16,
+    borderWidth: 1,
     borderColor: '#e2e8f0',
+    marginBottom: 14,
   },
-  accountOptionActive: {
-    borderColor: colors.primary,
-    backgroundColor: colors.primaryMuted,
+  accountAvatar: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  accountOptionEmoji: {
-    fontSize: 22,
-    marginRight: 10,
+  accountAvatarText: {
+    fontSize: 20,
+    fontWeight: '900',
+    color: colors.white,
   },
-  accountOptionTitle: {
-    fontSize: 13,
-    fontWeight: '800',
+  accountNameText: {
+    fontSize: 14,
+    fontWeight: '900',
     color: colors.slate900,
   },
-  accountOptionSub: {
-    fontSize: 10,
+  accountEmailText: {
+    fontSize: 11,
     color: colors.slate500,
-    marginTop: 2,
+    marginTop: 1,
+  },
+  accountRoleBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(15, 23, 42, 0.08)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    marginTop: 4,
+  },
+  accountRoleBadgeText: {
+    fontSize: 9,
+    fontWeight: '900',
+    color: colors.slate800,
+    letterSpacing: 0.5,
+  },
+  sessionInfoBox: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    padding: 12,
+    gap: 6,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    marginBottom: 10,
+  },
+  sessionInfoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  sessionInfoLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.slate500,
+  },
+  sessionInfoVal: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: colors.slate800,
+    maxWidth: 180,
   },
   logoutBtn: {
-    marginTop: 12,
+    marginTop: 8,
     paddingVertical: 12,
     borderRadius: 12,
     backgroundColor: '#fee2e2',

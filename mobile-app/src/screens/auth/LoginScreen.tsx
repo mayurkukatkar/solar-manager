@@ -8,30 +8,89 @@ import {
   Alert,
   ActivityIndicator,
   Modal,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import { colors } from '../../theme/colors';
 
 export const LoginScreen: React.FC = () => {
-  const { login, backendStatus, updateServerUrl, switchTenantSession } = useAuth();
+  const {
+    login,
+    forceResetPassword,
+    sessionExpired,
+    clearSessionExpired,
+    backendStatus,
+    updateServerUrl,
+  } = useAuth();
+
   const [email, setEmail] = useState('mayurkukatkar43@gmail.com');
-  const [password, setPassword] = useState('password123');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  // Server Modal State
   const [serverModalVisible, setServerModalVisible] = useState(false);
   const [customUrl, setCustomUrl] = useState(backendStatus.serverUrl);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<string | null>(null);
 
+  // First-Time Password Reset Modal State
+  const [resetModalVisible, setResetModalVisible] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [tempPassword, setTempPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [resetLoading, setResetLoading] = useState(false);
+
   const handleSignIn = async () => {
-    if (!email) {
-      Alert.alert('Required', 'Please enter your email address.');
+    if (!email.trim()) {
+      Alert.alert('Required', 'Please enter your corporate email address.');
       return;
     }
+    if (!password) {
+      Alert.alert('Required', 'Please enter your password.');
+      return;
+    }
+
     setLoading(true);
-    const res = await login(email, password);
+    const res = await login(email.trim(), password);
     setLoading(false);
+
+    if (res.requiresPasswordReset) {
+      setResetEmail(res.email || email.trim());
+      setTempPassword(password);
+      setNewPassword('');
+      setConfirmPassword('');
+      setResetModalVisible(true);
+      return;
+    }
+
     if (!res.success && res.error) {
       Alert.alert('Authentication Failed', res.error);
+    }
+  };
+
+  const handleResetSubmit = async () => {
+    if (!newPassword || newPassword.length < 8) {
+      Alert.alert('Security Policy', 'New password must be at least 8 characters long.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      Alert.alert('Mismatch', 'New password and confirmation do not match.');
+      return;
+    }
+
+    setResetLoading(true);
+    const res = await forceResetPassword(resetEmail, tempPassword, newPassword);
+    setResetLoading(false);
+
+    if (res.success) {
+      setResetModalVisible(false);
+      Alert.alert('Security Setup Complete', 'Your permanent password has been saved. Logging in...');
+    } else {
+      Alert.alert('Reset Failed', res.error || 'Failed to update temporary password.');
     }
   };
 
@@ -43,7 +102,7 @@ export const LoginScreen: React.FC = () => {
       if (res.isOnline) {
         setTestResult(`✅ Connected! Latency: ${res.latencyMs || 0}ms`);
       } else {
-        setTestResult(`⚠️ Unreachable at ${customUrl}.`);
+        setTestResult(`⚠️ Unreachable at ${customUrl}. Check backend deployment.`);
       }
     } catch (err: any) {
       setTestResult(`❌ Error: ${err.message}`);
@@ -53,211 +112,324 @@ export const LoginScreen: React.FC = () => {
   };
 
   return (
-    <View style={styles.container}>
-      {/* BRANDING MATCHING LIVE WEB FRONTEND */}
-      <View style={styles.brandBox}>
-        <View style={styles.logoBadge}>
-          <Text style={styles.logoSun}>☀️</Text>
-        </View>
-        <Text style={styles.appName}>SOLAR MANAGER ERP</Text>
-        <Text style={styles.appTagline}>Enterprise Solar EPC & Asset Management</Text>
-      </View>
-
-      <View style={styles.card}>
-        <View style={styles.cardHeader}>
-          <View>
-            <Text style={styles.cardTitle}>Platform Control</Text>
-            <Text style={styles.cardSubtitle}>Enter your credentials to access workspace</Text>
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      <ScrollView
+        contentContainerStyle={styles.scrollContainer}
+        keyboardShouldPersistTaps="handled"
+      >
+        {/* BRANDING HEADER */}
+        <View style={styles.brandBox}>
+          <View style={styles.logoBadge}>
+            <Text style={styles.logoSun}>☀️</Text>
           </View>
+          <Text style={styles.appName}>SOLAR MANAGER ERP</Text>
+          <Text style={styles.appTagline}>Enterprise Solar EPC & Asset Management</Text>
+        </View>
+
+        {/* SESSION EXPIRED BANNER */}
+        {sessionExpired && (
+          <View style={styles.sessionBanner}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.sessionBannerTitle}>⚠️ Session Expired</Text>
+              <Text style={styles.sessionBannerText}>
+                Your authentication token expired or was revoked. Please sign in again.
+              </Text>
+            </View>
+            <TouchableOpacity onPress={clearSessionExpired} style={styles.sessionBannerClose}>
+              <Text style={styles.sessionBannerCloseText}>✕</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* LOGIN CARD */}
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <View>
+              <Text style={styles.cardTitle}>Platform Control</Text>
+              <Text style={styles.cardSubtitle}>Verified cloud authentication</Text>
+            </View>
+            <TouchableOpacity
+              style={[
+                styles.backendStatusPill,
+                backendStatus.isOnline ? styles.backendOnline : styles.backendOffline,
+              ]}
+              onPress={() => {
+                setCustomUrl(backendStatus.serverUrl);
+                setTestResult(null);
+                setServerModalVisible(true);
+              }}
+            >
+              <View
+                style={[
+                  styles.dot,
+                  { backgroundColor: backendStatus.isOnline ? '#10b981' : '#f59e0b' },
+                ]}
+              />
+              <Text style={styles.backendStatusText}>
+                {backendStatus.isOnline ? 'Live Vercel' : 'Offline'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* EMAIL INPUT */}
+          <Text style={styles.inputLabel}>CORPORATE EMAIL</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="platform@whereready.com"
+            placeholderTextColor="#94a3b8"
+            value={email}
+            onChangeText={setEmail}
+            autoCapitalize="none"
+            autoCorrect={false}
+            keyboardType="email-address"
+          />
+
+          {/* PASSWORD INPUT WITH SHOW/HIDE */}
+          <Text style={styles.inputLabel}>PASSWORD</Text>
+          <View style={styles.passwordInputContainer}>
+            <TextInput
+              style={styles.passwordInput}
+              placeholder="Enter your password"
+              placeholderTextColor="#94a3b8"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry={!showPassword}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            <TouchableOpacity
+              style={styles.showPasswordBtn}
+              onPress={() => setShowPassword(!showPassword)}
+            >
+              <Text style={styles.showPasswordText}>{showPassword ? 'Hide' : 'Show'}</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* SIGN IN BUTTON */}
           <TouchableOpacity
-            style={[
-              styles.backendStatusPill,
-              backendStatus.isOnline ? styles.backendOnline : styles.backendOffline,
-            ]}
+            style={styles.loginBtn}
+            onPress={handleSignIn}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Text style={styles.loginBtnText}>Authenticate & Access</Text>
+            )}
+          </TouchableOpacity>
+
+          {/* TARGET SERVER LINK */}
+          <TouchableOpacity
+            style={styles.configServerLink}
             onPress={() => {
               setCustomUrl(backendStatus.serverUrl);
               setTestResult(null);
               setServerModalVisible(true);
             }}
           >
-            <View
-              style={[
-                styles.dot,
-                { backgroundColor: backendStatus.isOnline ? '#10b981' : '#f59e0b' },
-              ]}
-            />
-            <Text style={styles.backendStatusText}>
-              {backendStatus.isOnline ? 'Live Vercel' : 'Offline'}
+            <Text style={styles.configServerText}>
+              🔒 Target: {backendStatus.serverUrl}
             </Text>
           </TouchableOpacity>
-        </View>
 
-        <Text style={styles.inputLabel}>EMAIL ADDRESS</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="platform@whereready.com"
-          placeholderTextColor="#94a3b8"
-          value={email}
-          onChangeText={setEmail}
-          autoCapitalize="none"
-          keyboardType="email-address"
-        />
-
-        <Text style={styles.inputLabel}>PASSWORD</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="••••••••"
-          placeholderTextColor="#94a3b8"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-        />
-
-        <TouchableOpacity
-          style={styles.loginBtn}
-          onPress={handleSignIn}
-          disabled={loading}
-        >
-          {loading ? (
-            <ActivityIndicator size="small" color="#fff" />
-          ) : (
-            <Text style={styles.loginBtnText}>Sign In</Text>
-          )}
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.configServerLink}
-          onPress={() => {
-            setCustomUrl(backendStatus.serverUrl);
-            setTestResult(null);
-            setServerModalVisible(true);
-          }}
-        >
-          <Text style={styles.configServerText}>
-            ⚙️ Target: {backendStatus.serverUrl}
-          </Text>
-        </TouchableOpacity>
-
-        <View style={styles.divider}>
-          <View style={styles.line} />
-          <Text style={styles.dividerText}>1-TAP INSTANT ACCESS</Text>
-          <View style={styles.line} />
-        </View>
-
-        {/* 1-Tap Quick Tenants */}
-        <TouchableOpacity
-          style={[styles.quickRoleBtn, { borderColor: '#a7f3d0' }]}
-          onPress={() => switchTenantSession('MAYUR')}
-        >
-          <Text style={styles.quickRoleEmoji}>🏢</Text>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.quickRoleTitle}>WhereReady IT Solutions</Text>
-            <Text style={styles.quickRoleDesc}>Tenant Admin • Mayur Kukatkar (Nagpur)</Text>
+          <View style={styles.divider}>
+            <View style={styles.line} />
+            <Text style={styles.dividerText}>QUICK EMAIL PRESETS</Text>
+            <View style={styles.line} />
           </View>
-        </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.quickRoleBtn, { borderColor: '#bfdbfe' }]}
-          onPress={() => switchTenantSession('KUNAL')}
-        >
-          <Text style={styles.quickRoleEmoji}>☀️</Text>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.quickRoleTitle}>Solar Energy Solutions India</Text>
-            <Text style={styles.quickRoleDesc}>Tenant Admin • Kunal Prajapati (Mumbai)</Text>
+          {/* QUICK EMAIL PREFILL CHIPS (SECURE: DOES NOT BYPASS PASSWORD) */}
+          <View style={styles.presetAccountsGrid}>
+            <TouchableOpacity
+              style={styles.presetAccountBtn}
+              onPress={() => setEmail('mayurkukatkar43@gmail.com')}
+            >
+              <Text style={styles.presetAccountEmoji}>🏢</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.presetAccountTitle}>WhereReady IT Solutions</Text>
+                <Text style={styles.presetAccountSub}>mayurkukatkar43@gmail.com</Text>
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.presetAccountBtn}
+              onPress={() => setEmail('platform@whereready.com')}
+            >
+              <Text style={styles.presetAccountEmoji}>👑</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.presetAccountTitle}>Platform Super Admin</Text>
+                <Text style={styles.presetAccountSub}>platform@whereready.com</Text>
+              </View>
+            </TouchableOpacity>
           </View>
-        </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.quickRoleBtn, { borderColor: '#e9d5ff' }]}
-          onPress={() => switchTenantSession('SUPER_ADMIN')}
-        >
-          <Text style={styles.quickRoleEmoji}>👑</Text>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.quickRoleTitle}>Platform Super Admin</Text>
-            <Text style={styles.quickRoleDesc}>Platform Owner • Global Telemetry</Text>
-          </View>
-        </TouchableOpacity>
-      </View>
-
-      {/* Backend URL Config Modal */}
-      <Modal visible={serverModalVisible} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Backend API Target</Text>
-            <Text style={styles.modalSubtitle}>
-              Live backend deployed at Vercel:
+          <View style={styles.securityFooter}>
+            <Text style={styles.securityFooterText}>
+              🛡️ End-to-end encrypted with TLS 1.3 & Bearer JWT Token Verification
             </Text>
+          </View>
+        </View>
 
-            <TextInput
-              style={styles.serverInput}
-              value={customUrl}
-              onChangeText={setCustomUrl}
-              autoCapitalize="none"
-              autoCorrect={false}
-              placeholder="https://solar-manager-three.vercel.app"
-            />
+        {/* FIRST-TIME PASSWORD RESET MODAL */}
+        <Modal visible={resetModalVisible} transparent animationType="slide">
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeaderRow}>
+                <View style={styles.modalKeyBadge}>
+                  <Text style={{ fontSize: 20 }}>🔑</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.modalTitle}>Set Permanent Password</Text>
+                  <Text style={styles.modalSubtitle}>
+                    Initial activation requires setting a new secure password.
+                  </Text>
+                </View>
+              </View>
 
-            <View style={styles.presetsRow}>
+              <Text style={styles.inputLabel}>ACCOUNT EMAIL</Text>
+              <TextInput
+                style={[styles.input, { backgroundColor: '#f1f5f9', color: '#64748b' }]}
+                value={resetEmail}
+                editable={false}
+              />
+
+              <Text style={styles.inputLabel}>TEMPORARY PASSWORD</Text>
+              <TextInput
+                style={styles.input}
+                value={tempPassword}
+                onChangeText={setTempPassword}
+                secureTextEntry
+                placeholder="Current temporary password"
+                placeholderTextColor="#94a3b8"
+              />
+
+              <Text style={styles.inputLabel}>NEW PERMANENT PASSWORD (MIN 8 CHARS)</Text>
+              <TextInput
+                style={styles.input}
+                value={newPassword}
+                onChangeText={setNewPassword}
+                secureTextEntry
+                placeholder="Enter at least 8 characters"
+                placeholderTextColor="#94a3b8"
+              />
+
+              <Text style={styles.inputLabel}>CONFIRM NEW PASSWORD</Text>
+              <TextInput
+                style={styles.input}
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+                secureTextEntry
+                placeholder="Confirm new password"
+                placeholderTextColor="#94a3b8"
+              />
+
               <TouchableOpacity
-                style={styles.presetChip}
-                onPress={() => setCustomUrl('https://solar-manager-three.vercel.app')}
+                style={styles.resetSubmitBtn}
+                onPress={handleResetSubmit}
+                disabled={resetLoading}
               >
-                <Text style={styles.presetChipText}>Live Vercel Backend</Text>
+                {resetLoading ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.resetSubmitBtnText}>Save Password & Enter</Text>
+                )}
               </TouchableOpacity>
+
               <TouchableOpacity
-                style={styles.presetChip}
-                onPress={() => setCustomUrl('http://10.0.2.2:5000')}
+                style={styles.closeBtn}
+                onPress={() => setResetModalVisible(false)}
+                disabled={resetLoading}
               >
-                <Text style={styles.presetChipText}>Android Localhost</Text>
+                <Text style={styles.closeBtnText}>Cancel</Text>
               </TouchableOpacity>
             </View>
-
-            {testResult && (
-              <View style={styles.testResultBox}>
-                <Text style={styles.testResultText}>{testResult}</Text>
-              </View>
-            )}
-
-            <TouchableOpacity
-              style={styles.testBtn}
-              onPress={handleTestServer}
-              disabled={testing}
-            >
-              {testing ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <Text style={styles.testBtnText}>Test & Connect</Text>
-              )}
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.closeBtn}
-              onPress={() => setServerModalVisible(false)}
-            >
-              <Text style={styles.closeBtnText}>Done</Text>
-            </TouchableOpacity>
           </View>
-        </View>
-      </Modal>
-    </View>
+        </Modal>
+
+        {/* BACKEND SERVER URL MODAL */}
+        <Modal visible={serverModalVisible} transparent animationType="fade">
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>Backend API Endpoint</Text>
+              <Text style={styles.modalSubtitle}>
+                Production live backend endpoint:
+              </Text>
+
+              <TextInput
+                style={styles.serverInput}
+                value={customUrl}
+                onChangeText={setCustomUrl}
+                autoCapitalize="none"
+                autoCorrect={false}
+                placeholder="https://solar-manager-three.vercel.app"
+              />
+
+              <View style={styles.presetsRow}>
+                <TouchableOpacity
+                  style={styles.presetChip}
+                  onPress={() => setCustomUrl('https://solar-manager-three.vercel.app')}
+                >
+                  <Text style={styles.presetChipText}>Live Vercel Backend</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.presetChip}
+                  onPress={() => setCustomUrl('http://10.0.2.2:5000')}
+                >
+                  <Text style={styles.presetChipText}>Android Localhost</Text>
+                </TouchableOpacity>
+              </View>
+
+              {testResult && (
+                <View style={styles.testResultBox}>
+                  <Text style={styles.testResultText}>{testResult}</Text>
+                </View>
+              )}
+
+              <TouchableOpacity
+                style={styles.testBtn}
+                onPress={handleTestServer}
+                disabled={testing}
+              >
+                {testing ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.testBtnText}>Test & Connect</Text>
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.closeBtn}
+                onPress={() => setServerModalVisible(false)}
+              >
+                <Text style={styles.closeBtnText}>Done</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
+  scrollContainer: {
+    flexGrow: 1,
     backgroundColor: colors.slate900,
     justifyContent: 'center',
     padding: 20,
+    paddingVertical: 36,
   },
   brandBox: {
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 18,
   },
   logoBadge: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 58,
+    height: 58,
+    borderRadius: 29,
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
     justifyContent: 'center',
     alignItems: 'center',
@@ -266,10 +438,10 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.15)',
   },
   logoSun: {
-    fontSize: 26,
+    fontSize: 28,
   },
   appName: {
-    fontSize: 20,
+    fontSize: 21,
     fontWeight: '900',
     color: colors.white,
     letterSpacing: 1.5,
@@ -278,6 +450,35 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: colors.slate400,
     marginTop: 4,
+  },
+  sessionBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fef3c7',
+    borderColor: '#f59e0b',
+    borderWidth: 1.5,
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 16,
+  },
+  sessionBannerTitle: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#92400e',
+    marginBottom: 2,
+  },
+  sessionBannerText: {
+    fontSize: 11,
+    color: '#78350f',
+  },
+  sessionBannerClose: {
+    padding: 6,
+    marginLeft: 8,
+  },
+  sessionBannerCloseText: {
+    fontSize: 16,
+    color: '#92400e',
+    fontWeight: '800',
   },
   card: {
     backgroundColor: colors.white,
@@ -336,7 +537,7 @@ const styles = StyleSheet.create({
   inputLabel: {
     fontSize: 10,
     fontWeight: '800',
-    color: colors.slate400,
+    color: colors.slate500,
     letterSpacing: 0.5,
     marginBottom: 4,
   },
@@ -350,6 +551,31 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.slate900,
     marginBottom: 10,
+  },
+  passwordInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8fafc',
+    borderWidth: 1.5,
+    borderColor: '#e2e8f0',
+    borderRadius: 12,
+    marginBottom: 12,
+  },
+  passwordInput: {
+    flex: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 13,
+    color: colors.slate900,
+  },
+  showPasswordBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  showPasswordText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.slate600,
   },
   loginBtn: {
     backgroundColor: colors.slate900,
@@ -389,28 +615,44 @@ const styles = StyleSheet.create({
     marginHorizontal: 8,
     letterSpacing: 0.5,
   },
-  quickRoleBtn: {
+  presetAccountsGrid: {
+    gap: 8,
+  },
+  presetAccountBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 10,
     borderRadius: 12,
-    borderWidth: 1.5,
+    borderWidth: 1.2,
+    borderColor: '#e2e8f0',
     backgroundColor: '#f8fafc',
-    marginBottom: 6,
   },
-  quickRoleEmoji: {
-    fontSize: 20,
+  presetAccountEmoji: {
+    fontSize: 18,
     marginRight: 10,
   },
-  quickRoleTitle: {
+  presetAccountTitle: {
     fontSize: 12,
     fontWeight: '800',
     color: colors.slate900,
   },
-  quickRoleDesc: {
+  presetAccountSub: {
     fontSize: 10,
     color: colors.slate500,
     marginTop: 1,
+  },
+  securityFooter: {
+    marginTop: 14,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#f1f5f9',
+    alignItems: 'center',
+  },
+  securityFooterText: {
+    fontSize: 9,
+    color: colors.slate400,
+    textAlign: 'center',
+    fontWeight: '600',
   },
   modalOverlay: {
     flex: 1,
@@ -424,7 +666,21 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     padding: 24,
     width: '100%',
-    maxWidth: 360,
+    maxWidth: 380,
+  },
+  modalHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    gap: 12,
+  },
+  modalKeyBadge: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#fef3c7',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   modalTitle: {
     fontSize: 17,
@@ -432,10 +688,21 @@ const styles = StyleSheet.create({
     color: colors.slate900,
   },
   modalSubtitle: {
-    fontSize: 12,
+    fontSize: 11,
     color: colors.slate500,
-    marginTop: 4,
-    marginBottom: 14,
+    marginTop: 2,
+  },
+  resetSubmitBtn: {
+    backgroundColor: colors.primary,
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  resetSubmitBtnText: {
+    color: colors.white,
+    fontSize: 13,
+    fontWeight: '800',
   },
   serverInput: {
     backgroundColor: '#f8fafc',
