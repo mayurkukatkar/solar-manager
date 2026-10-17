@@ -12,6 +12,43 @@ interface AuthContextType {
   switchRole: (newRole: UserRole) => Promise<void>;
 }
 
+// In-Memory Storage Fallback if Native Module is null
+const memoryStore: Record<string, string> = {};
+
+const SafeStorage = {
+  getItem: async (key: string): Promise<string | null> => {
+    try {
+      if (AsyncStorage && typeof AsyncStorage.getItem === 'function') {
+        const val = await AsyncStorage.getItem(key);
+        if (val !== null) return val;
+      }
+    } catch {
+      // Graceful fallback to memory storage
+    }
+    return memoryStore[key] || null;
+  },
+  setItem: async (key: string, value: string): Promise<void> => {
+    memoryStore[key] = value;
+    try {
+      if (AsyncStorage && typeof AsyncStorage.setItem === 'function') {
+        await AsyncStorage.setItem(key, value);
+      }
+    } catch {
+      // Graceful fallback to memory storage
+    }
+  },
+  removeItem: async (key: string): Promise<void> => {
+    delete memoryStore[key];
+    try {
+      if (AsyncStorage && typeof AsyncStorage.removeItem === 'function') {
+        await AsyncStorage.removeItem(key);
+      }
+    } catch {
+      // Graceful fallback to memory storage
+    }
+  },
+};
+
 const DEFAULT_USERS: Record<UserRole, UserProfile> = {
   OWNER: {
     id: 'usr-owner-001',
@@ -61,20 +98,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const loadStoredSession = async () => {
     try {
-      const storedRole = (await AsyncStorage.getItem('@solar_user_role')) as UserRole | null;
-      const storedToken = await AsyncStorage.getItem('@solar_user_token');
+      const storedRole = (await SafeStorage.getItem('@solar_user_role')) as UserRole | null;
+      const storedToken = await SafeStorage.getItem('@solar_user_token');
       if (storedRole && DEFAULT_USERS[storedRole]) {
         setRole(storedRole);
         setUser(DEFAULT_USERS[storedRole]);
         setToken(storedToken || 'mock-jwt-token');
       } else {
-        // Default to Owner view for immediate ready testing
+        // Default to Owner view for immediate testing
         setRole('OWNER');
         setUser(DEFAULT_USERS.OWNER);
         setToken('mock-jwt-token');
       }
-    } catch (e) {
-      console.error('Failed to load session:', e);
+    } catch {
+      // Fallback defaults on any error
+      setRole('OWNER');
+      setUser(DEFAULT_USERS.OWNER);
+      setToken('mock-jwt-token');
     } finally {
       setIsLoading(false);
     }
@@ -94,8 +134,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setRole(targetRole);
     setToken('jwt-session-token');
 
-    await AsyncStorage.setItem('@solar_user_role', targetRole);
-    await AsyncStorage.setItem('@solar_user_token', 'jwt-session-token');
+    await SafeStorage.setItem('@solar_user_role', targetRole);
+    await SafeStorage.setItem('@solar_user_token', 'jwt-session-token');
     setIsLoading(false);
   };
 
@@ -103,14 +143,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setRole(newRole);
     const updatedUser = DEFAULT_USERS[newRole];
     setUser(updatedUser);
-    await AsyncStorage.setItem('@solar_user_role', newRole);
+    await SafeStorage.setItem('@solar_user_role', newRole);
   };
 
   const logout = async () => {
     setUser(null);
     setToken(null);
-    await AsyncStorage.removeItem('@solar_user_role');
-    await AsyncStorage.removeItem('@solar_user_token');
+    await SafeStorage.removeItem('@solar_user_role');
+    await SafeStorage.removeItem('@solar_user_token');
   };
 
   return (
