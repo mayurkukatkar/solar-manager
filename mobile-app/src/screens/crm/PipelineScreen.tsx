@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -25,6 +25,9 @@ import {
   Camera,
   Layers,
   CheckCircle2,
+  TrendingUp,
+  IndianRupee,
+  Calendar,
 } from 'lucide-react-native';
 import { crmApi } from '../../api/endpoints';
 import { LeadCaptureModal } from './LeadCaptureModal';
@@ -34,11 +37,11 @@ import { DiscomDocsModal } from '../projects/DiscomDocsModal';
 import { colors } from '../../theme/colors';
 
 const STAGES = [
-  { id: 'ALL', label: 'All' },
-  { id: 'LEADS', label: '1. Leads' },
-  { id: 'QUOTES', label: '2. Quotes' },
-  { id: 'ONBOARDING', label: '3. Onboard' },
-  { id: 'PROJECTS', label: '4. Projects' },
+  { id: 'ALL', label: 'All Records' },
+  { id: 'LEADS', label: '1. New Leads' },
+  { id: 'QUOTES', label: '2. Quotes Sent' },
+  { id: 'ONBOARDING', label: '3. KYC Pending' },
+  { id: 'PROJECTS', label: '4. Converted' },
 ];
 
 export const PipelineScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
@@ -118,10 +121,9 @@ export const PipelineScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
     setOnboardingModalVisible(false);
     fetchLeads();
     setSelectedProject(project);
-    // Optionally ask if rep wants to generate DISCOM docs immediately
     Alert.alert(
-      'Project Initialized',
-      'Customer onboarded to active project. Would you like to generate statutory DISCOM forms now?',
+      'Client Onboarded & Project Created',
+      'Customer converted into active installation project. Generate statutory DISCOM forms now?',
       [
         { text: 'Later', style: 'cancel' },
         { text: 'Generate DISCOM Docs', onPress: () => setDiscomModalVisible(true) },
@@ -137,6 +139,32 @@ export const PipelineScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
     });
     setDiscomModalVisible(true);
   };
+
+  // KPI Calculations for the Vendor
+  const pipelineMetrics = useMemo(() => {
+    let totalCap = 0;
+    let totalGross = 0;
+    let totalSubsidy = 0;
+    let wonCount = 0;
+
+    leads.forEach((l) => {
+      const c = l.estimatedCap || 3.3;
+      const g = l.estimatedValue || Math.round(c * 56000);
+      const s = c >= 3 ? 78000 : c >= 2 ? 60000 : 30000;
+      totalCap += c;
+      totalGross += g;
+      totalSubsidy += s;
+      if (l.status === 'WON') wonCount++;
+    });
+
+    return {
+      totalLeads: leads.length,
+      totalKw: Number(totalCap.toFixed(1)),
+      grossLakhs: (totalGross / 100000).toFixed(1),
+      subsidyLakhs: (totalSubsidy / 100000).toFixed(1),
+      wonCount,
+    };
+  }, [leads]);
 
   // Filter leads based on Stage & Search
   const filteredItems = leads.filter((item) => {
@@ -164,22 +192,45 @@ export const PipelineScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
 
   return (
     <View style={styles.container}>
-      {/* Top Header */}
+      {/* VENDOR BRANDED HEADER */}
       <View style={styles.header}>
         <View>
-          <Text style={styles.headerTitle}>Field Sales Pipeline</Text>
+          <Text style={styles.headerTitle}>Solar Field Command</Text>
           <Text style={styles.headerSubtitle}>
-            End-to-End Customer Lifecycle: Lead ➔ Quote ➔ Client ➔ DISCOM
+            Vendor Sales Pipeline & PM Surya Ghar Sizing
           </Text>
         </View>
         <TouchableOpacity
-          style={styles.newLeadBtn}
+          style={styles.scanBillBtn}
           onPress={handleOpenLeadCapture}
           activeOpacity={0.85}
         >
           <Camera size={16} color="#ffffff" />
-          <Text style={styles.newLeadBtnText}>Scan Bill</Text>
+          <Text style={styles.scanBillBtnText}>Scan Bill</Text>
         </TouchableOpacity>
+      </View>
+
+      {/* EXECUTIVE PULSE METRICS BAR */}
+      <View style={styles.pulseContainer}>
+        <View style={styles.pulseItem}>
+          <Text style={styles.pulseNum}>{pipelineMetrics.totalKw} <Text style={styles.pulseUnit}>kW</Text></Text>
+          <Text style={styles.pulseLabel}>Pipeline</Text>
+        </View>
+        <View style={styles.pulseDivider} />
+        <View style={styles.pulseItem}>
+          <Text style={styles.pulseNum}>₹{pipelineMetrics.grossLakhs} <Text style={styles.pulseUnit}>L</Text></Text>
+          <Text style={styles.pulseLabel}>Turnkey</Text>
+        </View>
+        <View style={styles.pulseDivider} />
+        <View style={styles.pulseItem}>
+          <Text style={styles.pulseNumGold}>₹{pipelineMetrics.subsidyLakhs} <Text style={styles.pulseUnitGold}>L</Text></Text>
+          <Text style={styles.pulseLabel}>Subsidy</Text>
+        </View>
+        <View style={styles.pulseDivider} />
+        <View style={styles.pulseItem}>
+          <Text style={styles.pulseNumGreen}>{pipelineMetrics.wonCount}</Text>
+          <Text style={styles.pulseLabel}>Won Clients</Text>
+        </View>
       </View>
 
       {/* SEARCH BAR */}
@@ -187,7 +238,7 @@ export const PipelineScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
         <Search size={16} color="#64748b" style={styles.searchIcon} />
         <TextInput
           style={styles.searchInput}
-          placeholder="Search customer, mobile, city..."
+          placeholder="Search customer, mobile, consumer no..."
           placeholderTextColor="#94a3b8"
           value={searchQuery}
           onChangeText={setSearchQuery}
@@ -199,6 +250,17 @@ export const PipelineScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.stageTabsContent}>
           {STAGES.map((s) => {
             const isActive = activeStage === s.id;
+            const count =
+              s.id === 'ALL'
+                ? leads.length
+                : s.id === 'LEADS'
+                ? leads.filter((l) => l.status === 'NEW' || l.status === 'CONTACTED' || !l.status).length
+                : s.id === 'QUOTES'
+                ? leads.filter((l) => l.status === 'QUALIFIED' || l.status === 'PROPOSAL_SENT').length
+                : s.id === 'ONBOARDING'
+                ? leads.filter((l) => l.status === 'SITE_SURVEY' || l.status === 'NEGOTIATION').length
+                : leads.filter((l) => l.status === 'WON' || l.status === 'COMPLETED').length;
+
             return (
               <TouchableOpacity
                 key={s.id}
@@ -209,6 +271,11 @@ export const PipelineScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
                 <Text style={[styles.stageChipText, isActive && styles.stageChipTextActive]}>
                   {s.label}
                 </Text>
+                <View style={[styles.chipBadge, isActive && styles.chipBadgeActive]}>
+                  <Text style={[styles.chipBadgeText, isActive && styles.chipBadgeTextActive]}>
+                    {count}
+                  </Text>
+                </View>
               </TouchableOpacity>
             );
           })}
@@ -225,7 +292,7 @@ export const PipelineScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
         {loading ? (
           <View style={styles.centerContainer}>
             <ActivityIndicator size="large" color={colors.primary} />
-            <Text style={styles.loadingText}>Loading Field Pipeline...</Text>
+            <Text style={styles.loadingText}>Connecting to Vendor ERP...</Text>
           </View>
         ) : filteredItems.length === 0 ? (
           <View style={styles.emptyContainer}>
@@ -234,7 +301,7 @@ export const PipelineScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
             </View>
             <Text style={styles.emptyTitle}>No Records Found</Text>
             <Text style={styles.emptySubtitle}>
-              Capture a new lead or scan a physical electricity bill to start the lifecycle pipeline.
+              Capture a new prospect or scan a physical electricity bill to start closing solar deals.
             </Text>
             <TouchableOpacity
               style={styles.emptyActionBtn}
@@ -242,7 +309,7 @@ export const PipelineScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
               activeOpacity={0.8}
             >
               <Plus size={16} color="#ffffff" />
-              <Text style={styles.emptyActionText}>Capture New Lead</Text>
+              <Text style={styles.emptyActionText}>Scan Electricity Bill</Text>
             </TouchableOpacity>
           </View>
         ) : (
@@ -273,24 +340,24 @@ export const PipelineScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
                 {/* SIZING & COMMERCIAL HIGHLIGHTS */}
                 <View style={styles.metricGrid}>
                   <View style={styles.metricItem}>
-                    <Text style={styles.metricLabel}>Capacity</Text>
+                    <Text style={styles.metricLabel}>Plant Size</Text>
                     <Text style={styles.metricValueBold}>{cap} kWp</Text>
                   </View>
                   <View style={styles.metricItem}>
-                    <Text style={styles.metricLabel}>Total Cost</Text>
+                    <Text style={styles.metricLabel}>Total Value</Text>
                     <Text style={styles.metricValue}>₹{gross.toLocaleString('en-IN')}</Text>
                   </View>
                   <View style={styles.metricItem}>
-                    <Text style={styles.metricLabel}>Govt Subsidy</Text>
+                    <Text style={styles.metricLabel}>PM Subsidy</Text>
                     <Text style={styles.metricValueGreen}>-₹{subsidy.toLocaleString('en-IN')}</Text>
                   </View>
                   <View style={styles.metricItem}>
-                    <Text style={styles.metricLabel}>Net Cost</Text>
+                    <Text style={styles.metricLabel}>Customer Cost</Text>
                     <Text style={styles.metricValueBlue}>₹{net.toLocaleString('en-IN')}</Text>
                   </View>
                 </View>
 
-                {/* CARD ACTIONS */}
+                {/* CONTEXTUAL ACTION ROW */}
                 <View style={styles.cardActionsRow}>
                   <TouchableOpacity
                     style={styles.iconActionBtn}
@@ -307,7 +374,7 @@ export const PipelineScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
                       activeOpacity={0.8}
                     >
                       <Building size={15} color="#d97706" />
-                      <Text style={styles.discomCtaText}>DISCOM Docs</Text>
+                      <Text style={styles.discomCtaText}>Generate Official DISCOM Docs</Text>
                     </TouchableOpacity>
                   ) : (
                     <>
@@ -317,7 +384,7 @@ export const PipelineScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
                         activeOpacity={0.8}
                       >
                         <FileText size={15} color="#2563eb" />
-                        <Text style={styles.quoteCtaText}>Create Quote</Text>
+                        <Text style={styles.quoteCtaText}>Custom Quote</Text>
                       </TouchableOpacity>
 
                       <TouchableOpacity
@@ -403,27 +470,84 @@ const styles = StyleSheet.create({
     marginTop: 2,
     fontWeight: '500',
   },
-  newLeadBtn: {
+  scanBillBtn: {
     backgroundColor: '#2563eb',
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
     paddingVertical: 9,
     borderRadius: 8,
     gap: 6,
+    shadowColor: '#2563eb',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  newLeadBtnText: {
+  scanBillBtnText: {
     color: '#ffffff',
     fontSize: 12,
     fontWeight: '800',
+  },
+  pulseContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#0f172a',
+    marginHorizontal: 16,
+    marginTop: 12,
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    alignItems: 'center',
+  },
+  pulseItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  pulseNum: {
+    fontSize: 15,
+    fontWeight: '900',
+    color: '#ffffff',
+  },
+  pulseUnit: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#94a3b8',
+  },
+  pulseNumGold: {
+    fontSize: 15,
+    fontWeight: '900',
+    color: '#fbbf24',
+  },
+  pulseUnitGold: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#fbbf24',
+  },
+  pulseNumGreen: {
+    fontSize: 15,
+    fontWeight: '900',
+    color: '#4ade80',
+  },
+  pulseLabel: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#94a3b8',
+    textTransform: 'uppercase',
+    marginTop: 2,
+    letterSpacing: 0.3,
+  },
+  pulseDivider: {
+    width: 1,
+    height: 24,
+    backgroundColor: 'rgba(255,255,255,0.12)',
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#ffffff',
     marginHorizontal: 16,
-    marginTop: 12,
-    marginBottom: 8,
+    marginTop: 10,
+    marginBottom: 6,
     borderRadius: 10,
     borderWidth: 1,
     borderColor: '#e2e8f0',
@@ -440,7 +564,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   stageTabsContainer: {
-    marginBottom: 6,
+    marginBottom: 4,
   },
   stageTabsContent: {
     paddingHorizontal: 16,
@@ -448,8 +572,11 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   stageChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 7,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: 20,
     backgroundColor: '#ffffff',
     borderWidth: 1,
@@ -465,6 +592,23 @@ const styles = StyleSheet.create({
     color: '#64748b',
   },
   stageChipTextActive: {
+    color: '#ffffff',
+  },
+  chipBadge: {
+    backgroundColor: '#f1f5f9',
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 10,
+  },
+  chipBadgeActive: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+  },
+  chipBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#475569',
+  },
+  chipBadgeTextActive: {
     color: '#ffffff',
   },
   listContainer: {

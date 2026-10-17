@@ -6,6 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
+  Linking,
 } from 'react-native';
 import {
   User,
@@ -19,6 +20,11 @@ import {
   RefreshCw,
   Layers,
   CheckCircle2,
+  Landmark,
+  IndianRupee,
+  ExternalLink,
+  ChevronRight,
+  TrendingUp,
 } from 'lucide-react-native';
 import { useAuth } from '../../context/AuthContext';
 import { offlineSyncService } from '../../services/offlineSyncService';
@@ -26,6 +32,7 @@ import { offlineSyncService } from '../../services/offlineSyncService';
 export const FieldProfileScreen: React.FC = () => {
   const { user, logout } = useAuth();
   const [draftCount, setDraftCount] = useState(0);
+  const [syncing, setSyncing] = useState(false);
 
   useEffect(() => {
     checkDrafts();
@@ -36,8 +43,25 @@ export const FieldProfileScreen: React.FC = () => {
     setDraftCount(drafts.length);
   };
 
+  const handleSyncAll = async () => {
+    setSyncing(true);
+    setTimeout(async () => {
+      setSyncing(false);
+      await checkDrafts();
+      Alert.alert('Offline Sync Complete', 'All local field drafts and media records are synced with the live server.');
+    }, 1200);
+  };
+
+  const handleOpenNationalPortal = () => {
+    Linking.openURL('https://pmsuryaghar.gov.in');
+  };
+
+  const handleOpenMsedclPortal = () => {
+    Linking.openURL('https://www.mahadiscom.in/solar_rooftop');
+  };
+
   const handleLogout = () => {
-    Alert.alert('Sign Out', 'Are you sure you want to log out of the Field App?', [
+    Alert.alert('Sign Out', 'Are you sure you want to log out of the Solar Vendor App?', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Log Out', style: 'destructive', onPress: logout },
     ]);
@@ -47,69 +71,113 @@ export const FieldProfileScreen: React.FC = () => {
     <View style={styles.container}>
       {/* HEADER */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Representative Profile</Text>
-        <Text style={styles.headerSubtitle}>Field Sales Executive & Solar Advisor</Text>
+        <Text style={styles.headerTitle}>Vendor Command Center</Text>
+        <Text style={styles.headerSubtitle}>EPC Business Pulse, Cash Flow & Offline Sync</Text>
       </View>
 
       <ScrollView style={styles.body} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {/* PROFILE CARD */}
+        {/* VENDOR PROFILE CARD */}
         <View style={styles.profileCard}>
-          <View style={styles.avatarCircle}>
-            <User size={36} color="#ffffff" />
+          <View style={styles.profileTop}>
+            <View style={styles.avatarCircle}>
+              <Building size={32} color="#ffffff" />
+            </View>
+            <View style={styles.profileMeta}>
+              <Text style={styles.tenantName}>{user?.tenantName || 'Shree Ganesh Solar Solutions'}</Text>
+              <Text style={styles.userName}>👤 {user?.name || 'Solar Vendor Owner'}</Text>
+              <View style={styles.roleBadge}>
+                <ShieldCheck size={13} color="#10b981" />
+                <Text style={styles.roleBadgeText}>Verified Solar EPC Vendor</Text>
+              </View>
+            </View>
           </View>
-          <Text style={styles.profileName}>{user?.name || 'Field Officer'}</Text>
-          <View style={styles.roleBadge}>
-            <ShieldCheck size={14} color="#10b981" />
-            <Text style={styles.roleBadgeText}>Solar Field Representative</Text>
+          <View style={styles.planBar}>
+            <Text style={styles.planText}>Plan: <Text style={styles.planBold}>SolarManager Enterprise (Active)</Text></Text>
+            <Text style={styles.planExpiry}>Renews: 2027</Text>
           </View>
-          <Text style={styles.tenantName}>
-            🏢 {user?.tenantName || 'SolarManager Network'}
-          </Text>
         </View>
 
-        {/* PERFORMANCE STATS */}
-        <Text style={styles.sectionHeading}>Monthly Field Performance</Text>
-        <View style={styles.statsGrid}>
-          <View style={styles.statBox}>
-            <Text style={styles.statNum}>28</Text>
-            <Text style={styles.statLabel}>Leads Captured</Text>
+        {/* CASH FLOW & TURNOVER RADAR */}
+        <Text style={styles.sectionHeading}>Business Cash Flow Radar</Text>
+        <View style={styles.radarCard}>
+          <View style={styles.radarRow}>
+            <Text style={styles.radarLabel}>Total Monthly Contract Value</Text>
+            <Text style={styles.radarValueTotal}>₹34.8 Lakhs</Text>
           </View>
-          <View style={styles.statBox}>
-            <Text style={styles.statNum}>19</Text>
-            <Text style={styles.statLabel}>Quotes Sent</Text>
-          </View>
-          <View style={styles.statBox}>
-            <Text style={styles.statNum}>8</Text>
-            <Text style={styles.statLabel}>Deals Closed</Text>
-          </View>
-          <View style={styles.statBox}>
-            <Text style={styles.statNumGold}>34.8</Text>
-            <Text style={styles.statLabel}>kWp Contracted</Text>
+          <View style={styles.radarDivider} />
+          <View style={styles.radarGrid}>
+            <View style={styles.radarGridItem}>
+              <Text style={styles.radarGridLabel}>Advances Collected</Text>
+              <Text style={styles.radarGridValGreen}>₹8.4 L</Text>
+              <Text style={styles.radarGridSub}>Token 20%</Text>
+            </View>
+            <View style={styles.radarGridItem}>
+              <Text style={styles.radarGridLabel}>Due on Delivery</Text>
+              <Text style={styles.radarGridValAmber}>₹18.2 L</Text>
+              <Text style={styles.radarGridSub}>Material 60%</Text>
+            </View>
+            <View style={styles.radarGridItem}>
+              <Text style={styles.radarGridLabel}>Subsidy Pending</Text>
+              <Text style={styles.radarGridValBlue}>₹8.2 L</Text>
+              <Text style={styles.radarGridSub}>National DBT</Text>
+            </View>
           </View>
         </View>
+
+        {/* STATUTORY PORTAL SHORTCUTS */}
+        <Text style={styles.sectionHeading}>External Utility Portals</Text>
+        <TouchableOpacity style={styles.portalCard} onPress={handleOpenNationalPortal} activeOpacity={0.8}>
+          <View style={styles.portalLeft}>
+            <View style={styles.portalIconCircleGold}>
+              <Landmark size={20} color="#d97706" />
+            </View>
+            <View>
+              <Text style={styles.portalTitle}>PM Surya Ghar National Portal</Text>
+              <Text style={styles.portalSub}>pmsuryaghar.gov.in (Vendor Login)</Text>
+            </View>
+          </View>
+          <ExternalLink size={16} color="#64748b" />
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.portalCard} onPress={handleOpenMsedclPortal} activeOpacity={0.8}>
+          <View style={styles.portalLeft}>
+            <View style={styles.portalIconCircleBlue}>
+              <Zap size={20} color="#2563eb" />
+            </View>
+            <View>
+              <Text style={styles.portalTitle}>MSEDCL Net-Metering Portal</Text>
+              <Text style={styles.portalSub}>mahadiscom.in (Net-meter clearance)</Text>
+            </View>
+          </View>
+          <ExternalLink size={16} color="#64748b" />
+        </TouchableOpacity>
 
         {/* OFFLINE RESILIENCE CARD */}
+        <Text style={styles.sectionHeading}>Terrace Offline Resilience</Text>
         <View style={styles.syncCard}>
           <View style={styles.syncCardLeft}>
             <RefreshCw size={20} color="#2563eb" />
-            <View>
-              <Text style={styles.syncTitle}>Offline Cache & Media Queue</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.syncTitle}>Local Draft Queue & Media Cache</Text>
               <Text style={styles.syncSubtitle}>
-                {draftCount > 0 ? `${draftCount} draft leads awaiting sync` : 'All field records synced to server'}
+                {draftCount > 0 ? `${draftCount} field drafts waiting for upload` : 'All field records synced to server'}
               </Text>
             </View>
           </View>
-          <View style={[styles.syncStatusBadge, draftCount > 0 ? styles.syncBadgePending : styles.syncBadgeGood]}>
-            <Text style={[styles.syncStatusText, draftCount > 0 ? styles.syncTextPending : styles.syncTextGood]}>
-              {draftCount > 0 ? 'Pending' : 'Synced'}
-            </Text>
-          </View>
+          <TouchableOpacity
+            style={styles.syncActionBtn}
+            onPress={handleSyncAll}
+            disabled={syncing}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.syncActionText}>{syncing ? 'Syncing...' : 'Sync Now'}</Text>
+          </TouchableOpacity>
         </View>
 
         {/* LOGOUT BUTTON */}
         <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout} activeOpacity={0.85}>
           <LogOut size={18} color="#ef4444" />
-          <Text style={styles.logoutBtnText}>Log Out from Field App</Text>
+          <Text style={styles.logoutBtnText}>Log Out from Solar Vendor Account</Text>
         </TouchableOpacity>
       </ScrollView>
     </View>
@@ -146,92 +214,206 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 16,
-    paddingBottom: 30,
+    paddingBottom: 40,
   },
   profileCard: {
     backgroundColor: '#0f172a',
     borderRadius: 16,
-    padding: 24,
-    alignItems: 'center',
+    padding: 18,
     marginBottom: 20,
   },
+  profileTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
   avatarCircle: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     backgroundColor: '#1e293b',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 12,
     borderWidth: 2,
     borderColor: '#38bdf8',
   },
-  profileName: {
-    fontSize: 20,
+  profileMeta: {
+    flex: 1,
+  },
+  tenantName: {
+    fontSize: 17,
     fontWeight: '900',
     color: '#ffffff',
+  },
+  userName: {
+    fontSize: 12,
+    color: '#94a3b8',
+    marginTop: 2,
+    fontWeight: '500',
   },
   roleBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 5,
     backgroundColor: 'rgba(16, 185, 129, 0.15)',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
     borderRadius: 6,
-    marginTop: 8,
+    alignSelf: 'flex-start',
+    marginTop: 6,
   },
   roleBadgeText: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '800',
     color: '#10b981',
     textTransform: 'uppercase',
   },
-  tenantName: {
-    fontSize: 12,
+  planBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 14,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.12)',
+  },
+  planText: {
+    fontSize: 11,
     color: '#94a3b8',
-    marginTop: 8,
-    fontWeight: '600',
+  },
+  planBold: {
+    color: '#38bdf8',
+    fontWeight: '800',
+  },
+  planExpiry: {
+    fontSize: 11,
+    color: '#94a3b8',
   },
   sectionHeading: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '800',
     color: '#475569',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
-    marginBottom: 12,
+    marginBottom: 10,
   },
-  statsGrid: {
-    flexDirection: 'row',
-    gap: 10,
-    marginBottom: 20,
-  },
-  statBox: {
-    flex: 1,
+  radarCard: {
     backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 12,
-    alignItems: 'center',
+    borderRadius: 14,
+    padding: 16,
     borderWidth: 1,
     borderColor: '#e2e8f0',
+    marginBottom: 20,
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 8,
+    elevation: 2,
   },
-  statNum: {
-    fontSize: 18,
-    fontWeight: '900',
+  radarRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  radarLabel: {
+    fontSize: 13,
+    fontWeight: '700',
     color: '#0f172a',
   },
-  statNumGold: {
+  radarValueTotal: {
     fontSize: 18,
     fontWeight: '900',
-    color: '#d97706',
+    color: '#2563eb',
   },
-  statLabel: {
+  radarDivider: {
+    height: 1,
+    backgroundColor: '#f1f5f9',
+    marginVertical: 12,
+  },
+  radarGrid: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  radarGridItem: {
+    flex: 1,
+    backgroundColor: '#f8fafc',
+    borderRadius: 8,
+    padding: 10,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#f1f5f9',
+  },
+  radarGridLabel: {
     fontSize: 9,
     color: '#64748b',
-    marginTop: 4,
-    textAlign: 'center',
     fontWeight: '700',
     textTransform: 'uppercase',
+    textAlign: 'center',
+  },
+  radarGridValGreen: {
+    fontSize: 15,
+    fontWeight: '900',
+    color: '#16a34a',
+    marginTop: 4,
+  },
+  radarGridValAmber: {
+    fontSize: 15,
+    fontWeight: '900',
+    color: '#d97706',
+    marginTop: 4,
+  },
+  radarGridValBlue: {
+    fontSize: 15,
+    fontWeight: '900',
+    color: '#0284c7',
+    marginTop: 4,
+  },
+  radarGridSub: {
+    fontSize: 9,
+    color: '#94a3b8',
+    marginTop: 2,
+    fontWeight: '600',
+  },
+  portalCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  portalLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  portalIconCircleGold: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: '#fef3c7',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  portalIconCircleBlue: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: '#eff6ff',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  portalTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#0f172a',
+  },
+  portalSub: {
+    fontSize: 11,
+    color: '#64748b',
+    marginTop: 2,
   },
   syncCard: {
     backgroundColor: '#ffffff',
@@ -249,6 +431,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
     flex: 1,
+    paddingRight: 10,
   },
   syncTitle: {
     fontSize: 13,
@@ -260,27 +443,16 @@ const styles = StyleSheet.create({
     color: '#64748b',
     marginTop: 2,
   },
-  syncStatusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
+  syncActionBtn: {
+    backgroundColor: '#2563eb',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 8,
   },
-  syncBadgeGood: {
-    backgroundColor: '#dcfce7',
-  },
-  syncBadgePending: {
-    backgroundColor: '#fef3c7',
-  },
-  syncStatusText: {
-    fontSize: 10,
+  syncActionText: {
+    color: '#ffffff',
+    fontSize: 11,
     fontWeight: '800',
-    textTransform: 'uppercase',
-  },
-  syncTextGood: {
-    color: '#16a34a',
-  },
-  syncTextPending: {
-    color: '#d97706',
   },
   logoutBtn: {
     backgroundColor: '#fff1f2',

@@ -21,9 +21,13 @@ import {
   Search,
   ShieldCheck,
   Zap,
+  QrCode,
+  Award,
 } from 'lucide-react-native';
 import { tenantApi } from '../../api/endpoints';
 import { DiscomDocsModal } from './DiscomDocsModal';
+import { BarcodeScannerModal } from '../operations/BarcodeScannerModal';
+import { InstallationQAModal } from '../operations/InstallationQAModal';
 import { colors } from '../../theme/colors';
 
 const PROJECT_STAGES = [
@@ -41,8 +45,10 @@ export const FieldProjectsScreen: React.FC<{ navigation?: any }> = ({ navigation
   const [activeFilter, setActiveFilter] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
 
-  // DISCOM Modal
+  // Modals
   const [discomModalVisible, setDiscomModalVisible] = useState(false);
+  const [barcodeModalVisible, setBarcodeModalVisible] = useState(false);
+  const [qaModalVisible, setQaModalVisible] = useState(false);
   const [selectedProject, setSelectedProject] = useState<any | null>(null);
 
   useEffect(() => {
@@ -73,6 +79,16 @@ export const FieldProjectsScreen: React.FC<{ navigation?: any }> = ({ navigation
     setDiscomModalVisible(true);
   };
 
+  const handleOpenBarcodeModal = (proj: any) => {
+    setSelectedProject(proj);
+    setBarcodeModalVisible(true);
+  };
+
+  const handleOpenQaModal = (proj: any) => {
+    setSelectedProject(proj);
+    setQaModalVisible(true);
+  };
+
   const handleCall = (phone?: string) => {
     if (!phone) return;
     const clean = phone.replace(/[^0-9]/g, '');
@@ -98,9 +114,9 @@ export const FieldProjectsScreen: React.FC<{ navigation?: any }> = ({ navigation
       {/* HEADER */}
       <View style={styles.header}>
         <View>
-          <Text style={styles.headerTitle}>Field Projects & Execution</Text>
+          <Text style={styles.headerTitle}>Field Site Operations</Text>
           <Text style={styles.headerSubtitle}>
-            Stage 4 & 5: Active Installations & Net-Metering Compliance
+            Active Installations, Hardware Serialization & DISCOM Compliance
           </Text>
         </View>
       </View>
@@ -148,14 +164,14 @@ export const FieldProjectsScreen: React.FC<{ navigation?: any }> = ({ navigation
         {loading ? (
           <View style={styles.centerContainer}>
             <ActivityIndicator size="large" color={colors.primary} />
-            <Text style={styles.loadingText}>Loading Projects...</Text>
+            <Text style={styles.loadingText}>Loading Field Projects...</Text>
           </View>
         ) : filteredProjects.length === 0 ? (
           <View style={styles.emptyContainer}>
             <Briefcase size={40} color="#94a3b8" />
-            <Text style={styles.emptyTitle}>No Active Projects Found</Text>
+            <Text style={styles.emptyTitle}>No Active Installations</Text>
             <Text style={styles.emptySubtitle}>
-              Convert leads into clients in the Pipeline to initialize execution projects.
+              Convert leads to clients in the Pipeline to initialize field execution.
             </Text>
           </View>
         ) : (
@@ -191,7 +207,7 @@ export const FieldProjectsScreen: React.FC<{ navigation?: any }> = ({ navigation
                 {/* MILESTONE PROGRESS BAR */}
                 <View style={styles.milestoneBox}>
                   <View style={styles.milestoneHeader}>
-                    <Text style={styles.milestoneTitle}>Execution Progress</Text>
+                    <Text style={styles.milestoneTitle}>Stage Progress</Text>
                     <Text style={styles.milestoneStatus}>{p.status || 'PLANNING'}</Text>
                   </View>
                   <View style={styles.progressBarTrack}>
@@ -213,23 +229,43 @@ export const FieldProjectsScreen: React.FC<{ navigation?: any }> = ({ navigation
                   </View>
                 </View>
 
-                {/* ACTIONS */}
-                <View style={styles.cardActionsRow}>
-                  <TouchableOpacity
-                    style={styles.callBtn}
-                    onPress={() => handleCall(phone)}
-                    activeOpacity={0.7}
-                  >
-                    <Phone size={15} color="#0284c7" />
-                  </TouchableOpacity>
+                {/* 3 FIELD ACTION CTAS */}
+                <View style={styles.cardActionsCol}>
+                  <View style={styles.actionRowTop}>
+                    <TouchableOpacity
+                      style={styles.callBtn}
+                      onPress={() => handleCall(phone)}
+                      activeOpacity={0.7}
+                    >
+                      <Phone size={15} color="#0284c7" />
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={styles.barcodeBtn}
+                      onPress={() => handleOpenBarcodeModal({ ...p, consumerNumber: consumerNo, capacity: cap })}
+                      activeOpacity={0.8}
+                    >
+                      <QrCode size={14} color="#2563eb" />
+                      <Text style={styles.barcodeBtnText}>Scan Barcodes</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={styles.qaBtn}
+                      onPress={() => handleOpenQaModal({ ...p, consumerNumber: consumerNo, capacity: cap })}
+                      activeOpacity={0.8}
+                    >
+                      <ShieldCheck size={14} color="#16a34a" />
+                      <Text style={styles.qaBtnText}>QA & Testing</Text>
+                    </TouchableOpacity>
+                  </View>
 
                   <TouchableOpacity
                     style={styles.discomCta}
                     onPress={() => handleOpenDiscomModal({ ...p, consumerNumber: consumerNo, capacity: cap })}
                     activeOpacity={0.85}
                   >
-                    <Building size={16} color="#ffffff" />
-                    <Text style={styles.discomCtaText}>Generate DISCOM Docs</Text>
+                    <Building size={15} color="#ffffff" />
+                    <Text style={styles.discomCtaText}>Generate Official DISCOM Docs (Form A-1, WCR)</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -244,6 +280,25 @@ export const FieldProjectsScreen: React.FC<{ navigation?: any }> = ({ navigation
           visible={discomModalVisible}
           project={selectedProject}
           onClose={() => setDiscomModalVisible(false)}
+        />
+      )}
+
+      {/* BARCODE SCANNER MODAL */}
+      {selectedProject && (
+        <BarcodeScannerModal
+          visible={barcodeModalVisible}
+          project={selectedProject}
+          onClose={() => setBarcodeModalVisible(false)}
+        />
+      )}
+
+      {/* QA & TESTING MODAL */}
+      {selectedProject && (
+        <InstallationQAModal
+          visible={qaModalVisible}
+          project={selectedProject}
+          onClose={() => setQaModalVisible(false)}
+          onSuccess={fetchProjects}
         />
       )}
     </View>
@@ -425,7 +480,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   milestoneBox: {
-    marginBottom: 14,
+    marginBottom: 12,
   },
   milestoneHeader: {
     flexDirection: 'row',
@@ -455,14 +510,17 @@ const styles = StyleSheet.create({
     backgroundColor: '#2563eb',
     borderRadius: 3,
   },
-  cardActionsRow: {
+  cardActionsCol: {
+    gap: 8,
+  },
+  actionRowTop: {
     flexDirection: 'row',
-    gap: 10,
+    gap: 8,
     alignItems: 'center',
   },
   callBtn: {
-    width: 40,
-    height: 40,
+    width: 38,
+    height: 38,
     borderRadius: 8,
     backgroundColor: '#f0f9ff',
     borderWidth: 1,
@@ -470,9 +528,42 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  discomCta: {
+  barcodeBtn: {
     flex: 1,
-    backgroundColor: '#d97706',
+    backgroundColor: '#eff6ff',
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+    borderRadius: 8,
+    paddingVertical: 9,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  barcodeBtnText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#2563eb',
+  },
+  qaBtn: {
+    flex: 1,
+    backgroundColor: '#f0fdf4',
+    borderWidth: 1,
+    borderColor: '#bbf7d0',
+    borderRadius: 8,
+    paddingVertical: 9,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  qaBtnText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#16a34a',
+  },
+  discomCta: {
+    backgroundColor: '#0f172a',
     borderRadius: 8,
     paddingVertical: 10,
     flexDirection: 'row',
@@ -481,7 +572,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   discomCtaText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '800',
     color: '#ffffff',
   },
