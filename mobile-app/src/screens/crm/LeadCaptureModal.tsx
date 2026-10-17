@@ -203,9 +203,15 @@ export const LeadCaptureModal: React.FC<LeadCaptureModalProps> = ({
         }
       );
 
-      // Open Full-Proof Verification Screen so representative sees and validates extracted fields
-      setStagedExtractedData(extracted);
-      setReviewModalVisible(true);
+      if (extracted && extracted.extractedFields && extracted.extractedFields.length > 0) {
+        setStagedExtractedData(extracted);
+        setReviewModalVisible(true);
+      } else {
+        Alert.alert(
+          'Scan Notice',
+          'Could not detect text clearly on this document. Please ensure the bill is well-lit and in focus, or enter details manually.'
+        );
+      }
     } catch (err: any) {
       Alert.alert('Scan Alert', 'Could not complete OCR auto-fill automatically. You can fill the fields manually.');
     } finally {

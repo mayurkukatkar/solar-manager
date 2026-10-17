@@ -207,18 +207,35 @@ class BillOcrService {
           extractedFields: d.extractedFields || [],
         };
       }
-    } catch (e) {
-      console.log('Backend OCR route error or network issue, using authentic Maharashtra MSEDCL model:', e);
+    } catch (e: any) {
+      console.warn('[Bill OCR] Backend OCR route error or network issue:', e.message);
     }
 
-    onProgress?.('Finalizing Verified MSEDCL Extraction...', 98);
-    await new Promise((resolve) => setTimeout(resolve, 200));
+    onProgress?.('Finalizing extraction...', 100);
+    await new Promise((resolve) => setTimeout(resolve, 150));
 
-    // High accuracy fallback to official Maharashtra MSEDCL profile
-    const preset = SAMPLE_DISCOM_BILLS[0];
+    // Return clean extracted object without hardcoded dummy overlays
     return {
-      ...preset.data,
-      confidenceScore: 0.99,
+      consumerNumber: '',
+      billingUnit: '',
+      subDivision: '',
+      consumerName: '',
+      mobile: '',
+      email: '',
+      address: '',
+      city: '',
+      pincode: '',
+      sanctionedLoad: '',
+      monthlyBill: '',
+      monthlyUnits: '',
+      discomName: 'MSEDCL (Mahavitaran)',
+      applicationRefNo: '',
+      recommendedKw: 3.0,
+      estimatedAnnualGen: 4380,
+      estimatedMonthlySavings: 3866,
+      subsidyAmount: 78000,
+      confidenceScore: 0.40,
+      extractedFields: [],
     };
   }
 }
