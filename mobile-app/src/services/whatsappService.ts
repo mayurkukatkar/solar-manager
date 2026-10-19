@@ -96,9 +96,11 @@ Warm regards,
 export function sanitizeIndianPhone(rawPhone?: string): string {
   if (!rawPhone) return '';
   const digits = rawPhone.replace(/[^0-9]/g, '');
-  if (digits.length === 10) return `91${digits}`;
-  if (digits.length === 11 && digits.startsWith('0')) return `91${digits.slice(1)}`;
-  if (digits.length === 12 && digits.startsWith('91')) return digits;
+  if (!digits) return '';
+  const last10 = digits.slice(-10);
+  if (last10.length === 10) {
+    return `91${last10}`;
+  }
   return digits;
 }
 

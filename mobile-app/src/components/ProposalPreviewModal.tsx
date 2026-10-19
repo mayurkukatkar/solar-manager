@@ -425,6 +425,11 @@ export const ProposalPreviewModal: React.FC<ProposalPreviewModalProps> = ({
 
         {/* BOTTOM ACTION BAR */}
         <View style={styles.bottomBar}>
+          <View style={styles.actionHintRow}>
+            <Text style={styles.actionHintText}>
+              📲 <Text style={{ fontWeight: '700' }}>Direct Chat</Text> auto-opens customer chat | 📎 <Text style={{ fontWeight: '700' }}>WhatsApp PDF</Text> attaches document
+            </Text>
+          </View>
           <View style={styles.actionRowMain}>
             {/* 1. SHARE PDF DIRECTLY ON WHATSAPP */}
             <TouchableOpacity
@@ -438,7 +443,7 @@ export const ProposalPreviewModal: React.FC<ProposalPreviewModalProps> = ({
               ) : (
                 <>
                   <MessageCircle size={18} color="#ffffff" />
-                  <Text style={styles.whatsAppPdfBtnText}>Share PDF to WhatsApp</Text>
+                  <Text style={styles.whatsAppPdfBtnText}>WhatsApp PDF</Text>
                 </>
               )}
             </TouchableOpacity>
@@ -455,7 +460,7 @@ export const ProposalPreviewModal: React.FC<ProposalPreviewModalProps> = ({
               ) : (
                 <>
                   <Send size={16} color="#16a34a" />
-                  <Text style={styles.whatsAppTextBtnText}>Text Pitch</Text>
+                  <Text style={styles.whatsAppTextBtnText}>Direct Chat</Text>
                 </>
               )}
             </TouchableOpacity>
@@ -881,6 +886,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     gap: 8,
+  },
+  actionHintRow: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 6,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    alignItems: 'center',
+    marginBottom: 2,
+  },
+  actionHintText: {
+    fontSize: 10.5,
+    color: '#64748b',
+    fontWeight: '500',
   },
   actionRowMain: {
     flexDirection: 'row',
