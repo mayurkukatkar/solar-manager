@@ -1,7 +1,7 @@
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
-import { File, Paths } from 'expo-file-system';
-import { Alert, Share } from 'react-native';
+import * as FileSystem from 'expo-file-system/legacy';
+import { Alert } from 'react-native';
 
 export interface QuotationPdfProps {
   quotationNumber: string;
@@ -685,40 +685,6 @@ export function generateDiscomHtml(type: string, data: any): string {
   `;
 }
 
-function base64ToUint8Array(base64: string): Uint8Array {
-  if (typeof atob === 'function') {
-    const binaryString = atob(base64);
-    const len = binaryString.length;
-    const bytes = new Uint8Array(len);
-    for (let i = 0; i < len; i++) {
-      bytes[i] = binaryString.charCodeAt(i);
-    }
-    return bytes;
-  }
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-  const lookup = new Uint8Array(256);
-  for (let i = 0; i < chars.length; i++) {
-    lookup[chars.charCodeAt(i)] = i;
-  }
-  let bufferLength = base64.length * 0.75;
-  if (base64[base64.length - 1] === '=') {
-    bufferLength--;
-    if (base64[base64.length - 2] === '=') bufferLength--;
-  }
-  const bytes = new Uint8Array(bufferLength);
-  let p = 0;
-  for (let i = 0; i < base64.length; i += 4) {
-    const e1 = lookup[base64.charCodeAt(i)];
-    const e2 = lookup[base64.charCodeAt(i + 1)];
-    const e3 = lookup[base64.charCodeAt(i + 2)];
-    const e4 = lookup[base64.charCodeAt(i + 3)];
-    bytes[p++] = (e1 << 2) | (e2 >> 4);
-    bytes[p++] = ((e2 & 15) << 4) | (e3 >> 2);
-    bytes[p++] = ((e3 & 3) << 6) | (e4 & 63);
-  }
-  return bytes;
-}
-
 export async function previewPdf(html: string): Promise<boolean> {
   try {
     await Print.printAsync({ html });
@@ -730,16 +696,15 @@ export async function previewPdf(html: string): Promise<boolean> {
       let shareUri = uri;
       if (base64) {
         try {
-          const bytes = base64ToUint8Array(base64);
-          const target = new File(Paths.document, 'Quotation_Preview.pdf');
-          if (target.exists) {
-            try { target.delete(); } catch (_) {}
-          }
-          await target.write(bytes);
-          if (target.exists) {
-            shareUri = target.uri;
-          }
-        } catch (_) {}
+          const docDir = FileSystem.documentDirectory || FileSystem.cacheDirectory || '';
+          const previewFileUri = `${docDir}Quotation_Preview.pdf`;
+          await FileSystem.writeAsStringAsync(previewFileUri, base64, {
+            encoding: 'base64',
+          });
+          shareUri = previewFileUri;
+        } catch (writeErr) {
+          console.warn('Preview writeAsStringAsync error:', writeErr);
+        }
       }
 
       const isAvailable = await Sharing.isAvailableAsync().catch(() => false);
@@ -764,68 +729,63 @@ export async function sharePdfFile(html: string, fileName: string): Promise<stri
     const { uri, base64 } = await Print.printToFileAsync({ html, base64: true });
     let shareableUri = uri;
 
-    // Sanitize file name for file systems and messaging apps (e.g. WhatsApp document name)
-    const cleanFileName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const baseName = fileName.replace(/\.pdf$/i, '').replace(/[^a-zA-Z0-9_-]/g, '_');
+    const cleanFileName = `${baseName}.pdf`;
 
-    // Write Base64 bytes directly to sandboxed file in Paths.document (or Paths.cache)
-    // This creates an app-owned file with 100% READ permissions so ExpoSharing won't reject it
+    // Write Base64 string directly into FileSystem.documentDirectory (or cacheDirectory).
+    // Writing through FileSystem inside documentDirectory ensures 100% read permission for Android FileProvider and WhatsApp.
     if (base64) {
+      let written = false;
       try {
-        const bytes = base64ToUint8Array(base64);
-        let targetFile = new File(Paths.document, cleanFileName);
-        if (targetFile.exists) {
-          try { targetFile.delete(); } catch (_) {}
-        }
-        await targetFile.write(bytes);
-        if (targetFile.exists) {
-          shareableUri = targetFile.uri;
+        const docDir = FileSystem.documentDirectory || '';
+        if (docDir) {
+          const docUri = `${docDir}${cleanFileName}`;
+          await FileSystem.writeAsStringAsync(docUri, base64, {
+            encoding: 'base64',
+          });
+          const info = await FileSystem.getInfoAsync(docUri).catch(() => null);
+          if (info && info.exists && info.size > 0) {
+            shareableUri = docUri;
+            written = true;
+          }
         }
       } catch (docErr) {
-        console.warn('Paths.document write failed, trying Paths.cache:', docErr);
+        console.warn('Writing to documentDirectory failed, trying cacheDirectory:', docErr);
+      }
+
+      if (!written) {
         try {
-          const bytes = base64ToUint8Array(base64);
-          let targetFile = new File(Paths.cache, cleanFileName);
-          if (targetFile.exists) {
-            try { targetFile.delete(); } catch (_) {}
-          }
-          await targetFile.write(bytes);
-          if (targetFile.exists) {
-            shareableUri = targetFile.uri;
+          const cacheDir = FileSystem.cacheDirectory || '';
+          if (cacheDir) {
+            const cacheUri = `${cacheDir}${cleanFileName}`;
+            await FileSystem.writeAsStringAsync(cacheUri, base64, {
+              encoding: 'base64',
+            });
+            const info = await FileSystem.getInfoAsync(cacheUri).catch(() => null);
+            if (info && info.exists && info.size > 0) {
+              shareableUri = cacheUri;
+              written = true;
+            }
           }
         } catch (cacheErr) {
-          console.warn('Paths.cache write failed:', cacheErr);
+          console.warn('Writing to cacheDirectory failed:', cacheErr);
         }
       }
     }
 
-    // 1. Try Expo Sharing (passes content URI via FileProvider so WhatsApp attaches the file)
-    try {
-      const isAvailable = await Sharing.isAvailableAsync().catch(() => false);
-      if (isAvailable) {
-        await Sharing.shareAsync(shareableUri, {
-          mimeType: 'application/pdf',
-          dialogTitle: `Share ${fileName}`,
-          UTI: 'com.adobe.pdf',
-        });
-        return shareableUri;
-      }
-    } catch (sharingErr) {
-      console.warn('Expo Sharing failed, trying native Share fallback:', sharingErr);
+    const isAvailable = await Sharing.isAvailableAsync().catch(() => false);
+    if (!isAvailable) {
+      Alert.alert('Sharing Unavailable', 'File sharing is not supported on this device.');
+      return null;
     }
 
-    // 2. Fallback to React Native core Share
-    try {
-      await Share.share({
-        title: fileName,
-        url: shareableUri,
-        message: `Proposal: ${fileName}`,
-      });
-      return shareableUri;
-    } catch (shareErr) {
-      console.warn('React Native Share fallback error:', shareErr);
-    }
+    // Expo Sharing passes content URI via Android FileProvider so WhatsApp attaches the actual PDF document
+    await Sharing.shareAsync(shareableUri, {
+      mimeType: 'application/pdf',
+      dialogTitle: `Share ${cleanFileName}`,
+      UTI: 'com.adobe.pdf',
+    });
 
-    Alert.alert('PDF Exported', `Proposal PDF saved at: ${shareableUri}`);
     return shareableUri;
   } catch (err: any) {
     console.error('PDF generation error:', err);
