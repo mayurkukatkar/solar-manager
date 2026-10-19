@@ -34,9 +34,11 @@ import {
   ChevronUp,
   FileText,
   Briefcase,
+  Sparkles,
 } from 'lucide-react-native';
 import { Header } from '../../components/Header';
 import { InvoicePdfModal } from '../../components/InvoicePdfModal';
+import { CreateInvoiceModal } from '../../components/CreateInvoiceModal';
 import { financeApi } from '../../api/endpoints';
 import { colors } from '../../theme/colors';
 
@@ -45,8 +47,8 @@ export const FinanceScreen: React.FC<{ navigation?: any; route?: any }> = ({ nav
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState(route?.params?.customerName || '');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'OVERDUE' | 'UNPAID' | 'PARTIAL' | 'PAID'>('ALL');
-  const [milestoneFilter, setMilestoneFilter] = useState<'ALL' | 'ADVANCE' | 'MATERIAL_DELIVERY' | 'INSTALLATION' | 'COMMISSIONING'>('ALL');
-  const [showMilestoneGuide, setShowMilestoneGuide] = useState(false);
+  const [docCategoryFilter, setDocCategoryFilter] = useState<'ALL' | 'TAX_INVOICE' | 'PROFORMA' | 'ADVANCE'>('ALL');
+  const [createInvoiceModalVisible, setCreateInvoiceModalVisible] = useState(false);
 
   // PDF Invoice Modal State
   const [pdfModalVisible, setPdfModalVisible] = useState(false);
@@ -151,18 +153,19 @@ export const FinanceScreen: React.FC<{ navigation?: any; route?: any }> = ({ nav
       if (statusFilter === 'PARTIAL') return !isPaid && totalPaid > 0 && !isOverdue;
       if (statusFilter === 'PAID') return isPaid;
 
-      // 3. Pipeline Milestone Filter
-      if (milestoneFilter !== 'ALL') {
-        const curM = (inv.milestone || inv.milestoneTitle || '').toUpperCase();
-        if (milestoneFilter === 'ADVANCE' && !curM.includes('ADVANCE') && !curM.includes('TOKEN') && !curM.includes('STAGE 1')) return false;
-        if (milestoneFilter === 'MATERIAL_DELIVERY' && !curM.includes('MATERIAL') && !curM.includes('DELIVERY') && !curM.includes('STAGE 2')) return false;
-        if (milestoneFilter === 'INSTALLATION' && !curM.includes('INSTALLATION') && !curM.includes('STAGE 3')) return false;
-        if (milestoneFilter === 'COMMISSIONING' && !curM.includes('COMMISSIONING') && !curM.includes('DISCOM') && !curM.includes('STAGE 4')) return false;
+      // 3. Document Category Filter (Tax Invoice, Proforma, Advance)
+      if (docCategoryFilter !== 'ALL') {
+        const num = (inv.invoiceNumber || '').toUpperCase();
+        const type = (inv.invoiceType || inv.milestone || '').toUpperCase();
+        const title = (inv.milestoneTitle || '').toUpperCase();
+        if (docCategoryFilter === 'PROFORMA' && !type.includes('PROFORMA') && !num.startsWith('PRO') && !title.includes('PROFORMA')) return false;
+        if (docCategoryFilter === 'ADVANCE' && !type.includes('ADVANCE') && !num.startsWith('ADV') && !title.includes('ADVANCE') && !title.includes('TOKEN')) return false;
+        if (docCategoryFilter === 'TAX_INVOICE' && (type.includes('PROFORMA') || num.startsWith('PRO') || type.includes('ADVANCE') || num.startsWith('ADV'))) return false;
       }
 
       return true;
     });
-  }, [invoices, searchQuery, statusFilter, milestoneFilter]);
+  }, [invoices, searchQuery, statusFilter, docCategoryFilter]);
 
   // Open PDF Invoice Modal
   const handleOpenPdfModal = (invoice: any) => {
@@ -329,62 +332,23 @@ export const FinanceScreen: React.FC<{ navigation?: any; route?: any }> = ({ nav
           </View>
         </View>
 
-        {/* MILESTONE BILLING GUIDE TOGGLE */}
-        <TouchableOpacity
-          style={styles.milestoneGuideBtn}
-          onPress={() => setShowMilestoneGuide(!showMilestoneGuide)}
-          activeOpacity={0.7}
-        >
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <Receipt size={16} color="#059669" />
-            <Text style={styles.milestoneGuideBtnText}>EPC Standard Milestone Billing Cycle (20/60/15/5)</Text>
+        {/* SMART COMMERCIAL INVOICE GENERATOR BANNER */}
+        <View style={styles.createInvoiceBar}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.createInvoiceBarTitle}>Smart Commercial Invoicing</Text>
+            <Text style={styles.createInvoiceBarSub}>
+              GST Tax Invoices, Bank Proformas & Advance Receipts
+            </Text>
           </View>
-          {showMilestoneGuide ? <ChevronUp size={16} color="#64748b" /> : <ChevronDown size={16} color="#64748b" />}
-        </TouchableOpacity>
-
-        {showMilestoneGuide && (
-          <View style={styles.milestoneGuideBox}>
-            <View style={styles.milestoneStep}>
-              <View style={[styles.milestoneBadge, { backgroundColor: '#ecfdf5' }]}>
-                <Text style={[styles.milestoneBadgeText, { color: '#059669' }]}>20%</Text>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.milestoneStepTitle}>Advance Booking Token</Text>
-                <Text style={styles.milestoneStepDesc}>Due on proposal signoff & DISCOM net-metering portal filing</Text>
-              </View>
-            </View>
-
-            <View style={styles.milestoneStep}>
-              <View style={[styles.milestoneBadge, { backgroundColor: '#eff6ff' }]}>
-                <Text style={[styles.milestoneBadgeText, { color: '#2563eb' }]}>60%</Text>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.milestoneStepTitle}>Material Delivery On-Site</Text>
-                <Text style={styles.milestoneStepDesc}>Due when DCR solar modules, string inverter & structures arrive</Text>
-              </View>
-            </View>
-
-            <View style={styles.milestoneStep}>
-              <View style={[styles.milestoneBadge, { backgroundColor: '#fffbeb' }]}>
-                <Text style={[styles.milestoneBadgeText, { color: '#d97706' }]}>15%</Text>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.milestoneStepTitle}>Installation & Synchronization</Text>
-                <Text style={styles.milestoneStepDesc}>Due upon module mounting, wiring & initial inverter sync test</Text>
-              </View>
-            </View>
-
-            <View style={styles.milestoneStep}>
-              <View style={[styles.milestoneBadge, { backgroundColor: '#faf5ff' }]}>
-                <Text style={[styles.milestoneBadgeText, { color: '#7c3aed' }]}>5%</Text>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.milestoneStepTitle}>DISCOM Net-Meter & DBT Release</Text>
-                <Text style={styles.milestoneStepDesc}>Due on bi-directional meter installation & PM Surya Ghar CFA clearance</Text>
-              </View>
-            </View>
-          </View>
-        )}
+          <TouchableOpacity
+            style={styles.createInvoiceBtn}
+            onPress={() => setCreateInvoiceModalVisible(true)}
+            activeOpacity={0.85}
+          >
+            <Plus size={16} color="#ffffff" strokeWidth={2.8} />
+            <Text style={styles.createInvoiceBtnText}>New Invoice</Text>
+          </TouchableOpacity>
+        </View>
 
         {/* SEARCH AND FILTER BAR */}
         <View style={styles.filterSection}>
@@ -417,7 +381,7 @@ export const FinanceScreen: React.FC<{ navigation?: any; route?: any }> = ({ nav
                 >
                   <Text style={[styles.statusChipText, isActive && styles.statusChipTextActive]}>
                     {filterKey === 'ALL'
-                      ? `All (${invoices.length})`
+                      ? `All Status`
                       : filterKey === 'OVERDUE'
                       ? `Overdue (${stats.overdueCount})`
                       : filterKey === 'UNPAID'
@@ -431,25 +395,24 @@ export const FinanceScreen: React.FC<{ navigation?: any; route?: any }> = ({ nav
             })}
           </ScrollView>
 
-          {/* PIPELINE MILESTONE FILTER CHIPS */}
+          {/* COMMERCIAL DOCUMENT TYPE FILTER CHIPS */}
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.statusChipsContainer, { marginTop: 8 }]}>
             {([
-              { key: 'ALL', label: 'All Milestones' },
-              { key: 'ADVANCE', label: 'Stage 1: 20% Token' },
-              { key: 'MATERIAL_DELIVERY', label: 'Stage 2: 60% Material' },
-              { key: 'INSTALLATION', label: 'Stage 3: 15% Installation' },
-              { key: 'COMMISSIONING', label: 'Stage 4: 5% Commissioning' },
-            ] as const).map((mItem) => {
-              const isActive = milestoneFilter === mItem.key;
+              { key: 'ALL', label: `All Invoices (${invoices.length})` },
+              { key: 'TAX_INVOICE', label: '📄 Tax Invoices' },
+              { key: 'PROFORMA', label: '🏦 Bank Proformas' },
+              { key: 'ADVANCE', label: '💳 Advance Vouchers' },
+            ] as const).map((docItem) => {
+              const isActive = docCategoryFilter === docItem.key;
               return (
                 <TouchableOpacity
-                  key={mItem.key}
+                  key={docItem.key}
                   style={[styles.milestoneChip, isActive && styles.milestoneChipActive]}
-                  onPress={() => setMilestoneFilter(mItem.key)}
+                  onPress={() => setDocCategoryFilter(docItem.key)}
                   activeOpacity={0.7}
                 >
                   <Text style={[styles.milestoneChipText, isActive && styles.milestoneChipTextActive]}>
-                    {mItem.label}
+                    {docItem.label}
                   </Text>
                 </TouchableOpacity>
               );
@@ -460,7 +423,7 @@ export const FinanceScreen: React.FC<{ navigation?: any; route?: any }> = ({ nav
         {/* INVOICES SECTION */}
         <View style={styles.invoicesHeaderRow}>
           <Text style={styles.sectionTitle}>
-            Milestone Invoices ({filteredInvoices.length})
+            Invoices & Commercial Bills ({filteredInvoices.length})
           </Text>
           <TouchableOpacity
             style={styles.refreshIconBtn}
@@ -505,6 +468,11 @@ export const FinanceScreen: React.FC<{ navigation?: any; route?: any }> = ({ nav
             const isOverdue = inv.isOverdue || (inv.dueDate && new Date(inv.dueDate) < new Date() && !isPaid);
             const progress = inv.amount > 0 ? Math.min(100, Math.round((totalPaid / inv.amount) * 100)) : 0;
             const isExpanded = expandedInvoiceId === inv.id;
+
+            const num = (inv.invoiceNumber || '').toUpperCase();
+            const type = (inv.invoiceType || inv.milestone || '').toUpperCase();
+            const isProforma = type.includes('PROFORMA') || num.startsWith('PRO');
+            const isAdvance = type.includes('ADVANCE') || num.startsWith('ADV');
 
             return (
               <View key={inv.id} style={styles.invoiceCard}>
@@ -557,11 +525,34 @@ export const FinanceScreen: React.FC<{ navigation?: any; route?: any }> = ({ nav
                   </View>
                 </View>
 
-                {/* MILESTONE TAG */}
+                {/* DOCUMENT TYPE & BILLING SCOPE */}
                 <View style={styles.milestoneTagRow}>
-                  <View style={styles.milestoneTag}>
-                    <Text style={styles.milestoneTagText}>
-                      🏷️ {inv.milestoneTitle || inv.milestone || 'Stage Milestone'}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, marginRight: 8 }}>
+                    <View
+                      style={[
+                        styles.docTypePill,
+                        isProforma
+                          ? styles.docTypePillProforma
+                          : isAdvance
+                          ? styles.docTypePillAdvance
+                          : styles.docTypePillTax,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.docTypePillText,
+                          isProforma
+                            ? styles.docTypePillTextProforma
+                            : isAdvance
+                            ? styles.docTypePillTextAdvance
+                            : styles.docTypePillTextTax,
+                        ]}
+                      >
+                        {isProforma ? 'PROFORMA' : isAdvance ? 'ADVANCE' : 'TAX INVOICE'}
+                      </Text>
+                    </View>
+                    <Text style={styles.invoiceScopeText} numberOfLines={1}>
+                      {inv.milestoneTitle || 'Complete Turnkey Rooftop Solar Supply & Installation'}
                     </Text>
                   </View>
                   {inv.dueDate && (
@@ -790,6 +781,13 @@ export const FinanceScreen: React.FC<{ navigation?: any; route?: any }> = ({ nav
         }}
         invoice={pdfTargetInvoice}
       />
+
+      {/* SMART INVOICE CREATOR MODAL */}
+      <CreateInvoiceModal
+        visible={createInvoiceModalVisible}
+        onClose={() => setCreateInvoiceModalVisible(false)}
+        onSuccess={() => fetchFinanceData()}
+      />
     </View>
   );
 };
@@ -924,58 +922,78 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     color: '#1d4ed8',
   },
-  milestoneGuideBtn: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  milestoneGuideBtnText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#334155',
-  },
-  milestoneGuideBox: {
+  createInvoiceBar: {
     backgroundColor: '#ffffff',
     borderRadius: 14,
     borderWidth: 1,
     borderColor: '#e2e8f0',
     padding: 14,
-    marginBottom: 14,
-    gap: 12,
-  },
-  milestoneStep: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 10,
-  },
-  milestoneBadge: {
-    width: 44,
-    height: 24,
-    borderRadius: 6,
-    justifyContent: 'center',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
   },
-  milestoneBadgeText: {
-    fontSize: 11,
+  createInvoiceBarTitle: {
+    fontSize: 13,
     fontWeight: '800',
-  },
-  milestoneStepTitle: {
-    fontSize: 12,
-    fontWeight: '700',
     color: '#0f172a',
   },
-  milestoneStepDesc: {
+  createInvoiceBarSub: {
     fontSize: 11,
     color: '#64748b',
     marginTop: 2,
-    lineHeight: 15,
+  },
+  createInvoiceBtn: {
+    backgroundColor: '#059669',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  createInvoiceBtnText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#ffffff',
+  },
+  docTypePill: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  docTypePillTax: {
+    backgroundColor: '#ecfdf5',
+    borderColor: '#a7f3d0',
+  },
+  docTypePillProforma: {
+    backgroundColor: '#eff6ff',
+    borderColor: '#bfdbfe',
+  },
+  docTypePillAdvance: {
+    backgroundColor: '#faf5ff',
+    borderColor: '#e9d5ff',
+  },
+  docTypePillText: {
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+  },
+  docTypePillTextTax: {
+    color: '#059669',
+  },
+  docTypePillTextProforma: {
+    color: '#2563eb',
+  },
+  docTypePillTextAdvance: {
+    color: '#7c3aed',
+  },
+  invoiceScopeText: {
+    flex: 1,
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#334155',
   },
   filterSection: {
     marginBottom: 14,

@@ -280,13 +280,13 @@ export const InvoicePdfModal: React.FC<InvoicePdfModalProps> = ({
               </View>
             </View>
 
-            {/* MILESTONE BANNER */}
+            {/* INVOICE SCOPE BANNER */}
             <View style={styles.milestoneBanner}>
               <Text style={styles.milestoneBannerTitle}>
-                🏷️ Milestone: {invoicePdfData.milestoneTitle}
+                🏷️ {invoicePdfData.milestoneTitle || 'Commercial Solar Billing Scope'}
               </Text>
               <Text style={styles.milestoneBannerSub}>
-                Standard 4-Stage Solar EPC Milestone Billing (20/60/15/5)
+                {invoicePdfData.invoiceType === 'PROFORMA' ? 'Proforma Estimation Document for Bank Sanction & Net-Metering' : invoicePdfData.invoiceType === 'ADVANCE_RECEIPT' ? 'Advance Payment Voucher & Booking Receipt' : 'Official Commercial Tax Invoice & Equipment Supply Schedule'}
               </Text>
             </View>
 

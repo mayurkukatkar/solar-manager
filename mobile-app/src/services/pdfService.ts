@@ -689,7 +689,8 @@ export interface InvoicePdfProps {
   invoiceNumber: string;
   invoiceDate: string;
   dueDate: string;
-  milestoneTitle: string;
+  invoiceType?: 'TAX_INVOICE' | 'PROFORMA' | 'ADVANCE_RECEIPT' | 'CUSTOM';
+  milestoneTitle?: string;
   milestoneKey?: string;
 
   companyName: string;
@@ -793,12 +794,16 @@ export function generateInvoiceHtml(data: InvoicePdfProps): string {
   const statusBg = isPaid ? '#ecfdf5' : isOverdue ? '#fff1f2' : '#fffbeb';
   const statusBorder = isPaid ? '#a7f3d0' : isOverdue ? '#fecdd3' : '#fde68a';
 
+  const isProforma = data.invoiceType === 'PROFORMA' || (data.invoiceNumber || '').startsWith('PRO');
+  const isAdvance = data.invoiceType === 'ADVANCE_RECEIPT' || (data.invoiceNumber || '').startsWith('ADV');
+  const docTitle = isProforma ? 'PROFORMA INVOICE' : isAdvance ? 'ADVANCE PAYMENT RECEIPT' : 'TAX INVOICE';
+
   const defaultItems = [
     {
-      description: `${data.milestoneTitle || 'Solar EPC Milestone Work'} (${data.projectCapacityKw || 3.3} kWp Grid-Tied System)`,
+      description: `${data.milestoneTitle || 'Complete Turnkey Rooftop Solar PV System Kit'} (${data.projectCapacityKw || 3.3} kWp Grid-Tied)`,
       hsn: '8541',
       qty: 1,
-      unit: 'Stage',
+      unit: 'System',
       rate: data.subtotal || data.grossTotal,
       amount: data.subtotal || data.grossTotal,
       gstRate: data.taxRate || 13.8,
@@ -1086,7 +1091,7 @@ export function generateInvoiceHtml(data: InvoicePdfProps): string {
         </div>
       </td>
       <td style="vertical-align: top; width: 40%;" class="invoice-title-box">
-        <div class="invoice-title">TAX INVOICE</div>
+        <div class="invoice-title">${docTitle}</div>
         <div><span class="status-badge">${isPaid ? 'PAID IN FULL' : isOverdue ? 'OVERDUE' : data.status || 'UNPAID'}</span></div>
         <div class="company-meta">
           <strong>Invoice No:</strong> ${data.invoiceNumber}<br>
@@ -1124,11 +1129,11 @@ export function generateInvoiceHtml(data: InvoicePdfProps): string {
     </tr>
   </table>
 
-  <!-- MILESTONE STAGE BANNER -->
+  <!-- BILLING SCOPE BANNER -->
   <div class="milestone-badge-bar">
-    <div class="milestone-title">📍 Milestone: ${data.milestoneTitle || 'Milestone Payment'}</div>
+    <div class="milestone-title">📍 Scope / Description: ${data.milestoneTitle || 'Complete Turnkey Rooftop Solar PV Installation'}</div>
     <div class="milestone-sub">
-      Solar EPC Standard Contract Milestone • Turnkey Rooftop Supply, Execution & Statutory Commissioning
+      Turnkey Solar Rooftop Contract • Statutory Equipment Supply, Execution & Grid Net-Metering
     </div>
   </div>
 

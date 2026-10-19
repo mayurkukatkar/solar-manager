@@ -38,6 +38,7 @@ import { QuotationBuilderModal } from './QuotationBuilderModal';
 import { CustomerOnboardingModal } from './CustomerOnboardingModal';
 import { DiscomDocsModal } from '../projects/DiscomDocsModal';
 import { InvoicePdfModal } from '../../components/InvoicePdfModal';
+import { CreateInvoiceModal } from '../../components/CreateInvoiceModal';
 import { colors } from '../../theme/colors';
 
 const STAGES = [
@@ -61,10 +62,11 @@ export const PipelineScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
   const [onboardingModalVisible, setOnboardingModalVisible] = useState(false);
   const [discomModalVisible, setDiscomModalVisible] = useState(false);
 
-  // PDF Invoice Modal & Milestone Gen State
+  // PDF Invoice Modal & Commercial Invoicing State
   const [pdfModalVisible, setPdfModalVisible] = useState(false);
   const [selectedInvoiceForPdf, setSelectedInvoiceForPdf] = useState<any | null>(null);
-  const [generatingMilestonesLeadId, setGeneratingMilestonesLeadId] = useState<string | null>(null);
+  const [createInvoiceModalVisible, setCreateInvoiceModalVisible] = useState(false);
+  const [targetLeadForInvoice, setTargetLeadForInvoice] = useState<any | null>(null);
 
   // Active Context for Modals
   const [selectedLead, setSelectedLead] = useState<any | null>(null);
@@ -181,6 +183,11 @@ export const PipelineScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
     setDiscomModalVisible(true);
   };
 
+  const handleOpenCreateInvoiceForLead = (lead: any) => {
+    setTargetLeadForInvoice(lead);
+    setCreateInvoiceModalVisible(true);
+  };
+
   const handleOpenPdfInvoiceForLead = (lead: any) => {
     const invs: any[] = [];
     if (lead.customer?.invoices) invs.push(...lead.customer.invoices);
@@ -206,60 +213,16 @@ export const PipelineScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
       setPdfModalVisible(true);
     } else {
       Alert.alert(
-        'Generate 4-Stage Invoices?',
-        `No milestone invoices generated yet for ${lead.name}.\n\nWould you like to generate the standard 20/60/15/5 milestone billing cycle now?`,
+        'Create Commercial Invoice',
+        `No invoices have been issued yet for ${lead.name}.\n\nWould you like to issue a Tax Invoice, Bank Proforma, or Advance Deposit now?`,
         [
           { text: 'Cancel', style: 'cancel' },
           {
-            text: 'Generate & Preview',
-            onPress: () => handleGenerateMilestonesForLead(lead, true),
+            text: '+ Issue Invoice',
+            onPress: () => handleOpenCreateInvoiceForLead(lead),
           },
         ]
       );
-    }
-  };
-
-  const handleGenerateMilestonesForLead = async (lead: any, openPdfAfter = false) => {
-    setGeneratingMilestonesLeadId(lead.id);
-    try {
-      const cap = lead.estimatedCap || 3.3;
-      const totalAmount = lead.estimatedValue || Math.round(cap * 56000);
-      const invoices = await financeApi.createMilestoneInvoicesForProject({
-        leadId: lead.id,
-        customerId: lead.customerId || lead.customer?.id,
-        projectId: lead.projects?.[0]?.id,
-        totalAmount,
-        capacityKw: cap,
-        customerName: lead.name,
-      });
-
-      Alert.alert(
-        'Milestone Invoices Generated! 🎉',
-        `Standard 4-stage billing schedule created for ${lead.name}:\n• Stage 1 (20% Advance Token)\n• Stage 2 (60% Material Delivery)\n• Stage 3 (15% Installation)\n• Stage 4 (5% Commissioning/DBT)`
-      );
-
-      fetchLeads();
-
-      if (openPdfAfter && Array.isArray(invoices) && invoices.length > 0) {
-        setSelectedInvoiceForPdf({
-          ...invoices[0],
-          customer: invoices[0].customer || lead.customer || {
-            name: lead.name,
-            mobile: lead.mobile,
-            address: lead.address,
-            city: lead.city,
-            consumerNumber: lead.consumerNumber,
-          },
-        });
-        setPdfModalVisible(true);
-      }
-    } catch (err: any) {
-      Alert.alert(
-        'Generation Failed',
-        err.response?.data?.error || err.message || 'Could not generate milestone invoices.'
-      );
-    } finally {
-      setGeneratingMilestonesLeadId(null);
     }
   };
 
@@ -458,7 +421,7 @@ export const PipelineScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
             const net = Math.max(0, gross - subsidy);
             const isWon = item.status === 'WON';
 
-            // Live linked milestone invoices
+            // Live linked commercial invoices
             const leadInvoices: any[] = [];
             if (item.customer?.invoices) leadInvoices.push(...item.customer.invoices);
             if (item.projects) {
@@ -475,21 +438,28 @@ export const PipelineScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
               return s + (i.totalPaid ?? pSum);
             }, 0);
             const totalDue = Math.max(0, totalBilled - totalPaid);
+            const realizedPct = totalBilled > 0 ? Math.min(100, Math.round((totalPaid / totalBilled) * 100)) : 0;
+            const billedOfDealPct = gross > 0 ? Math.min(100, Math.round((totalBilled / gross) * 100)) : 0;
 
-            const findStageStatus = (stageNum: number, keyMatch: string) => {
-              const inv = uniqueInvoices.find((i: any) => {
-                const m = (i.milestone || i.milestoneTitle || '').toUpperCase();
-                return m.includes(keyMatch) || m.includes(`STAGE ${stageNum}`);
-              });
-              if (!inv) return 'PENDING';
-              const p = (inv.payments || []).reduce((s: number, pm: any) => s + (pm.amount || 0), 0);
-              return (inv.status === 'PAID' || p >= inv.amount) ? 'PAID' : 'BILLED';
-            };
-
-            const s1Status = findStageStatus(1, 'ADVANCE');
-            const s2Status = findStageStatus(2, 'MATERIAL');
-            const s3Status = findStageStatus(3, 'INSTALL');
-            const s4Status = findStageStatus(4, 'COMMISSION');
+            // Status Badge calculation
+            let statusLabel = 'NOT INVOICED';
+            let statusBadgeStyle = styles.commercialStatusNeutral;
+            let statusTextStyle = styles.commercialStatusTextNeutral;
+            if (hasInvoices) {
+              if (totalDue === 0 && totalPaid > 0) {
+                statusLabel = '✓ 100% SETTLED';
+                statusBadgeStyle = styles.commercialStatusSuccess;
+                statusTextStyle = styles.commercialStatusTextSuccess;
+              } else if (totalPaid > 0) {
+                statusLabel = `PARTIAL (${realizedPct}%)`;
+                statusBadgeStyle = styles.commercialStatusInfo;
+                statusTextStyle = styles.commercialStatusTextInfo;
+              } else {
+                statusLabel = `DUE ₹${(totalDue / 1000).toFixed(0)}k`;
+                statusBadgeStyle = styles.commercialStatusWarning;
+                statusTextStyle = styles.commercialStatusTextWarning;
+              }
+            }
 
             return (
               <View key={item.id} style={styles.leadCard}>
@@ -528,99 +498,107 @@ export const PipelineScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
                   </View>
                 </View>
 
-                {/* 4-STAGE MILESTONE BILLING PIPELINE TRACKER */}
-                <View style={styles.milestoneSection}>
-                  <View style={styles.milestoneSectionHeader}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                      <Receipt size={13} color="#059669" />
-                      <Text style={styles.milestoneSectionTitle}>EPC MILESTONES (20/60/15/5)</Text>
+                {/* COMMERCIAL BILLING & REALIZED CASHFLOW HUB */}
+                <View style={styles.commercialBillingBox}>
+                  <View style={styles.commercialHeaderRow}>
+                    <View style={styles.commercialTitleGroup}>
+                      <View style={styles.commercialIconCircle}>
+                        <Receipt size={13} color="#059669" />
+                      </View>
+                      <View>
+                        <Text style={styles.commercialTitle}>COMMERCIAL BILLING & CASHFLOW</Text>
+                        <Text style={styles.commercialSub}>
+                          {hasInvoices
+                            ? `${uniqueInvoices.length} document(s) • ${billedOfDealPct}% of contract invoiced`
+                            : 'No commercial invoice issued yet'}
+                        </Text>
+                      </View>
                     </View>
-                    {hasInvoices ? (
-                      <Text style={styles.milestoneSectionSummary}>
-                        Paid: <Text style={{ color: '#059669', fontWeight: '800' }}>₹{totalPaid.toLocaleString('en-IN')}</Text> / ₹{totalBilled.toLocaleString('en-IN')}
+                    <View style={[styles.commercialStatusBadge, statusBadgeStyle]}>
+                      <Text style={[styles.commercialStatusText, statusTextStyle]}>{statusLabel}</Text>
+                    </View>
+                  </View>
+
+                  {/* REALIZED CASHFLOW PROGRESS BAR */}
+                  <View style={styles.progressBarWrapper}>
+                    <View style={styles.progressBarTrack}>
+                      <View
+                        style={[
+                          styles.progressBarFill,
+                          {
+                            width: `${hasInvoices ? realizedPct : 0}%`,
+                            backgroundColor: totalDue === 0 && totalPaid > 0 ? '#10b981' : '#0284c7',
+                          },
+                        ]}
+                      />
+                    </View>
+                  </View>
+
+                  {/* 3-COLUMN METRICS GRID */}
+                  <View style={styles.commercialMetricsRow}>
+                    <View style={styles.commercialMetricCol}>
+                      <Text style={styles.commercialMetricLabel}>Invoiced</Text>
+                      <Text style={styles.commercialMetricVal}>₹{totalBilled.toLocaleString('en-IN')}</Text>
+                      <Text style={styles.commercialMetricHint}>
+                        {hasInvoices ? `${billedOfDealPct}% of deal` : 'Ready to Bill'}
                       </Text>
-                    ) : (
-                      <Text style={styles.milestoneSectionSummaryPending}>Schedule Not Generated</Text>
-                    )}
+                    </View>
+                    <View style={[styles.commercialMetricCol, styles.commercialMetricColBorder]}>
+                      <Text style={styles.commercialMetricLabel}>Received</Text>
+                      <Text style={[styles.commercialMetricVal, { color: '#059669' }]}>
+                        ₹{totalPaid.toLocaleString('en-IN')}
+                      </Text>
+                      <Text style={styles.commercialMetricHint}>
+                        {hasInvoices ? `${realizedPct}% realized` : '₹0 collected'}
+                      </Text>
+                    </View>
+                    <View style={styles.commercialMetricCol}>
+                      <Text style={styles.commercialMetricLabel}>Balance Due</Text>
+                      <Text
+                        style={[
+                          styles.commercialMetricVal,
+                          { color: totalDue > 0 ? '#d97706' : '#64748b' },
+                        ]}
+                      >
+                        ₹{totalDue.toLocaleString('en-IN')}
+                      </Text>
+                      <Text style={styles.commercialMetricHint}>
+                        {totalDue > 0 ? 'Pending' : 'All clear'}
+                      </Text>
+                    </View>
                   </View>
 
-                  {/* 4 MINI PILLS */}
-                  <View style={styles.milestonePillsRow}>
-                    {[
-                      { label: 'S1: 20% Token', status: s1Status },
-                      { label: 'S2: 60% Mat.', status: s2Status },
-                      { label: 'S3: 15% Inst.', status: s3Status },
-                      { label: 'S4: 5% DBT', status: s4Status },
-                    ].map((step, sIdx) => {
-                      const isStepPaid = step.status === 'PAID';
-                      const isStepBilled = step.status === 'BILLED';
-                      return (
-                        <View
-                          key={sIdx}
-                          style={[
-                            styles.milestoneMiniPill,
-                            isStepPaid && styles.milestoneMiniPillPaid,
-                            isStepBilled && styles.milestoneMiniPillBilled,
-                          ]}
-                        >
-                          <Text
-                            style={[
-                              styles.milestoneMiniPillText,
-                              isStepPaid && styles.milestoneMiniPillTextPaid,
-                              isStepBilled && styles.milestoneMiniPillTextBilled,
-                            ]}
-                          >
-                            {isStepPaid ? '✓ ' : isStepBilled ? '⏳ ' : '○ '}{step.label}
-                          </Text>
-                        </View>
-                      );
-                    })}
-                  </View>
-                </View>
+                  {/* COMMERCIAL ACTIONS: QUICK INVOICE, PDF, LEDGER */}
+                  <View style={styles.commercialActionsRow}>
+                    <TouchableOpacity
+                      style={styles.quickInvoiceBtn}
+                      onPress={() => handleOpenCreateInvoiceForLead(item)}
+                      activeOpacity={0.85}
+                    >
+                      <Plus size={13} color="#ffffff" />
+                      <Text style={styles.quickInvoiceBtnText}>+ Quick Invoice</Text>
+                    </TouchableOpacity>
 
-                {/* DEDICATED FINANCE & PDF INVOICE ACTIONS */}
-                <View style={styles.financeQuickActionsRow}>
-                  {hasInvoices ? (
-                    <>
+                    {hasInvoices && (
                       <TouchableOpacity
                         style={styles.viewPdfInvoiceBtn}
                         onPress={() => handleOpenPdfInvoiceForLead(item)}
                         activeOpacity={0.8}
                       >
                         <FileText size={13} color="#2563eb" />
-                        <Text style={styles.viewPdfInvoiceBtnText}>📄 PDF Invoice</Text>
+                        <Text style={styles.viewPdfInvoiceBtnText}>📄 PDF</Text>
                       </TouchableOpacity>
+                    )}
 
-                      <TouchableOpacity
-                        style={styles.leadFinanceLinkBtn}
-                        onPress={() => handleNavigateToFinanceForLead(item)}
-                        activeOpacity={0.8}
-                      >
-                        <CreditCard size={13} color="#059669" />
-                        <Text style={styles.leadFinanceLinkBtnText}>
-                          💳 Billing & Ledger {totalDue > 0 ? `(₹${(totalDue / 1000).toFixed(0)}k Due)` : '✓'}
-                        </Text>
-                      </TouchableOpacity>
-                    </>
-                  ) : (
                     <TouchableOpacity
-                      style={styles.generateMilestonesBtn}
-                      onPress={() => handleGenerateMilestonesForLead(item, false)}
-                      disabled={generatingMilestonesLeadId === item.id}
-                      activeOpacity={0.85}
+                      style={styles.leadFinanceLinkBtn}
+                      onPress={() => handleNavigateToFinanceForLead(item)}
+                      activeOpacity={0.8}
                     >
-                      {generatingMilestonesLeadId === item.id ? (
-                        <ActivityIndicator size="small" color="#059669" />
-                      ) : (
-                        <>
-                          <Sparkles size={14} color="#059669" />
-                          <Text style={styles.generateMilestonesBtnText}>
-                            ⚡ Generate 4-Stage Invoices (20/60/15/5)
-                          </Text>
-                        </>
-                      )}
+                      <CreditCard size={13} color="#059669" />
+                      <Text style={styles.leadFinanceLinkBtnText}>💳 Ledger</Text>
                     </TouchableOpacity>
-                  )}
+                  </View>
                 </View>
 
                 {/* CONTEXTUAL ACTION ROW */}
@@ -706,6 +684,21 @@ export const PipelineScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
           onClose={() => setDiscomModalVisible(false)}
         />
       )}
+
+      {/* SMART COMMERCIAL INVOICE CREATOR MODAL */}
+      <CreateInvoiceModal
+        visible={createInvoiceModalVisible}
+        initialLead={targetLeadForInvoice}
+        onClose={() => {
+          setCreateInvoiceModalVisible(false);
+          setTargetLeadForInvoice(null);
+        }}
+        onSuccess={() => {
+          setCreateInvoiceModalVisible(false);
+          setTargetLeadForInvoice(null);
+          fetchLeads();
+        }}
+      />
 
       {/* PDF INVOICE PREVIEW & ACTIONS MODAL */}
       <InvoicePdfModal
@@ -1132,77 +1125,162 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#d97706',
   },
-  milestoneSection: {
-    backgroundColor: '#f8fafc',
-    borderRadius: 10,
+  commercialBillingBox: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: '#e2e8f0',
-    padding: 10,
-    marginBottom: 10,
+    padding: 12,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 3,
+    elevation: 1,
   },
-  milestoneSectionHeader: {
+  commercialHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 6,
+    marginBottom: 8,
   },
-  milestoneSectionTitle: {
+  commercialTitleGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
+  },
+  commercialIconCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#ecfdf5',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#a7f3d0',
+  },
+  commercialTitle: {
     fontSize: 10,
-    fontWeight: '800',
-    color: '#334155',
-    letterSpacing: 0.3,
+    fontWeight: '900',
+    color: '#1e293b',
+    letterSpacing: 0.4,
   },
-  milestoneSectionSummary: {
+  commercialSub: {
     fontSize: 10,
     color: '#64748b',
-    fontWeight: '600',
+    fontWeight: '500',
+    marginTop: 1,
   },
-  milestoneSectionSummaryPending: {
-    fontSize: 10,
-    color: '#94a3b8',
-    fontWeight: '600',
-    fontStyle: 'italic',
-  },
-  milestonePillsRow: {
-    flexDirection: 'row',
-    gap: 4,
-  },
-  milestoneMiniPill: {
-    flex: 1,
-    backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
+  commercialStatusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
     borderRadius: 6,
-    paddingVertical: 5,
-    paddingHorizontal: 2,
-    alignItems: 'center',
+    borderWidth: 1,
   },
-  milestoneMiniPillPaid: {
+  commercialStatusNeutral: {
+    backgroundColor: '#f1f5f9',
+    borderColor: '#e2e8f0',
+  },
+  commercialStatusSuccess: {
     backgroundColor: '#ecfdf5',
     borderColor: '#a7f3d0',
   },
-  milestoneMiniPillBilled: {
+  commercialStatusInfo: {
     backgroundColor: '#eff6ff',
     borderColor: '#bfdbfe',
   },
-  milestoneMiniPillText: {
-    fontSize: 9,
-    fontWeight: '700',
-    color: '#94a3b8',
+  commercialStatusWarning: {
+    backgroundColor: '#fffbeb',
+    borderColor: '#fde68a',
   },
-  milestoneMiniPillTextPaid: {
+  commercialStatusText: {
+    fontSize: 9,
+    fontWeight: '800',
+  },
+  commercialStatusTextNeutral: {
+    color: '#64748b',
+  },
+  commercialStatusTextSuccess: {
     color: '#059669',
   },
-  milestoneMiniPillTextBilled: {
+  commercialStatusTextInfo: {
     color: '#2563eb',
   },
-  financeQuickActionsRow: {
-    flexDirection: 'row',
-    gap: 8,
+  commercialStatusTextWarning: {
+    color: '#d97706',
+  },
+  progressBarWrapper: {
     marginBottom: 10,
   },
-  viewPdfInvoiceBtn: {
+  progressBarTrack: {
+    height: 5,
+    backgroundColor: '#f1f5f9',
+    borderRadius: 999,
+    overflow: 'hidden',
+  },
+  progressBarFill: {
+    height: '100%',
+    borderRadius: 999,
+  },
+  commercialMetricsRow: {
+    flexDirection: 'row',
+    backgroundColor: '#f8fafc',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#f1f5f9',
+  },
+  commercialMetricCol: {
     flex: 1,
+    alignItems: 'center',
+  },
+  commercialMetricColBorder: {
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  commercialMetricLabel: {
+    fontSize: 9,
+    color: '#64748b',
+    fontWeight: '700',
+    textTransform: 'uppercase',
+  },
+  commercialMetricVal: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#0f172a',
+    marginTop: 2,
+  },
+  commercialMetricHint: {
+    fontSize: 9,
+    color: '#94a3b8',
+    fontWeight: '600',
+    marginTop: 1,
+  },
+  commercialActionsRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  quickInvoiceBtn: {
+    flex: 1.3,
+    backgroundColor: '#059669',
+    borderRadius: 8,
+    paddingVertical: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+  },
+  quickInvoiceBtnText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#ffffff',
+  },
+  viewPdfInvoiceBtn: {
+    flex: 0.9,
     backgroundColor: '#eff6ff',
     borderWidth: 1,
     borderColor: '#bfdbfe',
@@ -1211,7 +1289,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 5,
+    gap: 4,
   },
   viewPdfInvoiceBtnText: {
     fontSize: 11,
@@ -1219,37 +1297,20 @@ const styles = StyleSheet.create({
     color: '#2563eb',
   },
   leadFinanceLinkBtn: {
-    flex: 1.2,
-    backgroundColor: '#ecfdf5',
+    flex: 1,
+    backgroundColor: '#f8fafc',
     borderWidth: 1,
-    borderColor: '#a7f3d0',
+    borderColor: '#e2e8f0',
     borderRadius: 8,
     paddingVertical: 8,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 5,
+    gap: 4,
   },
   leadFinanceLinkBtnText: {
     fontSize: 11,
-    fontWeight: '800',
-    color: '#059669',
-  },
-  generateMilestonesBtn: {
-    flex: 1,
-    backgroundColor: '#f0fdf4',
-    borderWidth: 1,
-    borderColor: '#bbf7d0',
-    borderRadius: 8,
-    paddingVertical: 9,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-  },
-  generateMilestonesBtnText: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#059669',
+    fontWeight: '700',
+    color: '#334155',
   },
 });
