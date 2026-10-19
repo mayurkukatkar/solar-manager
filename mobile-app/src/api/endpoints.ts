@@ -255,12 +255,52 @@ export const loansApi = {
 // 10. FINANCE & INVOICING SERVICE
 // ==========================================
 export const financeApi = {
-  getInvoices: async () => {
-    const res = await apiClient.get('/api/tenant/finance');
+  getStats: async () => {
+    const res = await apiClient.get('/api/tenant/finance/stats');
+    return res.data;
+  },
+  getInvoices: async (params?: { status?: string; search?: string }) => {
+    let query = '';
+    const parts: string[] = [];
+    if (params?.status) parts.push(`status=${params.status}`);
+    if (params?.search) parts.push(`search=${encodeURIComponent(params.search)}`);
+    if (parts.length > 0) query = '?' + parts.join('&');
+    const res = await apiClient.get(`/api/tenant/finance${query}`);
     return res.data;
   },
   getInvoiceDetails: async (id: string) => {
     const res = await apiClient.get(`/api/tenant/finance/${id}`);
+    return res.data;
+  },
+  createInvoice: async (data: {
+    customerId: string;
+    projectId?: string;
+    milestone?: string;
+    milestoneTitle?: string;
+    subtotal?: number;
+    taxRate?: number;
+    taxAmount?: number;
+    subsidyDeduction?: number;
+    amount: number;
+    dueDate?: string;
+    notes?: string;
+  }) => {
+    const res = await apiClient.post('/api/tenant/finance', data);
+    return res.data;
+  },
+  recordPayment: async (
+    invoiceId: string,
+    data: { amount: number; mode: string; reference?: string; notes?: string; date?: string }
+  ) => {
+    const res = await apiClient.post(`/api/tenant/invoices/${invoiceId}/payments`, data);
+    return res.data;
+  },
+  getReceipt: async (invoiceId: string, paymentId: string) => {
+    const res = await apiClient.get(`/api/tenant/invoices/${invoiceId}/receipt/${paymentId}`);
+    return res.data;
+  },
+  getWhatsAppPayload: async (invoiceId: string) => {
+    const res = await apiClient.get(`/api/tenant/invoices/${invoiceId}/whatsapp-payload`);
     return res.data;
   },
 };

@@ -41,72 +41,443 @@ router.get('/api/tenant/dashboard', requireTenantAuth, async (req, res) => {
   }
 });
 
-// INVOICES / FINANCE
+// INVOICES & FINANCIAL ANALYTICS
 // ----------------------------------------------------
+
+// 1. Financial Stats & KPIs (Receivables, Realized, Subsidy, Overdue)
+router.get('/api/tenant/finance/stats', requireTenantAuth, async (req, res) => {
+  try {
+    const tenantId = req.user.tenantId;
+
+    const [invoices, payments, projectsWithSubsidy] = await Promise.all([
+      prisma.invoice.findMany({
+        where: { tenantId },
+        include: { payments: true }
+      }),
+      prisma.payment.findMany({
+        where: { invoice: { tenantId } }
+      }),
+      prisma.subsidyApplication.findMany({
+        where: { tenantId },
+        select: { centralSubsidyAmount: true, stateSubsidyAmount: true, amount: true, status: true }
+      })
+    ]);
+
+    const totalInvoiced = invoices.reduce((sum, inv) => sum + (inv.amount || 0), 0);
+    const totalCollected = payments.reduce((sum, p) => sum + (p.amount || 0), 0);
+    const outstanding = Math.max(0, totalInvoiced - totalCollected);
+
+    const now = new Date();
+    let overdueAmount = 0;
+    let overdueCount = 0;
+    let paidCount = 0;
+    let partialCount = 0;
+    let unpaidCount = 0;
+
+    invoices.forEach(inv => {
+      const paidForInv = inv.payments.reduce((s, p) => s + (p.amount || 0), 0);
+      const isPaid = paidForInv >= inv.amount || inv.status === 'PAID';
+      
+      if (isPaid) {
+        paidCount++;
+      } else if (paidForInv > 0) {
+        partialCount++;
+      } else {
+        unpaidCount++;
+      }
+
+      if (!isPaid && inv.dueDate && new Date(inv.dueDate) < now) {
+        overdueCount++;
+        overdueAmount += Math.max(0, inv.amount - paidForInv);
+      }
+    });
+
+    // PM Surya Ghar DBT Subsidies expected across active pipelines
+    const expectedSubsidies = projectsWithSubsidy.reduce((sum, s) => {
+      const val = s.centralSubsidyAmount || s.amount || 0;
+      return sum + val;
+    }, 0);
+
+    // GST Collected Estimate (13.8% composite solar GST on realized collections)
+    const effectiveGstCollected = Math.round(totalCollected - (totalCollected / 1.138));
+
+    // Collection rate percentage
+    const collectionRate = totalInvoiced > 0 ? Math.round((totalCollected / totalInvoiced) * 100) : 0;
+
+    res.json({
+      stats: {
+        totalInvoiced,
+        totalCollected,
+        outstanding,
+        overdueAmount,
+        overdueCount,
+        paidCount,
+        partialCount,
+        unpaidCount,
+        totalInvoices: invoices.length,
+        expectedSubsidies,
+        effectiveGstCollected,
+        collectionRate
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching finance stats:', error);
+    res.status(500).json({ error: 'Failed to fetch financial statistics' });
+  }
+});
+
+// 2. Invoices List with Rich Solar EPC Metadata
 router.get('/api/tenant/finance', requireTenantAuth, async (req, res) => {
   try {
-    const finance = await prisma.invoice.findMany({ 
-      where: { tenantId: req.user.tenantId },
-      include: { customer: true, project: true, payments: true },
+    const { status, search, customerId, projectId } = req.query;
+    const where = { tenantId: req.user.tenantId };
+
+    if (customerId) where.customerId = customerId;
+    if (projectId) where.projectId = projectId;
+
+    if (search) {
+      where.OR = [
+        { invoiceNumber: { contains: search, mode: 'insensitive' } },
+        { customer: { name: { contains: search, mode: 'insensitive' } } },
+        { customer: { mobile: { contains: search, mode: 'insensitive' } } },
+        { project: { name: { contains: search, mode: 'insensitive' } } }
+      ];
+    }
+
+    const invoices = await prisma.invoice.findMany({ 
+      where,
+      include: { 
+        customer: true, 
+        project: {
+          select: {
+            id: true,
+            name: true,
+            projectNumber: true,
+            capacity: true,
+            capacityUnit: true,
+            systemType: true,
+            currentStage: true
+          }
+        }, 
+        payments: { orderBy: { date: 'desc' } } 
+      },
       orderBy: { createdAt: 'desc' }
     });
-    res.json({ finance });
+
+    const now = new Date();
+    const enriched = invoices.map(inv => {
+      const totalPaid = (inv.payments || []).reduce((sum, p) => sum + (p.amount || 0), 0);
+      const balance = Math.max(0, (inv.amount || 0) - totalPaid);
+      const isOverdue = !['PAID'].includes(inv.status) && inv.dueDate && new Date(inv.dueDate) < now;
+      
+      let computedStatus = inv.status;
+      if (totalPaid >= inv.amount && inv.amount > 0) {
+        computedStatus = 'PAID';
+      } else if (totalPaid > 0) {
+        computedStatus = 'PARTIAL';
+      } else if (isOverdue) {
+        computedStatus = 'OVERDUE';
+      }
+
+      return {
+        ...inv,
+        totalPaid,
+        balance,
+        isOverdue,
+        computedStatus
+      };
+    });
+
+    // Apply status filter if provided
+    let filtered = enriched;
+    if (status && status !== 'ALL') {
+      if (status === 'OVERDUE') {
+        filtered = enriched.filter(i => i.isOverdue && i.computedStatus !== 'PAID');
+      } else if (status === 'PENDING') {
+        filtered = enriched.filter(i => ['UNPAID', 'PENDING'].includes(i.computedStatus) && !i.isOverdue);
+      } else {
+        filtered = enriched.filter(i => i.computedStatus === status || i.status === status);
+      }
+    }
+
+    res.json({ finance: filtered });
   } catch (error) {
+    console.error('Error fetching invoices:', error);
     res.status(500).json({ error: 'Failed to fetch invoices' });
   }
 });
 
+// 3. Single Invoice Details with Tenant Tax Profile
 router.get('/api/tenant/finance/:id', requireTenantAuth, async (req, res) => {
   try {
-    const invoice = await prisma.invoice.findUnique({
-      where: { id: req.params.id, tenantId: req.user.tenantId },
-      include: { customer: true, project: true, payments: { orderBy: { date: 'desc' } } }
-    });
+    const [invoice, tenant] = await Promise.all([
+      prisma.invoice.findUnique({
+        where: { id: req.params.id, tenantId: req.user.tenantId },
+        include: { 
+          customer: true, 
+          project: {
+            include: {
+              subsidies: true,
+              discomApplication: true
+            }
+          }, 
+          payments: { orderBy: { date: 'desc' } } 
+        }
+      }),
+      prisma.tenant.findUnique({
+        where: { id: req.user.tenantId },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          phone: true,
+          address: true,
+          city: true,
+          state: true,
+          pincode: true,
+          gstin: true,
+          logoUrl: true,
+          signatureUrl: true,
+          pan: true
+        }
+      })
+    ]);
+
     if (!invoice) return res.status(404).json({ error: 'Invoice not found' });
-    res.json({ invoice });
+
+    const totalPaid = (invoice.payments || []).reduce((sum, p) => sum + (p.amount || 0), 0);
+    const balance = Math.max(0, (invoice.amount || 0) - totalPaid);
+
+    res.json({ 
+      invoice: {
+        ...invoice,
+        totalPaid,
+        balance
+      },
+      tenant
+    });
   } catch (error) {
+    console.error('Error fetching invoice details:', error);
     res.status(500).json({ error: 'Failed to fetch invoice' });
   }
 });
 
+// 4. Create Milestone / GST Tax Invoice
 router.post('/api/tenant/finance', requireTenantAuth, async (req, res) => {
   try {
-    if (!req.body.customerId) return res.status(400).json({ error: 'customerId required' });
-    
+    const { 
+      customerId, 
+      projectId, 
+      milestone, 
+      milestoneTitle, 
+      subtotal, 
+      taxRate = 13.8, 
+      taxAmount, 
+      subsidyDeduction = 0, 
+      amount, 
+      dueDate, 
+      items, 
+      notes, 
+      terms,
+      status = 'UNPAID' 
+    } = req.body;
+
+    if (!customerId) return res.status(400).json({ error: 'customerId is required' });
+
     const count = await prisma.invoice.count({ where: { tenantId: req.user.tenantId } });
-    
+    const currentYear = new Date().getFullYear();
+    const invoiceNumber = `INV-${currentYear}-${(count + 1).toString().padStart(4, '0')}`;
+
+    // Standard default solar line items if none passed
+    const defaultItems = [
+      {
+        description: 'Solar PV Module Supply & Mounting Structure Kit (DCR Compliant)',
+        hsn: '8541',
+        qty: 1,
+        unit: 'Set',
+        rate: parseFloat(subtotal) || parseFloat(amount) || 0,
+        amount: parseFloat(subtotal) || parseFloat(amount) || 0,
+        gstRate: parseFloat(taxRate) || 13.8
+      }
+    ];
+
     const invoice = await prisma.invoice.create({
       data: {
         tenantId: req.user.tenantId,
-        customerId: req.body.customerId,
-        projectId: req.body.projectId || null,
-        invoiceNumber: `INV-${(count + 1).toString().padStart(4, '0')}`,
-        amount: parseFloat(req.body.amount) || 0,
-        dueDate: req.body.dueDate ? new Date(req.body.dueDate) : null,
-        status: 'UNPAID'
+        customerId,
+        projectId: projectId || null,
+        invoiceNumber,
+        milestone: milestone || 'CUSTOM',
+        milestoneTitle: milestoneTitle || (milestone ? `${milestone.replace('_', ' ')} Milestone` : 'Solar EPC Milestone Invoice'),
+        subtotal: parseFloat(subtotal) || parseFloat(amount) || 0,
+        taxRate: parseFloat(taxRate) || 13.8,
+        taxAmount: parseFloat(taxAmount) || 0,
+        subsidyDeduction: parseFloat(subsidyDeduction) || 0,
+        amount: parseFloat(amount) || 0,
+        dueDate: dueDate ? new Date(dueDate) : new Date(Date.now() + 15 * 86400000), // Default 15 days
+        status: status === 'PAID' ? 'PAID' : 'UNPAID',
+        items: items && items.length > 0 ? items : defaultItems,
+        notes: notes || 'Payment terms: 100% advance against respective milestone delivery. Bank RTGS/NEFT/UPI accepted.',
+        terms: terms || '1. Warranty as per manufacturer terms. 2. Goods once sold will not be taken back without authorization. 3. DISCOM net meter timeline depends on local utility approvals.'
       },
-      include: { customer: true, project: true }
+      include: { customer: true, project: true, payments: true }
     });
+
+    // Automatically record project timeline activity if linked
+    if (projectId) {
+      try {
+        await prisma.projectTimelineEvent.create({
+          data: {
+            projectId,
+            title: `Tax Invoice ${invoiceNumber} Generated`,
+            description: `${invoice.milestoneTitle} billed for ₹${invoice.amount.toLocaleString('en-IN')}`,
+            eventType: 'MILESTONE',
+            createdBy: req.user.userId
+          }
+        });
+      } catch (e) {
+        console.warn('Failed to log project timeline event for invoice:', e.message);
+      }
+    }
+
     res.status(201).json({ invoice });
   } catch (error) {
-    console.error(error);
+    console.error('Error creating invoice:', error);
     res.status(500).json({ error: 'Failed to create invoice' });
   }
 });
 
+// 5. Convert Quotation into Milestone Tax Invoices
+router.post('/api/tenant/finance/convert-quotation', requireTenantAuth, async (req, res) => {
+  try {
+    const { quotationId, template = 'STANDARD_4_STAGE', selectedMilestone } = req.body;
+    if (!quotationId) return res.status(400).json({ error: 'quotationId is required' });
+
+    const quote = await prisma.quotation.findFirst({
+      where: { id: quotationId, tenantId: req.user.tenantId },
+      include: { customer: true, projects: true }
+    });
+
+    if (!quote) return res.status(404).json({ error: 'Quotation not found' });
+
+    const totalSystemPrice = quote.total || (quote.subtotal + quote.tax - quote.discount) || 150000;
+    const centralSubsidy = quote.indicativeSubsidy || 78000;
+    const linkedProjectId = quote.projects?.[0]?.id || null;
+
+    // Define Standard Solar EPC Milestone Schedule
+    const milestones = [
+      {
+        key: 'ADVANCE',
+        pct: 20,
+        title: 'Stage 1: Advance Booking & Work Order (20%)',
+        desc: 'Booking advance for engineering design, site layout and DISCOM net-meter filing',
+        hsn: '9954',
+        dueDays: 0
+      },
+      {
+        key: 'MATERIAL_DELIVERY',
+        pct: 60,
+        title: 'Stage 2: PV Modules & Inverter Site Delivery (60%)',
+        desc: 'Supply of Tier-1 DCR Solar Panels, Grid-Tied Inverter, HDG Structure & ACDB/DCDB',
+        hsn: '8541',
+        dueDays: 10
+      },
+      {
+        key: 'INSTALLATION',
+        pct: 15,
+        title: 'Stage 3: Structure Erection & Electrical Testing (15%)',
+        desc: 'Mounting of modules, inverter cabling, surge protection and earthing pit verification',
+        hsn: '9954',
+        dueDays: 20
+      },
+      {
+        key: 'COMMISSIONING',
+        pct: 5,
+        title: 'Stage 4: DISCOM Net Metering & Grid Sync (5%)',
+        desc: 'Final utility net meter synchronization, CEIG safety inspection and portal claim handover',
+        hsn: '9954',
+        dueDays: 30
+      }
+    ];
+
+    let targetMilestones = milestones;
+    if (selectedMilestone) {
+      targetMilestones = milestones.filter(m => m.key === selectedMilestone);
+    }
+
+    const createdInvoices = [];
+    const count = await prisma.invoice.count({ where: { tenantId: req.user.tenantId } });
+    const currentYear = new Date().getFullYear();
+
+    for (let i = 0; i < targetMilestones.length; i++) {
+      const ms = targetMilestones[i];
+      const invNumber = `INV-${currentYear}-${(count + 1 + i).toString().padStart(4, '0')}`;
+      
+      const milestoneAmount = Math.round(totalSystemPrice * (ms.pct / 100));
+      const taxableSubtotal = Math.round(milestoneAmount / 1.138);
+      const taxAmount = milestoneAmount - taxableSubtotal;
+
+      const inv = await prisma.invoice.create({
+        data: {
+          tenantId: req.user.tenantId,
+          customerId: quote.customerId || (quote.customer ? quote.customer.id : null),
+          projectId: linkedProjectId,
+          invoiceNumber: invNumber,
+          milestone: ms.key,
+          milestoneTitle: ms.title,
+          subtotal: taxableSubtotal,
+          taxRate: 13.8,
+          taxAmount,
+          subsidyDeduction: ms.key === 'COMMISSIONING' ? centralSubsidy : 0,
+          amount: milestoneAmount,
+          dueDate: new Date(Date.now() + ms.dueDays * 86400000),
+          status: 'UNPAID',
+          items: [
+            {
+              description: `${ms.title} - ${ms.desc} (${quote.systemCapacity || 3.3} kWp System)`,
+              hsn: ms.hsn,
+              qty: 1,
+              unit: 'Stage',
+              rate: taxableSubtotal,
+              amount: taxableSubtotal,
+              gstRate: 13.8
+            }
+          ],
+          notes: `Quotation ref: ${quote.qNumber}. PM Surya Ghar central subsidy of ₹${centralSubsidy.toLocaleString('en-IN')} to be credited via DBT directly to customer Aadhaar-linked bank account upon commissioning.`,
+          terms: 'Standard Solar EPC terms apply. Goods remain contractor property until full invoice settlement.'
+        },
+        include: { customer: true, project: true }
+      });
+
+      createdInvoices.push(inv);
+    }
+
+    res.status(201).json({
+      message: `Successfully generated ${createdInvoices.length} milestone invoice(s)`,
+      invoices: createdInvoices
+    });
+  } catch (error) {
+    console.error('Error converting quotation to invoices:', error);
+    res.status(500).json({ error: 'Failed to generate milestone invoices from quotation' });
+  }
+});
+
+// 6. Delete Invoice
 router.delete('/api/tenant/finance/:id', requireTenantAuth, async (req, res) => {
   try {
     await prisma.invoice.delete({
       where: { id: req.params.id, tenantId: req.user.tenantId }
     });
-    res.json({ message: 'Invoice deleted' });
+    res.json({ message: 'Invoice deleted successfully' });
   } catch (error) {
     res.status(500).json({ error: 'Failed to delete invoice' });
   }
 });
 
-// PAYMENTS (Record payments against invoices)
+// PAYMENTS (Record, Receipts & Status Sync)
 // ----------------------------------------------------
+
+// 7. Get Payments for an Invoice
 router.get('/api/tenant/invoices/:id/payments', requireTenantAuth, async (req, res) => {
   try {
     const payments = await prisma.payment.findMany({
@@ -119,44 +490,217 @@ router.get('/api/tenant/invoices/:id/payments', requireTenantAuth, async (req, r
   }
 });
 
+// 8. Record Payment with Receipt Number & Auto Status Progression
 router.post('/api/tenant/invoices/:id/payments', requireTenantAuth, async (req, res) => {
   try {
-    const { amount, mode, reference, date } = req.body;
-    if (!amount || amount <= 0) return res.status(400).json({ error: 'Valid amount is required' });
+    const { amount, mode = 'UPI', reference, date, notes } = req.body;
+    const parsedAmount = parseFloat(amount);
+    if (!parsedAmount || parsedAmount <= 0) {
+      return res.status(400).json({ error: 'A valid payment amount greater than zero is required' });
+    }
 
     const invoice = await prisma.invoice.findUnique({
       where: { id: req.params.id, tenantId: req.user.tenantId },
-      include: { payments: true }
+      include: { payments: true, customer: true, project: true }
     });
     if (!invoice) return res.status(404).json({ error: 'Invoice not found' });
 
-    const totalPaid = invoice.payments.reduce((sum, p) => sum + p.amount, 0);
-    const newTotal = totalPaid + parseFloat(amount);
+    // Generate unique receipt number
+    const currentYear = new Date().getFullYear();
+    const totalPaymentsCount = await prisma.payment.count({
+      where: { invoice: { tenantId: req.user.tenantId } }
+    });
+    const receiptNumber = `REC-${currentYear}-${(totalPaymentsCount + 1).toString().padStart(4, '0')}`;
 
-    // Create payment
+    // Create Payment Record
     const payment = await prisma.payment.create({
       data: {
         invoiceId: req.params.id,
-        amount: parseFloat(amount),
-        mode: mode || 'BANK_TRANSFER',
-        reference: reference || null,
+        amount: parsedAmount,
+        mode: mode || 'UPI',
+        reference: reference ? reference.trim() : null,
+        notes: notes || null,
+        receiptNumber,
         date: date ? new Date(date) : new Date()
       }
     });
 
+    // Recompute total payments
+    const totalPaid = invoice.payments.reduce((sum, p) => sum + p.amount, 0) + parsedAmount;
+    
     // Auto-update invoice status
     let newStatus = 'PARTIAL';
-    if (newTotal >= invoice.amount) newStatus = 'PAID';
-    
-    await prisma.invoice.update({
+    if (totalPaid >= invoice.amount) {
+      newStatus = 'PAID';
+    } else if (totalPaid <= 0) {
+      newStatus = 'UNPAID';
+    }
+
+    const updatedInvoice = await prisma.invoice.update({
       where: { id: req.params.id },
-      data: { status: newStatus }
+      data: { status: newStatus },
+      include: { customer: true, project: true, payments: { orderBy: { date: 'desc' } } }
     });
 
-    res.status(201).json({ payment, invoiceStatus: newStatus });
+    // Log timeline event on project if present
+    if (invoice.projectId) {
+      try {
+        await prisma.projectTimelineEvent.create({
+          data: {
+            projectId: invoice.projectId,
+            title: `Payment Received: ₹${parsedAmount.toLocaleString('en-IN')}`,
+            description: `Payment received via ${mode} (${reference ? `Ref: ${reference}` : 'No ref'}). Receipt: ${receiptNumber}. Invoice ${invoice.invoiceNumber} status is now ${newStatus}.`,
+            eventType: 'PAYMENT',
+            createdBy: req.user.userId
+          }
+        });
+      } catch (err) {
+        console.warn('Could not record project timeline event for payment:', err.message);
+      }
+    }
+
+    res.status(201).json({ 
+      payment, 
+      invoice: updatedInvoice, 
+      receiptNumber,
+      invoiceStatus: newStatus 
+    });
   } catch (error) {
-    console.error(error);
+    console.error('Error recording payment:', error);
     res.status(500).json({ error: 'Failed to record payment' });
+  }
+});
+
+// 9. Payment Receipt Payload
+router.get('/api/tenant/invoices/:id/receipt/:paymentId', requireTenantAuth, async (req, res) => {
+  try {
+    const { id, paymentId } = req.params;
+
+    const [payment, invoice, tenant] = await Promise.all([
+      prisma.payment.findUnique({
+        where: { id: paymentId }
+      }),
+      prisma.invoice.findUnique({
+        where: { id, tenantId: req.user.tenantId },
+        include: { customer: true, project: true, payments: true }
+      }),
+      prisma.tenant.findUnique({
+        where: { id: req.user.tenantId },
+        select: {
+          id: true,
+          name: true,
+          address: true,
+          city: true,
+          state: true,
+          pincode: true,
+          phone: true,
+          email: true,
+          gstin: true,
+          logoUrl: true,
+          signatureUrl: true
+        }
+      })
+    ]);
+
+    if (!payment || !invoice) {
+      return res.status(404).json({ error: 'Payment or invoice not found' });
+    }
+
+    const totalPaidToDate = invoice.payments
+      .filter(p => new Date(p.date) <= new Date(payment.date))
+      .reduce((sum, p) => sum + p.amount, 0);
+
+    const balanceRemaining = Math.max(0, invoice.amount - totalPaidToDate);
+
+    res.json({
+      receipt: {
+        receiptNumber: payment.receiptNumber || `REC-${payment.id.slice(0, 8).toUpperCase()}`,
+        date: payment.date,
+        amountPaid: payment.amount,
+        mode: payment.mode,
+        reference: payment.reference,
+        invoiceNumber: invoice.invoiceNumber,
+        milestone: invoice.milestoneTitle || invoice.milestone || 'Project Billing',
+        invoiceTotal: invoice.amount,
+        totalPaidToDate,
+        balanceRemaining,
+        customer: invoice.customer,
+        project: invoice.project,
+        tenant
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching receipt data:', error);
+    res.status(500).json({ error: 'Failed to fetch receipt data' });
+  }
+});
+
+// 10. Generate WhatsApp Payment Reminder / Invoice Notice
+router.get('/api/tenant/invoices/:id/whatsapp-payload', requireTenantAuth, async (req, res) => {
+  try {
+    const [invoice, tenant] = await Promise.all([
+      prisma.invoice.findUnique({
+        where: { id: req.params.id, tenantId: req.user.tenantId },
+        include: { customer: true, project: true, payments: true }
+      }),
+      prisma.tenant.findUnique({
+        where: { id: req.user.tenantId },
+        select: { name: true, phone: true, email: true, gstin: true }
+      })
+    ]);
+
+    if (!invoice) return res.status(404).json({ error: 'Invoice not found' });
+
+    const totalPaid = (invoice.payments || []).reduce((sum, p) => sum + p.amount, 0);
+    const balance = Math.max(0, invoice.amount - totalPaid);
+    const customerMobile = invoice.customer?.mobile || invoice.customer?.phone || '';
+    const cleanMobile = customerMobile.replace(/\D/g, '');
+
+    const bankInfo = tenant?.settings?.bankDetails || {
+      bankName: 'HDFC Bank',
+      accountNumber: 'Solar EPC Current A/c',
+      ifsc: 'HDFC0001234',
+      upiId: 'solar.epc@upi'
+    };
+
+    const message = [
+      `⚡ *SOLAR TAX INVOICE & PAYMENT NOTICE*`,
+      `━━━━━━━━━━━━━━━━━━━━━━━━━━`,
+      `Dear *${invoice.customer?.name || 'Customer'}*,`,
+      ``,
+      `Your solar milestone invoice has been issued:`,
+      `📄 *Invoice No:* ${invoice.invoiceNumber}`,
+      `🏷️ *Milestone:* ${invoice.milestoneTitle || 'Solar Installation Milestone'}`,
+      invoice.project ? `☀️ *System Capacity:* ${invoice.project.capacity || 3.3} kWp Rooftop System` : null,
+      `💰 *Total Billed:* ₹${invoice.amount.toLocaleString('en-IN')}`,
+      `✅ *Paid to Date:* ₹${totalPaid.toLocaleString('en-IN')}`,
+      `⏳ *Balance Due:* *₹${balance.toLocaleString('en-IN')}*`,
+      invoice.dueDate ? `📅 *Due Date:* ${new Date(invoice.dueDate).toLocaleDateString('en-IN')}` : null,
+      ``,
+      `💳 *Bank Transfer / UPI Details:*`,
+      `• *Company:* ${tenant?.name || 'Solar Energy EPC'}`,
+      `• *Bank:* ${bankInfo.bankName || 'HDFC Bank'}`,
+      `• *A/C No:* ${bankInfo.accountNumber || 'Check with office'}`,
+      `• *IFSC Code:* ${bankInfo.ifsc || 'Check with office'}`,
+      `• *UPI ID:* ${bankInfo.upiId || 'Check with office'}`,
+      ``,
+      `Kindly reply with the transaction UTR / screenshot once completed for immediate receipt generation and PM Surya Ghar portal submission.`,
+      `━━━━━━━━━━━━━━━━━━━━━━━━━━`,
+      `_Issued by ${tenant?.name || 'Solar ERP'}_`
+    ].filter(Boolean).join('\n');
+
+    const whatsappUrl = `https://wa.me/${cleanMobile ? (cleanMobile.startsWith('91') ? cleanMobile : '91' + cleanMobile) : ''}?text=${encodeURIComponent(message)}`;
+
+    res.json({
+      message,
+      whatsappUrl,
+      customerPhone: cleanMobile,
+      invoiceNumber: invoice.invoiceNumber,
+      balance
+    });
+  } catch (error) {
+    console.error('Error generating WhatsApp payload:', error);
+    res.status(500).json({ error: 'Failed to generate WhatsApp notification' });
   }
 });
 
