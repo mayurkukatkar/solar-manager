@@ -1,6 +1,7 @@
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
-import { Alert } from 'react-native';
+import * as FileSystem from 'expo-file-system/legacy';
+import { Alert, Share } from 'react-native';
 
 export interface QuotationPdfProps {
   quotationNumber: string;
@@ -692,10 +693,20 @@ export async function previewPdf(html: string): Promise<boolean> {
     console.warn('Native Print preview failed, falling back to share:', err?.message);
     try {
       const { uri } = await Print.printToFileAsync({ html });
-      const isAvailable = await Sharing.isAvailableAsync();
+      let shareUri = uri;
+      const targetDir = FileSystem.documentDirectory || FileSystem.cacheDirectory;
+      if (targetDir) {
+        try {
+          const destUri = `${targetDir}Quotation_Preview.pdf`;
+          await FileSystem.copyAsync({ from: uri, to: destUri });
+          shareUri = destUri;
+        } catch (_) {}
+      }
+
+      const isAvailable = await Sharing.isAvailableAsync().catch(() => false);
       if (isAvailable) {
-        await Sharing.shareAsync(uri, {
-          UTI: '.pdf',
+        await Sharing.shareAsync(shareUri, {
+          UTI: 'com.adobe.pdf',
           mimeType: 'application/pdf',
           dialogTitle: 'View / Save Proposal PDF',
         });
@@ -712,33 +723,58 @@ export async function previewPdf(html: string): Promise<boolean> {
 export async function sharePdfFile(html: string, fileName: string): Promise<string | null> {
   try {
     const { uri } = await Print.printToFileAsync({ html });
-    
-    // Attempt Expo Sharing first
-    const isAvailable = await Sharing.isAvailableAsync().catch(() => false);
-    if (isAvailable) {
-      await Sharing.shareAsync(uri, {
-        mimeType: 'application/pdf',
-        dialogTitle: `Share ${fileName}`,
-        UTI: 'com.adobe.pdf',
-      });
-      return uri;
+    let shareableUri = uri;
+
+    // Sanitize file name for file systems and messaging apps (e.g. WhatsApp document name)
+    const cleanFileName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const targetDir = FileSystem.documentDirectory || FileSystem.cacheDirectory;
+
+    if (targetDir) {
+      try {
+        const destUri = `${targetDir}${cleanFileName}`;
+        const fileInfo = await FileSystem.getInfoAsync(destUri).catch(() => ({ exists: false }));
+        if (fileInfo && fileInfo.exists) {
+          await FileSystem.deleteAsync(destUri, { idempotent: true }).catch(() => {});
+        }
+        await FileSystem.copyAsync({
+          from: uri,
+          to: destUri,
+        });
+        shareableUri = destUri;
+      } catch (copyErr) {
+        console.warn('Could not copy PDF to documentDirectory, using print uri:', copyErr);
+      }
     }
 
-    // Fallback to React Native core Share
+    // 1. Try Expo Sharing (handles Android FileProvider and iOS Share Sheet)
     try {
-      const { Share } = await import('react-native');
+      const isAvailable = await Sharing.isAvailableAsync().catch(() => false);
+      if (isAvailable) {
+        await Sharing.shareAsync(shareableUri, {
+          mimeType: 'application/pdf',
+          dialogTitle: `Share ${fileName}`,
+          UTI: 'com.adobe.pdf',
+        });
+        return shareableUri;
+      }
+    } catch (sharingErr) {
+      console.warn('Expo Sharing failed, trying native Share fallback:', sharingErr);
+    }
+
+    // 2. Fallback to React Native core Share
+    try {
       await Share.share({
         title: fileName,
-        url: uri,
+        url: shareableUri,
         message: `Proposal: ${fileName}`,
       });
-      return uri;
+      return shareableUri;
     } catch (shareErr) {
       console.warn('React Native Share fallback error:', shareErr);
     }
 
-    Alert.alert('PDF Exported', `Proposal PDF saved at: ${uri}`);
-    return uri;
+    Alert.alert('PDF Exported', `Proposal PDF saved at: ${shareableUri}`);
+    return shareableUri;
   } catch (err: any) {
     console.error('PDF generation error:', err);
     Alert.alert('PDF Export Error', err.message || 'Failed to generate PDF document');
