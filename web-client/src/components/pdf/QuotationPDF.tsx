@@ -910,7 +910,7 @@ export const QuotationPDF = ({ data }: { data: QuotationData }) => {
 
         <div className="ml-auto w-80 space-y-4 text-sm">
           <div className="flex justify-between text-slate-600">
-            <span>Subtotal</span>
+            <span>Taxable Subtotal</span>
             <span className="font-bold text-slate-800">{formatCurrency(data.subtotal)}</span>
           </div>
           {data.discount > 0 && (
@@ -920,7 +920,7 @@ export const QuotationPDF = ({ data }: { data: QuotationData }) => {
             </div>
           )}
           <div className="flex justify-between text-slate-600">
-            <span>Tax</span>
+            <span>Embedded GST (Composite Solar)</span>
             <span className="font-bold text-slate-800">{formatCurrency(data.tax)}</span>
           </div>
           {data.other_charges > 0 && (
@@ -931,7 +931,7 @@ export const QuotationPDF = ({ data }: { data: QuotationData }) => {
           )}
           
           <div className="pt-6 border-t-2 border-slate-800 flex justify-between items-center">
-            <span className="font-bold text-slate-800 uppercase tracking-widest text-xs">TOTAL INVESTMENT</span>
+            <span className="font-bold text-slate-800 uppercase tracking-widest text-xs">TOTAL SOLAR SYSTEM COST (ALL GST INCLUDED)</span>
             <span className="text-3xl font-black text-[#071A2B]">{formatCurrency(data.grand_total)}</span>
           </div>
           <p className="text-right text-xs text-slate-500 italic">{data.amount_in_words}</p>

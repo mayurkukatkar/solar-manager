@@ -37,7 +37,7 @@ export function generateWhatsAppMessage(data: WhatsAppPitchData): string {
 नमस्कार! आपल्या घरासाठी/प्रतिष्ठानासाठी तयार केलेला रूफटॉप सोलर प्रस्ताव खालीलप्रमाणे आहे:
 
 ⚡ *सिस्टम क्षमता*: ${data.systemCapacityKw} kWp ऑन-ग्रीड सोलर
-💰 *एकूण प्रकल्प मूल्य*: ₹${gross}
+💰 *सोलर सिस्टम एकूण खर्च (सर्व GST सह)*: ₹${gross}
 🎁 *पीएम सूर्य घर शासकीय अनुदान*: -₹${subsidy}
 👉 *आपली निव्वळ गुंतवणूक*: *₹${net}*
 📉 *अंदाजित मासिक वीज बचत*: ₹${savings}/महिना
@@ -58,7 +58,7 @@ export function generateWhatsAppMessage(data: WhatsAppPitchData): string {
 आपके घर/प्रतिष्ठान के लिए विशेष रूप से तैयार किया गया सोलर कोटेशन:
 
 ⚡ *सिस्टम क्षमता*: ${data.systemCapacityKw} kWp ग्रिड-टाईड सोलर
-💰 *कुल प्रोजेक्ट लागत*: ₹${gross}
+💰 *सोलर सिस्टम कुल लागत (सभी GST सहित)*: ₹${gross}
 🎁 *पीएम सूर्य घर सरकारी सब्सिडी*: -₹${subsidy}
 👉 *आपकी कुल शुद्ध लागत*: *₹${net}*
 📉 *अनुमानित मासिक बचत*: ₹${savings}/माह
@@ -67,7 +67,7 @@ export function generateWhatsAppMessage(data: WhatsAppPitchData): string {
 📄 विस्तृत तकनीकी व वित्तीय कोटेशन (PDF) संलग्न है। 
 साइट सर्वे व तत्काल सब्सिडी बुकिंग के लिए हमसे संपर्क करें!
 
-सादर,
+ सादर,
 *${rep}* | ${company}
 📞 संपर्क: ${data.repPhone || ''}`;
   }
@@ -79,7 +79,7 @@ Dear *${data.customerName}*,
 Thank you for connecting with us. We are delighted to present your customized Solar Rooftop Proposal:
 
 ⚡ *System Capacity*: ${data.systemCapacityKw} kWp On-Grid System
-💰 *Total Turnkey Value*: ₹${gross}
+💰 *Solar System Cost (Incl. All GST)*: ₹${gross}
 🎁 *PM Surya Ghar Central Subsidy*: -₹${subsidy}
 👉 *Net Customer Investment*: *₹${net}*
 📉 *Estimated Monthly Bill Savings*: ₹${savings}/month

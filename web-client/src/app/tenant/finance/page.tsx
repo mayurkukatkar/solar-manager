@@ -577,14 +577,21 @@ export default function Finance() {
 
             {/* Totals */}
             <div className="flex justify-end mb-16">
-              <div className="w-64">
+              <div className="w-72">
                 <div className="flex justify-between py-2 border-b" style={{ borderColor: '#e2e8f0' }}>
-                  <span className="text-sm" style={{ color: '#64748b' }}>Subtotal</span>
-                  <span className="text-sm font-bold" style={{ color: '#1e293b' }}>₹ {(inv.amount || 0).toLocaleString()}</span>
+                  <span className="text-sm" style={{ color: '#64748b' }}>Taxable Subtotal</span>
+                  <span className="text-sm font-bold" style={{ color: '#1e293b' }}>₹ {Math.round((inv.amount || 0) / 1.138).toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between py-2 border-b" style={{ borderColor: '#e2e8f0' }}>
+                  <span className="text-sm" style={{ color: '#64748b' }}>Embedded GST (13.8%)</span>
+                  <span className="text-sm font-bold" style={{ color: '#1e293b' }}>₹ {((inv.amount || 0) - Math.round((inv.amount || 0) / 1.138)).toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between py-3">
-                  <span className="text-base font-bold" style={{ color: '#0f172a' }}>Total Due</span>
-                  <span className="text-base font-black" style={{ color: '#059669' }}>₹ {(inv.amount || 0).toLocaleString()}</span>
+                  <div>
+                    <span className="text-base font-bold" style={{ color: '#0f172a' }}>Total Due</span>
+                    <span className="block text-[11px] font-medium" style={{ color: '#059669' }}>All GST Included</span>
+                  </div>
+                  <span className="text-xl font-black" style={{ color: '#059669' }}>₹ {(inv.amount || 0).toLocaleString()}</span>
                 </div>
               </div>
             </div>

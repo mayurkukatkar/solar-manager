@@ -949,7 +949,7 @@ export function QuotationDetailModal({
                   </div>
                 ) : (
                   <div id="detail-modal-pdf-content" className="w-full max-w-[850px] shadow-2xl rounded-2xl overflow-hidden bg-white">
-                    <QuotationPDF data={pdfProposalData} />
+                    {pdfProposalData && <QuotationPDF data={pdfProposalData} />}
                   </div>
                 )}
               </div>

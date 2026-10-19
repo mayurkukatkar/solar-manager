@@ -27,8 +27,12 @@ export const QuickQuoteScreen: React.FC<{ route?: any }> = ({ route }) => {
   const [prospectName, setProspectName] = useState(initialParams.prospectName || initialParams.lead?.name || '');
   const [prospectPhone, setProspectPhone] = useState(initialParams.prospectPhone || initialParams.lead?.mobile || '');
   const [monthlyBill, setMonthlyBill] = useState(initialParams.monthlyBill || (initialParams.lead?.monthlyBill ? String(initialParams.lead.monthlyBill) : '3500'));
-  const [capacityKw, setCapacityKw] = useState(initialParams.capacityKw || (initialParams.lead?.estimatedCap ? String(initialParams.lead.estimatedCap) : '3.3'));
-  const [pricePerKw, setPricePerKw] = useState('56000');
+  const defaultCap = initialParams.capacityKw || (initialParams.lead?.estimatedCap ? String(initialParams.lead.estimatedCap) : '3.3');
+  const [capacityKw, setCapacityKw] = useState(defaultCap);
+  const initialCapNum = parseFloat(defaultCap) || 3.3;
+  const [systemCost, setSystemCost] = useState(
+    initialParams.systemCost || String(Math.round(initialCapNum * 58000))
+  );
   const [generating, setGenerating] = useState(false);
 
   React.useEffect(() => {
@@ -38,14 +42,18 @@ export const QuickQuoteScreen: React.FC<{ route?: any }> = ({ route }) => {
       if (p.prospectName || lead?.name) setProspectName(p.prospectName || lead.name);
       if (p.prospectPhone || lead?.mobile) setProspectPhone(p.prospectPhone || lead.mobile);
       if (p.monthlyBill || lead?.monthlyBill) setMonthlyBill(String(p.monthlyBill || lead.monthlyBill));
-      if (p.capacityKw || lead?.estimatedCap) setCapacityKw(String(p.capacityKw || lead.estimatedCap));
+      if (p.capacityKw || lead?.estimatedCap) {
+        const c = String(p.capacityKw || lead.estimatedCap);
+        setCapacityKw(c);
+        const cNum = parseFloat(c) || 3.3;
+        setSystemCost(String(Math.round(cNum * 58000)));
+      }
     }
   }, [route?.params]);
 
-  // Calculations
+  // Calculations: Single input drives turnkey pricing (All GST Included)
   const cap = parseFloat(capacityKw) || 3.3;
-  const rate = parseFloat(pricePerKw) || 56000;
-  const gross = Math.round(cap * rate);
+  const gross = parseFloat(systemCost) || Math.round(cap * 58000);
 
   const computeSubsidy = (kw: number): number => {
     if (kw <= 0) return 0;
@@ -63,13 +71,23 @@ export const QuickQuoteScreen: React.FC<{ route?: any }> = ({ route }) => {
   const lifetimeSavings = Math.round(annualUnits * 25 * 8.5 * 0.92);
   const paybackYears = Number((net / (monthlySavings * 12)).toFixed(1));
 
-  // Auto-adjust capacity when bill changes
+  // Auto-adjust capacity & suggested system cost when bill changes
   const handleBillChange = (val: string) => {
     setMonthlyBill(val);
     const billNum = parseFloat(val);
     if (!isNaN(billNum) && billNum > 0) {
       const rec = Math.max(1, Math.min(25, (billNum / 8.5) / 120));
-      setCapacityKw(rec.toFixed(1));
+      const formattedCap = rec.toFixed(1);
+      setCapacityKw(formattedCap);
+      setSystemCost(String(Math.round(parseFloat(formattedCap) * 58000)));
+    }
+  };
+
+  const handleCapacityChange = (val: string) => {
+    setCapacityKw(val);
+    const cNum = parseFloat(val);
+    if (!isNaN(cNum) && cNum > 0) {
+      setSystemCost(String(Math.round(cNum * 58000)));
     }
   };
 
@@ -181,26 +199,40 @@ export const QuickQuoteScreen: React.FC<{ route?: any }> = ({ route }) => {
               <TextInput
                 style={styles.inputHighlight}
                 value={capacityKw}
-                onChangeText={setCapacityKw}
+                onChangeText={handleCapacityChange}
                 keyboardType="decimal-pad"
               />
             </View>
-            <View style={styles.formCol}>
-              <Text style={styles.label}>Rate (₹ / kWp)</Text>
+          </View>
+
+          {/* SINGLE PRICING INPUT: SOLAR SYSTEM COST (INCL. ALL GST) */}
+          <View style={styles.systemCostBox}>
+            <View style={styles.costTitleRow}>
+              <Text style={styles.costPrimaryLabel}>Solar System Cost (Incl. All GST) *</Text>
+              <View style={styles.gstTag}>
+                <Text style={styles.gstTagText}>GST Included</Text>
+              </View>
+            </View>
+            <View style={styles.costInputRow}>
+              <Text style={styles.rupeeSymbol}>₹</Text>
               <TextInput
-                style={styles.input}
-                value={pricePerKw}
-                onChangeText={setPricePerKw}
+                style={styles.costInput}
+                value={systemCost}
+                onChangeText={setSystemCost}
                 keyboardType="numeric"
+                placeholder="e.g. 195000"
               />
             </View>
+            <Text style={styles.costHelpText}>
+              Turnkey plant price with all taxes. Same total will appear on the final invoice.
+            </Text>
           </View>
         </View>
 
         {/* ECONOMICS HERO CARD */}
         <View style={styles.heroCard}>
           <View style={styles.heroRow}>
-            <Text style={styles.heroLabel}>Turnkey Plant Cost</Text>
+            <Text style={styles.heroLabel}>Turnkey Plant Cost (All GST Included)</Text>
             <Text style={styles.heroVal}>₹{gross.toLocaleString('en-IN')}</Text>
           </View>
           <View style={styles.heroRow}>
@@ -335,6 +367,71 @@ const styles = StyleSheet.create({
     color: '#1d4ed8',
     fontWeight: '800',
     marginBottom: 10,
+  },
+  systemCostBox: {
+    backgroundColor: '#f0fdf4',
+    borderWidth: 1.5,
+    borderColor: '#16a34a',
+    borderRadius: 12,
+    padding: 14,
+    marginTop: 4,
+    marginBottom: 6,
+  },
+  costTitleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  costPrimaryLabel: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#14532d',
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+  },
+  gstTag: {
+    backgroundColor: '#dcfce7',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#86efac',
+  },
+  gstTagText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#15803d',
+    textTransform: 'uppercase',
+  },
+  costInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    borderWidth: 1.5,
+    borderColor: '#22c55e',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    marginBottom: 6,
+  },
+  rupeeSymbol: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: '#15803d',
+    marginRight: 6,
+  },
+  costInput: {
+    flex: 1,
+    fontSize: 20,
+    fontWeight: '900',
+    color: '#0f172a',
+    paddingVertical: 10,
+  },
+  costHelpText: {
+    fontSize: 11,
+    color: '#166534',
+    fontWeight: '500',
+    lineHeight: 15,
   },
   heroCard: {
     backgroundColor: '#0f172a',

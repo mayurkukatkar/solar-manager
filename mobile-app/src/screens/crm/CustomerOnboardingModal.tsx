@@ -76,8 +76,9 @@ export const CustomerOnboardingModal: React.FC<CustomerOnboardingModalProps> = (
   const [ifscCode, setIfscCode] = useState('');
   const [accountHolderName, setAccountHolderName] = useState(lead?.name || '');
 
-  // Token Advance
-  const defaultAdvance = quotationData?.netCustomerCost ? String(Math.round(quotationData.netCustomerCost * 0.2)) : '20000';
+  // Token Advance (20% of turnkey plant cost including all GST)
+  const systemTotal = quotationData?.grossTotal || quotationData?.totalSystemCost || (quotationData?.netCustomerCost ? quotationData.netCustomerCost : 185000);
+  const defaultAdvance = String(Math.round(systemTotal * 0.2));
   const [advanceAmount, setAdvanceAmount] = useState(defaultAdvance);
   const [paymentMode, setPaymentMode] = useState('UPI / QR Transfer');
   const [transactionRef, setTransactionRef] = useState('');

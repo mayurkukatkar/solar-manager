@@ -60,21 +60,23 @@ export const QuotationBuilderModal: React.FC<QuotationBuilderModalProps> = ({
   const [inverterBrand, setInverterBrand] = useState('Solis 3.3kW Grid-Tied Inverter');
   const [structureType, setStructureType] = useState('Elevated HDG GI Structure');
 
-  // Manual Pricing Overrides
-  const [ratePerKw, setRatePerKw] = useState('56000');
-  const [structureAddon, setStructureAddon] = useState('0');
-  const [discomLiaisoning, setDiscomLiaisoning] = useState('5000');
-  const [discount, setDiscount] = useState('0');
+  // Single Pricing Input: Solar System Cost (Including All GST)
+  const initialCapNum = parseFloat(String(initialCap)) || 3.3;
+  const [totalSystemCost, setTotalSystemCost] = useState<string>(
+    String(Math.round(initialCapNum * 58000))
+  );
 
   // Solar Economics Calculation
   const cap = parseFloat(capacityKw) || 3.3;
-  const rate = parseFloat(ratePerKw) || 56000;
-  const addon = parseFloat(structureAddon) || 0;
-  const liaisoning = parseFloat(discomLiaisoning) || 0;
-  const disc = parseFloat(discount) || 0;
+  const grossTotal = parseFloat(totalSystemCost) || Math.round(cap * 58000);
 
-  const baseMaterialCost = Math.round(cap * rate);
-  const grossTotal = baseMaterialCost + addon + liaisoning - disc;
+  const handleCapacityChange = (val: string) => {
+    setCapacityKw(val);
+    const c = parseFloat(val);
+    if (!isNaN(c) && c > 0) {
+      setTotalSystemCost(String(Math.round(c * 58000)));
+    }
+  };
 
   // PM Surya Ghar Muft Bijli Yojana Central Subsidy
   const computeSubsidy = (kw: number): number => {
@@ -126,7 +128,7 @@ export const QuotationBuilderModal: React.FC<QuotationBuilderModalProps> = ({
     grossAmount: grossTotal,
     subsidyAmount: subsidy,
     netPayable: netCustomerCost,
-    discount: disc,
+    discount: 0,
     monthlyGenerationUnits: monthlyUnits,
     annualGenerationUnits: annualUnits,
     currentMonthlyBill: lead?.monthlyBill || Math.round(monthlySavings * 1.15),
@@ -211,6 +213,7 @@ export const QuotationBuilderModal: React.FC<QuotationBuilderModalProps> = ({
       const quoteSummary = {
         capacityKw: cap,
         grossTotal,
+        totalSystemCost: grossTotal,
         subsidy,
         netCustomerCost,
         panelBrand,
@@ -264,7 +267,7 @@ export const QuotationBuilderModal: React.FC<QuotationBuilderModalProps> = ({
                 <TextInput
                   style={styles.inputHighlight}
                   value={capacityKw}
-                  onChangeText={setCapacityKw}
+                  onChangeText={handleCapacityChange}
                   keyboardType="decimal-pad"
                 />
               </View>
@@ -303,77 +306,42 @@ export const QuotationBuilderModal: React.FC<QuotationBuilderModalProps> = ({
             />
           </View>
 
-          {/* SECTION 2: MANUAL PRICING MATRIX */}
+          {/* SECTION 2: SOLAR SYSTEM COST (ALL GST INCLUDED) */}
           <View style={styles.card}>
             <View style={styles.cardHeader}>
-              <Text style={styles.cardTitle}>2. Manual Pricing & Economics</Text>
-              <Text style={styles.cardSubtitle}>Set custom pricing overrides and add-ons</Text>
-            </View>
-
-            <View style={styles.formRow}>
-              <View style={styles.formCol}>
-                <Text style={styles.label}>Base Price (₹ / kWp)</Text>
-                <TextInput
-                  style={styles.input}
-                  value={ratePerKw}
-                  onChangeText={setRatePerKw}
-                  keyboardType="numeric"
-                />
-              </View>
-              <View style={styles.formCol}>
-                <Text style={styles.label}>Base Material Cost</Text>
-                <View style={styles.readOnlyBox}>
-                  <Text style={styles.readOnlyVal}>₹{baseMaterialCost.toLocaleString('en-IN')}</Text>
+              <View style={styles.costHeaderBetween}>
+                <Text style={styles.cardTitle}>2. Solar System Cost (All GST Included)</Text>
+                <View style={styles.gstTag}>
+                  <Text style={styles.gstTagText}>GST Included</Text>
                 </View>
               </View>
+              <Text style={styles.cardSubtitle}>
+                Single all-inclusive turnkey plant cost. Same figure will appear on the final invoice.
+              </Text>
             </View>
 
-            <View style={styles.formRow}>
-              <View style={styles.formCol}>
-                <Text style={styles.label}>Structure Elevation Add-on (₹)</Text>
+            <View style={styles.singleCostCard}>
+              <Text style={styles.costFieldLabel}>Total Solar System Cost (₹) *</Text>
+              <View style={styles.costInputRow}>
+                <Text style={styles.costRupeeSymbol}>₹</Text>
                 <TextInput
-                  style={styles.input}
-                  value={structureAddon}
-                  onChangeText={setStructureAddon}
+                  style={styles.costBigInput}
+                  value={totalSystemCost}
+                  onChangeText={setTotalSystemCost}
                   keyboardType="numeric"
-                  placeholder="0"
+                  placeholder="e.g. 195000"
                 />
               </View>
-              <View style={styles.formCol}>
-                <Text style={styles.label}>Net-Meter Liaisoning (₹)</Text>
-                <TextInput
-                  style={styles.input}
-                  value={discomLiaisoning}
-                  onChangeText={setDiscomLiaisoning}
-                  keyboardType="numeric"
-                />
-              </View>
-            </View>
-
-            <View style={styles.formRow}>
-              <View style={styles.formCol}>
-                <Text style={styles.label}>Special Discount (₹)</Text>
-                <TextInput
-                  style={styles.input}
-                  value={discount}
-                  onChangeText={setDiscount}
-                  keyboardType="numeric"
-                  placeholder="0"
-                />
-              </View>
-              <View style={styles.formCol}>
-                <Text style={styles.label}>Gross Turnkey Total</Text>
-                <View style={styles.readOnlyBox}>
-                  <Text style={styles.readOnlyVal}>₹{grossTotal.toLocaleString('en-IN')}</Text>
-                </View>
-              </View>
+              <Text style={styles.costNote}>
+                ✅ Includes Panels, Inverter, Structure, Cables, Earthing, Installation, Liaisoning & 100% of GST.
+              </Text>
             </View>
           </View>
 
           {/* SECTION 3: SUBSIDY & NET CUSTOMER INVESTMENT */}
           <View style={styles.summaryCard}>
             <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Gross Plant Cost</Text>
+              <Text style={styles.summaryLabel}>Solar System Cost (All GST Included)</Text>
               <Text style={styles.summaryValue}>₹{grossTotal.toLocaleString('en-IN')}</Text>
             </View>
             <View style={styles.summaryRow}>
@@ -618,6 +586,71 @@ const styles = StyleSheet.create({
     color: '#1d4ed8',
     fontWeight: '800',
     marginBottom: 10,
+  },
+  costHeaderBetween: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  gstTag: {
+    backgroundColor: '#dcfce7',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#86efac',
+  },
+  gstTagText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#15803d',
+    textTransform: 'uppercase',
+  },
+  singleCostCard: {
+    backgroundColor: '#f0fdf4',
+    borderWidth: 1.5,
+    borderColor: '#16a34a',
+    borderRadius: 12,
+    padding: 14,
+    marginTop: 4,
+  },
+  costFieldLabel: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#14532d',
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+    marginBottom: 8,
+  },
+  costInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    borderWidth: 1.5,
+    borderColor: '#22c55e',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    marginBottom: 6,
+  },
+  costRupeeSymbol: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: '#15803d',
+    marginRight: 6,
+  },
+  costBigInput: {
+    flex: 1,
+    fontSize: 20,
+    fontWeight: '900',
+    color: '#0f172a',
+    paddingVertical: 10,
+  },
+  costNote: {
+    fontSize: 11,
+    color: '#166534',
+    fontWeight: '500',
+    lineHeight: 15,
   },
   readOnlyBox: {
     backgroundColor: '#f1f5f9',

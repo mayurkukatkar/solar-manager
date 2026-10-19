@@ -280,8 +280,22 @@ router.post('/api/tenant/quotations', requireTenantAuth, async (req, res) => {
       targetCustomerId = createdCustomer.id;
     }
 
-    // Auto calculate solar generation & financial ROI
-    const totalPayable = Number(subtotal) + Number(tax) - Number(discount);
+    // Auto calculate solar generation & financial ROI with all-inclusive GST pricing
+    let totalPayable = req.body.totalSystemCost || req.body.total;
+    let finalSubtotal = Number(subtotal);
+    let finalTax = Number(tax);
+    let finalDiscount = Number(discount);
+
+    if (totalPayable) {
+      totalPayable = Number(totalPayable);
+      // All-inclusive GST calculation: 13.8% composite solar GST (70% material @ 12% + 30% service @ 18%)
+      finalSubtotal = Math.round(totalPayable / 1.138);
+      finalTax = totalPayable - finalSubtotal;
+      finalDiscount = 0;
+    } else {
+      totalPayable = finalSubtotal + finalTax - finalDiscount;
+    }
+
     const solarMetrics = calculateSolarMetrics({
       capacity: systemCapacity,
       totalCost: totalPayable,
@@ -351,16 +365,16 @@ router.post('/api/tenant/quotations', requireTenantAuth, async (req, res) => {
         {
           description: `${systemCapacity} kWp Solar PV Power Plant Equipment (Modules, Inverter, Structure, Cables)`,
           quantity: 1,
-          unitPrice: Math.round(Number(subtotal) * 0.8),
-          taxRate: 13.8,
-          total: Math.round(Number(subtotal) * 0.8)
+          unitPrice: Math.round(Number(finalSubtotal) * 0.75),
+          taxRate: 12.0,
+          total: Math.round(Number(finalSubtotal) * 0.75)
         },
         {
           description: 'Comprehensive Installation, Testing, Liasoning & Commissioning Services',
           quantity: 1,
-          unitPrice: Math.round(Number(subtotal) * 0.2),
+          unitPrice: finalSubtotal - Math.round(Number(finalSubtotal) * 0.75),
           taxRate: 18.0,
-          total: Math.round(Number(subtotal) * 0.2)
+          total: finalSubtotal - Math.round(Number(finalSubtotal) * 0.75)
         }
       ];
     }
@@ -373,9 +387,9 @@ router.post('/api/tenant/quotations', requireTenantAuth, async (req, res) => {
         qNumber,
         date: new Date(),
         validityDays: Number(validityDays),
-        subtotal: Number(subtotal),
-        tax: Number(tax),
-        discount: Number(discount),
+        subtotal: Number(finalSubtotal),
+        tax: Number(finalTax),
+        discount: Number(finalDiscount),
         total: totalPayable,
         status: 'DRAFT',
 

@@ -347,16 +347,16 @@ export function generateQuotationHtml(data: QuotationPdfProps): string {
   <div class="pricing-card">
     <div style="font-size: 11pt; font-weight: 700; color: #cbd5e1; margin-bottom: 10px;">Commercial Investment Summary</div>
     <div class="pricing-row">
-      <span>Turnkey System Price (${data.systemCapacityKw} kWp Grid-Tied System)</span>
+      <span>Solar System Cost (${data.systemCapacityKw} kWp System - All GST Included)</span>
       <span>₹${gross}</span>
     </div>
     ${data.discount ? `
     <div class="pricing-row">
-      <span>Special Festive / Company Discount</span>
+      <span>Special Discount</span>
       <span style="color: #fbbf24;">-₹${formatInr(data.discount)}</span>
     </div>` : ''}
     <div class="pricing-row">
-      <span>Govt Central Financial Assistance (PM Surya Ghar Subsidy)</span>
+      <span>Govt Central Subsidy (PM Surya Ghar Direct DBT)</span>
       <span class="subsidy-text">-₹${subsidy}</span>
     </div>
     <div class="pricing-row total">
@@ -470,7 +470,7 @@ export function generateQuotationHtml(data: QuotationPdfProps): string {
       <tr>
         <th>Milestone</th>
         <th>Percentage</th>
-        <th>Amount</th>
+        <th>Amount (All GST Included)</th>
         <th>Trigger</th>
       </tr>
     </thead>
@@ -478,23 +478,26 @@ export function generateQuotationHtml(data: QuotationPdfProps): string {
       <tr>
         <td><strong>Token Advance</strong></td>
         <td>20%</td>
-        <td>₹${formatInr(data.netPayable * 0.2)}</td>
+        <td>₹${formatInr(data.grossAmount * 0.2)}</td>
         <td>Upon proposal sign-off & site registration</td>
       </tr>
       <tr>
         <td><strong>Material Dispatch</strong></td>
         <td>60%</td>
-        <td>₹${formatInr(data.netPayable * 0.6)}</td>
+        <td>₹${formatInr(data.grossAmount * 0.6)}</td>
         <td>Upon delivery of panels, inverter & structure to site</td>
       </tr>
       <tr>
         <td><strong>Commissioning & Handover</strong></td>
         <td>20%</td>
-        <td>₹${formatInr(data.netPayable * 0.2)}</td>
+        <td>₹${formatInr(data.grossAmount * 0.2)}</td>
         <td>Upon physical installation & Net-meter synchronization</td>
       </tr>
     </tbody>
   </table>
+  <div style="font-size: 8pt; color: #64748b; margin-top: 6px;">
+    * Note: Milestone billing amounts are based on the total turnkey system cost (₹${gross} including all GST). PM Surya Ghar subsidy (₹${subsidy}) is directly credited to the consumer's bank account upon DISCOM commissioning.
+  </div>
 
   ${data.bankDetails ? `
   <div class="card" style="margin-top: 16px; background: #f8fafc;">

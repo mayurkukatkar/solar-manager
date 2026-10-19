@@ -156,10 +156,11 @@ export function QuotationWizardModal({
     structureBrand: 'Galvanized HDG High Rise',
     structureWarranty: '10 Years Structural',
 
-    // Step 3: Pricing
+    // Step 3: Single All-Inclusive Pricing (All GST Included)
+    totalSystemCost: 275000,
     equipmentSubtotal: 215000,
     labourServices: 65000,
-    discount: 5000,
+    discount: 0,
     taxRate: 0, // Composite GST
     validityDays: 15,
     items: generateDefaultLineItems(5.0, 'Waaree', 550, 9, 'Growatt', 'Galvanized HDG High Rise'),
@@ -174,8 +175,9 @@ export function QuotationWizardModal({
     ]
   });
 
-  // State for inventory product selection in Step 3
+  // State for inventory product selection & BOM toggle in Step 3
   const [showProductPicker, setShowProductPicker] = useState(false);
+  const [showBOMDetails, setShowBOMDetails] = useState(false);
   const [productSearch, setProductSearch] = useState('');
 
   // PRESETS CONFIGURATIONS (Maharashtra standard packages)
@@ -279,9 +281,10 @@ export function QuotationWizardModal({
       panelQuantity: preset.panelQty,
       inverterBrand: preset.inverterBrand,
       inverterCapacity: preset.capacity,
+      totalSystemCost: preset.indicativePrice,
       equipmentSubtotal: preset.equipment,
       labourServices: preset.labour,
-      discount: preset.discount,
+      discount: 0,
       items: updatedItems
     }));
   };
@@ -407,24 +410,17 @@ export function QuotationWizardModal({
     setFormData(prev => ({ ...prev, items: defaultItems }));
   };
 
-  // SOLAR CALCULATIONS & METRICS ENGINE
+  // SOLAR CALCULATIONS & METRICS ENGINE (ALL GST INCLUDED SINGLE TURNKEY PRICING)
   const calculations = useMemo(() => {
     const cap = Number(formData.systemCapacity) || 5;
-    const itemsList = formData.items || [];
     
-    // Subtotal before tax
-    const subtotal = itemsList.length > 0
-      ? itemsList.reduce((sum, item) => sum + (Number(item.quantity) * Number(item.unitPrice)), 0)
-      : (Number(formData.equipmentSubtotal) + Number(formData.labourServices));
-
+    // Single All-Inclusive Turnkey Price (GST included)
+    const total = Number(formData.totalSystemCost) || (cap ? Math.round(cap * 55000) : 275000);
     const discount = Number(formData.discount) || 0;
 
-    // Line-item tax computation
-    const tax = itemsList.length > 0
-      ? itemsList.reduce((sum, item) => sum + Math.round((Number(item.quantity) * Number(item.unitPrice)) * ((Number(item.taxRate) || 0) / 100)), 0)
-      : Math.round(Math.max(0, subtotal - discount) * (Number(formData.taxRate) / 100));
-
-    const total = Math.max(0, subtotal + tax - discount);
+    // Embedded GST (13.8% Composite Solar EPC Rate: 70% material @ 12% + 30% service @ 18%)
+    const subtotal = Math.round(total / 1.138);
+    const tax = total - subtotal;
 
     // Maharashtra Solar Generation (avg 4.0 - 4.1 kWh / kWp / day -> 1,460 kWh / kWp / yr)
     const annualGeneration = Math.round(cap * 1460);
@@ -455,7 +451,7 @@ export function QuotationWizardModal({
       indicativeSubsidy,
       netCustomerCost: Math.max(0, total - indicativeSubsidy)
     };
-  }, [formData.systemCapacity, formData.items, formData.equipmentSubtotal, formData.labourServices, formData.discount, formData.taxRate, formData.connectionType]);
+  }, [formData.systemCapacity, formData.totalSystemCost, formData.discount, formData.connectionType]);
 
   // AUTO RECALCULATE PANEL QUANTITY WHEN WATTAGE OR CAPACITY CHANGES
   const handleWattageChange = (wattage: number) => {
@@ -469,8 +465,9 @@ export function QuotationWizardModal({
 
   const handleCapacityChange = (cap: number) => {
     const qty = Math.ceil((cap * 1000) / formData.panelWattage);
+    const newTotalCost = Math.round(cap * 55000);
     const estEquip = Math.round(cap * 43000);
-    const estLabour = Math.round(cap * 13000);
+    const estLabour = Math.round(cap * 12000);
     const updatedItems = generateDefaultLineItems(
       cap,
       formData.panelBrand,
@@ -484,6 +481,7 @@ export function QuotationWizardModal({
       systemCapacity: cap,
       inverterCapacity: cap,
       panelQuantity: qty,
+      totalSystemCost: newTotalCost,
       equipmentSubtotal: estEquip,
       labourServices: estLabour,
       items: updatedItems
@@ -493,7 +491,7 @@ export function QuotationWizardModal({
   const steps = [
     { id: 1, name: 'Customer & Site', short: 'Customer' },
     { id: 2, name: 'System Hardware', short: 'System' },
-    { id: 3, name: 'Itemized Pricing', short: 'Pricing' },
+    { id: 3, name: 'System Cost (Incl. GST)', short: 'Pricing' },
     { id: 4, name: 'Terms & Milestones', short: 'Terms' },
     { id: 5, name: 'Proposal Summary', short: 'Review' }
   ];
@@ -523,9 +521,11 @@ export function QuotationWizardModal({
         inverterWarranty: formData.inverterWarranty,
         structureBrand: formData.structureBrand,
         structureWarranty: formData.structureWarranty,
+        totalSystemCost: calculations.total,
+        total: calculations.total,
         subtotal: calculations.subtotal,
         tax: calculations.tax,
-        discount: calculations.discount,
+        discount: 0,
         validityDays: formData.validityDays,
         items: formData.items.map(it => ({
           productId: it.productId || null,
@@ -1187,203 +1187,272 @@ export function QuotationWizardModal({
             )}
 
             {/* ======================================================== */}
-            {/* STEP 3: ITEMIZED BOM & PRICING */}
+            {/* ======================================================== */}
+            {/* STEP 3: SOLAR SYSTEM COST (INCL. ALL GST) */}
             {/* ======================================================== */}
             {currentStep === 3 && (
               <div className="space-y-6 animate-in fade-in duration-200">
-                <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-5">
+                <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-6">
+                  
+                  {/* HEADER */}
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
                     <div>
-                      <h3 className="text-lg font-black text-slate-900 flex items-center gap-2">
-                        <IndianRupee size={20} className="text-emerald-600" /> Commercial Bill of Materials (BOM)
-                      </h3>
-                      <p className="text-xs text-slate-500 mt-0.5">
-                        Itemized breakdown of modules, balance of system, installation services, and GST taxes.
+                      <div className="flex items-center gap-2 mb-1">
+                        <h3 className="text-xl font-black text-slate-900 flex items-center gap-2">
+                          <IndianRupee size={22} className="text-emerald-600" /> Solar System Cost (Including All GST)
+                        </h3>
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-300">
+                          GST 100% Included
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-500">
+                        Enter the single turnkey price for this solar plant. The exact same figure appears on quotations, proposals, and customer invoices with no surprise taxes added on top.
                       </p>
                     </div>
-
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setShowProductPicker(prev => !prev)}
-                        className="px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors"
-                      >
-                        <Package size={14} /> {showProductPicker ? 'Close Catalog' : 'Add from Catalog'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleAddItem}
-                        className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors"
-                      >
-                        <Plus size={14} /> Custom Line
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleResetBOM}
-                        title="Reset to default package BOM"
-                        className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-colors"
-                      >
-                        <RefreshCw size={14} />
-                      </button>
-                    </div>
                   </div>
 
-                  {/* INVENTORY CATALOG DRAWER */}
-                  {showProductPicker && (
-                    <div className="p-4 bg-slate-50 border border-emerald-200 rounded-2xl space-y-3 animate-in fade-in">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-extrabold uppercase text-slate-700 flex items-center gap-1.5">
-                          <Search size={14} className="text-emerald-600" /> Live Inventory Products
-                        </span>
-                        <button type="button" onClick={() => setShowProductPicker(false)} className="text-xs text-slate-400 hover:text-slate-600">
-                          Close
-                        </button>
-                      </div>
+                  {/* HERO SINGLE PRICING INPUT */}
+                  <div className="p-6 rounded-3xl bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-transparent border-2 border-emerald-500/40 space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <label className="text-xs font-black uppercase tracking-wider text-emerald-950">
+                        Total Solar System Cost (₹) *
+                      </label>
+                      <span className="text-xs text-emerald-700 font-semibold">
+                        Includes Modules, Inverter, Structure, Installation, Liaisoning & all GST
+                      </span>
+                    </div>
 
+                    <div className="flex items-center gap-3 bg-white p-4 rounded-2xl border-2 border-emerald-500 shadow-sm focus-within:ring-4 focus-within:ring-emerald-500/20 transition-all">
+                      <span className="text-3xl font-black text-emerald-600 pl-1">₹</span>
                       <input
-                        type="text"
-                        placeholder="Search product SKU, brand or name..."
-                        value={productSearch}
-                        onChange={e => setProductSearch(e.target.value)}
-                        className="w-full px-3 py-2 bg-white rounded-xl border border-slate-200 text-xs font-medium outline-none focus:ring-2 focus:ring-emerald-500"
+                        type="number"
+                        min="10000"
+                        step="1000"
+                        value={formData.totalSystemCost}
+                        onChange={e => setFormData({ ...formData, totalSystemCost: Number(e.target.value) })}
+                        className="w-full text-2xl sm:text-4xl font-black text-slate-900 bg-transparent outline-none"
+                        placeholder="e.g. 195000"
                       />
-
-                      <div className="max-h-48 overflow-y-auto space-y-1.5 pr-1">
-                        {products
-                          .filter(p => !productSearch || p.name?.toLowerCase().includes(productSearch.toLowerCase()) || p.brand?.toLowerCase().includes(productSearch.toLowerCase()))
-                          .slice(0, 8)
-                          .map(p => (
-                            <div
-                              key={p.id}
-                              onClick={() => handleSelectProduct(p)}
-                              className="p-2.5 bg-white hover:bg-emerald-50 border border-slate-200 hover:border-emerald-300 rounded-xl flex items-center justify-between cursor-pointer transition-colors text-xs"
-                            >
-                              <div>
-                                <p className="font-bold text-slate-900">{p.name}</p>
-                                <p className="text-[11px] text-slate-400">{p.brand || 'Generic'} · Stock: {p.currentStock ?? 'In Stock'}</p>
-                              </div>
-                              <div className="text-right">
-                                <span className="font-black text-[#071A2B]">₹{(p.sellingPrice || 0).toLocaleString()}</span>
-                                <span className="block text-[10px] text-emerald-600 font-bold">+ Add Item</span>
-                              </div>
-                            </div>
-                          ))}
-                      </div>
+                      <span className="px-3 py-1.5 bg-emerald-600 text-white text-xs font-extrabold rounded-xl uppercase tracking-wider whitespace-nowrap shadow-sm">
+                        All GST Included
+                      </span>
                     </div>
-                  )}
 
-                  {/* ITEMIZED TABLE */}
-                  <div className="border border-slate-200 rounded-2xl overflow-hidden bg-white shadow-sm">
-                    <table className="w-full text-left text-xs">
-                      <thead className="bg-slate-50 text-slate-500 font-extrabold uppercase text-[10px] tracking-wider border-b border-slate-200">
-                        <tr>
-                          <th className="py-3 px-4">Description</th>
-                          <th className="py-3 px-2 w-20 text-center">Qty</th>
-                          <th className="py-3 px-3 w-32">Unit Rate (₹)</th>
-                          <th className="py-3 px-2 w-24 text-center">GST %</th>
-                          <th className="py-3 px-4 text-right w-32">Line Total (₹)</th>
-                          <th className="py-3 px-2 text-center w-10"></th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {formData.items.map((item, idx) => (
-                          <tr key={item.id || idx} className="hover:bg-slate-50/60 transition-colors">
-                            <td className="p-2.5">
-                              <input
-                                type="text"
-                                value={item.description}
-                                onChange={e => handleUpdateItem(idx, 'description', e.target.value)}
-                                className="w-full px-2.5 py-1.5 bg-slate-50/80 hover:bg-white focus:bg-white rounded-lg border border-transparent hover:border-slate-300 focus:border-emerald-500 font-bold text-slate-800 text-xs outline-none"
-                              />
-                            </td>
-                            <td className="p-2">
-                              <input
-                                type="number"
-                                min="1"
-                                value={item.quantity}
-                                onChange={e => handleUpdateItem(idx, 'quantity', Number(e.target.value))}
-                                className="w-full px-2 py-1.5 bg-slate-50/80 hover:bg-white focus:bg-white rounded-lg border border-transparent hover:border-slate-300 focus:border-emerald-500 font-bold text-slate-900 text-xs text-center outline-none"
-                              />
-                            </td>
-                            <td className="p-2">
-                              <input
-                                type="number"
-                                min="0"
-                                value={item.unitPrice}
-                                onChange={e => handleUpdateItem(idx, 'unitPrice', Number(e.target.value))}
-                                className="w-full px-2 py-1.5 bg-slate-50/80 hover:bg-white focus:bg-white rounded-lg border border-transparent hover:border-slate-300 focus:border-emerald-500 font-bold text-slate-900 text-xs outline-none"
-                              />
-                            </td>
-                            <td className="p-2 text-center">
-                              <select
-                                value={item.taxRate}
-                                onChange={e => handleUpdateItem(idx, 'taxRate', Number(e.target.value))}
-                                className="px-2 py-1.5 bg-slate-50/80 hover:bg-white focus:bg-white rounded-lg border border-transparent hover:border-slate-300 focus:border-emerald-500 font-bold text-slate-800 text-[11px] outline-none"
-                              >
-                                <option value="0">0%</option>
-                                <option value="5">5%</option>
-                                <option value="12">12%</option>
-                                <option value="18">18%</option>
-                              </select>
-                            </td>
-                            <td className="p-3 text-right font-black text-slate-900">
-                              ₹{(Math.round(item.quantity * item.unitPrice)).toLocaleString()}
-                            </td>
-                            <td className="p-2 text-center">
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteItem(idx)}
-                                title="Delete line item"
-                                className="p-1 text-slate-400 hover:text-red-600 rounded-lg transition-colors"
-                              >
-                                <Trash2 size={14} />
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-
-                    {/* COMMERCIAL SUMMARY STRIP */}
-                    <div className="bg-slate-50/90 p-5 border-t border-slate-200 grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
-                      <div>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase block">Subtotal</span>
-                        <span className="text-base font-extrabold text-slate-800">₹{calculations.subtotal.toLocaleString()}</span>
-                      </div>
-                      <div>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase block">Taxes (GST)</span>
-                        <span className="text-base font-extrabold text-slate-800">₹{calculations.tax.toLocaleString()}</span>
-                      </div>
-                      <div>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase block">Special Discount (₹)</span>
-                        <input
-                          type="number"
-                          value={formData.discount}
-                          onChange={e => setFormData({ ...formData, discount: Number(e.target.value) })}
-                          className="w-full px-2.5 py-1 bg-white rounded-lg border border-slate-200 font-bold text-emerald-600 text-xs mt-0.5 outline-none focus:ring-1 focus:ring-emerald-500"
-                        />
-                      </div>
-                      <div className="text-right">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase block">Total Payable</span>
-                        <span className="text-xl font-black text-[#071A2B]">₹{calculations.total.toLocaleString()}</span>
-                      </div>
+                    {/* QUICK PACKAGE PRESETS */}
+                    <div className="flex flex-wrap items-center gap-2 pt-1">
+                      <span className="text-xs font-bold text-slate-500">Common Packages:</span>
+                      {[
+                        { cap: 3, cost: 185000, label: '3 kWp (₹1.85 Lakh)' },
+                        { cap: 3.3, cost: 215000, label: '3.3 kWp (₹2.15 Lakh)' },
+                        { cap: 5, cost: 275000, label: '5 kWp (₹2.75 Lakh)' },
+                        { cap: 10, cost: 510000, label: '10 kWp (₹5.10 Lakh)' },
+                      ].map(item => (
+                        <button
+                          key={item.label}
+                          type="button"
+                          onClick={() => setFormData(prev => ({ ...prev, systemCapacity: item.cap, totalSystemCost: item.cost }))}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border ${
+                            formData.totalSystemCost === item.cost
+                              ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
+                              : 'bg-white hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-300 text-slate-700 border-slate-200'
+                          }`}
+                        >
+                          {item.label}
+                        </button>
+                      ))}
                     </div>
                   </div>
 
-                  {/* SUBSIDY CALLOUT */}
-                  {calculations.indicativeSubsidy > 0 && (
-                    <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  {/* 3-COLUMN ECONOMICS MATRIX */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-1">
+                      <span className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider block">Turnkey Solar Plant Cost</span>
+                      <p className="text-2xl font-black text-slate-900">₹{calculations.total.toLocaleString()}</p>
+                      <p className="text-[11px] text-slate-500 font-medium">All GST Included · Quoted on Invoice</p>
+                    </div>
+
+                    <div className="p-5 rounded-2xl bg-emerald-50/70 border border-emerald-200 space-y-1">
+                      <span className="text-[11px] font-extrabold text-emerald-800 uppercase tracking-wider block">PM Surya Ghar Subsidy</span>
+                      <p className="text-2xl font-black text-emerald-700">-₹{calculations.indicativeSubsidy.toLocaleString()}</p>
+                      <p className="text-[11px] text-emerald-600 font-medium">Direct DBT Bank Credit to Customer</p>
+                    </div>
+
+                    <div className="p-5 rounded-2xl bg-[#071A2B] text-white space-y-1 shadow-md">
+                      <span className="text-[11px] font-extrabold text-emerald-400 uppercase tracking-wider block">Net Customer Investment</span>
+                      <p className="text-2xl font-black text-white">₹{calculations.netCustomerCost.toLocaleString()}</p>
+                      <p className="text-[11px] text-slate-400 font-medium">Effective Outflow Post Subsidy</p>
+                    </div>
+                  </div>
+
+                  {/* TAX COMPLIANCE BANNER & TOGGLE */}
+                  <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5 text-slate-700">
+                      <Shield className="text-emerald-600 flex-shrink-0" size={20} />
                       <div>
-                        <p className="font-bold text-emerald-900 flex items-center gap-1.5">
-                          <Sparkles size={14} className="text-emerald-600" /> PM Surya Ghar Central Subsidy: ₹{calculations.indicativeSubsidy.toLocaleString()}
+                        <p className="font-extrabold text-slate-900">
+                          GST Compliance & Invoice Guarantee (No Extra Tax on Invoice)
                         </p>
-                        <p className="text-slate-600 text-[11px] mt-0.5">
-                          Direct DBT credit to customer account upon MSEDCL commissioning. Not deducted from vendor invoice.
+                        <p className="text-slate-500 text-[11px] mt-0.5">
+                          Taxable Base: <strong>₹{calculations.subtotal.toLocaleString()}</strong> + Embedded Solar GST (13.8% Composite): <strong>₹{calculations.tax.toLocaleString()}</strong> = Grand Invoice Total: <strong>₹{calculations.total.toLocaleString()}</strong>
                         </p>
                       </div>
-                      <div className="text-right">
-                        <span className="text-[10px] text-slate-400 uppercase font-bold">Effective Net Outflow</span>
-                        <p className="text-base font-black text-[#071A2B]">₹{calculations.netCustomerCost.toLocaleString()}</p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setShowBOMDetails(prev => !prev)}
+                      className="px-3.5 py-2 bg-white hover:bg-slate-100 text-slate-800 font-bold border border-slate-300 rounded-xl transition-colors text-xs whitespace-nowrap shadow-sm"
+                    >
+                      {showBOMDetails ? 'Hide Technical BOM' : 'View Itemized Technical BOM'}
+                    </button>
+                  </div>
+
+                  {/* OPTIONAL COLLAPSIBLE ITEMIZED BOM TABLE (FOR DISCOM & CATALOG) */}
+                  {showBOMDetails && (
+                    <div className="space-y-4 pt-2 border-t border-slate-100 animate-in fade-in">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-sm font-black text-slate-800 uppercase tracking-wider">Technical Hardware Line Items</h4>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setShowProductPicker(prev => !prev)}
+                            className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors"
+                          >
+                            <Package size={14} /> {showProductPicker ? 'Close Catalog' : 'Add from Catalog'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleAddItem}
+                            className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors"
+                          >
+                            <Plus size={14} /> Custom Line
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleResetBOM}
+                            title="Reset to default package BOM"
+                            className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-colors"
+                          >
+                            <RefreshCw size={14} />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* INVENTORY CATALOG DRAWER */}
+                      {showProductPicker && (
+                        <div className="p-4 bg-slate-50 border border-emerald-200 rounded-2xl space-y-3 animate-in fade-in">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-extrabold uppercase text-slate-700 flex items-center gap-1.5">
+                              <Search size={14} className="text-emerald-600" /> Live Inventory Products
+                            </span>
+                            <button type="button" onClick={() => setShowProductPicker(false)} className="text-xs text-slate-400 hover:text-slate-600">
+                              Close
+                            </button>
+                          </div>
+
+                          <input
+                            type="text"
+                            placeholder="Search product SKU, brand or name..."
+                            value={productSearch}
+                            onChange={e => setProductSearch(e.target.value)}
+                            className="w-full px-3 py-2 bg-white rounded-xl border border-slate-200 text-xs font-medium outline-none focus:ring-2 focus:ring-emerald-500"
+                          />
+
+                          <div className="max-h-48 overflow-y-auto space-y-1.5 pr-1">
+                            {products
+                              .filter(p => !productSearch || p.name?.toLowerCase().includes(productSearch.toLowerCase()) || p.brand?.toLowerCase().includes(productSearch.toLowerCase()))
+                              .slice(0, 8)
+                              .map(p => (
+                                <div
+                                  key={p.id}
+                                  onClick={() => handleSelectProduct(p)}
+                                  className="p-2.5 bg-white hover:bg-emerald-50 border border-slate-200 hover:border-emerald-300 rounded-xl flex items-center justify-between cursor-pointer transition-colors text-xs"
+                                >
+                                  <div>
+                                    <p className="font-bold text-slate-900">{p.name}</p>
+                                    <p className="text-[11px] text-slate-400">{p.brand || 'Generic'} · Stock: {p.currentStock ?? 'In Stock'}</p>
+                                  </div>
+                                  <div className="text-right">
+                                    <span className="font-black text-[#071A2B]">₹{(p.sellingPrice || 0).toLocaleString()}</span>
+                                    <span className="block text-[10px] text-emerald-600 font-bold">+ Add Item</span>
+                                  </div>
+                                </div>
+                              ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* ITEMIZED TABLE */}
+                      <div className="border border-slate-200 rounded-2xl overflow-hidden bg-white shadow-sm">
+                        <table className="w-full text-left text-xs">
+                          <thead className="bg-slate-50 text-slate-500 font-extrabold uppercase text-[10px] tracking-wider border-b border-slate-200">
+                            <tr>
+                              <th className="py-3 px-4">Description</th>
+                              <th className="py-3 px-2 w-20 text-center">Qty</th>
+                              <th className="py-3 px-3 w-32">Unit Rate (₹)</th>
+                              <th className="py-3 px-2 w-24 text-center">GST %</th>
+                              <th className="py-3 px-4 text-right w-32">Line Total (₹)</th>
+                              <th className="py-3 px-2 text-center w-10"></th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {formData.items.map((item, idx) => (
+                              <tr key={item.id || idx} className="hover:bg-slate-50/60 transition-colors">
+                                <td className="p-2.5">
+                                  <input
+                                    type="text"
+                                    value={item.description}
+                                    onChange={e => handleUpdateItem(idx, 'description', e.target.value)}
+                                    className="w-full px-2.5 py-1.5 bg-slate-50/80 hover:bg-white focus:bg-white rounded-lg border border-transparent hover:border-slate-300 focus:border-emerald-500 font-bold text-slate-800 text-xs outline-none"
+                                  />
+                                </td>
+                                <td className="p-2">
+                                  <input
+                                    type="number"
+                                    min="1"
+                                    value={item.quantity}
+                                    onChange={e => handleUpdateItem(idx, 'quantity', Number(e.target.value))}
+                                    className="w-full px-2 py-1.5 bg-slate-50/80 hover:bg-white focus:bg-white rounded-lg border border-transparent hover:border-slate-300 focus:border-emerald-500 font-bold text-slate-900 text-xs text-center outline-none"
+                                  />
+                                </td>
+                                <td className="p-2">
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    value={item.unitPrice}
+                                    onChange={e => handleUpdateItem(idx, 'unitPrice', Number(e.target.value))}
+                                    className="w-full px-2 py-1.5 bg-slate-50/80 hover:bg-white focus:bg-white rounded-lg border border-transparent hover:border-slate-300 focus:border-emerald-500 font-bold text-slate-900 text-xs outline-none"
+                                  />
+                                </td>
+                                <td className="p-2 text-center">
+                                  <select
+                                    value={item.taxRate}
+                                    onChange={e => handleUpdateItem(idx, 'taxRate', Number(e.target.value))}
+                                    className="px-2 py-1.5 bg-slate-50/80 hover:bg-white focus:bg-white rounded-lg border border-transparent hover:border-slate-300 focus:border-emerald-500 font-bold text-slate-800 text-[11px] outline-none"
+                                  >
+                                    <option value="0">0%</option>
+                                    <option value="5">5%</option>
+                                    <option value="12">12%</option>
+                                    <option value="18">18%</option>
+                                  </select>
+                                </td>
+                                <td className="p-3 text-right font-black text-slate-900">
+                                  ₹{(Math.round(item.quantity * item.unitPrice)).toLocaleString()}
+                                </td>
+                                <td className="p-2 text-center">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteItem(idx)}
+                                    title="Delete line item"
+                                    className="p-1 text-slate-400 hover:text-red-600 rounded-lg transition-colors"
+                                  >
+                                    <Trash2 size={14} />
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
                       </div>
                     </div>
                   )}
