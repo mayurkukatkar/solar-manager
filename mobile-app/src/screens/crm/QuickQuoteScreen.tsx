@@ -379,11 +379,6 @@ export const QuickQuoteScreen: React.FC<{ route?: any }> = ({ route }) => {
 
       {/* BOTTOM ACTION */}
       <View style={styles.bottomBar}>
-        <View style={styles.actionHintRow}>
-          <Text style={styles.actionHintText}>
-            📲 <Text style={{ fontWeight: '700' }}>Direct Chat</Text> auto-opens customer chat | 📎 <Text style={{ fontWeight: '700' }}>WhatsApp PDF</Text> attaches document
-          </Text>
-        </View>
         <View style={styles.actionRowTop}>
           <TouchableOpacity
             style={styles.pdfBtn}
