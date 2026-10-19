@@ -303,6 +303,54 @@ export const financeApi = {
     const res = await apiClient.get(`/api/tenant/invoices/${invoiceId}/whatsapp-payload`);
     return res.data;
   },
+  convertQuotation: async (quotationId: string, options?: { template?: string; selectedMilestone?: string }) => {
+    const res = await apiClient.post('/api/tenant/finance/convert-quotation', {
+      quotationId,
+      ...options,
+    });
+    return res.data;
+  },
+  createMilestoneInvoicesForProject: async (data: {
+    leadId?: string;
+    customerId?: string;
+    projectId?: string;
+    totalAmount: number;
+    capacityKw?: number;
+    customerName?: string;
+  }) => {
+    try {
+      const res = await apiClient.post('/api/tenant/finance/milestone-invoices', data);
+      if (res.data?.invoices) return res.data.invoices;
+    } catch (e: any) {
+      console.warn('Direct milestone creation endpoint notice:', e.message);
+    }
+    const stages = [
+      { key: 'ADVANCE', pct: 0.20, title: 'Stage 1: Advance Booking & Work Order (20%)', days: 0 },
+      { key: 'MATERIAL_DELIVERY', pct: 0.60, title: 'Stage 2: PV Modules & Inverter Delivery (60%)', days: 10 },
+      { key: 'INSTALLATION', pct: 0.15, title: 'Stage 3: Structure & Electrical Testing (15%)', days: 20 },
+      { key: 'COMMISSIONING', pct: 0.05, title: 'Stage 4: DISCOM Net Metering & Grid Sync (5%)', days: 30 },
+    ];
+    const results = [];
+    for (const st of stages) {
+      const amt = Math.round(data.totalAmount * st.pct);
+      const subtotal = Math.round(amt / 1.138);
+      const tax = amt - subtotal;
+      const inv = await apiClient.post('/api/tenant/finance', {
+        customerId: data.customerId,
+        projectId: data.projectId,
+        milestone: st.key,
+        milestoneTitle: st.title,
+        subtotal,
+        taxAmount: tax,
+        taxRate: 13.8,
+        amount: amt,
+        dueDate: new Date(Date.now() + st.days * 86400000).toISOString(),
+        notes: `Turnkey ${data.capacityKw || 3.3} kWp Solar EPC plant for ${data.customerName || 'Customer'}.`,
+      });
+      results.push(inv.data?.invoice);
+    }
+    return results;
+  },
 };
 
 // ==========================================

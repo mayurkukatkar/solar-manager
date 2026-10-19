@@ -29,13 +29,15 @@ import {
   IndianRupee,
   Calendar,
   Receipt,
+  CreditCard,
 } from 'lucide-react-native';
-import { crmApi } from '../../api/endpoints';
+import { crmApi, financeApi } from '../../api/endpoints';
 import { offlineSyncService } from '../../services/offlineSyncService';
 import { LeadCaptureModal } from './LeadCaptureModal';
 import { QuotationBuilderModal } from './QuotationBuilderModal';
 import { CustomerOnboardingModal } from './CustomerOnboardingModal';
 import { DiscomDocsModal } from '../projects/DiscomDocsModal';
+import { InvoicePdfModal } from '../../components/InvoicePdfModal';
 import { colors } from '../../theme/colors';
 
 const STAGES = [
@@ -58,6 +60,11 @@ export const PipelineScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
   const [quoteModalVisible, setQuoteModalVisible] = useState(false);
   const [onboardingModalVisible, setOnboardingModalVisible] = useState(false);
   const [discomModalVisible, setDiscomModalVisible] = useState(false);
+
+  // PDF Invoice Modal & Milestone Gen State
+  const [pdfModalVisible, setPdfModalVisible] = useState(false);
+  const [selectedInvoiceForPdf, setSelectedInvoiceForPdf] = useState<any | null>(null);
+  const [generatingMilestonesLeadId, setGeneratingMilestonesLeadId] = useState<string | null>(null);
 
   // Active Context for Modals
   const [selectedLead, setSelectedLead] = useState<any | null>(null);
@@ -172,6 +179,92 @@ export const PipelineScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
       capacity: item.estimatedCap || 3.3,
     });
     setDiscomModalVisible(true);
+  };
+
+  const handleOpenPdfInvoiceForLead = (lead: any) => {
+    const invs: any[] = [];
+    if (lead.customer?.invoices) invs.push(...lead.customer.invoices);
+    if (lead.projects) {
+      lead.projects.forEach((p: any) => {
+        if (p.invoices) invs.push(...p.invoices);
+      });
+    }
+
+    if (invs.length > 0) {
+      const unpaid = invs.find((i: any) => i.status !== 'PAID');
+      const target = unpaid || invs[0];
+      setSelectedInvoiceForPdf({
+        ...target,
+        customer: target.customer || lead.customer || {
+          name: lead.name,
+          mobile: lead.mobile,
+          address: lead.address,
+          city: lead.city,
+          consumerNumber: lead.consumerNumber,
+        },
+      });
+      setPdfModalVisible(true);
+    } else {
+      Alert.alert(
+        'Generate 4-Stage Invoices?',
+        `No milestone invoices generated yet for ${lead.name}.\n\nWould you like to generate the standard 20/60/15/5 milestone billing cycle now?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Generate & Preview',
+            onPress: () => handleGenerateMilestonesForLead(lead, true),
+          },
+        ]
+      );
+    }
+  };
+
+  const handleGenerateMilestonesForLead = async (lead: any, openPdfAfter = false) => {
+    setGeneratingMilestonesLeadId(lead.id);
+    try {
+      const cap = lead.estimatedCap || 3.3;
+      const totalAmount = lead.estimatedValue || Math.round(cap * 56000);
+      const invoices = await financeApi.createMilestoneInvoicesForProject({
+        leadId: lead.id,
+        customerId: lead.customerId || lead.customer?.id,
+        projectId: lead.projects?.[0]?.id,
+        totalAmount,
+        capacityKw: cap,
+        customerName: lead.name,
+      });
+
+      Alert.alert(
+        'Milestone Invoices Generated! 🎉',
+        `Standard 4-stage billing schedule created for ${lead.name}:\n• Stage 1 (20% Advance Token)\n• Stage 2 (60% Material Delivery)\n• Stage 3 (15% Installation)\n• Stage 4 (5% Commissioning/DBT)`
+      );
+
+      fetchLeads();
+
+      if (openPdfAfter && Array.isArray(invoices) && invoices.length > 0) {
+        setSelectedInvoiceForPdf({
+          ...invoices[0],
+          customer: invoices[0].customer || lead.customer || {
+            name: lead.name,
+            mobile: lead.mobile,
+            address: lead.address,
+            city: lead.city,
+            consumerNumber: lead.consumerNumber,
+          },
+        });
+        setPdfModalVisible(true);
+      }
+    } catch (err: any) {
+      Alert.alert(
+        'Generation Failed',
+        err.response?.data?.error || err.message || 'Could not generate milestone invoices.'
+      );
+    } finally {
+      setGeneratingMilestonesLeadId(null);
+    }
+  };
+
+  const handleNavigateToFinanceForLead = (lead: any) => {
+    navigation?.navigate('Finance', { customerName: lead.name });
   };
 
   // KPI Calculations for the Vendor
@@ -365,6 +458,39 @@ export const PipelineScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
             const net = Math.max(0, gross - subsidy);
             const isWon = item.status === 'WON';
 
+            // Live linked milestone invoices
+            const leadInvoices: any[] = [];
+            if (item.customer?.invoices) leadInvoices.push(...item.customer.invoices);
+            if (item.projects) {
+              item.projects.forEach((p: any) => {
+                if (p.invoices) leadInvoices.push(...p.invoices);
+              });
+            }
+            const uniqueInvoices = Array.from(new Map(leadInvoices.map((i: any) => [i.id, i])).values());
+            const hasInvoices = uniqueInvoices.length > 0;
+
+            const totalBilled = uniqueInvoices.reduce((s: number, i: any) => s + (i.amount || 0), 0);
+            const totalPaid = uniqueInvoices.reduce((s: number, i: any) => {
+              const pSum = (i.payments || []).reduce((ps: number, p: any) => ps + (p.amount || 0), 0);
+              return s + (i.totalPaid ?? pSum);
+            }, 0);
+            const totalDue = Math.max(0, totalBilled - totalPaid);
+
+            const findStageStatus = (stageNum: number, keyMatch: string) => {
+              const inv = uniqueInvoices.find((i: any) => {
+                const m = (i.milestone || i.milestoneTitle || '').toUpperCase();
+                return m.includes(keyMatch) || m.includes(`STAGE ${stageNum}`);
+              });
+              if (!inv) return 'PENDING';
+              const p = (inv.payments || []).reduce((s: number, pm: any) => s + (pm.amount || 0), 0);
+              return (inv.status === 'PAID' || p >= inv.amount) ? 'PAID' : 'BILLED';
+            };
+
+            const s1Status = findStageStatus(1, 'ADVANCE');
+            const s2Status = findStageStatus(2, 'MATERIAL');
+            const s3Status = findStageStatus(3, 'INSTALL');
+            const s4Status = findStageStatus(4, 'COMMISSION');
+
             return (
               <View key={item.id} style={styles.leadCard}>
                 {/* CARD HEADER */}
@@ -400,6 +526,101 @@ export const PipelineScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
                     <Text style={styles.metricLabel}>Customer Cost</Text>
                     <Text style={styles.metricValueBlue}>₹{net.toLocaleString('en-IN')}</Text>
                   </View>
+                </View>
+
+                {/* 4-STAGE MILESTONE BILLING PIPELINE TRACKER */}
+                <View style={styles.milestoneSection}>
+                  <View style={styles.milestoneSectionHeader}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Receipt size={13} color="#059669" />
+                      <Text style={styles.milestoneSectionTitle}>EPC MILESTONES (20/60/15/5)</Text>
+                    </View>
+                    {hasInvoices ? (
+                      <Text style={styles.milestoneSectionSummary}>
+                        Paid: <Text style={{ color: '#059669', fontWeight: '800' }}>₹{totalPaid.toLocaleString('en-IN')}</Text> / ₹{totalBilled.toLocaleString('en-IN')}
+                      </Text>
+                    ) : (
+                      <Text style={styles.milestoneSectionSummaryPending}>Schedule Not Generated</Text>
+                    )}
+                  </View>
+
+                  {/* 4 MINI PILLS */}
+                  <View style={styles.milestonePillsRow}>
+                    {[
+                      { label: 'S1: 20% Token', status: s1Status },
+                      { label: 'S2: 60% Mat.', status: s2Status },
+                      { label: 'S3: 15% Inst.', status: s3Status },
+                      { label: 'S4: 5% DBT', status: s4Status },
+                    ].map((step, sIdx) => {
+                      const isStepPaid = step.status === 'PAID';
+                      const isStepBilled = step.status === 'BILLED';
+                      return (
+                        <View
+                          key={sIdx}
+                          style={[
+                            styles.milestoneMiniPill,
+                            isStepPaid && styles.milestoneMiniPillPaid,
+                            isStepBilled && styles.milestoneMiniPillBilled,
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.milestoneMiniPillText,
+                              isStepPaid && styles.milestoneMiniPillTextPaid,
+                              isStepBilled && styles.milestoneMiniPillTextBilled,
+                            ]}
+                          >
+                            {isStepPaid ? '✓ ' : isStepBilled ? '⏳ ' : '○ '}{step.label}
+                          </Text>
+                        </View>
+                      );
+                    })}
+                  </View>
+                </View>
+
+                {/* DEDICATED FINANCE & PDF INVOICE ACTIONS */}
+                <View style={styles.financeQuickActionsRow}>
+                  {hasInvoices ? (
+                    <>
+                      <TouchableOpacity
+                        style={styles.viewPdfInvoiceBtn}
+                        onPress={() => handleOpenPdfInvoiceForLead(item)}
+                        activeOpacity={0.8}
+                      >
+                        <FileText size={13} color="#2563eb" />
+                        <Text style={styles.viewPdfInvoiceBtnText}>📄 PDF Invoice</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={styles.leadFinanceLinkBtn}
+                        onPress={() => handleNavigateToFinanceForLead(item)}
+                        activeOpacity={0.8}
+                      >
+                        <CreditCard size={13} color="#059669" />
+                        <Text style={styles.leadFinanceLinkBtnText}>
+                          💳 Billing & Ledger {totalDue > 0 ? `(₹${(totalDue / 1000).toFixed(0)}k Due)` : '✓'}
+                        </Text>
+                      </TouchableOpacity>
+                    </>
+                  ) : (
+                    <TouchableOpacity
+                      style={styles.generateMilestonesBtn}
+                      onPress={() => handleGenerateMilestonesForLead(item, false)}
+                      disabled={generatingMilestonesLeadId === item.id}
+                      activeOpacity={0.85}
+                    >
+                      {generatingMilestonesLeadId === item.id ? (
+                        <ActivityIndicator size="small" color="#059669" />
+                      ) : (
+                        <>
+                          <Sparkles size={14} color="#059669" />
+                          <Text style={styles.generateMilestonesBtnText}>
+                            ⚡ Generate 4-Stage Invoices (20/60/15/5)
+                          </Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
+                  )}
                 </View>
 
                 {/* CONTEXTUAL ACTION ROW */}
@@ -485,6 +706,16 @@ export const PipelineScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
           onClose={() => setDiscomModalVisible(false)}
         />
       )}
+
+      {/* PDF INVOICE PREVIEW & ACTIONS MODAL */}
+      <InvoicePdfModal
+        visible={pdfModalVisible}
+        onClose={() => {
+          setPdfModalVisible(false);
+          setSelectedInvoiceForPdf(null);
+        }}
+        invoice={selectedInvoiceForPdf}
+      />
     </View>
   );
 };
@@ -900,5 +1131,125 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '800',
     color: '#d97706',
+  },
+  milestoneSection: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    padding: 10,
+    marginBottom: 10,
+  },
+  milestoneSectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  milestoneSectionTitle: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#334155',
+    letterSpacing: 0.3,
+  },
+  milestoneSectionSummary: {
+    fontSize: 10,
+    color: '#64748b',
+    fontWeight: '600',
+  },
+  milestoneSectionSummaryPending: {
+    fontSize: 10,
+    color: '#94a3b8',
+    fontWeight: '600',
+    fontStyle: 'italic',
+  },
+  milestonePillsRow: {
+    flexDirection: 'row',
+    gap: 4,
+  },
+  milestoneMiniPill: {
+    flex: 1,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 6,
+    paddingVertical: 5,
+    paddingHorizontal: 2,
+    alignItems: 'center',
+  },
+  milestoneMiniPillPaid: {
+    backgroundColor: '#ecfdf5',
+    borderColor: '#a7f3d0',
+  },
+  milestoneMiniPillBilled: {
+    backgroundColor: '#eff6ff',
+    borderColor: '#bfdbfe',
+  },
+  milestoneMiniPillText: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#94a3b8',
+  },
+  milestoneMiniPillTextPaid: {
+    color: '#059669',
+  },
+  milestoneMiniPillTextBilled: {
+    color: '#2563eb',
+  },
+  financeQuickActionsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 10,
+  },
+  viewPdfInvoiceBtn: {
+    flex: 1,
+    backgroundColor: '#eff6ff',
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+    borderRadius: 8,
+    paddingVertical: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+  },
+  viewPdfInvoiceBtnText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#2563eb',
+  },
+  leadFinanceLinkBtn: {
+    flex: 1.2,
+    backgroundColor: '#ecfdf5',
+    borderWidth: 1,
+    borderColor: '#a7f3d0',
+    borderRadius: 8,
+    paddingVertical: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+  },
+  leadFinanceLinkBtnText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#059669',
+  },
+  generateMilestonesBtn: {
+    flex: 1,
+    backgroundColor: '#f0fdf4',
+    borderWidth: 1,
+    borderColor: '#bbf7d0',
+    borderRadius: 8,
+    paddingVertical: 9,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  generateMilestonesBtnText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#059669',
   },
 });

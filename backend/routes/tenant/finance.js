@@ -262,6 +262,150 @@ router.get('/api/tenant/finance/:id', requireTenantAuth, async (req, res) => {
   }
 });
 
+// 3b. Generate Server-Side PDF Tax Invoice
+router.get('/api/tenant/invoices/:id/pdf', requireTenantAuth, async (req, res) => {
+  try {
+    const [invoice, tenant] = await Promise.all([
+      prisma.invoice.findUnique({
+        where: { id: req.params.id, tenantId: req.user.tenantId },
+        include: {
+          customer: true,
+          project: true,
+          payments: { orderBy: { date: 'desc' } }
+        }
+      }),
+      prisma.tenant.findUnique({
+        where: { id: req.user.tenantId }
+      })
+    ]);
+
+    if (!invoice) return res.status(404).json({ error: 'Invoice not found' });
+
+    const { PDFDocument, StandardFonts, rgb } = require('pdf-lib');
+    const pdfDoc = await PDFDocument.create();
+    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+
+    const page = pdfDoc.addPage();
+    const { width, height } = page.getSize();
+    let y = height - 50;
+
+    const drawText = (text, x, yPos, size = 10, isBold = false, color = rgb(0.1, 0.1, 0.1)) => {
+      page.drawText(String(text || ''), { x, y: yPos, size, font: isBold ? fontBold : font, color });
+    };
+
+    // Brand Header
+    drawText(tenant?.name || 'Solar Solutions Pvt Ltd', 50, y, 16, true, rgb(0.06, 0.72, 0.5));
+    y -= 16;
+    drawText('GST Registered Solar EPC Turnkey Contractor', 50, y, 9, false, rgb(0.4, 0.4, 0.4));
+    y -= 14;
+    drawText(`GSTIN: ${tenant?.gstin || '27AABCS1429B1Z5'} | PAN: ${tenant?.pan || 'AABCS1429B'}`, 50, y, 9, false, rgb(0.4, 0.4, 0.4));
+
+    // Title on Right
+    drawText('TAX INVOICE', width - 200, height - 50, 18, true, rgb(0.06, 0.72, 0.5));
+    drawText(`Invoice No: ${invoice.invoiceNumber || 'INV-2026'}`, width - 200, height - 70, 9, true);
+    drawText(`Date: ${new Date(invoice.createdAt).toLocaleDateString('en-IN')}`, width - 200, height - 85, 9);
+    drawText(`Due: ${invoice.dueDate ? new Date(invoice.dueDate).toLocaleDateString('en-IN') : 'Immediate'}`, width - 200, height - 100, 9);
+    drawText(`Status: ${invoice.status || 'UNPAID'}`, width - 200, height - 115, 9, true, rgb(0.8, 0.2, 0.2));
+
+    y -= 40;
+    page.drawLine({ start: { x: 50, y }, end: { x: width - 50, y }, thickness: 1, color: rgb(0.85, 0.85, 0.85) });
+    y -= 20;
+
+    // Parties Box
+    drawText('BILLED TO (CUSTOMER):', 50, y, 9, true, rgb(0.4, 0.4, 0.4));
+    drawText('PROJECT & PIPELINE CONTEXT:', 300, y, 9, true, rgb(0.4, 0.4, 0.4));
+    y -= 15;
+
+    drawText(invoice.customer?.name || 'Valued Customer', 50, y, 11, true);
+    drawText(invoice.project?.name || `${invoice.customer?.name}'s Solar Plant`, 300, y, 11, true);
+    y -= 15;
+
+    drawText(`Mobile: ${invoice.customer?.mobile || 'N/A'}`, 50, y, 9);
+    drawText(`Capacity: ${invoice.project?.capacity || 3.3} kWp Grid-Tied`, 300, y, 9);
+    y -= 15;
+
+    drawText(`Address: ${invoice.customer?.address || invoice.customer?.city || 'Maharashtra'}`, 50, y, 9);
+    drawText(`Consumer #: ${invoice.customer?.consumerNumber || 'N/A'} (MSEDCL)`, 300, y, 9);
+    y -= 30;
+
+    // Milestone Header
+    page.drawRectangle({ x: 50, y: y - 5, width: width - 100, height: 22, color: rgb(0.92, 0.98, 0.95) });
+    drawText(`Milestone: ${invoice.milestoneTitle || invoice.milestone || 'Solar EPC Milestone'}`, 60, y + 2, 10, true, rgb(0.04, 0.45, 0.3));
+    y -= 35;
+
+    // Table Header
+    page.drawRectangle({ x: 50, y: y - 5, width: width - 100, height: 20, color: rgb(0.06, 0.09, 0.16) });
+    drawText('#', 60, y, 9, true, rgb(1, 1, 1));
+    drawText('Description of Supply', 90, y, 9, true, rgb(1, 1, 1));
+    drawText('HSN', 320, y, 9, true, rgb(1, 1, 1));
+    drawText('Qty', 370, y, 9, true, rgb(1, 1, 1));
+    drawText('Taxable (Rs.)', 410, y, 9, true, rgb(1, 1, 1));
+    drawText('Amount (Rs.)', 480, y, 9, true, rgb(1, 1, 1));
+    y -= 25;
+
+    // Table Row
+    const subtotal = Math.round(invoice.subtotal || invoice.amount / 1.138);
+    drawText('1', 60, y, 9);
+    drawText(String(invoice.milestoneTitle || 'Solar EPC Milestone Work').slice(0, 36), 90, y, 9, true);
+    drawText('8541', 320, y, 9);
+    drawText('1 Stage', 370, y, 9);
+    drawText(subtotal.toLocaleString('en-IN'), 410, y, 9);
+    drawText(Number(invoice.amount || 0).toLocaleString('en-IN'), 480, y, 9, true);
+    y -= 20;
+
+    page.drawLine({ start: { x: 50, y }, end: { x: width - 50, y }, thickness: 1, color: rgb(0.85, 0.85, 0.85) });
+    y -= 25;
+
+    // Financial Breakdown
+    const totalPaid = (invoice.payments || []).reduce((sum, p) => sum + (p.amount || 0), 0);
+    const balance = Math.max(0, (invoice.amount || 0) - totalPaid);
+    const taxAmt = Math.round(invoice.amount - subtotal);
+
+    drawText('Taxable Subtotal:', 340, y, 9);
+    drawText(`Rs. ${subtotal.toLocaleString('en-IN')}`, 470, y, 9);
+    y -= 16;
+    drawText('GST (13.8% Composite):', 340, y, 9);
+    drawText(`Rs. ${taxAmt.toLocaleString('en-IN')}`, 470, y, 9);
+    y -= 18;
+
+    page.drawRectangle({ x: 330, y: y - 5, width: 220, height: 22, color: rgb(0.06, 0.72, 0.5) });
+    drawText('Gross Invoice Total:', 340, y + 2, 10, true, rgb(1, 1, 1));
+    drawText(`Rs. ${Number(invoice.amount || 0).toLocaleString('en-IN')}`, 470, y + 2, 10, true, rgb(1, 1, 1));
+    y -= 24;
+
+    if (totalPaid > 0) {
+      drawText('Less: Paid to Date:', 340, y, 9, true, rgb(0.06, 0.6, 0.3));
+      drawText(`-Rs. ${totalPaid.toLocaleString('en-IN')}`, 470, y, 9, true, rgb(0.06, 0.6, 0.3));
+      y -= 16;
+    }
+
+    drawText('Balance Payable:', 340, y, 10, true, rgb(0.8, 0.3, 0.0));
+    drawText(`Rs. ${balance.toLocaleString('en-IN')}`, 470, y, 10, true, rgb(0.8, 0.3, 0.0));
+    y -= 35;
+
+    // Bank Details Box
+    drawText('Bank NEFT/RTGS & UPI Remittance Details:', 50, y, 9, true, rgb(0.3, 0.3, 0.3));
+    y -= 14;
+    drawText(`A/C: ${tenant?.name || 'Solar Solutions'} | Bank: HDFC Bank | A/C No: 50200088992211 | IFSC: HDFC0001234`, 50, y, 8.5);
+    y -= 12;
+    drawText('UPI ID: solarmanager@hdfcbank | Direct portal payment link attached to WhatsApp notification', 50, y, 8.5);
+    y -= 30;
+
+    // Footer
+    drawText('Terms: Subject to local utility statutory clearance. Warranties as per OEM terms under PM Surya Ghar scheme.', 50, 45, 8, false, rgb(0.5, 0.5, 0.5));
+    drawText('Authorized Signatory - Digitally Verified System Invoice', width - 260, 45, 8, true, rgb(0.2, 0.2, 0.2));
+
+    const pdfBytes = await pdfDoc.save();
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${invoice.invoiceNumber || 'Invoice'}.pdf"`);
+    res.end(Buffer.from(pdfBytes));
+  } catch (error) {
+    console.error('Invoice PDF error:', error);
+    res.status(500).json({ error: 'Failed to generate invoice PDF' });
+  }
+});
+
 // 4. Create Milestone / GST Tax Invoice
 router.post('/api/tenant/finance', requireTenantAuth, async (req, res) => {
   try {
@@ -459,6 +603,174 @@ router.post('/api/tenant/finance/convert-quotation', requireTenantAuth, async (r
   } catch (error) {
     console.error('Error converting quotation to invoices:', error);
     res.status(500).json({ error: 'Failed to generate milestone invoices from quotation' });
+  }
+});
+
+// 5b. Generate Standard 4-Stage Milestone Invoices directly for Lead/Customer/Project
+router.post('/api/tenant/finance/milestone-invoices', requireTenantAuth, async (req, res) => {
+  try {
+    const tenantId = req.user.tenantId;
+    const { leadId, customerId: inputCustomerId, projectId: inputProjectId, totalAmount, systemCapacity } = req.body;
+
+    let customerId = inputCustomerId;
+    let projectId = inputProjectId;
+    let lead = null;
+
+    if (leadId) {
+      lead = await prisma.lead.findUnique({
+        where: { id: leadId, tenantId },
+        include: { customer: true, projects: true }
+      });
+      if (lead) {
+        if (!customerId && lead.customerId) customerId = lead.customerId;
+        if (!customerId && lead.customer) customerId = lead.customer.id;
+        if (!projectId && lead.projects && lead.projects.length > 0) projectId = lead.projects[0].id;
+      }
+    }
+
+    // If still no customer, create or find one based on lead details
+    if (!customerId && lead) {
+      let existingCust = lead.mobile ? await prisma.customer.findFirst({
+        where: { tenantId, mobile: lead.mobile }
+      }) : null;
+
+      if (!existingCust) {
+        existingCust = await prisma.customer.create({
+          data: {
+            tenantId,
+            leadId: lead.id,
+            name: lead.name,
+            mobile: lead.mobile || 'N/A',
+            address: lead.address || null,
+            city: lead.city || null,
+            customerType: 'RESIDENTIAL'
+          }
+        });
+      }
+
+      customerId = existingCust.id;
+      if (!lead.customerId) {
+        await prisma.lead.update({
+          where: { id: lead.id },
+          data: { customerId }
+        }).catch(() => {});
+      }
+    }
+
+    if (!customerId) {
+      return res.status(400).json({ error: 'Customer or Lead with valid contact information is required' });
+    }
+
+    const customer = await prisma.customer.findUnique({ where: { id: customerId } });
+
+    // Sizing and Commercials
+    const cap = parseFloat(systemCapacity) || (lead ? (lead.estimatedCap || 3.3) : 3.3);
+    const grossPrice = parseFloat(totalAmount) || (lead ? (lead.estimatedValue || Math.round(cap * 56000)) : Math.round(cap * 56000));
+    const centralSubsidy = cap >= 3 ? 78000 : cap >= 2 ? 60000 : 30000;
+
+    // Check if milestone invoices already exist for this customer/project
+    const existingInvoices = await prisma.invoice.findMany({
+      where: {
+        tenantId,
+        customerId,
+        ...(projectId ? { projectId } : {})
+      }
+    });
+
+    const standardStages = [
+      {
+        key: 'ADVANCE',
+        pct: 20,
+        title: 'Stage 1: Advance Booking & Work Order (20%)',
+        desc: 'Engineering design, physical site layout & DISCOM net-metering portal application',
+        hsn: '9954',
+        dueDays: 0
+      },
+      {
+        key: 'MATERIAL_DELIVERY',
+        pct: 60,
+        title: 'Stage 2: Material Delivery On-Site (60%)',
+        desc: 'Supply of Tier-1 DCR solar modules, grid-tied inverter, mounting structure kit & DC cables',
+        hsn: '8541',
+        dueDays: 15
+      },
+      {
+        key: 'INSTALLATION',
+        pct: 15,
+        title: 'Stage 3: Installation & Inverter Sync (15%)',
+        desc: 'Mechanical module mounting, string inverter cabling, grounding/earthing and generation testing',
+        hsn: '9954',
+        dueDays: 30
+      },
+      {
+        key: 'COMMISSIONING',
+        pct: 5,
+        title: 'Stage 4: DISCOM Net-Metering & PM Surya Ghar DBT Release (5%)',
+        desc: 'Bi-directional DISCOM meter installation, joint inspection report & Central DBT subsidy clearance',
+        hsn: '9954',
+        dueDays: 45
+      }
+    ];
+
+    const createdInvoices = [];
+    const count = await prisma.invoice.count({ where: { tenantId } });
+    const currentYear = new Date().getFullYear();
+
+    for (let i = 0; i < standardStages.length; i++) {
+      const ms = standardStages[i];
+      // Skip if milestone already billed
+      const alreadyHas = existingInvoices.some(
+        inv => (inv.milestone === ms.key) || (inv.milestoneTitle && inv.milestoneTitle.includes(`Stage ${i + 1}`))
+      );
+      if (alreadyHas) continue;
+
+      const invNumber = `INV-${currentYear}-${(count + 1 + createdInvoices.length).toString().padStart(4, '0')}`;
+      const milestoneAmount = Math.round(grossPrice * (ms.pct / 100));
+      const taxableSubtotal = Math.round(milestoneAmount / 1.138);
+      const taxAmount = milestoneAmount - taxableSubtotal;
+
+      const inv = await prisma.invoice.create({
+        data: {
+          tenantId,
+          customerId,
+          projectId: projectId || null,
+          invoiceNumber: invNumber,
+          milestone: ms.key,
+          milestoneTitle: ms.title,
+          subtotal: taxableSubtotal,
+          taxRate: 13.8,
+          taxAmount,
+          subsidyDeduction: ms.key === 'COMMISSIONING' ? centralSubsidy : 0,
+          amount: milestoneAmount,
+          dueDate: new Date(Date.now() + ms.dueDays * 86400000),
+          status: 'UNPAID',
+          items: [
+            {
+              description: `${ms.title} - ${ms.desc} (${cap} kWp System)`,
+              hsn: ms.hsn,
+              qty: 1,
+              unit: 'Stage',
+              rate: taxableSubtotal,
+              amount: taxableSubtotal,
+              gstRate: 13.8
+            }
+          ],
+          notes: `Turnkey Solar EPC Project for ${customer?.name || 'Customer'}. PM Surya Ghar central CFA of ₹${centralSubsidy.toLocaleString('en-IN')} disbursed directly to consumer bank account.`,
+          terms: 'Payment due on delivery of respective milestone. Bank NEFT/RTGS/UPI accepted.'
+        },
+        include: { customer: true, project: true, payments: true }
+      });
+
+      createdInvoices.push(inv);
+    }
+
+    res.status(201).json({
+      message: `Generated ${createdInvoices.length} milestone invoice(s)`,
+      invoices: createdInvoices
+    });
+  } catch (error) {
+    console.error('Error generating milestone invoices:', error);
+    res.status(500).json({ error: 'Failed to generate milestone invoices' });
   }
 });
 

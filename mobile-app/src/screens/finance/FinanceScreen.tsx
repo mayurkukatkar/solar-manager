@@ -32,17 +32,25 @@ import {
   Layers,
   ChevronDown,
   ChevronUp,
+  FileText,
+  Briefcase,
 } from 'lucide-react-native';
 import { Header } from '../../components/Header';
+import { InvoicePdfModal } from '../../components/InvoicePdfModal';
 import { financeApi } from '../../api/endpoints';
 import { colors } from '../../theme/colors';
 
 export const FinanceScreen: React.FC<{ navigation?: any; route?: any }> = ({ navigation, route }) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState(route?.params?.customerName || '');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'OVERDUE' | 'UNPAID' | 'PARTIAL' | 'PAID'>('ALL');
+  const [milestoneFilter, setMilestoneFilter] = useState<'ALL' | 'ADVANCE' | 'MATERIAL_DELIVERY' | 'INSTALLATION' | 'COMMISSIONING'>('ALL');
   const [showMilestoneGuide, setShowMilestoneGuide] = useState(false);
+
+  // PDF Invoice Modal State
+  const [pdfModalVisible, setPdfModalVisible] = useState(false);
+  const [pdfTargetInvoice, setPdfTargetInvoice] = useState<any | null>(null);
 
   // Financial Stats
   const [stats, setStats] = useState({
@@ -71,8 +79,11 @@ export const FinanceScreen: React.FC<{ navigation?: any; route?: any }> = ({ nav
   const [expandedInvoiceId, setExpandedInvoiceId] = useState<string | null>(null);
 
   useEffect(() => {
+    if (route?.params?.customerName) {
+      setSearchQuery(route.params.customerName);
+    }
     fetchFinanceData();
-  }, []);
+  }, [route?.params]);
 
   const fetchFinanceData = async () => {
     try {
@@ -140,9 +151,24 @@ export const FinanceScreen: React.FC<{ navigation?: any; route?: any }> = ({ nav
       if (statusFilter === 'PARTIAL') return !isPaid && totalPaid > 0 && !isOverdue;
       if (statusFilter === 'PAID') return isPaid;
 
+      // 3. Pipeline Milestone Filter
+      if (milestoneFilter !== 'ALL') {
+        const curM = (inv.milestone || inv.milestoneTitle || '').toUpperCase();
+        if (milestoneFilter === 'ADVANCE' && !curM.includes('ADVANCE') && !curM.includes('TOKEN') && !curM.includes('STAGE 1')) return false;
+        if (milestoneFilter === 'MATERIAL_DELIVERY' && !curM.includes('MATERIAL') && !curM.includes('DELIVERY') && !curM.includes('STAGE 2')) return false;
+        if (milestoneFilter === 'INSTALLATION' && !curM.includes('INSTALLATION') && !curM.includes('STAGE 3')) return false;
+        if (milestoneFilter === 'COMMISSIONING' && !curM.includes('COMMISSIONING') && !curM.includes('DISCOM') && !curM.includes('STAGE 4')) return false;
+      }
+
       return true;
     });
-  }, [invoices, searchQuery, statusFilter]);
+  }, [invoices, searchQuery, statusFilter, milestoneFilter]);
+
+  // Open PDF Invoice Modal
+  const handleOpenPdfModal = (invoice: any) => {
+    setPdfTargetInvoice(invoice);
+    setPdfModalVisible(true);
+  };
 
   // Open Payment Modal
   const handleOpenPaymentModal = (invoice: any) => {
@@ -404,6 +430,31 @@ export const FinanceScreen: React.FC<{ navigation?: any; route?: any }> = ({ nav
               );
             })}
           </ScrollView>
+
+          {/* PIPELINE MILESTONE FILTER CHIPS */}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.statusChipsContainer, { marginTop: 8 }]}>
+            {([
+              { key: 'ALL', label: 'All Milestones' },
+              { key: 'ADVANCE', label: 'Stage 1: 20% Token' },
+              { key: 'MATERIAL_DELIVERY', label: 'Stage 2: 60% Material' },
+              { key: 'INSTALLATION', label: 'Stage 3: 15% Installation' },
+              { key: 'COMMISSIONING', label: 'Stage 4: 5% Commissioning' },
+            ] as const).map((mItem) => {
+              const isActive = milestoneFilter === mItem.key;
+              return (
+                <TouchableOpacity
+                  key={mItem.key}
+                  style={[styles.milestoneChip, isActive && styles.milestoneChipActive]}
+                  onPress={() => setMilestoneFilter(mItem.key)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.milestoneChipText, isActive && styles.milestoneChipTextActive]}>
+                    {mItem.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
         </View>
 
         {/* INVOICES SECTION */}
@@ -589,14 +640,23 @@ export const FinanceScreen: React.FC<{ navigation?: any; route?: any }> = ({ nav
 
                 {/* ACTION BUTTONS ROW */}
                 <View style={styles.cardActionsRow}>
+                  <TouchableOpacity
+                    style={styles.pdfInvoiceBtn}
+                    onPress={() => handleOpenPdfModal(inv)}
+                    activeOpacity={0.85}
+                  >
+                    <FileText size={14} color="#2563eb" style={{ marginRight: 4 }} />
+                    <Text style={styles.pdfInvoiceBtnText}>PDF Invoice</Text>
+                  </TouchableOpacity>
+
                   {!isPaid && (
                     <TouchableOpacity
                       style={styles.recordPayBtn}
                       onPress={() => handleOpenPaymentModal(inv)}
                       activeOpacity={0.85}
                     >
-                      <CreditCard size={15} color="#ffffff" style={{ marginRight: 6 }} />
-                      <Text style={styles.recordPayBtnText}>Record Payment</Text>
+                      <CreditCard size={14} color="#ffffff" style={{ marginRight: 4 }} />
+                      <Text style={styles.recordPayBtnText}>Record Pay</Text>
                     </TouchableOpacity>
                   )}
 
@@ -605,9 +665,9 @@ export const FinanceScreen: React.FC<{ navigation?: any; route?: any }> = ({ nav
                     onPress={() => handleSendWhatsAppReminder(inv)}
                     activeOpacity={0.85}
                   >
-                    <MessageCircle size={15} color="#15803d" style={{ marginRight: 6 }} />
+                    <MessageCircle size={14} color="#15803d" style={{ marginRight: 4 }} />
                     <Text style={styles.whatsappNoticeBtnText}>
-                      {isPaid ? 'Share Receipt on WA' : 'WhatsApp Notice'}
+                      {isPaid ? 'Share WA' : 'WA Notice'}
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -720,6 +780,16 @@ export const FinanceScreen: React.FC<{ navigation?: any; route?: any }> = ({ nav
           </View>
         </View>
       </Modal>
+
+      {/* PDF INVOICE PREVIEW & ACTIONS MODAL */}
+      <InvoicePdfModal
+        visible={pdfModalVisible}
+        onClose={() => {
+          setPdfModalVisible(false);
+          setPdfTargetInvoice(null);
+        }}
+        invoice={pdfTargetInvoice}
+      />
     </View>
   );
 };
@@ -1349,5 +1419,43 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '800',
     color: '#ffffff',
+  },
+  milestoneChip: {
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  milestoneChipActive: {
+    backgroundColor: '#0284c7',
+    borderColor: '#0284c7',
+  },
+  milestoneChipText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#64748b',
+  },
+  milestoneChipTextActive: {
+    color: '#ffffff',
+    fontWeight: '700',
+  },
+  pdfInvoiceBtn: {
+    flex: 1,
+    backgroundColor: '#eff6ff',
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  pdfInvoiceBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#2563eb',
   },
 });

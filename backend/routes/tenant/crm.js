@@ -48,8 +48,26 @@ router.get('/api/tenant/leads', requireTenantAuth, async (req, res) => {
       where,
       include: {
         assignee: true,
-        customer: true,
-        projects: { select: { id: true, name: true, status: true, capacity: true } },
+        customer: {
+          include: {
+            invoices: {
+              include: { payments: true },
+              orderBy: { createdAt: 'asc' }
+            }
+          }
+        },
+        projects: {
+          select: {
+            id: true,
+            name: true,
+            status: true,
+            capacity: true,
+            invoices: {
+              include: { payments: true },
+              orderBy: { createdAt: 'asc' }
+            }
+          }
+        },
         quotations: { select: { id: true, qNumber: true, total: true, status: true } }
       },
       orderBy: { createdAt: 'desc' }

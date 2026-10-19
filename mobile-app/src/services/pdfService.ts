@@ -685,6 +685,606 @@ export function generateDiscomHtml(type: string, data: any): string {
   `;
 }
 
+export interface InvoicePdfProps {
+  invoiceNumber: string;
+  invoiceDate: string;
+  dueDate: string;
+  milestoneTitle: string;
+  milestoneKey?: string;
+
+  companyName: string;
+  companyAddress: string;
+  companyPhone: string;
+  companyEmail: string;
+  companyGstin?: string;
+  companyPan?: string;
+  companyLogoUrl?: string;
+
+  customerName: string;
+  customerPhone: string;
+  customerEmail?: string;
+  customerAddress: string;
+  consumerNumber?: string;
+  discomName?: string;
+
+  projectName?: string;
+  projectCapacityKw?: number;
+  systemType?: string;
+  sanctionedLoad?: number;
+
+  subtotal: number;
+  taxRate: number;
+  taxAmount: number;
+  subsidyDeduction?: number;
+  grossTotal: number;
+  totalPaid: number;
+  balanceDue: number;
+  status: string;
+
+  items?: Array<{
+    description: string;
+    hsn?: string;
+    qty?: number;
+    unit?: string;
+    rate?: number;
+    amount?: number;
+    gstRate?: number;
+  }>;
+
+  payments?: Array<{
+    date?: string;
+    amount?: number;
+    mode?: string;
+    reference?: string;
+  }>;
+
+  bankDetails?: {
+    accountName: string;
+    bankName: string;
+    accountNumber: string;
+    ifsc: string;
+    upiId?: string;
+    branch?: string;
+  };
+
+  terms?: string;
+  notes?: string;
+}
+
+function numberToWordsINR(amount: number): string {
+  const rounded = Math.round(amount || 0);
+  if (rounded === 0) return 'Rupees Zero Only';
+
+  const singleDigits = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+  const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+
+  function convertTwoDigits(n: number): string {
+    if (n < 20) return singleDigits[n];
+    return tens[Math.floor(n / 10)] + (n % 10 !== 0 ? ' ' + singleDigits[n % 10] : '');
+  }
+
+  function convertThreeDigits(n: number): string {
+    if (n === 0) return '';
+    if (n < 100) return convertTwoDigits(n);
+    return singleDigits[Math.floor(n / 100)] + ' Hundred' + (n % 100 !== 0 ? ' and ' + convertTwoDigits(n % 100) : '');
+  }
+
+  let crore = Math.floor(rounded / 10000000);
+  let rem = rounded % 10000000;
+  let lakh = Math.floor(rem / 100000);
+  rem = rem % 100000;
+  let thousand = Math.floor(rem / 1000);
+  let hundreds = rem % 1000;
+
+  let words = '';
+  if (crore > 0) words += convertTwoDigits(crore) + ' Crore ';
+  if (lakh > 0) words += convertTwoDigits(lakh) + ' Lakh ';
+  if (thousand > 0) words += convertTwoDigits(thousand) + ' Thousand ';
+  if (hundreds > 0) words += convertThreeDigits(hundreds) + ' ';
+
+  return 'Rupees ' + words.trim() + ' Only';
+}
+
+export function generateInvoiceHtml(data: InvoicePdfProps): string {
+  const formatInr = (n: number) => Math.round(n || 0).toLocaleString('en-IN');
+  const isPaid = data.status === 'PAID' || data.balanceDue <= 0;
+  const isOverdue = data.status === 'OVERDUE';
+  const statusColor = isPaid ? '#059669' : isOverdue ? '#e11d48' : '#d97706';
+  const statusBg = isPaid ? '#ecfdf5' : isOverdue ? '#fff1f2' : '#fffbeb';
+  const statusBorder = isPaid ? '#a7f3d0' : isOverdue ? '#fecdd3' : '#fde68a';
+
+  const defaultItems = [
+    {
+      description: `${data.milestoneTitle || 'Solar EPC Milestone Work'} (${data.projectCapacityKw || 3.3} kWp Grid-Tied System)`,
+      hsn: '8541',
+      qty: 1,
+      unit: 'Stage',
+      rate: data.subtotal || data.grossTotal,
+      amount: data.subtotal || data.grossTotal,
+      gstRate: data.taxRate || 13.8,
+    },
+  ];
+
+  const items = data.items && data.items.length > 0 ? data.items : defaultItems;
+  const halfGstRate = ((data.taxRate || 13.8) / 2).toFixed(1);
+  const halfGstAmount = Math.round((data.taxAmount || (data.grossTotal - data.subtotal)) / 2);
+  const amountInWords = numberToWordsINR(data.grossTotal);
+
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Tax Invoice - ${data.invoiceNumber}</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 10mm 12mm;
+    }
+    * {
+      box-sizing: border-box;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      color: #0f172a;
+      background: #ffffff;
+      margin: 0;
+      padding: 0;
+      font-size: 9.5pt;
+      line-height: 1.4;
+    }
+    .header-table {
+      width: 100%;
+      border-collapse: collapse;
+      border-bottom: 2px solid #0f172a;
+      padding-bottom: 12px;
+      margin-bottom: 12px;
+    }
+    .company-title {
+      font-size: 18pt;
+      font-weight: 900;
+      color: #0f172a;
+      letter-spacing: -0.5px;
+      margin: 0 0 4px 0;
+    }
+    .company-sub {
+      font-size: 8.5pt;
+      color: #059669;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 4px;
+    }
+    .company-meta {
+      font-size: 8.5pt;
+      color: #475569;
+      line-height: 1.35;
+    }
+    .invoice-title-box {
+      text-align: right;
+    }
+    .invoice-title {
+      font-size: 20pt;
+      font-weight: 900;
+      color: #059669;
+      letter-spacing: 1px;
+      margin: 0 0 6px 0;
+    }
+    .status-badge {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 4px;
+      font-size: 8.5pt;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      border: 1px solid ${statusBorder};
+      background: ${statusBg};
+      color: ${statusColor};
+      margin-bottom: 8px;
+    }
+    .meta-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 14px;
+    }
+    .meta-table td {
+      vertical-align: top;
+      width: 50%;
+      padding: 10px;
+      border: 1px solid #e2e8f0;
+      background: #fafafa;
+    }
+    .meta-heading {
+      font-size: 8pt;
+      font-weight: 800;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+      border-bottom: 1px solid #e2e8f0;
+      padding-bottom: 4px;
+    }
+    .party-name {
+      font-size: 11pt;
+      font-weight: 800;
+      color: #0f172a;
+      margin-bottom: 4px;
+    }
+    .party-meta {
+      font-size: 8.5pt;
+      color: #334155;
+      line-height: 1.4;
+    }
+    .project-banner {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      border-radius: 6px;
+      padding: 8px 12px;
+      margin-bottom: 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .project-banner-title {
+      font-size: 9.5pt;
+      font-weight: 800;
+      color: #1e40af;
+    }
+    .project-banner-sub {
+      font-size: 8.5pt;
+      color: #3b82f6;
+    }
+    .milestone-badge-bar {
+      background: #ecfdf5;
+      border: 1px solid #a7f3d0;
+      border-radius: 6px;
+      padding: 8px 12px;
+      margin-bottom: 14px;
+    }
+    .milestone-title {
+      font-size: 10pt;
+      font-weight: 800;
+      color: #065f46;
+    }
+    .milestone-sub {
+      font-size: 8.5pt;
+      color: #047857;
+      margin-top: 2px;
+    }
+    .items-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 14px;
+    }
+    .items-table th {
+      background: #0f172a;
+      color: #ffffff;
+      font-size: 8pt;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 8px 10px;
+      border: 1px solid #0f172a;
+    }
+    .items-table td {
+      border: 1px solid #e2e8f0;
+      padding: 8px 10px;
+      font-size: 9pt;
+      color: #1e293b;
+    }
+    .totals-container {
+      width: 100%;
+      display: flex;
+      justify-content: flex-end;
+      margin-bottom: 14px;
+    }
+    .totals-table {
+      width: 45%;
+      border-collapse: collapse;
+    }
+    .totals-table td {
+      padding: 6px 10px;
+      font-size: 9pt;
+      border-bottom: 1px solid #f1f5f9;
+    }
+    .totals-label {
+      color: #64748b;
+      font-weight: 600;
+    }
+    .totals-val {
+      text-align: right;
+      font-weight: 700;
+      color: #0f172a;
+    }
+    .grand-total-row {
+      background: #059669;
+      color: #ffffff;
+    }
+    .grand-total-row td {
+      padding: 10px;
+      font-size: 11pt;
+      font-weight: 900;
+      color: #ffffff;
+      border: none;
+    }
+    .words-box {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 8px 12px;
+      margin-bottom: 14px;
+      font-size: 8.5pt;
+      color: #334155;
+    }
+    .payments-box {
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 10px 12px;
+      margin-bottom: 14px;
+      background: #ffffff;
+    }
+    .payments-title {
+      font-size: 8.5pt;
+      font-weight: 800;
+      color: #059669;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+    }
+    .payments-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .payments-table th, .payments-table td {
+      padding: 5px 8px;
+      font-size: 8.5pt;
+      border-bottom: 1px solid #f1f5f9;
+      text-align: left;
+    }
+    .bank-and-sign {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 14px;
+    }
+    .bank-and-sign td {
+      vertical-align: top;
+      width: 50%;
+      padding: 10px;
+      border: 1px solid #e2e8f0;
+    }
+    .sign-box {
+      text-align: right;
+      height: 90px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .terms-text {
+      font-size: 7.5pt;
+      color: #64748b;
+      line-height: 1.35;
+      margin-top: 14px;
+      border-top: 1px solid #e2e8f0;
+      padding-top: 8px;
+    }
+  </style>
+</head>
+<body>
+  <!-- HEADER -->
+  <table class="header-table">
+    <tr>
+      <td style="vertical-align: top; width: 60%;">
+        <div class="company-title">${data.companyName || 'Solar Solutions Pvt Ltd'}</div>
+        <div class="company-sub">Authorized Solar EPC Partner & Turnkey Contractor</div>
+        <div class="company-meta">
+          ${data.companyAddress || 'Corporate Office, Solar Park, Maharashtra'}<br>
+          📞 ${data.companyPhone || '+91 98765 43210'} | ✉️ ${data.companyEmail || 'contact@solarmanager.in'}<br>
+          ${data.companyGstin ? `<strong>GSTIN:</strong> ${data.companyGstin}` : '<strong>GSTIN:</strong> 27AABCS1429B1Z5'} | 
+          ${data.companyPan ? `<strong>PAN:</strong> ${data.companyPan}` : '<strong>PAN:</strong> AABCS1429B'}
+        </div>
+      </td>
+      <td style="vertical-align: top; width: 40%;" class="invoice-title-box">
+        <div class="invoice-title">TAX INVOICE</div>
+        <div><span class="status-badge">${isPaid ? 'PAID IN FULL' : isOverdue ? 'OVERDUE' : data.status || 'UNPAID'}</span></div>
+        <div class="company-meta">
+          <strong>Invoice No:</strong> ${data.invoiceNumber}<br>
+          <strong>Invoice Date:</strong> ${data.invoiceDate}<br>
+          <strong>Due Date:</strong> ${data.dueDate}<br>
+          <strong>Reverse Charge:</strong> No
+        </div>
+      </td>
+    </tr>
+  </table>
+
+  <!-- BILL TO & SHIP TO -->
+  <table class="meta-table">
+    <tr>
+      <td>
+        <div class="meta-heading">Billed To (Client / Customer)</div>
+        <div class="party-name">${data.customerName || 'Valued Customer'}</div>
+        <div class="party-meta">
+          📞 Mobile: ${data.customerPhone || 'N/A'}<br>
+          ${data.customerEmail ? `✉️ Email: ${data.customerEmail}<br>` : ''}
+          📍 Installation Site: ${data.customerAddress || 'Site Location, Maharashtra'}<br>
+          🏛️ State: Maharashtra (Code: 27)
+        </div>
+      </td>
+      <td>
+        <div class="meta-heading">Project & Statutory Profile</div>
+        <div class="party-name">${data.projectName || `${data.customerName}'s Rooftop Solar`}</div>
+        <div class="party-meta">
+          ⚡ System Capacity: <strong>${data.projectCapacityKw || 3.3} kWp Grid-Tied</strong><br>
+          🔌 DISCOM Consumer No: <strong>${data.consumerNumber || 'N/A'}</strong><br>
+          🏢 Utility Provider: ${data.discomName || 'MSEDCL (Mahavitaran)'}<br>
+          🏛️ Scheme: PM Surya Ghar Muft Bijli Yojana
+        </div>
+      </td>
+    </tr>
+  </table>
+
+  <!-- MILESTONE STAGE BANNER -->
+  <div class="milestone-badge-bar">
+    <div class="milestone-title">📍 Milestone: ${data.milestoneTitle || 'Milestone Payment'}</div>
+    <div class="milestone-sub">
+      Solar EPC Standard Contract Milestone • Turnkey Rooftop Supply, Execution & Statutory Commissioning
+    </div>
+  </div>
+
+  <!-- ITEMS TABLE -->
+  <table class="items-table">
+    <thead>
+      <tr>
+        <th style="width: 5%;">#</th>
+        <th style="width: 48%; text-align: left;">Item Description</th>
+        <th style="width: 10%;">HSN/SAC</th>
+        <th style="width: 7%;">Qty</th>
+        <th style="width: 15%; text-align: right;">Rate (₹)</th>
+        <th style="width: 15%; text-align: right;">Amount (₹)</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${items
+        .map(
+          (it, idx) => `
+        <tr>
+          <td style="text-align: center; color: #64748b;">${idx + 1}</td>
+          <td>
+            <strong>${it.description}</strong>
+          </td>
+          <td style="text-align: center; font-family: monospace;">${it.hsn || '8541'}</td>
+          <td style="text-align: center;">${it.qty || 1} ${it.unit || 'Stage'}</td>
+          <td style="text-align: right;">₹${formatInr(it.rate || it.amount || 0)}</td>
+          <td style="text-align: right; font-weight: 700;">₹${formatInr(it.amount || 0)}</td>
+        </tr>
+      `
+        )
+        .join('')}
+    </tbody>
+  </table>
+
+  <!-- TOTALS BREAKDOWN -->
+  <div class="totals-container">
+    <table class="totals-table">
+      <tr>
+        <td class="totals-label">Taxable Subtotal</td>
+        <td class="totals-val">₹${formatInr(data.subtotal)}</td>
+      </tr>
+      <tr>
+        <td class="totals-label">CGST (${halfGstRate}%)</td>
+        <td class="totals-val">₹${formatInr(halfGstAmount)}</td>
+      </tr>
+      <tr>
+        <td class="totals-label">SGST (${halfGstRate}%)</td>
+        <td class="totals-val">₹${formatInr(halfGstAmount)}</td>
+      </tr>
+      <tr class="grand-total-row">
+        <td>Total Invoice Value</td>
+        <td style="text-align: right;">₹${formatInr(data.grossTotal)}</td>
+      </tr>
+      ${
+        data.totalPaid > 0
+          ? `
+        <tr>
+          <td class="totals-label" style="color: #059669; font-weight: 700;">Less: Total Paid to Date</td>
+          <td class="totals-val" style="color: #059669; font-weight: 800;">-₹${formatInr(data.totalPaid)}</td>
+        </tr>
+      `
+          : ''
+      }
+      <tr>
+        <td class="totals-label" style="font-weight: 800; font-size: 10pt; color: #0f172a;">Balance Due</td>
+        <td class="totals-val" style="font-weight: 900; font-size: 11pt; color: ${data.balanceDue > 0 ? '#d97706' : '#059669'};">
+          ₹${formatInr(data.balanceDue)}
+        </td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- AMOUNT IN WORDS -->
+  <div class="words-box">
+    <strong>Invoice Amount in Words:</strong> ${amountInWords}
+  </div>
+
+  <!-- PAYMENTS HISTORY (IF ANY) -->
+  ${
+    data.payments && data.payments.length > 0
+      ? `
+    <div class="payments-box">
+      <div class="payments-title">Recorded Payment Transactions</div>
+      <table class="payments-table">
+        <thead>
+          <tr style="color: #64748b; font-size: 8pt; text-transform: uppercase;">
+            <th>Date</th>
+            <th>Mode</th>
+            <th>Reference / UTR</th>
+            <th style="text-align: right;">Amount Paid</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${data.payments
+            .map(
+              (p) => `
+            <tr>
+              <td>${p.date ? new Date(p.date).toLocaleDateString('en-IN') : 'Confirmed'}</td>
+              <td><strong>${p.mode || 'UPI'}</strong></td>
+              <td>${p.reference || 'Standard Transfer'}</td>
+              <td style="text-align: right; color: #059669; font-weight: 800;">₹${formatInr(p.amount || 0)}</td>
+            </tr>
+          `
+            )
+            .join('')}
+        </tbody>
+      </table>
+    </div>
+  `
+      : ''
+  }
+
+  <!-- BANK DETAILS & SIGNATURE -->
+  <table class="bank-and-sign">
+    <tr>
+      <td>
+        <div class="meta-heading">Bank Transfer & UPI Remittance</div>
+        <div class="party-meta" style="line-height: 1.5;">
+          <strong>Account Name:</strong> ${data.bankDetails?.accountName || data.companyName || 'Solar Solutions Pvt Ltd'}<br>
+          <strong>Bank Name:</strong> ${data.bankDetails?.bankName || 'HDFC Bank Ltd'}<br>
+          <strong>Account Number:</strong> ${data.bankDetails?.accountNumber || '50200088992211'}<br>
+          <strong>IFSC Code:</strong> ${data.bankDetails?.ifsc || 'HDFC0001234'}<br>
+          <strong>UPI ID:</strong> ${data.bankDetails?.upiId || 'solarmanager@hdfcbank'}
+        </div>
+      </td>
+      <td>
+        <div class="meta-heading">Authorized Signatory</div>
+        <div class="sign-box">
+          <div style="font-size: 8pt; color: #64748b;">
+            For <strong>${data.companyName || 'Solar Solutions Pvt Ltd'}</strong>
+          </div>
+          <div style="text-align: center; color: #94a3b8; font-style: italic; font-size: 8pt;">
+            [Digitally Verified Solar ERP Invoice]
+          </div>
+          <div style="font-size: 8.5pt; font-weight: 700; color: #0f172a;">
+            Authorized Signatory
+          </div>
+        </div>
+      </td>
+    </tr>
+  </table>
+
+  <!-- TERMS -->
+  <div class="terms-text">
+    <strong>Terms & Conditions:</strong><br>
+    1. Payment is due within the stipulated due date. Interest @ 18% p.a. applicable on overdue milestone payments.<br>
+    2. Solar PV modules and inverters are warranted by respective OEM manufacturers under PM Surya Ghar guidelines.<br>
+    3. Net-metering clearance and Central CFA Subsidy DBT release are governed by DISCOM & MNRE portal SLAs.<br>
+    4. Subject to local jurisdiction. This is a computer-generated GST tax invoice.
+  </div>
+</body>
+</html>
+  `;
+}
+
 export async function previewPdf(html: string): Promise<boolean> {
   try {
     await Print.printAsync({ html });
