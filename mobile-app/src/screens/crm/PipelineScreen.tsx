@@ -201,12 +201,12 @@ export const PipelineScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
           </Text>
         </View>
         <TouchableOpacity
-          style={styles.scanBillBtn}
+          style={styles.addLeadHeaderBtn}
           onPress={handleOpenLeadCapture}
           activeOpacity={0.85}
         >
-          <Camera size={16} color="#ffffff" />
-          <Text style={styles.scanBillBtnText}>Scan Bill</Text>
+          <Plus size={16} color="#ffffff" strokeWidth={2.8} />
+          <Text style={styles.addLeadHeaderBtnText}>New Lead</Text>
         </TouchableOpacity>
       </View>
 
@@ -308,8 +308,8 @@ export const PipelineScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
               onPress={handleOpenLeadCapture}
               activeOpacity={0.8}
             >
-              <Plus size={16} color="#ffffff" />
-              <Text style={styles.emptyActionText}>Scan Electricity Bill</Text>
+              <Plus size={16} color="#ffffff" strokeWidth={2.5} />
+              <Text style={styles.emptyActionText}>Add New Prospect</Text>
             </TouchableOpacity>
           </View>
         ) : (
@@ -470,21 +470,21 @@ const styles = StyleSheet.create({
     marginTop: 2,
     fontWeight: '500',
   },
-  scanBillBtn: {
+  addLeadHeaderBtn: {
     backgroundColor: '#2563eb',
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 9,
+    paddingHorizontal: 13,
+    paddingVertical: 8,
     borderRadius: 8,
-    gap: 6,
+    gap: 5,
     shadowColor: '#2563eb',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 4,
     elevation: 3,
   },
-  scanBillBtnText: {
+  addLeadHeaderBtnText: {
     color: '#ffffff',
     fontSize: 12,
     fontWeight: '800',
