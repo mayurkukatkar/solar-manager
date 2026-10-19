@@ -32,6 +32,9 @@ export const LoginScreen: React.FC = () => {
     forceResetPassword,
     sessionExpired,
     clearSessionExpired,
+    accountSuspended,
+    accountSuspendedMessage,
+    clearAccountSuspended,
   } = useAuth();
 
   const [email, setEmail] = useState('');
@@ -125,6 +128,22 @@ export const LoginScreen: React.FC = () => {
             </Text>
             <TouchableOpacity onPress={clearSessionExpired} style={{ padding: 4 }}>
               <X size={14} color="#64748b" />
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* ACCOUNT SUSPENDED BANNER */}
+        {accountSuspended && (
+          <View style={styles.suspendedBanner}>
+            <AlertCircle size={16} color="#e11d48" style={{ marginRight: 8, marginTop: 2 }} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.suspendedBannerTitle}>ACCOUNT SUSPENDED</Text>
+              <Text style={styles.suspendedBannerText}>
+                {accountSuspendedMessage || 'Your organization account is suspended by platform administrator.'}
+              </Text>
+            </View>
+            <TouchableOpacity onPress={clearAccountSuspended} style={{ padding: 4 }}>
+              <X size={14} color="#be123c" />
             </TouchableOpacity>
           </View>
         )}
@@ -447,5 +466,29 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: '#64748b',
+  },
+  suspendedBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#fff1f2',
+    borderWidth: 1,
+    borderColor: '#fecdd3',
+    padding: 12,
+    borderRadius: 14,
+    marginBottom: 16,
+    width: '100%',
+  },
+  suspendedBannerTitle: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: '#be123c',
+    letterSpacing: 0.5,
+    marginBottom: 2,
+  },
+  suspendedBannerText: {
+    fontSize: 12,
+    color: '#9f1239',
+    lineHeight: 16,
+    fontWeight: '500',
   },
 });

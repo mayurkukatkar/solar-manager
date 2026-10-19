@@ -47,9 +47,14 @@ const STORAGE_AUTH_TOKEN_KEY = '@solar_user_token';
 
 let currentBaseUrl = DEFAULT_API_URL;
 let unauthorizedHandler: (() => void) | null = null;
+let suspendedHandler: ((message: string) => void) | null = null;
 
 export const setUnauthorizedHandler = (handler: () => void) => {
   unauthorizedHandler = handler;
+};
+
+export const setSuspendedHandler = (handler: (message: string) => void) => {
+  suspendedHandler = handler;
 };
 
 // Security check: validate URL structure and enforce HTTPS for external endpoints
@@ -110,11 +115,27 @@ apiClient.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Response Interceptor: Handle 401 Session Expiry & Format Sanitized Errors
+// Response Interceptor: Handle 401 Session Expiry, 403 Account Suspension & Format Sanitized Errors
 apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
-    if (error.response?.status === 401) {
+    const isSuspended =
+      error.response?.status === 403 &&
+      (error.response?.data?.code === 'TENANT_SUSPENDED' ||
+       error.response?.data?.isSuspended ||
+       String(error.response?.data?.error || '').toLowerCase().includes('suspended'));
+
+    if (isSuspended) {
+      // Organization account frozen by Super Admin
+      await SafeStorage.removeItem(STORAGE_AUTH_TOKEN_KEY);
+      await SafeStorage.removeItem('@solar_user_profile');
+      const suspendMsg =
+        error.response?.data?.error ||
+        'Account Suspended: Your organization account has been suspended by the platform administrator.';
+      if (suspendedHandler) {
+        suspendedHandler(suspendMsg);
+      }
+    } else if (error.response?.status === 401) {
       // Session expired or revoked
       await SafeStorage.removeItem(STORAGE_AUTH_TOKEN_KEY);
       if (unauthorizedHandler) {

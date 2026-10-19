@@ -6,7 +6,7 @@ const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
 const prisma = require('../../db');
-const { requireSuperAdmin } = require('../../middleware/auth');
+const { requireSuperAdmin, invalidateTenantStatusCache } = require('../../middleware/auth');
 
 // 3. Get All Tenants
 router.get('/tenants', requireSuperAdmin, async (req, res) => {
@@ -140,6 +140,8 @@ router.put('/tenants/:id/status', requireSuperAdmin, async (req, res) => {
       where: { id: req.params.id },
       data: { status }
     });
+    // Immediately invalidate in-memory status cache so web & mobile get blocked instantly
+    invalidateTenantStatusCache(req.params.id);
     res.json({ message: `Tenant status updated to ${status}`, tenant });
   } catch (error) {
     console.error(error);

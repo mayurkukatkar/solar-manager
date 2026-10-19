@@ -105,6 +105,45 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
     });
   };
 
+  // Verify active tenant status on mount & route change
+  useEffect(() => {
+    let isMounted = true;
+    const verifyTenantStatus = async () => {
+      try {
+        const res = await axios.get(
+          `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/me`,
+          { withCredentials: true }
+        );
+        if (isMounted && res.data?.user?.tenant?.status === 'SUSPENDED') {
+          localStorage.removeItem('token');
+          localStorage.removeItem('auth_token');
+          router.replace('/suspended');
+        }
+      } catch (err: any) {
+        if (isMounted) {
+          if (
+            err.response?.status === 403 &&
+            (err.response?.data?.code === 'TENANT_SUSPENDED' ||
+             err.response?.data?.isSuspended ||
+             String(err.response?.data?.error || '').toLowerCase().includes('suspended'))
+          ) {
+            localStorage.removeItem('token');
+            localStorage.removeItem('auth_token');
+            router.replace('/suspended');
+          } else if (err.response?.status === 401) {
+            localStorage.removeItem('token');
+            localStorage.removeItem('auth_token');
+            router.replace('/login');
+          }
+        }
+      }
+    };
+    verifyTenantStatus();
+    return () => {
+      isMounted = false;
+    };
+  }, [pathname, router]);
+
   // Initialize auto-expansion based on active path & close mobile drawer
   useEffect(() => {
     const activeGroup = MENU_GROUPS.find(g => 

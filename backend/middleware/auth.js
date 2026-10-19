@@ -17,8 +17,39 @@ const requireSuperAdmin = (req, res, next) => {
   }
 };
 
-const requireTenantAuth = (req, res, next) => {
-  const token = req.cookies.tenant_token || (req.headers.authorization?.startsWith('Bearer ') ? req.headers.authorization.split(' ')[1] : null);
+// In-Memory cache for tenant status to avoid redundant DB queries on every sub-second call
+// Automatically invalidated immediately when Super Admin changes tenant status
+const tenantStatusCache = new Map();
+const TENANT_CACHE_TTL_MS = 5000; // 5-second TTL fallback
+
+const invalidateTenantStatusCache = (tenantId) => {
+  if (tenantId) {
+    tenantStatusCache.delete(tenantId);
+  } else {
+    tenantStatusCache.clear();
+  }
+};
+
+const getTenantStatus = async (tenantId) => {
+  if (!tenantId) return 'NOT_FOUND';
+  const now = Date.now();
+  const cached = tenantStatusCache.get(tenantId);
+  if (cached && (now - cached.cachedAt) < TENANT_CACHE_TTL_MS) {
+    return cached.status;
+  }
+
+  const tenant = await prisma.tenant.findUnique({
+    where: { id: tenantId },
+    select: { status: true, name: true }
+  });
+
+  const status = tenant ? tenant.status : 'NOT_FOUND';
+  tenantStatusCache.set(tenantId, { status, cachedAt: now });
+  return status;
+};
+
+const requireTenantAuth = async (req, res, next) => {
+  const token = req.cookies?.tenant_token || (req.headers.authorization?.startsWith('Bearer ') ? req.headers.authorization.split(' ')[1] : null);
   if (!token) return res.status(401).json({ error: 'Unauthorized: Tenant Access Required' });
   
   try {
@@ -29,6 +60,32 @@ const requireTenantAuth = (req, res, next) => {
     if (!payload.tenantId) {
        return res.status(403).json({ error: 'Forbidden: No tenant context' });
     }
+
+    // LIVE TENANT STATUS CHECK - Enforce Super Admin Suspension Immediately
+    const status = await getTenantStatus(payload.tenantId);
+    if (status === 'SUSPENDED') {
+      return res.status(403).json({
+        error: 'Account Suspended: Your organization account has been suspended by the platform administrator. Access to solar operations and data has been disabled.',
+        code: 'TENANT_SUSPENDED',
+        isSuspended: true
+      });
+    }
+
+    if (status === 'CANCELLED') {
+      return res.status(403).json({
+        error: 'Account Cancelled: Your organization subscription has ended. Please contact platform administration.',
+        code: 'TENANT_CANCELLED',
+        isSuspended: true
+      });
+    }
+
+    if (status === 'NOT_FOUND') {
+      return res.status(404).json({
+        error: 'Tenant organization not found or removed.',
+        code: 'TENANT_NOT_FOUND'
+      });
+    }
+
     req.user = payload;
     next();
   } catch (err) {
@@ -89,4 +146,11 @@ const logAudit = async (req, action, entity, entityId = null, details = null) =>
   }
 };
 
-module.exports = { requireSuperAdmin, requireTenantAuth, requirePermission, logAudit, JWT_SECRET };
+module.exports = {
+  requireSuperAdmin,
+  requireTenantAuth,
+  requirePermission,
+  logAudit,
+  invalidateTenantStatusCache,
+  JWT_SECRET
+};

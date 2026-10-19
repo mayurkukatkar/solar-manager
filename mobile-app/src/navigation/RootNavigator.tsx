@@ -20,6 +20,7 @@ import { FinanceScreen } from '../screens/finance/FinanceScreen';
 import { ModulesScreen } from '../screens/modules/ModulesScreen';
 import { FieldProfileScreen } from '../screens/profile/FieldProfileScreen';
 import { LeadCaptureModal } from '../screens/crm/LeadCaptureModal';
+import { AccountSuspendedModal } from '../components/AccountSuspendedModal';
 import { colors } from '../theme/colors';
 
 export const navigationRef = createNavigationContainerRef<any>();
@@ -136,7 +137,14 @@ const MainTabNavigator: React.FC = () => {
 };
 
 export const RootNavigator: React.FC = () => {
-  const { user, isLoading } = useAuth();
+  const {
+    user,
+    isLoading,
+    accountSuspended,
+    accountSuspendedMessage,
+    clearAccountSuspended,
+    checkServerConnection,
+  } = useAuth();
 
   if (isLoading) {
     return (
@@ -147,20 +155,32 @@ export const RootNavigator: React.FC = () => {
   }
 
   return (
-    <NavigationContainer ref={navigationRef}>
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
-        {!user ? (
-          <Stack.Screen name="Login" component={LoginScreen} />
-        ) : (
-          <>
-            <Stack.Screen name="MainTabs" component={MainTabNavigator} />
-            <Stack.Screen name="QuickQuote" component={QuickQuoteScreen} />
-            <Stack.Screen name="Modules" component={ModulesScreen} />
-            <Stack.Screen name="FinanceDetail" component={FinanceScreen} />
-          </>
-        )}
-      </Stack.Navigator>
-    </NavigationContainer>
+    <>
+      <NavigationContainer ref={navigationRef}>
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+          {!user ? (
+            <Stack.Screen name="Login" component={LoginScreen} />
+          ) : (
+            <>
+              <Stack.Screen name="MainTabs" component={MainTabNavigator} />
+              <Stack.Screen name="QuickQuote" component={QuickQuoteScreen} />
+              <Stack.Screen name="Modules" component={ModulesScreen} />
+              <Stack.Screen name="FinanceDetail" component={FinanceScreen} />
+            </>
+          )}
+        </Stack.Navigator>
+      </NavigationContainer>
+
+      {/* GLOBAL ACCOUNT SUSPENSION MODAL */}
+      <AccountSuspendedModal
+        visible={accountSuspended}
+        message={accountSuspendedMessage}
+        onCheckAgain={async () => {
+          await checkServerConnection();
+        }}
+        onDismiss={clearAccountSuspended}
+      />
+    </>
   );
 };
 

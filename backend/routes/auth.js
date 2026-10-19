@@ -8,12 +8,38 @@ const { JWT_SECRET } = require('../middleware/auth');
 router.post('/login', async (req, res) => {
   const { email, password } = req.body;
   try {
-    const user = await prisma.user.findUnique({ where: { email } });
+    const user = await prisma.user.findUnique({
+      where: { email },
+      include: {
+        tenant: {
+          select: { id: true, name: true, status: true }
+        }
+      }
+    });
     if (!user) return res.status(401).json({ error: 'Invalid credentials' });
 
     const validPassword = await bcrypt.compare(password, user.password);
     if (!validPassword) {
       return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    // ENFORCE SUSPENSION: Block suspended or cancelled tenant accounts
+    if (user.role !== 'SUPER_ADMIN' && user.tenant) {
+      if (user.tenant.status === 'SUSPENDED') {
+        return res.status(403).json({
+          error: 'Account Suspended: Your company account has been suspended by the platform administrator. Access to solar management operations is disabled.',
+          code: 'TENANT_SUSPENDED',
+          isSuspended: true
+        });
+      }
+
+      if (user.tenant.status === 'CANCELLED') {
+        return res.status(403).json({
+          error: 'Account Cancelled: Your company subscription has ended. Please contact platform administration.',
+          code: 'TENANT_CANCELLED',
+          isSuspended: true
+        });
+      }
     }
 
     if (user.mustChangePassword) {
@@ -68,7 +94,7 @@ router.post('/force-reset-password', async (req, res) => {
 });
 
 router.get('/me', async (req, res) => {
-  const token = req.cookies.tenant_token || req.cookies.super_admin_token || (req.headers.authorization?.startsWith('Bearer ') ? req.headers.authorization.split(' ')[1] : null);
+  const token = req.cookies?.tenant_token || req.cookies?.super_admin_token || (req.headers.authorization?.startsWith('Bearer ') ? req.headers.authorization.split(' ')[1] : null);
   if (!token) return res.status(401).json({ error: 'Not authenticated' });
   try {
     const payload = jwt.verify(token, JWT_SECRET);
@@ -86,12 +112,33 @@ router.get('/me', async (req, res) => {
             name: true,
             city: true,
             state: true,
-            logoUrl: true
+            logoUrl: true,
+            status: true
           }
         }
       }
     });
     if (!user) return res.status(404).json({ error: 'User not found' });
+
+    // ENFORCE SUSPENSION on profile validation
+    if (user.role !== 'SUPER_ADMIN' && user.tenant?.status === 'SUSPENDED') {
+      return res.status(403).json({
+        error: 'Account Suspended: Your company account has been suspended by the platform administrator.',
+        code: 'TENANT_SUSPENDED',
+        isSuspended: true,
+        user
+      });
+    }
+
+    if (user.role !== 'SUPER_ADMIN' && user.tenant?.status === 'CANCELLED') {
+      return res.status(403).json({
+        error: 'Account Cancelled: Your company subscription has ended.',
+        code: 'TENANT_CANCELLED',
+        isSuspended: true,
+        user
+      });
+    }
+
     res.json({ user });
   } catch (err) {
     res.status(401).json({ error: 'Invalid session' });
