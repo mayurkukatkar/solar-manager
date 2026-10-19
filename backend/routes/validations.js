@@ -28,7 +28,7 @@ const createLeadSchema = z.object({
   mobile: z.string().min(10, "Valid mobile is required"),
   company: z.string().nullish().or(z.literal('')),
   source: z.string().nullish().or(z.literal('')),
-  estimatedCap: z.number().nullish()
+  estimatedCap: z.union([z.number(), z.string()]).nullish()
 });
 
 // Inventory

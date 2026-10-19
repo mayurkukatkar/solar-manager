@@ -28,8 +28,10 @@ import {
   TrendingUp,
   IndianRupee,
   Calendar,
+  Receipt,
 } from 'lucide-react-native';
 import { crmApi } from '../../api/endpoints';
+import { offlineSyncService } from '../../services/offlineSyncService';
 import { LeadCaptureModal } from './LeadCaptureModal';
 import { QuotationBuilderModal } from './QuotationBuilderModal';
 import { CustomerOnboardingModal } from './CustomerOnboardingModal';
@@ -68,10 +70,42 @@ export const PipelineScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
 
   const fetchLeads = async () => {
     try {
-      const res = await crmApi.getLeads({ all: true }).catch(() => null);
-      if (res && Array.isArray(res.leads)) {
-        setLeads(res.leads);
-      }
+      const [res, drafts] = await Promise.all([
+        crmApi.getLeads({ all: true }).catch((err) => {
+          console.warn('Leads fetch notice:', err.message);
+          return null;
+        }),
+        offlineSyncService.getDraftLeads().catch(() => []),
+      ]);
+
+      const serverLeads = (res && Array.isArray(res.leads)) ? res.leads : [];
+      
+      const draftLeadsFormatted = (drafts || []).map((d: any) => ({
+        id: d.localId,
+        name: d.name,
+        mobile: d.mobile,
+        address: d.address,
+        city: d.city,
+        pincode: d.pincode,
+        estimatedCap: d.recommendedKw,
+        monthlyBill: d.monthlyBill,
+        sanctionedLoad: d.sanctionedLoadKw,
+        status: 'NEW',
+        stage: 'NEW',
+        isDraft: true,
+        consumerNumber: d.consumerNumber,
+        notes: `Consumer No: ${d.consumerNumber || 'N/A'}, BU: ${d.bu || 'N/A'} (Draft)`,
+        createdAt: d.savedAt || new Date().toISOString(),
+      }));
+
+      const merged = [
+        ...draftLeadsFormatted.filter(
+          (draft: any) => !serverLeads.some((sl: any) => sl.mobile === draft.mobile)
+        ),
+        ...serverLeads,
+      ];
+
+      setLeads(merged);
     } catch (err: any) {
       console.warn('Leads fetch notice:', err.message);
     } finally {
@@ -96,7 +130,7 @@ export const PipelineScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
   };
 
   const handleLeadCreated = (newLead: any) => {
-    setLeads((prev) => [newLead, ...prev]);
+    setLeads((prev) => [newLead, ...prev.filter((l) => l.id !== newLead.id && l.mobile !== newLead.mobile)]);
   };
 
   const handleProceedToQuoteFromLead = (lead: any) => {
@@ -194,20 +228,31 @@ export const PipelineScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
     <View style={styles.container}>
       {/* VENDOR BRANDED HEADER */}
       <View style={styles.header}>
-        <View>
+        <View style={{ flex: 1 }}>
           <Text style={styles.headerTitle}>Solar Field Command</Text>
           <Text style={styles.headerSubtitle}>
             Vendor Sales Pipeline & PM Surya Ghar Sizing
           </Text>
         </View>
-        <TouchableOpacity
-          style={styles.addLeadHeaderBtn}
-          onPress={handleOpenLeadCapture}
-          activeOpacity={0.85}
-        >
-          <Plus size={16} color="#ffffff" strokeWidth={2.8} />
-          <Text style={styles.addLeadHeaderBtnText}>New Lead</Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <TouchableOpacity
+            style={styles.financeHeaderBtn}
+            onPress={() => navigation?.navigate('Finance')}
+            activeOpacity={0.85}
+          >
+            <Receipt size={15} color="#059669" strokeWidth={2.5} />
+            <Text style={styles.financeHeaderBtnText}>Finance</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.addLeadHeaderBtn}
+            onPress={handleOpenLeadCapture}
+            activeOpacity={0.85}
+          >
+            <Plus size={16} color="#ffffff" strokeWidth={2.8} />
+            <Text style={styles.addLeadHeaderBtnText}>New Lead</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* EXECUTIVE PULSE METRICS BAR */}
@@ -330,9 +375,9 @@ export const PipelineScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
                       📍 {item.city || 'Site Location'} {item.consumerNumber ? `| No: ${item.consumerNumber}` : ''}
                     </Text>
                   </View>
-                  <View style={[styles.statusBadge, isWon ? styles.statusBadgeWon : styles.statusBadgeActive]}>
-                    <Text style={[styles.statusBadgeText, isWon ? styles.statusBadgeTextWon : styles.statusBadgeTextActive]}>
-                      {item.status || 'NEW'}
+                  <View style={[styles.statusBadge, item.isDraft ? styles.statusBadgeDraft : isWon ? styles.statusBadgeWon : styles.statusBadgeActive]}>
+                    <Text style={[styles.statusBadgeText, item.isDraft ? styles.statusBadgeTextDraft : isWon ? styles.statusBadgeTextWon : styles.statusBadgeTextActive]}>
+                      {item.isDraft ? 'OFFLINE DRAFT' : item.status || 'NEW'}
                     </Text>
                   </View>
                 </View>
@@ -472,6 +517,22 @@ const styles = StyleSheet.create({
     marginTop: 2,
     fontWeight: '500',
   },
+  financeHeaderBtn: {
+    backgroundColor: '#ecfdf5',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    gap: 4,
+    borderWidth: 1,
+    borderColor: '#a7f3d0',
+  },
+  financeHeaderBtnText: {
+    color: '#059669',
+    fontSize: 12,
+    fontWeight: '800',
+  },
   addLeadHeaderBtn: {
     backgroundColor: '#2563eb',
     flexDirection: 'row',
@@ -490,6 +551,13 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 12,
     fontWeight: '800',
+  },
+  statusBadgeDraft: {
+    backgroundColor: '#fffbeb',
+    borderColor: '#fde68a',
+  },
+  statusBadgeTextDraft: {
+    color: '#d97706',
   },
   pulseContainer: {
     flexDirection: 'row',

@@ -33,8 +33,6 @@ router.get('/api/tenant/leads', requireTenantAuth, async (req, res) => {
     if (source) where.source = source;
     if (status && status !== 'ALL') {
       where.status = status;
-    } else if (!status && all !== 'true') {
-      where.status = { notIn: ['WON', 'LOST'] }; // Default to active leads only
     }
     if (assigneeId) where.assigneeId = assigneeId;
     if (search) {
@@ -113,7 +111,7 @@ router.get('/api/tenant/leads/:id', requireTenantAuth, async (req, res) => {
 
 router.post('/api/tenant/leads', requireTenantAuth, validate(createLeadSchema), async (req, res) => {
   try {
-    const { mobile, email, forceCreate, ...rest } = req.body;
+    const { mobile, email, forceCreate, name, ...rest } = req.body;
     
     // Duplicate Detection
     const duplicate = await prisma.lead.findFirst({
@@ -126,32 +124,48 @@ router.post('/api/tenant/leads', requireTenantAuth, validate(createLeadSchema), 
       }
     });
     
+    let lead;
     if (duplicate && !forceCreate) {
-      return res.status(409).json({ error: 'Duplicate lead found', duplicate });
+      // Update existing lead with latest details so data is never lost
+      lead = await prisma.lead.update({
+        where: { id: duplicate.id },
+        data: {
+          ...rest,
+          ...(name ? { name } : {}),
+          ...(email ? { email } : {}),
+          updatedAt: new Date()
+        }
+      });
+      return res.json({ lead, message: 'Existing lead updated' });
+    } else {
+      lead = await prisma.lead.create({
+        data: {
+          ...rest,
+          name,
+          mobile,
+          email,
+          tenantId: req.user.tenantId
+        }
+      });
     }
     
-    const lead = await prisma.lead.create({
-      data: {
-        ...rest,
-        mobile,
-        email,
-        tenantId: req.user.tenantId
-      }
-    });
-    
     // Log Activity
-    await prisma.leadActivity.create({
-      data: {
-        leadId: lead.id,
-        type: 'STATUS_CHANGE',
-        description: 'Lead created',
-        performedBy: req.user.id
-      }
-    });
+    try {
+      await prisma.leadActivity.create({
+        data: {
+          leadId: lead.id,
+          type: 'STATUS_CHANGE',
+          description: duplicate ? 'Lead updated with new inquiry' : 'Lead created',
+          performedBy: req.user.userId || req.user.id || 'SYSTEM'
+        }
+      });
+    } catch (e) {
+      console.warn('Could not log lead activity:', e.message);
+    }
     
     res.json({ lead });
   } catch (error) {
-    console.error(error);
+    console.error('Lead create error:', error);
     res.status(500).json({ error: 'Failed to create lead' });
   }
 });

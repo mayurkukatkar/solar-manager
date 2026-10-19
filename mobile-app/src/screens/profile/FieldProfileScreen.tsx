@@ -25,11 +25,13 @@ import {
   ExternalLink,
   ChevronRight,
   TrendingUp,
+  Receipt,
+  Layers as HubLayers,
 } from 'lucide-react-native';
 import { useAuth } from '../../context/AuthContext';
 import { offlineSyncService } from '../../services/offlineSyncService';
 
-export const FieldProfileScreen: React.FC = () => {
+export const FieldProfileScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
   const { user, logout } = useAuth();
   const [draftCount, setDraftCount] = useState(0);
   const [syncing, setSyncing] = useState(false);
@@ -122,7 +124,73 @@ export const FieldProfileScreen: React.FC = () => {
               <Text style={styles.radarGridSub}>National DBT</Text>
             </View>
           </View>
+
+          <TouchableOpacity
+            style={styles.openFinanceBtn}
+            onPress={() => navigation?.navigate('Finance')}
+            activeOpacity={0.8}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Receipt size={16} color="#059669" />
+              <Text style={styles.openFinanceBtnText}>View Full Invoices & Milestone Billing</Text>
+            </View>
+            <ChevronRight size={16} color="#059669" />
+          </TouchableOpacity>
         </View>
+
+        {/* ENTERPRISE MODULES SHORTCUTS */}
+        <Text style={styles.sectionHeading}>Solar Enterprise Hub</Text>
+        
+        <TouchableOpacity
+          style={styles.portalCard}
+          onPress={() => navigation?.navigate('Finance')}
+          activeOpacity={0.8}
+        >
+          <View style={styles.portalLeft}>
+            <View style={[styles.portalIconCircleGold, { backgroundColor: '#ecfdf5' }]}>
+              <Receipt size={20} color="#059669" />
+            </View>
+            <View>
+              <Text style={styles.portalTitle}>Finance & Invoicing</Text>
+              <Text style={styles.portalSub}>Milestone billing, collections & overdue aging</Text>
+            </View>
+          </View>
+          <ChevronRight size={16} color="#64748b" />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.portalCard}
+          onPress={() => navigation?.navigate('Modules', { screen: 'SUBSIDY' })}
+          activeOpacity={0.8}
+        >
+          <View style={styles.portalLeft}>
+            <View style={styles.portalIconCircleGold}>
+              <Landmark size={20} color="#d97706" />
+            </View>
+            <View>
+              <Text style={styles.portalTitle}>PM Surya Ghar Studio</Text>
+              <Text style={styles.portalSub}>CFA national portal tracking & DBT release</Text>
+            </View>
+          </View>
+          <ChevronRight size={16} color="#64748b" />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.portalCard}
+          onPress={() => navigation?.navigate('Modules')}
+          activeOpacity={0.8}
+        >
+          <View style={styles.portalLeft}>
+            <View style={[styles.portalIconCircleBlue, { backgroundColor: '#f5f3ff' }]}>
+              <HubLayers size={20} color="#7c3aed" />
+            </View>
+            <View>
+              <Text style={styles.portalTitle}>Solar Hub (All 8 Modules)</Text>
+              <Text style={styles.portalSub}>Quotations, Site Surveys, AMC, Logistics & DISCOM</Text>
+            </View>
+          </View>
+          <ChevronRight size={16} color="#64748b" />
+        </TouchableOpacity>
 
         {/* STATUTORY PORTAL SHORTCUTS */}
         <Text style={styles.sectionHeading}>External Utility Portals</Text>
@@ -372,6 +440,20 @@ const styles = StyleSheet.create({
     color: '#94a3b8',
     marginTop: 2,
     fontWeight: '600',
+  },
+  openFinanceBtn: {
+    marginTop: 14,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#f1f5f9',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  openFinanceBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#059669',
   },
   portalCard: {
     backgroundColor: '#ffffff',

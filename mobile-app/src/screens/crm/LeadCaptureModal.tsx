@@ -197,14 +197,19 @@ export const LeadCaptureModal: React.FC<LeadCaptureModalProps> = ({
         monthlyBill: parseFloat(monthlyBill) || undefined,
         sanctionedLoad: parseFloat(sanctionedLoad) || undefined,
         notes: `Consumer No: ${consumerNumber || 'N/A'}, BU: ${billingUnit || 'N/A'}, DISCOM: ${discomName}`,
+        forceCreate: true,
       };
 
       let createdLead: any = null;
       try {
         const res = await crmApi.createLead(leadPayload);
         createdLead = res.lead || { ...leadPayload, id: res.id || `lead_${Date.now()}` };
-      } catch (backendError) {
-        console.warn('Backend unavailable, saving offline draft:', backendError);
+      } catch (backendError: any) {
+        console.warn('Backend create lead warning:', backendError);
+        if (backendError.response?.data?.error && backendError.response.status === 400) {
+          Alert.alert('Validation Error', backendError.response.data.error);
+          return;
+        }
         const draft = await offlineSyncService.saveDraftLead({
           name: name.trim(),
           mobile: cleanPhone,
@@ -219,7 +224,7 @@ export const LeadCaptureModal: React.FC<LeadCaptureModalProps> = ({
           recommendedKw,
           billPhotoUri: billAttachmentUri || undefined,
         });
-        createdLead = { ...draft, id: draft.localId, stage: 'NEW' };
+        createdLead = { ...draft, id: draft.localId, stage: 'NEW', isDraft: true };
       }
 
       onSuccess(createdLead);

@@ -73,13 +73,15 @@ export default function CRMHub() {
     try {
       await axios.post(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/leads`, {
         ...newLead,
+        forceCreate: true,
         estimatedCap: newLead.estimatedCap ? parseFloat(newLead.estimatedCap) : null
       }, { withCredentials: true });
       setShowAddModal(false);
       setNewLead({ name: '', mobile: '', email: '', customerType: 'RESIDENTIAL', estimatedCap: '', city: 'Pune', source: 'Direct' });
-      fetchData();
-    } catch (err) {
-      alert('Failed to register account. Check if phone already exists.');
+      await fetchData();
+      setActiveTab('PIPELINE');
+    } catch (err: any) {
+      alert(err.response?.data?.error || 'Failed to register account. Check if phone already exists.');
     } finally {
       setSubmitting(false);
     }

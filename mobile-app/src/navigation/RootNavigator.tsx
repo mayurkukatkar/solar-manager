@@ -9,12 +9,15 @@ import {
   Zap,
   User,
   Plus,
+  Receipt,
 } from 'lucide-react-native';
 import { useAuth } from '../context/AuthContext';
 import { LoginScreen } from '../screens/auth/LoginScreen';
 import { PipelineScreen } from '../screens/crm/PipelineScreen';
 import { FieldProjectsScreen } from '../screens/projects/FieldProjectsScreen';
 import { QuickQuoteScreen } from '../screens/crm/QuickQuoteScreen';
+import { FinanceScreen } from '../screens/finance/FinanceScreen';
+import { ModulesScreen } from '../screens/modules/ModulesScreen';
 import { FieldProfileScreen } from '../screens/profile/FieldProfileScreen';
 import { LeadCaptureModal } from '../screens/crm/LeadCaptureModal';
 import { colors } from '../theme/colors';
@@ -23,7 +26,11 @@ export const navigationRef = createNavigationContainerRef<any>();
 
 export function navigateToTab(screenName: string, params?: any) {
   if (navigationRef.isReady()) {
-    navigationRef.navigate('MainTabs', { screen: screenName, params });
+    if (screenName === 'QuickQuote' || screenName === 'Modules') {
+      navigationRef.navigate(screenName, params);
+    } else {
+      navigationRef.navigate('MainTabs', { screen: screenName, params });
+    }
   }
 }
 
@@ -85,12 +92,12 @@ const MainTabNavigator: React.FC = () => {
           }}
         />
         <Tab.Screen
-          name="QuickQuote"
-          component={QuickQuoteScreen}
+          name="Finance"
+          component={FinanceScreen}
           options={{
-            tabBarLabel: 'Quick Quote',
+            tabBarLabel: 'Finance',
             tabBarIcon: ({ color }) => (
-              <Zap size={22} color={color} strokeWidth={2.2} />
+              <Receipt size={22} color={color} strokeWidth={2.2} />
             ),
           }}
         />
@@ -145,7 +152,12 @@ export const RootNavigator: React.FC = () => {
         {!user ? (
           <Stack.Screen name="Login" component={LoginScreen} />
         ) : (
-          <Stack.Screen name="MainTabs" component={MainTabNavigator} />
+          <>
+            <Stack.Screen name="MainTabs" component={MainTabNavigator} />
+            <Stack.Screen name="QuickQuote" component={QuickQuoteScreen} />
+            <Stack.Screen name="Modules" component={ModulesScreen} />
+            <Stack.Screen name="FinanceDetail" component={FinanceScreen} />
+          </>
         )}
       </Stack.Navigator>
     </NavigationContainer>
