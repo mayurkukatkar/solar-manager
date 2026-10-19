@@ -22,13 +22,25 @@ import {
 import { generateQuotationHtml, createAndSharePdf } from '../../services/pdfService';
 import { openWhatsAppWithPitch } from '../../services/whatsappService';
 
-export const QuickQuoteScreen: React.FC = () => {
-  const [prospectName, setProspectName] = useState('');
-  const [prospectPhone, setProspectPhone] = useState('');
-  const [monthlyBill, setMonthlyBill] = useState('3500');
-  const [capacityKw, setCapacityKw] = useState('3.3');
+export const QuickQuoteScreen: React.FC<{ route?: any }> = ({ route }) => {
+  const initialParams = route?.params || {};
+  const [prospectName, setProspectName] = useState(initialParams.prospectName || initialParams.lead?.name || '');
+  const [prospectPhone, setProspectPhone] = useState(initialParams.prospectPhone || initialParams.lead?.mobile || '');
+  const [monthlyBill, setMonthlyBill] = useState(initialParams.monthlyBill || (initialParams.lead?.monthlyBill ? String(initialParams.lead.monthlyBill) : '3500'));
+  const [capacityKw, setCapacityKw] = useState(initialParams.capacityKw || (initialParams.lead?.estimatedCap ? String(initialParams.lead.estimatedCap) : '3.3'));
   const [pricePerKw, setPricePerKw] = useState('56000');
   const [generating, setGenerating] = useState(false);
+
+  React.useEffect(() => {
+    if (route?.params) {
+      const p = route.params;
+      const lead = p.lead;
+      if (p.prospectName || lead?.name) setProspectName(p.prospectName || lead.name);
+      if (p.prospectPhone || lead?.mobile) setProspectPhone(p.prospectPhone || lead.mobile);
+      if (p.monthlyBill || lead?.monthlyBill) setMonthlyBill(String(p.monthlyBill || lead.monthlyBill));
+      if (p.capacityKw || lead?.estimatedCap) setCapacityKw(String(p.capacityKw || lead.estimatedCap));
+    }
+  }, [route?.params]);
 
   // Calculations
   const cap = parseFloat(capacityKw) || 3.3;

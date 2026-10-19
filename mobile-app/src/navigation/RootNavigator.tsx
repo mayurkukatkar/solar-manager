@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, ActivityIndicator, TouchableOpacity } from 'react-native';
-import { NavigationContainer, useNavigation } from '@react-navigation/native';
+import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import {
@@ -19,6 +19,14 @@ import { FieldProfileScreen } from '../screens/profile/FieldProfileScreen';
 import { LeadCaptureModal } from '../screens/crm/LeadCaptureModal';
 import { colors } from '../theme/colors';
 
+export const navigationRef = createNavigationContainerRef<any>();
+
+export function navigateToTab(screenName: string, params?: any) {
+  if (navigationRef.isReady()) {
+    navigationRef.navigate('MainTabs', { screen: screenName, params });
+  }
+}
+
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
@@ -26,7 +34,6 @@ const EmptyScreen: React.FC = () => null;
 
 const MainTabNavigator: React.FC = () => {
   const [leadModalVisible, setLeadModalVisible] = useState(false);
-  const navigation = useNavigation<any>();
 
   return (
     <>
@@ -104,11 +111,17 @@ const MainTabNavigator: React.FC = () => {
         onClose={() => setLeadModalVisible(false)}
         onSuccess={(lead) => {
           setLeadModalVisible(false);
-          navigation.navigate('Pipeline');
+          navigateToTab('Pipeline');
         }}
         onProceedToQuote={(lead) => {
           setLeadModalVisible(false);
-          navigation.navigate('QuickQuote');
+          navigateToTab('QuickQuote', {
+            lead,
+            prospectName: lead?.name,
+            prospectPhone: lead?.mobile,
+            monthlyBill: lead?.monthlyBill ? String(lead.monthlyBill) : undefined,
+            capacityKw: lead?.estimatedCap ? String(lead.estimatedCap) : undefined,
+          });
         }}
       />
     </>
@@ -127,7 +140,7 @@ export const RootNavigator: React.FC = () => {
   }
 
   return (
-    <NavigationContainer>
+    <NavigationContainer ref={navigationRef}>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {!user ? (
           <Stack.Screen name="Login" component={LoginScreen} />
