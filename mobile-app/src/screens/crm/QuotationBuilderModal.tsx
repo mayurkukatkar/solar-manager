@@ -229,7 +229,7 @@ export const QuotationBuilderModal: React.FC<QuotationBuilderModalProps> = ({
       // 2. Export PDF and open WhatsApp document share
       const html = generateQuotationHtml(payload);
       const fileName = `Solar_Proposal_${payload.customerName.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
-      await sharePdfFile(html, fileName);
+      await sharePdfFile(html, fileName, payload.customerPhone);
 
       // 3. Mark stage advancement in CRM
       if (lead?.id) {
@@ -279,7 +279,7 @@ export const QuotationBuilderModal: React.FC<QuotationBuilderModalProps> = ({
       }
       const payload = buildPdfPayload();
       const html = generateQuotationHtml(payload);
-      await sharePdfFile(html, `Solar_Proposal_${payload.customerName.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`);
+      await sharePdfFile(html, `Solar_Proposal_${payload.customerName.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`, payload.customerPhone);
     } catch (err: any) {
       Alert.alert('PDF Share Error', err.message || 'Could not export proposal PDF file');
     } finally {

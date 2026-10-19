@@ -66,7 +66,7 @@ export const ProposalPreviewModal: React.FC<ProposalPreviewModalProps> = ({
     try {
       const html = generateQuotationHtml(data);
       const fileName = `Solar_Proposal_${data.customerName.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
-      await sharePdfFile(html, fileName);
+      await sharePdfFile(html, fileName, data.customerPhone);
       if (onWhatsAppSent) onWhatsAppSent();
     } catch (err: any) {
       Alert.alert('WhatsApp PDF Share Error', err.message || 'Could not export proposal PDF');
@@ -104,7 +104,7 @@ export const ProposalPreviewModal: React.FC<ProposalPreviewModalProps> = ({
     try {
       const html = generateQuotationHtml(data);
       const fileName = `Solar_Proposal_${data.customerName.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
-      await sharePdfFile(html, fileName);
+      await sharePdfFile(html, fileName, data.customerPhone);
     } catch (err: any) {
       Alert.alert('PDF Share Error', err.message || 'Could not export proposal PDF');
     } finally {

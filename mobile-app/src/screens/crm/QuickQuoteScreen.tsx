@@ -192,7 +192,7 @@ export const QuickQuoteScreen: React.FC<{ route?: any }> = ({ route }) => {
 
       const html = generateQuotationHtml(payload);
       const fileName = `Solar_Proposal_${prospectName.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
-      await sharePdfFile(html, fileName);
+      await sharePdfFile(html, fileName, prospectPhone);
     } catch (err: any) {
       Alert.alert('WhatsApp PDF Share Error', err.message || 'Could not export proposal PDF');
     } finally {
@@ -240,7 +240,7 @@ export const QuickQuoteScreen: React.FC<{ route?: any }> = ({ route }) => {
       }
       const payload = buildPdfPayload();
       const html = generateQuotationHtml(payload);
-      await sharePdfFile(html, `Quick_Quote_${prospectName.replace(/\s+/g, '_')}.pdf`);
+      await sharePdfFile(html, `Quick_Quote_${prospectName.replace(/\s+/g, '_')}.pdf`, prospectPhone);
     } catch (err: any) {
       Alert.alert('PDF Export Error', err.message || 'Could not export proposal PDF');
     } finally {

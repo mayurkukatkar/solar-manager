@@ -1,7 +1,9 @@
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system/legacy';
-import { Alert } from 'react-native';
+import * as IntentLauncher from 'expo-intent-launcher';
+import { Alert, Platform } from 'react-native';
+import { sanitizeIndianPhone } from './whatsappService';
 
 export interface QuotationPdfProps {
   quotationNumber: string;
@@ -724,7 +726,11 @@ export async function previewPdf(html: string): Promise<boolean> {
   }
 }
 
-export async function sharePdfFile(html: string, fileName: string): Promise<string | null> {
+export async function sharePdfFile(
+  html: string,
+  fileName: string,
+  customerPhone?: string
+): Promise<string | null> {
   try {
     const { uri, base64 } = await Print.printToFileAsync({ html, base64: true });
     let shareableUri = uri;
@@ -773,13 +779,54 @@ export async function sharePdfFile(html: string, fileName: string): Promise<stri
       }
     }
 
+    // 1. Direct WhatsApp Dispatch on Android (Direct to Customer Chat — No Searching Needed)
+    const targetPhone = sanitizeIndianPhone(customerPhone);
+    if (Platform.OS === 'android' && targetPhone) {
+      try {
+        const contentUri = await FileSystem.getContentUriAsync(shareableUri);
+        const jid = `${targetPhone}@s.whatsapp.net`;
+
+        // Attempt direct launch into customer chat with attached PDF via com.whatsapp
+        try {
+          await IntentLauncher.startActivityAsync('android.intent.action.SEND', {
+            type: 'application/pdf',
+            packageName: 'com.whatsapp',
+            extra: {
+              'android.intent.extra.STREAM': contentUri,
+              'jid': jid,
+            },
+            flags: 1, // Intent.FLAG_GRANT_READ_URI_PERMISSION
+          });
+          return shareableUri;
+        } catch (waErr) {
+          console.warn('Direct com.whatsapp intent failed, trying WhatsApp Business (com.whatsapp.w4b):', waErr);
+          try {
+            await IntentLauncher.startActivityAsync('android.intent.action.SEND', {
+              type: 'application/pdf',
+              packageName: 'com.whatsapp.w4b',
+              extra: {
+                'android.intent.extra.STREAM': contentUri,
+                'jid': jid,
+              },
+              flags: 1,
+            });
+            return shareableUri;
+          } catch (w4bErr) {
+            console.warn('Direct com.whatsapp.w4b intent failed:', w4bErr);
+          }
+        }
+      } catch (intentPrepErr) {
+        console.warn('Intent preparation error, falling back to Sharing:', intentPrepErr);
+      }
+    }
+
+    // 2. Fallback to standard Expo Sharing (for iOS or if direct package intent is blocked)
     const isAvailable = await Sharing.isAvailableAsync().catch(() => false);
     if (!isAvailable) {
       Alert.alert('Sharing Unavailable', 'File sharing is not supported on this device.');
       return null;
     }
 
-    // Expo Sharing passes content URI via Android FileProvider so WhatsApp attaches the actual PDF document
     await Sharing.shareAsync(shareableUri, {
       mimeType: 'application/pdf',
       dialogTitle: `Share ${cleanFileName}`,
