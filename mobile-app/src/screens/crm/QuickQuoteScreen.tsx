@@ -18,9 +18,12 @@ import {
   Share2,
   TrendingDown,
   Percent,
+  Eye,
+  CheckCircle2,
 } from 'lucide-react-native';
-import { generateQuotationHtml, createAndSharePdf } from '../../services/pdfService';
+import { generateQuotationHtml, previewPdf, sharePdfFile, createAndSharePdf } from '../../services/pdfService';
 import { openWhatsAppWithPitch } from '../../services/whatsappService';
+import { quotationsApi } from '../../api/endpoints';
 
 export const QuickQuoteScreen: React.FC<{ route?: any }> = ({ route }) => {
   const initialParams = route?.params || {};
@@ -33,7 +36,11 @@ export const QuickQuoteScreen: React.FC<{ route?: any }> = ({ route }) => {
   const [systemCost, setSystemCost] = useState(
     initialParams.systemCost || String(Math.round(initialCapNum * 58000))
   );
-  const [generating, setGenerating] = useState(false);
+  const [generatingPdf, setGeneratingPdf] = useState(false);
+  const [sharingWhatsApp, setSharingWhatsApp] = useState(false);
+  const [sharingPdf, setSharingPdf] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncedQuote, setSyncedQuote] = useState<any>(null);
 
   React.useEffect(() => {
     if (route?.params) {
@@ -91,60 +98,141 @@ export const QuickQuoteScreen: React.FC<{ route?: any }> = ({ route }) => {
     }
   };
 
-  const handleShareQuote = async () => {
+  const buildPdfPayload = () => ({
+    quotationNumber: syncedQuote?.qNumber || `QQ-${Date.now().toString().slice(-6)}`,
+    quotationDate: new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
+    validUntil: new Date(Date.now() + 15 * 86400000).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
+    companyName: 'SolarManager Solutions Pvt Ltd',
+    companyAddress: 'Corporate Office, Pune 411038',
+    companyPhone: '+91 98765 43210',
+    companyEmail: 'contact@solarmanager.in',
+    customerName: prospectName,
+    customerPhone: prospectPhone || '',
+    customerAddress: 'Site Location, Maharashtra',
+    systemCapacityKw: cap,
+    grossAmount: gross,
+    subsidyAmount: subsidy,
+    netPayable: net,
+    monthlyGenerationUnits: monthlyUnits,
+    annualGenerationUnits: annualUnits,
+    currentMonthlyBill: parseFloat(monthlyBill) || monthlySavings,
+    estimatedMonthlyBill: 150,
+    monthlySavings,
+    lifetimeSavings,
+    paybackYears: isNaN(paybackYears) ? 3.5 : paybackYears,
+    co2ReductionKg: Math.round(annualUnits * 0.82),
+    treeEquivalent: Math.round((annualUnits * 0.82) / 20),
+    bankDetails: {
+      accountName: 'SolarManager Solutions Pvt Ltd',
+      bankName: 'HDFC Bank',
+      accountNumber: '50200088992211',
+      ifsc: 'HDFC0001234',
+      upiId: 'solarmanager@hdfcbank',
+    },
+  });
+
+  const syncToBackend = async (statusOverride = 'SENT') => {
+    if (!prospectName.trim()) return null;
+    try {
+      setSyncing(true);
+      const res = await quotationsApi.createQuotation({
+        newCustomer: {
+          name: prospectName.trim(),
+          mobile: prospectPhone.trim(),
+          address: 'Site Location, Maharashtra',
+        },
+        customerName: prospectName.trim(),
+        customerPhone: prospectPhone.trim(),
+        systemCapacity: cap,
+        totalSystemCost: gross,
+        status: statusOverride,
+        panelBrand: 'Waaree 540W Mono PERC Bifacial',
+        inverterBrand: 'Solis 3.3kW On-Grid Inverter',
+        structureBrand: 'Elevated HDG Structure',
+        validityDays: 15,
+      });
+
+      if (res?.quotation) {
+        setSyncedQuote(res.quotation);
+        return res.quotation;
+      }
+    } catch (err: any) {
+      console.warn('Quick quote cloud sync notice:', err?.message);
+    } finally {
+      setSyncing(false);
+    }
+    return null;
+  };
+
+  const handlePreviewPdf = async () => {
     if (!prospectName.trim()) {
       Alert.alert('Customer Name', 'Please enter a prospect name for the proposal');
       return;
     }
-    setGenerating(true);
+    setGeneratingPdf(true);
     try {
-      const html = generateQuotationHtml({
-        quotationNumber: `QQ-${Date.now().toString().slice(-6)}`,
-        quotationDate: new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
-        validUntil: new Date(Date.now() + 15 * 86400000).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
-        companyName: 'SolarManager Solutions Pvt Ltd',
-        companyAddress: 'Corporate Office, Pune 411038',
-        companyPhone: '+91 98765 43210',
-        companyEmail: 'contact@solarmanager.in',
+      if (!syncedQuote) {
+        syncToBackend('VIEWED').catch(() => {});
+      }
+      const payload = buildPdfPayload();
+      const html = generateQuotationHtml(payload);
+      await previewPdf(html);
+    } catch (err: any) {
+      Alert.alert('Preview Error', err.message || 'Could not launch PDF preview');
+    } finally {
+      setGeneratingPdf(false);
+    }
+  };
+
+  const handleSendWhatsApp = async () => {
+    if (!prospectName.trim()) {
+      Alert.alert('Customer Name', 'Please enter a prospect name for the proposal');
+      return;
+    }
+    setSharingWhatsApp(true);
+    try {
+      const saved = await syncToBackend('SENT');
+      const quoteNumber = saved?.qNumber || syncedQuote?.qNumber || `QQ-${Date.now().toString().slice(-6)}`;
+      const payload = buildPdfPayload();
+      payload.quotationNumber = quoteNumber;
+
+      await openWhatsAppWithPitch({
         customerName: prospectName,
-        customerPhone: prospectPhone || '',
-        customerAddress: 'Site Location',
+        customerPhone: prospectPhone,
         systemCapacityKw: cap,
         grossAmount: gross,
         subsidyAmount: subsidy,
         netPayable: net,
-        monthlyGenerationUnits: monthlyUnits,
-        annualGenerationUnits: annualUnits,
-        currentMonthlyBill: parseFloat(monthlyBill) || monthlySavings,
-        estimatedMonthlyBill: 150,
         monthlySavings,
         lifetimeSavings,
-        paybackYears: isNaN(paybackYears) ? 3.5 : paybackYears,
-        co2ReductionKg: Math.round(annualUnits * 0.82),
-        treeEquivalent: Math.round((annualUnits * 0.82) / 20),
+        companyName: 'SolarManager Solutions',
+        repName: 'Solar Field Executive',
+        language: 'EN',
       });
-
-      await createAndSharePdf(html, `Quick_Quote_${prospectName.replace(/\s+/g, '_')}.pdf`);
-
-      if (prospectPhone.trim().length >= 10) {
-        await openWhatsAppWithPitch({
-          customerName: prospectName,
-          customerPhone: prospectPhone,
-          systemCapacityKw: cap,
-          grossAmount: gross,
-          subsidyAmount: subsidy,
-          netPayable: net,
-          monthlySavings,
-          lifetimeSavings,
-          companyName: 'SolarManager Solutions',
-          repName: 'Solar Field Executive',
-          language: 'EN',
-        });
-      }
     } catch (err: any) {
-      Alert.alert('Error', err.message || 'Could not dispatch quick quote');
+      Alert.alert('WhatsApp Dispatch Error', err.message || 'Could not launch WhatsApp');
     } finally {
-      setGenerating(false);
+      setSharingWhatsApp(false);
+    }
+  };
+
+  const handleSharePdfFile = async () => {
+    if (!prospectName.trim()) {
+      Alert.alert('Customer Name', 'Please enter a prospect name for the proposal');
+      return;
+    }
+    setSharingPdf(true);
+    try {
+      if (!syncedQuote) {
+        syncToBackend('SENT').catch(() => {});
+      }
+      const payload = buildPdfPayload();
+      const html = generateQuotationHtml(payload);
+      await sharePdfFile(html, `Quick_Quote_${prospectName.replace(/\s+/g, '_')}.pdf`);
+    } catch (err: any) {
+      Alert.alert('PDF Export Error', err.message || 'Could not export proposal PDF');
+    } finally {
+      setSharingPdf(false);
     }
   };
 
@@ -152,12 +240,23 @@ export const QuickQuoteScreen: React.FC<{ route?: any }> = ({ route }) => {
     <View style={styles.container}>
       {/* HEADER */}
       <View style={styles.header}>
-        <View>
+        <View style={{ flex: 1 }}>
           <Text style={styles.headerTitle}>Quick Field Estimator</Text>
           <Text style={styles.headerSubtitle}>
-            On-the-spot spot solar proposal & subsidy calculator
+            On-the-spot solar proposal & subsidy calculator
           </Text>
         </View>
+        {syncedQuote ? (
+          <View style={styles.badgeSynced}>
+            <CheckCircle2 size={12} color="#15803d" />
+            <Text style={styles.badgeSyncedText}>Web: {syncedQuote.qNumber}</Text>
+          </View>
+        ) : syncing ? (
+          <View style={styles.badgeSyncing}>
+            <ActivityIndicator size="small" color="#2563eb" />
+            <Text style={styles.badgeSyncingText}>Syncing...</Text>
+          </View>
+        ) : null}
       </View>
 
       <ScrollView style={styles.body} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -268,21 +367,55 @@ export const QuickQuoteScreen: React.FC<{ route?: any }> = ({ route }) => {
 
       {/* BOTTOM ACTION */}
       <View style={styles.bottomBar}>
-        <TouchableOpacity
-          style={styles.shareBtn}
-          onPress={handleShareQuote}
-          disabled={generating}
-          activeOpacity={0.85}
-        >
-          {generating ? (
-            <ActivityIndicator color="#ffffff" />
-          ) : (
-            <>
-              <MessageCircle size={18} color="#ffffff" />
-              <Text style={styles.shareBtnText}>Generate & Share Proposal</Text>
-            </>
-          )}
-        </TouchableOpacity>
+        <View style={styles.actionRowTop}>
+          <TouchableOpacity
+            style={styles.pdfBtn}
+            onPress={handlePreviewPdf}
+            disabled={generatingPdf}
+            activeOpacity={0.8}
+          >
+            {generatingPdf ? (
+              <ActivityIndicator size="small" color="#0f172a" />
+            ) : (
+              <>
+                <Eye size={16} color="#0f172a" />
+                <Text style={styles.pdfBtnText}>Preview PDF</Text>
+              </>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.whatsAppBtn}
+            onPress={handleSendWhatsApp}
+            disabled={sharingWhatsApp}
+            activeOpacity={0.85}
+          >
+            {sharingWhatsApp ? (
+              <ActivityIndicator size="small" color="#ffffff" />
+            ) : (
+              <>
+                <MessageCircle size={18} color="#ffffff" />
+                <Text style={styles.whatsAppBtnText}>Send WhatsApp</Text>
+              </>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.shareFileBtn}
+            onPress={handleSharePdfFile}
+            disabled={sharingPdf}
+            activeOpacity={0.8}
+          >
+            {sharingPdf ? (
+              <ActivityIndicator size="small" color="#334155" />
+            ) : (
+              <>
+                <Share2 size={16} color="#334155" />
+                <Text style={styles.shareFileBtnText}>Share PDF</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
       </View>
     </View>
   );
@@ -531,18 +664,88 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 14,
   },
-  shareBtn: {
-    backgroundColor: '#16a34a',
-    borderRadius: 12,
-    paddingVertical: 15,
+  actionRowTop: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  pdfBtn: {
+    flex: 1,
+    backgroundColor: '#f1f5f9',
+    borderRadius: 10,
+    paddingVertical: 12,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: 6,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
   },
-  shareBtnText: {
-    fontSize: 15,
+  pdfBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#0f172a',
+  },
+  whatsAppBtn: {
+    flex: 1.5,
+    backgroundColor: '#16a34a',
+    borderRadius: 10,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  whatsAppBtnText: {
+    fontSize: 13,
     fontWeight: '800',
     color: '#ffffff',
+  },
+  shareFileBtn: {
+    flex: 1,
+    backgroundColor: '#f8fafc',
+    borderRadius: 10,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+  },
+  shareFileBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#334155',
+  },
+  badgeSynced: {
+    backgroundColor: '#dcfce7',
+    borderWidth: 1,
+    borderColor: '#86efac',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  badgeSyncedText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#15803d',
+    textTransform: 'uppercase',
+  },
+  badgeSyncing: {
+    backgroundColor: '#eff6ff',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  badgeSyncingText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#2563eb',
   },
 });

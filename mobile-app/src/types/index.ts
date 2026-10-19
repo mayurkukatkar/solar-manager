@@ -91,14 +91,18 @@ export interface Quotation {
   tax: number;
   discount: number;
   total: number;
-  customer?: { name: string; email?: string; mobile?: string; phone?: string };
-  lead?: { name: string; email?: string; mobile?: string; phone?: string };
+  customer?: { name: string; email?: string; mobile?: string; phone?: string; address?: string };
+  lead?: { name: string; email?: string; mobile?: string; phone?: string; address?: string };
   createdAt: string;
+  date?: string;
   capacity?: number;
+  systemCapacity?: number;
   panelBrand?: string;
   inverterBrand?: string;
+  structureBrand?: string;
   netPayable?: number;
   subsidyAmount?: number;
+  indicativeSubsidy?: number;
 }
 
 export interface QuotationCalculation {

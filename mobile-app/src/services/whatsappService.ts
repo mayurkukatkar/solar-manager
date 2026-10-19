@@ -93,33 +93,49 @@ Warm regards,
 📞 ${data.repPhone || ''}`;
 }
 
-export async function openWhatsAppWithPitch(data: WhatsAppPitchData): Promise<boolean> {
-  const text = generateWhatsAppMessage(data);
-  const cleanPhone = (data.customerPhone || '').replace(/[^0-9]/g, '');
-  
-  // Format with country code 91 if 10 digits
-  const targetPhone = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
-  
-  const encodedText = encodeURIComponent(text);
-  const url = targetPhone
-    ? `whatsapp://send?phone=${targetPhone}&text=${encodedText}`
-    : `whatsapp://send?text=${encodedText}`;
+export function sanitizeIndianPhone(rawPhone?: string): string {
+  if (!rawPhone) return '';
+  const digits = rawPhone.replace(/[^0-9]/g, '');
+  if (digits.length === 10) return `91${digits}`;
+  if (digits.length === 11 && digits.startsWith('0')) return `91${digits.slice(1)}`;
+  if (digits.length === 12 && digits.startsWith('91')) return digits;
+  return digits;
+}
+
+export async function openWhatsAppDirect(phone?: string, text?: string): Promise<boolean> {
+  const targetPhone = sanitizeIndianPhone(phone);
+  const encodedText = text ? encodeURIComponent(text) : '';
+
+  const nativeUrl = targetPhone
+    ? `whatsapp://send?phone=${targetPhone}${encodedText ? `&text=${encodedText}` : ''}`
+    : `whatsapp://send${encodedText ? `?text=${encodedText}` : ''}`;
+
+  const universalUrl = targetPhone
+    ? `https://wa.me/${targetPhone}${encodedText ? `?text=${encodedText}` : ''}`
+    : `https://wa.me/${encodedText ? `?text=${encodedText}` : ''}`;
 
   try {
-    const supported = await Linking.canOpenURL(url);
-    if (supported) {
-      await Linking.openURL(url);
+    // 1. Direct native protocol invocation (avoids Android 11+ package visibility query failure)
+    await Linking.openURL(nativeUrl);
+    return true;
+  } catch (nativeErr: any) {
+    console.warn('Native WhatsApp protocol failed, trying universal link:', nativeErr?.message);
+    try {
+      // 2. Official wa.me universal link (natively caught by OS to open WhatsApp app or web)
+      await Linking.openURL(universalUrl);
       return true;
-    } else {
-      // Fallback web url
-      const webUrl = targetPhone
-        ? `https://api.whatsapp.com/send?phone=${targetPhone}&text=${encodedText}`
-        : `https://api.whatsapp.com/send?text=${encodedText}`;
-      await Linking.openURL(webUrl);
-      return true;
+    } catch (webErr: any) {
+      console.error('All WhatsApp link attempts failed:', webErr?.message);
+      Alert.alert(
+        'WhatsApp Not Available',
+        'Could not open WhatsApp on this device. Please check that WhatsApp is installed, or share the proposal PDF directly.'
+      );
+      return false;
     }
-  } catch (err: any) {
-    Alert.alert('WhatsApp Error', 'Could not open WhatsApp on this device. Please verify WhatsApp is installed.');
-    return false;
   }
+}
+
+export async function openWhatsAppWithPitch(data: WhatsAppPitchData): Promise<boolean> {
+  const text = generateWhatsAppMessage(data);
+  return openWhatsAppDirect(data.customerPhone, text);
 }

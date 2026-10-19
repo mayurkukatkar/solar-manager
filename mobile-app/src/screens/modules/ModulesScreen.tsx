@@ -29,6 +29,7 @@ import {
   Clock,
   ArrowRight,
   Plus,
+  Eye,
 } from 'lucide-react-native';
 import { Header } from '../../components/Header';
 import {
@@ -41,6 +42,8 @@ import {
   subsidyApi,
   procurementApi,
 } from '../../api/endpoints';
+import { generateQuotationHtml, previewPdf } from '../../services/pdfService';
+import { openWhatsAppDirect } from '../../services/whatsappService';
 import { useAuth } from '../../context/AuthContext';
 import { Quotation, Tenant, SiteSurvey, Invoice, SubsidyApplication } from '../../types';
 
@@ -317,22 +320,94 @@ export const ModulesScreen: React.FC<{ route?: any; navigation?: any }> = ({ rou
     setSavingQuote(true);
     try {
       await quotationsApi.createQuotation({
+        newCustomer: {
+          name: customerNameInput.trim(),
+          mobile: '',
+          address: 'Site Location, Maharashtra',
+        },
+        customerName: customerNameInput.trim(),
         systemCapacity: kw,
         panelBrand: selectedPanelBrand,
         inverterBrand: selectedInverterBrand,
         structureType: selectedStructure,
-        subtotal: baseEquip + baseServices,
-        tax: gst,
-        total: grossTotal,
-        notes: `Estimated CFA Subsidy: ₹${subsidy.toLocaleString('en-IN')}. Net: ₹${netPayable.toLocaleString('en-IN')}`,
+        totalSystemCost: grossTotal,
+        status: 'SENT',
       });
-      Alert.alert('Proposal Generated', 'Quotation recorded in central repository.');
+      Alert.alert('Proposal Generated', 'Quotation recorded and synced with central web module.');
+      setCustomerNameInput('');
       fetchQuotations();
     } catch (err: any) {
       Alert.alert('Notice', err.message || 'Quotation generated locally.');
     } finally {
       setSavingQuote(false);
     }
+  };
+
+  const handlePreviewSavedQuote = async (q: any) => {
+    try {
+      const cap = q.systemCapacity || 3.3;
+      const total = q.total || 195000;
+      const subsidy = q.indicativeSubsidy || (cap <= 1 ? 30000 : cap <= 2 ? 60000 : 78000);
+      const net = Math.max(0, total - subsidy);
+      const monthlyUnits = Math.round(cap * 120);
+      const annualUnits = Math.round(cap * 1460);
+      const monthlySavings = Math.round(monthlyUnits * 8.5);
+
+      const html = generateQuotationHtml({
+        quotationNumber: q.qNumber || 'QT-PROPOSAL',
+        quotationDate: new Date(q.date || Date.now()).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
+        validUntil: new Date(Date.now() + 15 * 86400000).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
+        companyName: 'SolarManager Solutions Pvt Ltd',
+        companyAddress: 'Corporate Office, Pune 411038',
+        companyPhone: '+91 98765 43210',
+        companyEmail: 'contact@solarmanager.in',
+        customerName: q.customer?.name || q.lead?.name || 'Valued Customer',
+        customerPhone: q.customer?.mobile || q.lead?.mobile || '',
+        customerAddress: q.customer?.address || q.lead?.address || 'Site Location, Maharashtra',
+        systemCapacityKw: cap,
+        panelBrand: q.panelBrand || 'Waaree 540W Mono PERC Bifacial',
+        inverterBrand: q.inverterBrand || 'Solis 3.3kW On-Grid Inverter',
+        structureType: q.structureBrand || 'Elevated HDG Structure',
+        grossAmount: total,
+        subsidyAmount: subsidy,
+        netPayable: net,
+        monthlyGenerationUnits: monthlyUnits,
+        annualGenerationUnits: annualUnits,
+        currentMonthlyBill: Math.round(monthlySavings * 1.15),
+        estimatedMonthlyBill: 150,
+        monthlySavings,
+        lifetimeSavings: Math.round(annualUnits * 25 * 8.5 * 0.92),
+        paybackYears: 3.5,
+        co2ReductionKg: Math.round(annualUnits * 0.82),
+        treeEquivalent: Math.round((annualUnits * 0.82) / 20),
+      });
+
+      await previewPdf(html);
+    } catch (err: any) {
+      Alert.alert('Preview Error', err.message || 'Could not preview quotation');
+    }
+  };
+
+  const handleWhatsAppSavedQuote = (q: any) => {
+    const custName = q.customer?.name || q.lead?.name || 'Valued Client';
+    const phone = q.customer?.mobile || q.lead?.mobile || '';
+    const cap = q.systemCapacity || 3.3;
+    const total = (q.total || 0).toLocaleString('en-IN');
+    const sub = (q.indicativeSubsidy || (cap <= 1 ? 30000 : cap <= 2 ? 60000 : 78000)).toLocaleString('en-IN');
+    const net = Math.max(0, (q.total || 0) - (q.indicativeSubsidy || 78000)).toLocaleString('en-IN');
+
+    const text = `☀️ *Solar Rooftop Proposal — ${q.qNumber}*
+Dear ${custName},
+
+Here are the details of your customized Rooftop Solar System:
+⚡ System Capacity: ${cap} kWp On-Grid System
+💰 Turnkey Plant Cost (All GST Included): ₹${total}
+🎁 PM Surya Ghar Central Subsidy: -₹${sub}
+👉 Net Customer Investment: ₹${net}
+
+📄 Detailed technical and financial proposal is saved in the central portal. Contact us to schedule installation!`;
+
+    openWhatsAppDirect(phone, text);
   };
 
   const handleConvertQuotationToProject = async (quoteId: string) => {
@@ -379,7 +454,7 @@ Here is your customized Rooftop Solar Quotation:
 ⚡ Inverter: ${selectedInverterBrand}
 🏗️ Mounting: ${selectedStructure}
 
-💰 Turnkey System Cost: ₹${grossTotal.toLocaleString('en-IN')}
+💰 Turnkey System Cost (All GST Included): ₹${grossTotal.toLocaleString('en-IN')}
 🏛️ Govt. CFA Subsidy: -₹${subsidy.toLocaleString('en-IN')}
 ✅ Customer Net Payable: ₹${netPayable.toLocaleString('en-IN')}
 
@@ -389,10 +464,7 @@ Here is your customized Rooftop Solar Quotation:
 
 Let's schedule your 3D roof survey!`;
 
-    const url = `whatsapp://send?text=${encodeURIComponent(text)}`;
-    Linking.openURL(url).catch(() => {
-      Alert.alert('Notice', 'Unable to launch WhatsApp directly.');
-    });
+    openWhatsAppDirect('', text);
   };
 
   const handleShareLoanWhatsApp = () => {
@@ -410,10 +482,7 @@ Let's schedule your 3D roof survey!`;
 ⚡ Monthly Electricity Bill Savings: ~₹${loanMonthlySavings.toLocaleString('en-IN')}/mo
 🎉 NET CASH BENEFIT: +₹${netMonthlyCashBenefit.toLocaleString('en-IN')}/month in your pocket from Day 1!`;
 
-    const url = `whatsapp://send?text=${encodeURIComponent(text)}`;
-    Linking.openURL(url).catch(() => {
-      Alert.alert('Notice', 'Unable to launch WhatsApp directly.');
-    });
+    openWhatsAppDirect('', text);
   };
 
   const MODULE_CATEGORIES = [
@@ -715,15 +784,33 @@ Let's schedule your 3D roof survey!`;
                       <View style={{ flex: 1 }}>
                         <Text style={styles.quoteNumber}>{q.qNumber}</Text>
                         <Text style={styles.quoteCustomer}>{q.customer?.name || q.lead?.name || 'Solar Prospect'}</Text>
+                        <Text style={{ fontSize: 11, color: '#059669', fontWeight: '700', marginTop: 2 }}>
+                          {q.systemCapacity || 3.3} kWp • ₹{(q.total || 0).toLocaleString('en-IN')}
+                        </Text>
                       </View>
                       <View style={{ alignItems: 'flex-end', gap: 6 }}>
-                        <Text style={styles.quoteTotal}>₹{(q.total || 0).toLocaleString('en-IN')}</Text>
-                        <TouchableOpacity
-                          style={styles.convertQuoteSmallBtn}
-                          onPress={() => handleConvertQuotationToProject(q.id)}
-                        >
-                          <Text style={styles.convertQuoteSmallBtnText}>Convert to Project</Text>
-                        </TouchableOpacity>
+                        <View style={{ flexDirection: 'row', gap: 6 }}>
+                          <TouchableOpacity
+                            style={styles.quoteActionSmallBtn}
+                            onPress={() => handlePreviewSavedQuote(q)}
+                          >
+                            <Eye size={12} color="#0f172a" />
+                            <Text style={styles.quoteActionSmallText}>PDF</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={[styles.quoteActionSmallBtn, { backgroundColor: '#dcfce7', borderColor: '#86efac' }]}
+                            onPress={() => handleWhatsAppSavedQuote(q)}
+                          >
+                            <MessageCircle size={12} color="#15803d" />
+                            <Text style={[styles.quoteActionSmallText, { color: '#15803d' }]}>WA</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={styles.convertQuoteSmallBtn}
+                            onPress={() => handleConvertQuotationToProject(q.id)}
+                          >
+                            <Text style={styles.convertQuoteSmallBtnText}>Convert</Text>
+                          </TouchableOpacity>
+                        </View>
                       </View>
                     </View>
                   ))
@@ -1403,14 +1490,30 @@ const styles = StyleSheet.create({
   },
   convertQuoteSmallBtn: {
     backgroundColor: '#ecfdf5',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
     borderRadius: 8,
   },
   convertQuoteSmallBtnText: {
     fontSize: 11,
     fontWeight: '700',
     color: '#059669',
+  },
+  quoteActionSmallBtn: {
+    backgroundColor: '#f1f5f9',
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  quoteActionSmallText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#0f172a',
   },
   sectionTitleWithAction: {
     flexDirection: 'row',

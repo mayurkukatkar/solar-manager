@@ -264,17 +264,22 @@ router.post('/api/tenant/quotations', requireTenantAuth, async (req, res) => {
     let targetCustomerId = customerId || null;
     let targetLeadId = leadId || null;
 
-    if (!targetCustomerId && !targetLeadId && newCustomer && newCustomer.name) {
+    const custName = newCustomer?.name || req.body.customerName || req.body.prospectName;
+    const custMobile = newCustomer?.mobile || req.body.customerPhone || req.body.prospectPhone || '';
+    const custEmail = newCustomer?.email || req.body.customerEmail || '';
+    const custAddress = newCustomer?.address || req.body.customerAddress || '';
+
+    if (!targetCustomerId && !targetLeadId && custName) {
       const createdCustomer = await prisma.customer.create({
         data: {
           tenantId,
-          name: newCustomer.name,
-          mobile: newCustomer.mobile || '',
-          email: newCustomer.email || '',
-          address: newCustomer.address || '',
-          city: newCustomer.city || 'Pune',
-          state: newCustomer.state || 'Maharashtra',
-          pincode: newCustomer.pincode || ''
+          name: custName,
+          mobile: custMobile,
+          email: custEmail,
+          address: custAddress,
+          city: newCustomer?.city || req.body.city || 'Pune',
+          state: newCustomer?.state || req.body.state || 'Maharashtra',
+          pincode: newCustomer?.pincode || req.body.pincode || ''
         }
       });
       targetCustomerId = createdCustomer.id;
@@ -391,7 +396,8 @@ router.post('/api/tenant/quotations', requireTenantAuth, async (req, res) => {
         tax: Number(finalTax),
         discount: Number(finalDiscount),
         total: totalPayable,
-        status: 'DRAFT',
+        status: req.body.status || 'SENT',
+        sentAt: (req.body.status === 'DRAFT') ? null : new Date(),
 
         // System Configuration
         systemCapacity: Number(systemCapacity),

@@ -684,7 +684,32 @@ export function generateDiscomHtml(type: string, data: any): string {
   `;
 }
 
-export async function createAndSharePdf(html: string, fileName: string): Promise<string | null> {
+export async function previewPdf(html: string): Promise<boolean> {
+  try {
+    await Print.printAsync({ html });
+    return true;
+  } catch (err: any) {
+    console.warn('Native Print preview failed, falling back to share:', err?.message);
+    try {
+      const { uri } = await Print.printToFileAsync({ html });
+      const isAvailable = await Sharing.isAvailableAsync();
+      if (isAvailable) {
+        await Sharing.shareAsync(uri, {
+          UTI: '.pdf',
+          mimeType: 'application/pdf',
+          dialogTitle: 'View / Save Proposal PDF',
+        });
+        return true;
+      }
+    } catch (fallbackErr) {
+      console.error('PDF Preview fallback failed:', fallbackErr);
+    }
+    Alert.alert('Preview Notice', err.message || 'Could not launch document preview');
+    return false;
+  }
+}
+
+export async function sharePdfFile(html: string, fileName: string): Promise<string | null> {
   try {
     const { uri } = await Print.printToFileAsync({ html });
     const isAvailable = await Sharing.isAvailableAsync();
@@ -695,7 +720,7 @@ export async function createAndSharePdf(html: string, fileName: string): Promise
         dialogTitle: `Share ${fileName}`,
       });
     } else {
-      Alert.alert('PDF Created', `File saved at ${uri}`);
+      Alert.alert('PDF Exported', `File saved at ${uri}`);
     }
     return uri;
   } catch (err: any) {
@@ -703,6 +728,8 @@ export async function createAndSharePdf(html: string, fileName: string): Promise
     return null;
   }
 }
+
+export const createAndSharePdf = sharePdfFile;
 
 export async function printDirectly(html: string): Promise<void> {
   try {

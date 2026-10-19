@@ -23,15 +23,18 @@ import {
   ArrowRight,
   TrendingDown,
   Percent,
+  Eye,
 } from 'lucide-react-native';
 import {
   generateQuotationHtml,
+  previewPdf,
+  sharePdfFile,
   createAndSharePdf,
   printDirectly,
   QuotationPdfProps,
 } from '../../services/pdfService';
 import { openWhatsAppWithPitch } from '../../services/whatsappService';
-import { crmApi } from '../../api/endpoints';
+import { crmApi, quotationsApi } from '../../api/endpoints';
 
 interface QuotationBuilderModalProps {
   visible: boolean;
@@ -50,6 +53,9 @@ export const QuotationBuilderModal: React.FC<QuotationBuilderModalProps> = ({
 }) => {
   const [generatingPdf, setGeneratingPdf] = useState(false);
   const [sharingWhatsApp, setSharingWhatsApp] = useState(false);
+  const [sharingPdf, setSharingPdf] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncedQuote, setSyncedQuote] = useState<any>(null);
   const [language, setLanguage] = useState<'EN' | 'HI' | 'MR'>('EN');
 
   // Technical Specs
@@ -102,7 +108,7 @@ export const QuotationBuilderModal: React.FC<QuotationBuilderModalProps> = ({
   const approxMonthlyEmi = Math.round((netCustomerCost * 0.0205));
 
   const buildPdfPayload = (): QuotationPdfProps => ({
-    quotationNumber: `QT-${Date.now().toString().slice(-6)}`,
+    quotationNumber: syncedQuote?.qNumber || `QT-${Date.now().toString().slice(-6)}`,
     quotationDate: new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
     validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString('en-IN', {
       day: '2-digit',
@@ -147,14 +153,61 @@ export const QuotationBuilderModal: React.FC<QuotationBuilderModalProps> = ({
     },
   });
 
+  const syncToBackend = async (statusOverride = 'SENT') => {
+    try {
+      setSyncing(true);
+      const customerName = lead?.name || 'Valued Customer';
+      const customerPhone = lead?.mobile || lead?.phone || '';
+      const customerAddress = lead?.address || 'Site Location, Maharashtra';
+
+      const res = await quotationsApi.createQuotation({
+        leadId: lead?.id,
+        customerId: lead?.customerId,
+        newCustomer: (!lead?.id && !lead?.customerId) ? {
+          name: customerName,
+          mobile: customerPhone,
+          address: customerAddress,
+        } : undefined,
+        customerName,
+        customerPhone,
+        customerAddress,
+        systemCapacity: cap,
+        totalSystemCost: grossTotal,
+        status: statusOverride,
+        panelBrand,
+        panelWattage: 540,
+        inverterBrand,
+        inverterCapacity: cap,
+        structureBrand: structureType,
+        validityDays: 15,
+      });
+
+      if (res?.quotation) {
+        setSyncedQuote(res.quotation);
+        if (onSuccess) onSuccess(res.quotation);
+        return res.quotation;
+      }
+    } catch (err: any) {
+      console.warn('Backend quotation sync notice:', err?.message);
+    } finally {
+      setSyncing(false);
+    }
+    return null;
+  };
+
   const handlePreviewPdf = async () => {
     setGeneratingPdf(true);
     try {
+      // 1. Trigger background sync to web module if not synced
+      if (!syncedQuote) {
+        syncToBackend('VIEWED').catch(() => {});
+      }
+      // 2. Open full-screen native interactive print/PDF previewer directly
       const payload = buildPdfPayload();
       const html = generateQuotationHtml(payload);
-      await createAndSharePdf(html, `Solar_Proposal_${payload.customerName.replace(/\s+/g, '_')}.pdf`);
+      await previewPdf(html);
     } catch (err: any) {
-      Alert.alert('PDF Error', err.message || 'Could not generate proposal PDF');
+      Alert.alert('PDF Preview Error', err.message || 'Could not launch document preview');
     } finally {
       setGeneratingPdf(false);
     }
@@ -173,12 +226,14 @@ export const QuotationBuilderModal: React.FC<QuotationBuilderModalProps> = ({
   const handleShareWhatsApp = async () => {
     setSharingWhatsApp(true);
     try {
-      // 1. Generate PDF file
-      const payload = buildPdfPayload();
-      const html = generateQuotationHtml(payload);
-      const pdfUri = await createAndSharePdf(html, `Solar_Proposal_${payload.customerName.replace(/\s+/g, '_')}.pdf`);
+      // 1. Sync quotation to backend database so it appears in web module
+      const saved = await syncToBackend('SENT');
+      const quoteNum = saved?.qNumber || syncedQuote?.qNumber || `QT-${Date.now().toString().slice(-6)}`;
 
-      // 2. Open WhatsApp with formatted pitch
+      const payload = buildPdfPayload();
+      payload.quotationNumber = quoteNum;
+
+      // 2. Open WhatsApp directly with personalized pitch (without share sheet blocking)
       await openWhatsAppWithPitch({
         customerName: payload.customerName,
         customerPhone: payload.customerPhone,
@@ -193,7 +248,7 @@ export const QuotationBuilderModal: React.FC<QuotationBuilderModalProps> = ({
         language,
       });
 
-      // Save quotation record to backend if lead id exists
+      // 3. Mark stage advancement in CRM
       if (lead?.id) {
         try {
           await crmApi.advanceLeadStage(lead.id, 'PROPOSAL_SENT');
@@ -202,9 +257,25 @@ export const QuotationBuilderModal: React.FC<QuotationBuilderModalProps> = ({
         }
       }
     } catch (err: any) {
-      Alert.alert('Dispatch Error', err.message || 'Failed to dispatch quotation via WhatsApp');
+      Alert.alert('WhatsApp Dispatch Error', err.message || 'Failed to dispatch quotation via WhatsApp');
     } finally {
       setSharingWhatsApp(false);
+    }
+  };
+
+  const handleSharePdfFile = async () => {
+    setSharingPdf(true);
+    try {
+      if (!syncedQuote) {
+        syncToBackend('SENT').catch(() => {});
+      }
+      const payload = buildPdfPayload();
+      const html = generateQuotationHtml(payload);
+      await sharePdfFile(html, `Solar_Proposal_${payload.customerName.replace(/\s+/g, '_')}.pdf`);
+    } catch (err: any) {
+      Alert.alert('PDF Share Error', err.message || 'Could not export proposal PDF file');
+    } finally {
+      setSharingPdf(false);
     }
   };
 
@@ -243,15 +314,27 @@ export const QuotationBuilderModal: React.FC<QuotationBuilderModalProps> = ({
         <ScrollView style={styles.body} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           {/* CLIENT PILL */}
           <View style={styles.clientPill}>
-            <View>
+            <View style={{ flex: 1 }}>
               <Text style={styles.clientName}>{lead?.name || 'Prospect'}</Text>
               <Text style={styles.clientPhone}>
                 📞 {lead?.mobile || 'No Phone'} {lead?.consumerNumber ? `| Consumer: ${lead.consumerNumber}` : ''}
               </Text>
             </View>
-            <View style={styles.badgeProposal}>
-              <Text style={styles.badgeProposalText}>Drafting</Text>
-            </View>
+            {syncedQuote ? (
+              <View style={styles.badgeSynced}>
+                <CheckCircle2 size={12} color="#15803d" />
+                <Text style={styles.badgeSyncedText}>Web Synced: {syncedQuote.qNumber}</Text>
+              </View>
+            ) : syncing ? (
+              <View style={styles.badgeSyncing}>
+                <ActivityIndicator size="small" color="#2563eb" />
+                <Text style={styles.badgeSyncingText}>Syncing...</Text>
+              </View>
+            ) : (
+              <View style={styles.badgeProposal}>
+                <Text style={styles.badgeProposalText}>Drafting</Text>
+              </View>
+            )}
           </View>
 
           {/* SECTION 1: SYSTEM SIZING & HARDWARE */}
@@ -411,7 +494,7 @@ export const QuotationBuilderModal: React.FC<QuotationBuilderModalProps> = ({
                 <ActivityIndicator size="small" color="#0f172a" />
               ) : (
                 <>
-                  <FileText size={16} color="#0f172a" />
+                  <Eye size={16} color="#0f172a" />
                   <Text style={styles.pdfBtnText}>Preview PDF</Text>
                 </>
               )}
@@ -428,7 +511,23 @@ export const QuotationBuilderModal: React.FC<QuotationBuilderModalProps> = ({
               ) : (
                 <>
                   <MessageCircle size={18} color="#ffffff" />
-                  <Text style={styles.whatsAppBtnText}>Send WhatsApp Proposal</Text>
+                  <Text style={styles.whatsAppBtnText}>Send WhatsApp</Text>
+                </>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.shareFileBtn}
+              onPress={handleSharePdfFile}
+              disabled={sharingPdf}
+              activeOpacity={0.8}
+            >
+              {sharingPdf ? (
+                <ActivityIndicator size="small" color="#334155" />
+              ) : (
+                <>
+                  <Share2 size={16} color="#334155" />
+                  <Text style={styles.shareFileBtnText}>Share PDF</Text>
                 </>
               )}
             </TouchableOpacity>
@@ -864,5 +963,53 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '800',
     color: '#ffffff',
+  },
+  shareFileBtn: {
+    flex: 1,
+    backgroundColor: '#f1f5f9',
+    borderRadius: 10,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  shareFileBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#334155',
+  },
+  badgeSynced: {
+    backgroundColor: '#dcfce7',
+    borderWidth: 1,
+    borderColor: '#86efac',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  badgeSyncedText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#15803d',
+    textTransform: 'uppercase',
+  },
+  badgeSyncing: {
+    backgroundColor: '#eff6ff',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  badgeSyncingText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#2563eb',
   },
 });
