@@ -685,6 +685,40 @@ export function generateDiscomHtml(type: string, data: any): string {
   `;
 }
 
+function base64ToUint8Array(base64: string): Uint8Array {
+  if (typeof atob === 'function') {
+    const binaryString = atob(base64);
+    const len = binaryString.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+    return bytes;
+  }
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+  const lookup = new Uint8Array(256);
+  for (let i = 0; i < chars.length; i++) {
+    lookup[chars.charCodeAt(i)] = i;
+  }
+  let bufferLength = base64.length * 0.75;
+  if (base64[base64.length - 1] === '=') {
+    bufferLength--;
+    if (base64[base64.length - 2] === '=') bufferLength--;
+  }
+  const bytes = new Uint8Array(bufferLength);
+  let p = 0;
+  for (let i = 0; i < base64.length; i += 4) {
+    const e1 = lookup[base64.charCodeAt(i)];
+    const e2 = lookup[base64.charCodeAt(i + 1)];
+    const e3 = lookup[base64.charCodeAt(i + 2)];
+    const e4 = lookup[base64.charCodeAt(i + 3)];
+    bytes[p++] = (e1 << 2) | (e2 >> 4);
+    bytes[p++] = ((e2 & 15) << 4) | (e3 >> 2);
+    bytes[p++] = ((e3 & 3) << 6) | (e4 & 63);
+  }
+  return bytes;
+}
+
 export async function previewPdf(html: string): Promise<boolean> {
   try {
     await Print.printAsync({ html });
@@ -692,19 +726,21 @@ export async function previewPdf(html: string): Promise<boolean> {
   } catch (err: any) {
     console.warn('Native Print preview failed, falling back to share:', err?.message);
     try {
-      const { uri } = await Print.printToFileAsync({ html });
+      const { uri, base64 } = await Print.printToFileAsync({ html, base64: true });
       let shareUri = uri;
-      try {
-        const source = new File(uri);
-        const target = new File(Paths.document, 'Quotation_Preview.pdf');
-        if (target.exists) {
-          try { target.delete(); } catch (_) {}
-        }
-        await source.copy(target);
-        if (target.exists) {
-          shareUri = target.uri;
-        }
-      } catch (_) {}
+      if (base64) {
+        try {
+          const bytes = base64ToUint8Array(base64);
+          const target = new File(Paths.document, 'Quotation_Preview.pdf');
+          if (target.exists) {
+            try { target.delete(); } catch (_) {}
+          }
+          await target.write(bytes);
+          if (target.exists) {
+            shareUri = target.uri;
+          }
+        } catch (_) {}
+      }
 
       const isAvailable = await Sharing.isAvailableAsync().catch(() => false);
       if (isAvailable) {
@@ -725,40 +761,44 @@ export async function previewPdf(html: string): Promise<boolean> {
 
 export async function sharePdfFile(html: string, fileName: string): Promise<string | null> {
   try {
-    const { uri } = await Print.printToFileAsync({ html });
+    const { uri, base64 } = await Print.printToFileAsync({ html, base64: true });
     let shareableUri = uri;
 
     // Sanitize file name for file systems and messaging apps (e.g. WhatsApp document name)
     const cleanFileName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
 
-    try {
-      const sourceFile = new File(uri);
-      const targetFile = new File(Paths.document, cleanFileName);
-      if (targetFile.exists) {
-        try { targetFile.delete(); } catch (_) {}
-      }
-      await sourceFile.copy(targetFile);
-      if (targetFile.exists) {
-        shareableUri = targetFile.uri;
-      }
-    } catch (copyErr) {
-      console.warn('Could not copy PDF using Paths.document, trying Paths.cache:', copyErr);
+    // Write Base64 bytes directly to sandboxed file in Paths.document (or Paths.cache)
+    // This creates an app-owned file with 100% READ permissions so ExpoSharing won't reject it
+    if (base64) {
       try {
-        const sourceFile = new File(uri);
-        const cacheTarget = new File(Paths.cache, cleanFileName);
-        if (cacheTarget.exists) {
-          try { cacheTarget.delete(); } catch (_) {}
+        const bytes = base64ToUint8Array(base64);
+        let targetFile = new File(Paths.document, cleanFileName);
+        if (targetFile.exists) {
+          try { targetFile.delete(); } catch (_) {}
         }
-        await sourceFile.copy(cacheTarget);
-        if (cacheTarget.exists) {
-          shareableUri = cacheTarget.uri;
+        await targetFile.write(bytes);
+        if (targetFile.exists) {
+          shareableUri = targetFile.uri;
         }
-      } catch (cacheErr) {
-        console.warn('Could not copy PDF to Paths.cache:', cacheErr);
+      } catch (docErr) {
+        console.warn('Paths.document write failed, trying Paths.cache:', docErr);
+        try {
+          const bytes = base64ToUint8Array(base64);
+          let targetFile = new File(Paths.cache, cleanFileName);
+          if (targetFile.exists) {
+            try { targetFile.delete(); } catch (_) {}
+          }
+          await targetFile.write(bytes);
+          if (targetFile.exists) {
+            shareableUri = targetFile.uri;
+          }
+        } catch (cacheErr) {
+          console.warn('Paths.cache write failed:', cacheErr);
+        }
       }
     }
 
-    // 1. Try Expo Sharing (handles Android FileProvider and iOS Share Sheet)
+    // 1. Try Expo Sharing (passes content URI via FileProvider so WhatsApp attaches the file)
     try {
       const isAvailable = await Sharing.isAvailableAsync().catch(() => false);
       if (isAvailable) {
