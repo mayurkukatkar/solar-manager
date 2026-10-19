@@ -1,6 +1,6 @@
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
-import * as FileSystem from 'expo-file-system/legacy';
+import { File, Paths } from 'expo-file-system';
 import { Alert, Share } from 'react-native';
 
 export interface QuotationPdfProps {
@@ -694,14 +694,17 @@ export async function previewPdf(html: string): Promise<boolean> {
     try {
       const { uri } = await Print.printToFileAsync({ html });
       let shareUri = uri;
-      const targetDir = FileSystem.documentDirectory || FileSystem.cacheDirectory;
-      if (targetDir) {
-        try {
-          const destUri = `${targetDir}Quotation_Preview.pdf`;
-          await FileSystem.copyAsync({ from: uri, to: destUri });
-          shareUri = destUri;
-        } catch (_) {}
-      }
+      try {
+        const source = new File(uri);
+        const target = new File(Paths.document, 'Quotation_Preview.pdf');
+        if (target.exists) {
+          try { target.delete(); } catch (_) {}
+        }
+        await source.copy(target);
+        if (target.exists) {
+          shareUri = target.uri;
+        }
+      } catch (_) {}
 
       const isAvailable = await Sharing.isAvailableAsync().catch(() => false);
       if (isAvailable) {
@@ -727,22 +730,31 @@ export async function sharePdfFile(html: string, fileName: string): Promise<stri
 
     // Sanitize file name for file systems and messaging apps (e.g. WhatsApp document name)
     const cleanFileName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
-    const targetDir = FileSystem.documentDirectory || FileSystem.cacheDirectory;
 
-    if (targetDir) {
+    try {
+      const sourceFile = new File(uri);
+      const targetFile = new File(Paths.document, cleanFileName);
+      if (targetFile.exists) {
+        try { targetFile.delete(); } catch (_) {}
+      }
+      await sourceFile.copy(targetFile);
+      if (targetFile.exists) {
+        shareableUri = targetFile.uri;
+      }
+    } catch (copyErr) {
+      console.warn('Could not copy PDF using Paths.document, trying Paths.cache:', copyErr);
       try {
-        const destUri = `${targetDir}${cleanFileName}`;
-        const fileInfo = await FileSystem.getInfoAsync(destUri).catch(() => ({ exists: false }));
-        if (fileInfo && fileInfo.exists) {
-          await FileSystem.deleteAsync(destUri, { idempotent: true }).catch(() => {});
+        const sourceFile = new File(uri);
+        const cacheTarget = new File(Paths.cache, cleanFileName);
+        if (cacheTarget.exists) {
+          try { cacheTarget.delete(); } catch (_) {}
         }
-        await FileSystem.copyAsync({
-          from: uri,
-          to: destUri,
-        });
-        shareableUri = destUri;
-      } catch (copyErr) {
-        console.warn('Could not copy PDF to documentDirectory, using print uri:', copyErr);
+        await sourceFile.copy(cacheTarget);
+        if (cacheTarget.exists) {
+          shareableUri = cacheTarget.uri;
+        }
+      } catch (cacheErr) {
+        console.warn('Could not copy PDF to Paths.cache:', cacheErr);
       }
     }
 
