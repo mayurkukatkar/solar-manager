@@ -3,7 +3,7 @@ const router = express.Router();
 const prisma = require('../../db');
 const { requireTenantAuth } = require('../../middleware/auth');
 const upload = require('../../middleware/upload');
-const { uploadFileBuffer } = require('../../services/storageService');
+const { uploadFileBuffer, getSignedUrl } = require('../../services/storageService');
 const crypto = require('crypto');
 
 // Utility to track document activity
@@ -57,10 +57,120 @@ router.get('/api/tenant/documents', requireTenantAuth, async (req, res) => {
       }
     });
 
-    res.json(documents);
+    // Auto-refresh signed URLs for private Supabase bucket storage
+    const enrichedDocs = await Promise.all(
+      documents.map(async (doc) => {
+        if (doc.storageKey) {
+          const freshUrl = await getSignedUrl(doc.storageKey, 86400 * 7);
+          if (freshUrl) {
+            return { ...doc, fileUrl: freshUrl };
+          }
+        }
+        return doc;
+      })
+    );
+
+    res.json(enrichedDocs);
   } catch (error) {
     console.error('Error fetching documents:', error);
     res.status(500).json({ error: 'Failed to fetch documents' });
+  }
+});
+
+// 1.5. GET PROJECT-CENTRIC DOCUMENT DOSSIER & READINESS SUMMARY
+router.get('/api/tenant/documents/projects-summary', requireTenantAuth, async (req, res) => {
+  try {
+    const tenantId = req.user.tenantId;
+
+    const projects = await prisma.project.findMany({
+      where: { tenantId },
+      select: {
+        id: true,
+        name: true,
+        projectNumber: true,
+        capacity: true,
+        currentStage: true,
+        status: true,
+        customer: {
+          select: { id: true, name: true, mobile: true, email: true, consumerNumber: true }
+        },
+        Document: {
+          select: {
+            id: true,
+            title: true,
+            category: true,
+            status: true,
+            fileUrl: true,
+            fileType: true,
+            fileSize: true,
+            storageKey: true,
+            createdAt: true
+          }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    const summary = await Promise.all(
+      projects.map(async (p) => {
+        const rawDocs = p.Document || [];
+        // Refresh signed URLs if needed
+        const docs = await Promise.all(
+          rawDocs.map(async (d) => {
+            if (d.storageKey) {
+              const fresh = await getSignedUrl(d.storageKey, 86400 * 7);
+              if (fresh) return { ...d, fileUrl: fresh };
+            }
+            return d;
+          })
+        );
+
+        const total = docs.length;
+        const verified = docs.filter(d => d.status === 'VERIFIED').length;
+        const pending = docs.filter(d => ['PENDING_UPLOAD', 'UPLOADED', 'UNDER_REVIEW'].includes(d.status)).length;
+
+        // Essential checklist items for Indian Solar EPC
+        const hasBill = docs.some(d => d.title.toLowerCase().includes('bill') || d.category === 'Electricity / DISCOM');
+        const hasKyc = docs.some(d => d.title.toLowerCase().includes('aadhaar') || d.title.toLowerCase().includes('pan') || d.category === 'Customer KYC');
+        const hasBank = docs.some(d => d.title.toLowerCase().includes('cheque') || d.title.toLowerCase().includes('passbook') || d.title.toLowerCase().includes('bank'));
+        const hasPhotos = docs.some(d => d.title.toLowerCase().includes('photo') || d.title.toLowerCase().includes('roof') || d.title.toLowerCase().includes('site'));
+
+        let readinessScore = 0;
+        if (hasBill) readinessScore += 30;
+        if (hasKyc) readinessScore += 25;
+        if (hasBank) readinessScore += 25;
+        if (hasPhotos) readinessScore += 20;
+
+        const missingChecklist = [];
+        if (!hasBill) missingChecklist.push('Electricity Bill (DISCOM)');
+        if (!hasKyc) missingChecklist.push('Aadhaar / KYC ID');
+        if (!hasBank) missingChecklist.push('Bank Cheque / Passbook (DBT)');
+        if (!hasPhotos) missingChecklist.push('Rooftop Survey Photos');
+
+        return {
+          id: p.id,
+          name: p.name,
+          projectNumber: p.projectNumber,
+          capacity: p.capacity,
+          currentStage: p.currentStage,
+          status: p.status,
+          customer: p.customer,
+          totalDocuments: total,
+          verifiedDocuments: verified,
+          pendingDocuments: pending,
+          readinessScore,
+          missingChecklist,
+          isDbtReady: hasKyc && hasBank,
+          isDiscomReady: hasBill,
+          documents: docs
+        };
+      })
+    );
+
+    res.json({ projects: summary });
+  } catch (error) {
+    console.error('Error fetching project document summary:', error);
+    res.status(500).json({ error: 'Failed to fetch project documents summary' });
   }
 });
 
@@ -406,6 +516,28 @@ router.get('/api/tenant/projects/:projectId/document-readiness', requireTenantAu
 
   } catch (error) {
     res.status(500).json({ error: 'Failed to calculate readiness' });
+  }
+});
+
+// 13. GET ON-DEMAND SIGNED URL FOR PRIVATE STORAGE
+router.get('/api/tenant/documents/:id/secure-url', requireTenantAuth, async (req, res) => {
+  try {
+    const doc = await prisma.document.findUnique({
+      where: { id: req.params.id, tenantId: req.user.tenantId }
+    });
+    if (!doc) return res.status(404).json({ error: 'Document not found' });
+
+    if (doc.storageKey) {
+      const signedUrl = await getSignedUrl(doc.storageKey, 3600); // 1-hour secure link
+      if (signedUrl) {
+        return res.json({ url: signedUrl, title: doc.title, fileType: doc.fileType });
+      }
+    }
+
+    res.json({ url: doc.fileUrl, title: doc.title, fileType: doc.fileType });
+  } catch (error) {
+    console.error('Error generating secure URL:', error);
+    res.status(500).json({ error: 'Failed to generate secure URL' });
   }
 });
 

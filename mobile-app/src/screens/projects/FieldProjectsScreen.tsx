@@ -34,6 +34,7 @@ import { apiClient } from '../../api/client';
 import { DiscomDocsModal } from './DiscomDocsModal';
 import { BarcodeScannerModal } from '../operations/BarcodeScannerModal';
 import { InstallationQAModal } from '../operations/InstallationQAModal';
+import { ProjectDossierModal } from './ProjectDossierModal';
 import { colors } from '../../theme/colors';
 
 const PROJECT_STAGES = [
@@ -364,73 +365,14 @@ export const FieldProjectsScreen: React.FC<{ navigation?: any }> = ({ navigation
         />
       )}
 
-      {/* FIELD DOCUMENTS VIEWER MODAL */}
+      {/* PROJECT DOSSIER & COMPLIANCE VAULT MODAL */}
       {selectedProject && (
-        <Modal
+        <ProjectDossierModal
           visible={docsModalVisible}
-          animationType="slide"
-          transparent={false}
-          onRequestClose={() => setDocsModalVisible(false)}
-        >
-          <View style={styles.docModalContainer}>
-            <View style={styles.docModalHeader}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.docModalTitle}>Project Documents</Text>
-                <Text style={styles.docModalSubtitle}>
-                  {selectedProject.projectNumber || 'PRJ'} • {selectedProject.name}
-                </Text>
-              </View>
-              <TouchableOpacity
-                onPress={() => setDocsModalVisible(false)}
-                style={styles.closeBtn}
-                activeOpacity={0.7}
-              >
-                <X size={20} color="#64748b" />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView style={{ flex: 1, padding: 16 }}>
-              {(!selectedProject.Document || selectedProject.Document.length === 0) ? (
-                <View style={styles.emptyDocsBox}>
-                  <FileText size={40} color="#94a3b8" />
-                  <Text style={styles.emptyDocsTitle}>No Uploaded Documents</Text>
-                  <Text style={styles.emptyDocsSub}>
-                    Documents attached by field representatives during onboarding (Electricity bill, Aadhaar, PAN, Roof photos) will be listed here.
-                  </Text>
-                </View>
-              ) : (
-                selectedProject.Document.map((doc: any) => (
-                  <View key={doc.id} style={styles.docItemCard}>
-                    <View style={styles.docItemLeft}>
-                      <View style={styles.docItemIconCircle}>
-                        <FileText size={18} color="#2563eb" />
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.docItemTitle}>{doc.title}</Text>
-                        <Text style={styles.docItemCategory}>
-                          {doc.category || 'Customer KYC'} • {new Date(doc.createdAt).toLocaleDateString()}
-                        </Text>
-                        <Text style={styles.docItemStatus}>
-                          Status: <Text style={{ color: doc.status === 'VERIFIED' ? '#16a34a' : '#d97706', fontWeight: 'bold' }}>{doc.status || 'UPLOADED'}</Text>
-                        </Text>
-                      </View>
-                    </View>
-                    {doc.fileUrl && (
-                      <TouchableOpacity
-                        style={styles.docOpenBtn}
-                        onPress={() => openDocumentUrl(doc.fileUrl)}
-                        activeOpacity={0.7}
-                      >
-                        <ExternalLink size={14} color="#2563eb" />
-                        <Text style={styles.docOpenText}>View</Text>
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                ))
-              )}
-            </ScrollView>
-          </View>
-        </Modal>
+          project={selectedProject}
+          onClose={() => setDocsModalVisible(false)}
+          onRefreshProject={fetchProjects}
+        />
       )}
     </View>
   );

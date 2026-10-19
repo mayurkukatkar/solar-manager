@@ -364,6 +364,22 @@ export const documentsApi = {
     const res = await apiClient.get(`/api/tenant/projects/${projectId}/document-checklist`);
     return res.data;
   },
+  getProjectsSummary: async () => {
+    const res = await apiClient.get('/api/tenant/documents/projects-summary');
+    return res.data;
+  },
+  verifyDocument: async (id: string) => {
+    const res = await apiClient.post(`/api/tenant/documents/${id}/verify`);
+    return res.data;
+  },
+  deleteDocument: async (id: string) => {
+    const res = await apiClient.delete(`/api/tenant/documents/${id}`);
+    return res.data;
+  },
+  getSecureUrl: async (id: string) => {
+    const res = await apiClient.get(`/api/tenant/documents/${id}/secure-url`);
+    return res.data;
+  },
 };
 
 // Backward-compatible aliases
