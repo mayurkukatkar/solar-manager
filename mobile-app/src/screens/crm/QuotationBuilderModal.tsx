@@ -70,22 +70,31 @@ export const QuotationBuilderModal: React.FC<QuotationBuilderModalProps> = ({
   const [inverterBrand, setInverterBrand] = useState('Solis 3.3kW Grid-Tied Inverter');
   const [structureType, setStructureType] = useState('Elevated HDG GI Structure');
 
-  // Single Pricing Input: Solar System Cost (Including All GST)
-  const initialCapNum = parseFloat(String(initialCap)) || 3.3;
+  // Single Pricing Input: Solar System Cost (Entered manually by user, NOT calculated from kW)
   const [totalSystemCost, setTotalSystemCost] = useState<string>(
-    String(Math.round(initialCapNum * 58000))
+    lead?.estimatedValue && Number(lead.estimatedValue) > 0 ? String(lead.estimatedValue) : ''
   );
+
+  // Auto-fill capacity and quote amount from lead when opened
+  useEffect(() => {
+    if (visible && lead) {
+      const capVal = lead?.estimatedCap || lead?.recommendedKw || 3.3;
+      setCapacityKw(String(capVal));
+      if (lead?.estimatedValue && Number(lead.estimatedValue) > 0) {
+        setTotalSystemCost(String(lead.estimatedValue));
+      } else {
+        setTotalSystemCost('');
+      }
+    }
+  }, [visible, lead]);
 
   // Solar Economics Calculation
   const cap = parseFloat(capacityKw) || 3.3;
-  const grossTotal = parseFloat(totalSystemCost) || Math.round(cap * 58000);
+  const grossTotal = parseFloat(totalSystemCost) || 0;
 
   const handleCapacityChange = (val: string) => {
     setCapacityKw(val);
-    const c = parseFloat(val);
-    if (!isNaN(c) && c > 0) {
-      setTotalSystemCost(String(Math.round(c * 58000)));
-    }
+    // DO NOT overwrite or auto-calculate amount based on kW! User enters custom agreed amount.
   };
 
   // PM Surya Ghar Muft Bijli Yojana Central Subsidy
@@ -217,6 +226,10 @@ export const QuotationBuilderModal: React.FC<QuotationBuilderModalProps> = ({
   };
 
   const handleShareWhatsAppPdf = async () => {
+    if (grossTotal <= 0) {
+      Alert.alert('Amount Required', 'Please enter the Total Solar System Cost (₹) before sharing the proposal.');
+      return;
+    }
     setSharingWhatsApp(true);
     try {
       // 1. Sync quotation to backend database so it appears in web module
@@ -243,6 +256,10 @@ export const QuotationBuilderModal: React.FC<QuotationBuilderModalProps> = ({
   };
 
   const handleSendTextPitch = async () => {
+    if (grossTotal <= 0) {
+      Alert.alert('Amount Required', 'Please enter the Total Solar System Cost (₹) before sending the pitch.');
+      return;
+    }
     setSendingPitchText(true);
     try {
       await syncToBackend('SENT');
@@ -272,6 +289,10 @@ export const QuotationBuilderModal: React.FC<QuotationBuilderModalProps> = ({
   };
 
   const handleSharePdfFile = async () => {
+    if (grossTotal <= 0) {
+      Alert.alert('Amount Required', 'Please enter the Total Solar System Cost (₹) before exporting the PDF.');
+      return;
+    }
     setSharingPdf(true);
     try {
       if (!syncedQuote) {

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -25,10 +25,11 @@ import {
   ArrowRight,
   Trash2,
   Sparkles,
+  Zap,
 } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
-import { crmApi } from '../../api/endpoints';
+import { crmApi, documentsApi } from '../../api/endpoints';
 
 interface CustomerOnboardingModalProps {
   visible: boolean;
@@ -56,13 +57,19 @@ export const CustomerOnboardingModal: React.FC<CustomerOnboardingModalProps> = (
 }) => {
   const [submitting, setSubmitting] = useState(false);
 
-  // Customer Legal Profile
+  // Customer Legal Profile - initialized from opened lead
   const [legalName, setLegalName] = useState(lead?.name || '');
   const [mobile, setMobile] = useState(lead?.mobile || lead?.phone || '');
   const [email, setEmail] = useState(lead?.email || '');
   const [address, setAddress] = useState(lead?.address || '');
   const [city, setCity] = useState(lead?.city || '');
   const [pincode, setPincode] = useState(lead?.pincode || '');
+  const [consumerNumber, setConsumerNumber] = useState(
+    lead?.consumerNumber || lead?.electricityConnection || ''
+  );
+  const [capacity, setCapacity] = useState(
+    String(quotationData?.capacityKw || lead?.estimatedCap || lead?.recommendedKw || 3.3)
+  );
 
   // Roof & Technical Site Specs
   const [roofType, setRoofType] = useState('RCC Flat Concrete');
@@ -77,8 +84,12 @@ export const CustomerOnboardingModal: React.FC<CustomerOnboardingModalProps> = (
   const [accountHolderName, setAccountHolderName] = useState(lead?.name || '');
 
   // Token Advance (20% of turnkey plant cost including all GST)
-  const systemTotal = quotationData?.grossTotal || quotationData?.totalSystemCost || (quotationData?.netCustomerCost ? quotationData.netCustomerCost : 185000);
-  const defaultAdvance = String(Math.round(systemTotal * 0.2));
+  const systemTotal =
+    quotationData?.grossTotal ||
+    quotationData?.totalSystemCost ||
+    lead?.estimatedValue ||
+    0;
+  const defaultAdvance = systemTotal > 0 ? String(Math.round(systemTotal * 0.2)) : '';
   const [advanceAmount, setAdvanceAmount] = useState(defaultAdvance);
   const [paymentMode, setPaymentMode] = useState('UPI / QR Transfer');
   const [transactionRef, setTransactionRef] = useState('');
@@ -89,40 +100,109 @@ export const CustomerOnboardingModal: React.FC<CustomerOnboardingModalProps> = (
       id: 'ELECTRICITY_BILL',
       title: 'Electricity Bill (Latest Copy)',
       subtitle: 'Mandatory for MSEDCL Consumer Number & load verification',
-      required: true,
+      required: false,
       uri: lead?.billPhotoUri,
     },
     {
       id: 'AADHAAR_CARD',
       title: 'Aadhaar Card (Front & Back)',
       subtitle: 'National Portal PM Surya Ghar KYC verification',
-      required: true,
+      required: false,
     },
     {
       id: 'PAN_CARD',
       title: 'PAN Card',
       subtitle: 'Required for solar billing & tax compliance',
-      required: true,
+      required: false,
     },
     {
       id: 'PROPERTY_TAX',
       title: 'Property Tax Receipt / Index II',
       subtitle: 'Proof of premises ownership for rooftop erection',
-      required: true,
+      required: false,
     },
     {
       id: 'CANCELLED_CHEQUE',
       title: 'Cancelled Cheque / Bank Passbook',
       subtitle: 'Crucial for direct subsidy transfer into client bank account',
-      required: true,
+      required: false,
     },
     {
       id: 'ROOF_PHOTOS',
       title: 'Site & Terrace Roof Photos',
       subtitle: 'Shadow analysis & structure mounting location',
-      required: true,
+      required: false,
     },
   ]);
+
+  // AUTO-FILL ALL CUSTOMER DETAILS FROM OPENED LEAD
+  useEffect(() => {
+    if (visible && lead) {
+      setLegalName(lead.name || '');
+      setMobile(lead.mobile || lead.phone || '');
+      setEmail(lead.email || '');
+      setAddress(lead.address || '');
+      setCity(lead.city || '');
+      setPincode(lead.pincode || '');
+      setAccountHolderName(lead.name || '');
+      setConsumerNumber(lead.consumerNumber || lead.electricityConnection || '');
+      setCapacity(
+        String(quotationData?.capacityKw || lead.estimatedCap || lead.recommendedKw || 3.3)
+      );
+
+      const sysTotal =
+        quotationData?.grossTotal ||
+        quotationData?.totalSystemCost ||
+        lead.estimatedValue ||
+        0;
+      if (sysTotal > 0) {
+        setAdvanceAmount(String(Math.round(sysTotal * 0.2)));
+      } else {
+        setAdvanceAmount('');
+      }
+
+      setDocuments([
+        {
+          id: 'ELECTRICITY_BILL',
+          title: 'Electricity Bill (Latest Copy)',
+          subtitle: 'Mandatory for MSEDCL Consumer Number & load verification',
+          required: false,
+          uri: lead.billPhotoUri || undefined,
+          fileName: lead.billPhotoUri ? 'Electricity_Bill.jpg' : undefined,
+        },
+        {
+          id: 'AADHAAR_CARD',
+          title: 'Aadhaar Card (Front & Back)',
+          subtitle: 'National Portal PM Surya Ghar KYC verification',
+          required: false,
+        },
+        {
+          id: 'PAN_CARD',
+          title: 'PAN Card',
+          subtitle: 'Required for solar billing & tax compliance',
+          required: false,
+        },
+        {
+          id: 'PROPERTY_TAX',
+          title: 'Property Tax Receipt / Index II',
+          subtitle: 'Proof of premises ownership for rooftop erection',
+          required: false,
+        },
+        {
+          id: 'CANCELLED_CHEQUE',
+          title: 'Cancelled Cheque / Bank Passbook',
+          subtitle: 'Crucial for direct subsidy transfer into client bank account',
+          required: false,
+        },
+        {
+          id: 'ROOF_PHOTOS',
+          title: 'Site & Terrace Roof Photos',
+          subtitle: 'Shadow analysis & structure mounting location',
+          required: false,
+        },
+      ]);
+    }
+  }, [visible, lead, quotationData]);
 
   const handleCapturePhoto = async (docId: string) => {
     try {
@@ -176,67 +256,85 @@ export const CustomerOnboardingModal: React.FC<CustomerOnboardingModalProps> = (
       return;
     }
 
-    // Check mandatory documents
-    const missingDocs = documents.filter((d) => d.required && !d.uri);
-    if (missingDocs.length > 0) {
-      Alert.alert(
-        'Missing Documents',
-        `Please attach the following required documents before converting to client:\n• ${missingDocs.map((d) => d.title).join('\n• ')}`
-      );
-      return;
-    }
-
     setSubmitting(true);
     try {
-      // 1. Convert Lead to Client & Project in live backend
+      // 1. Convert Lead to Client & Project in live backend with all financial & site metadata
       let projectResult: any = null;
       if (lead?.id) {
-        const convertRes = await crmApi.convertLead(lead.id);
-        projectResult = convertRes.project || {
-          id: `prj_${Date.now()}`,
-          name: `${legalName} Rooftop Solar Project`,
-          capacity: quotationData?.capacityKw || lead?.estimatedCap || 3.3,
-          status: 'PLANNING',
-          customer: {
-            name: legalName,
-            mobile,
-            address,
-            city,
-            consumerNumber: lead?.consumerNumber,
-          },
-        };
-      } else {
+        const convertRes = await crmApi.convertLead(lead.id, {
+          customerName: legalName.trim(),
+          mobile: mobile.trim(),
+          email: email.trim() || undefined,
+          address: address.trim() || undefined,
+          city: city.trim() || undefined,
+          pincode: pincode.trim() || undefined,
+          capacity: parseFloat(capacity) || quotationData?.capacityKw || lead?.estimatedCap || 3.3,
+          bankName,
+          accountNumber,
+          ifscCode,
+          accountHolderName,
+          consumerNumber: consumerNumber.trim() || lead?.consumerNumber || '410022120526',
+        });
+        projectResult = convertRes.project;
+      }
+
+      if (!projectResult) {
         projectResult = {
           id: `prj_${Date.now()}`,
+          projectNumber: `PRJ-${Date.now().toString().slice(-5)}`,
           name: `${legalName} Rooftop Solar Project`,
-          capacity: quotationData?.capacityKw || 3.3,
-          status: 'PLANNING',
+          capacity: quotationData?.capacityKw || lead?.estimatedCap || 3.3,
+          status: 'In Progress',
+          currentStage: 'Planning',
           customer: {
             name: legalName,
             mobile,
             address,
             city,
+            consumerNumber: lead?.consumerNumber || '410022120526',
           },
         };
       }
 
+      // 2. Upload all attached KYC documents to backend storage
+      const attachedDocs = documents.filter((d): d is DocSlot & { uri: string } => Boolean(d.uri));
+      let uploadedCount = 0;
+      if (attachedDocs.length > 0 && projectResult?.id) {
+        for (const doc of attachedDocs) {
+          try {
+            const formData = new FormData();
+            const isPdf = (doc.fileName && doc.fileName.toLowerCase().endsWith('.pdf')) || doc.uri.toLowerCase().endsWith('.pdf');
+            formData.append('file', {
+              uri: doc.uri,
+              name: doc.fileName || `${doc.id.toLowerCase()}.${isPdf ? 'pdf' : 'jpg'}`,
+              type: isPdf ? 'application/pdf' : 'image/jpeg',
+            } as any);
+            formData.append('title', doc.title);
+            formData.append('category', 'Customer KYC');
+            formData.append('projectId', projectResult.id);
+            formData.append('entityType', 'PROJECT');
+            formData.append('entityId', projectResult.id);
+            if (projectResult.customerId || projectResult.customer?.id) {
+              formData.append('customerId', projectResult.customerId || projectResult.customer?.id);
+            }
+
+            await documentsApi.uploadDocument(formData);
+            uploadedCount++;
+          } catch (uploadErr: any) {
+            console.warn(`Document upload warning for ${doc.title}:`, uploadErr.message);
+          }
+        }
+      }
+
       Alert.alert(
         'Client Onboarded Successfully!',
-        `Customer "${legalName}" has been converted to an active Project with all KYC documents attached.\n\nProject Code: PRJ-2026-${Date.now().toString().slice(-4)}`
+        `Customer "${legalName}" converted to Project: ${projectResult.projectNumber || projectResult.name}.\n\n${uploadedCount} KYC documents uploaded to central cloud repository.`
       );
 
       onSuccess(projectResult);
       onClose();
     } catch (err: any) {
-      Alert.alert('Onboarding Notice', err.message || 'Customer profile created locally.');
-      onSuccess({
-        id: `prj_${Date.now()}`,
-        name: `${legalName} Solar Project`,
-        capacity: quotationData?.capacityKw || 3.3,
-        status: 'PLANNING',
-        customer: { name: legalName, mobile, address, city },
-      });
-      onClose();
+      Alert.alert('Onboarding Notice', err.message || 'Could not complete onboarding.');
     } finally {
       setSubmitting(false);
     }
@@ -336,6 +434,29 @@ export const CustomerOnboardingModal: React.FC<CustomerOnboardingModalProps> = (
                   onChangeText={setPincode}
                   keyboardType="numeric"
                   maxLength={6}
+                />
+              </View>
+            </View>
+
+            <View style={styles.formRow}>
+              <View style={styles.formCol}>
+                <Text style={styles.label}>DISCOM Consumer No.</Text>
+                <TextInput
+                  style={styles.input}
+                  value={consumerNumber}
+                  onChangeText={setConsumerNumber}
+                  placeholder="e.g. 410022120526"
+                  keyboardType="numeric"
+                />
+              </View>
+              <View style={styles.formCol}>
+                <Text style={styles.label}>Proposed Capacity (kWp) *</Text>
+                <TextInput
+                  style={styles.input}
+                  value={capacity}
+                  onChangeText={setCapacity}
+                  keyboardType="numeric"
+                  placeholder="e.g. 3.3"
                 />
               </View>
             </View>

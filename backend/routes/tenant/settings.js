@@ -3,6 +3,7 @@ const router = express.Router();
 const prisma = require('../../db');
 const { requireTenantAuth } = require('../../middleware/auth');
 const upload = require('../../middleware/upload');
+const { uploadFileBuffer } = require('../../services/storageService');
 
 // TENANT - SETTINGS & COMPANY PROFILE
 // ----------------------------------------------------
@@ -63,7 +64,8 @@ router.patch('/api/tenant/settings', requireTenantAuth, async (req, res) => {
 router.post('/api/tenant/settings/upload', requireTenantAuth, upload.single('file'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No file provided' });
-    res.json({ url: req.file.path });
+    const uploaded = await uploadFileBuffer(req.file, 'settings', req);
+    res.json({ url: uploaded.fileUrl });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Failed to upload file' });

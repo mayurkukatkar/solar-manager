@@ -9,6 +9,7 @@ import {
   RefreshControl,
   ActivityIndicator,
   Linking,
+  Alert,
 } from 'react-native';
 import {
   Briefcase,
@@ -23,8 +24,13 @@ import {
   Zap,
   QrCode,
   Award,
+  FileText,
+  ExternalLink,
+  X,
 } from 'lucide-react-native';
+import { Modal } from 'react-native';
 import { tenantApi } from '../../api/endpoints';
+import { apiClient } from '../../api/client';
 import { DiscomDocsModal } from './DiscomDocsModal';
 import { BarcodeScannerModal } from '../operations/BarcodeScannerModal';
 import { InstallationQAModal } from '../operations/InstallationQAModal';
@@ -49,11 +55,18 @@ export const FieldProjectsScreen: React.FC<{ navigation?: any }> = ({ navigation
   const [discomModalVisible, setDiscomModalVisible] = useState(false);
   const [barcodeModalVisible, setBarcodeModalVisible] = useState(false);
   const [qaModalVisible, setQaModalVisible] = useState(false);
+  const [docsModalVisible, setDocsModalVisible] = useState(false);
   const [selectedProject, setSelectedProject] = useState<any | null>(null);
 
   useEffect(() => {
     fetchProjects();
-  }, []);
+    if (navigation?.addListener) {
+      const unsubscribe = navigation.addListener('focus', () => {
+        fetchProjects();
+      });
+      return unsubscribe;
+    }
+  }, [navigation]);
 
   const fetchProjects = async () => {
     try {
@@ -74,6 +87,20 @@ export const FieldProjectsScreen: React.FC<{ navigation?: any }> = ({ navigation
     fetchProjects();
   };
 
+  const openDocumentUrl = async (rawUrl?: string | null) => {
+    if (!rawUrl) return;
+    let finalUrl = rawUrl;
+    if (!finalUrl.startsWith('http://') && !finalUrl.startsWith('https://')) {
+      const base = apiClient.defaults.baseURL || 'http://localhost:5000';
+      finalUrl = `${base.replace(/\/+$/, '')}${finalUrl.startsWith('/') ? '' : '/'}${finalUrl}`;
+    }
+    try {
+      await Linking.openURL(finalUrl);
+    } catch {
+      Alert.alert('Cannot Open Document', 'Unable to open document file: ' + finalUrl);
+    }
+  };
+
   const handleOpenDiscomModal = (proj: any) => {
     setSelectedProject(proj);
     setDiscomModalVisible(true);
@@ -89,6 +116,11 @@ export const FieldProjectsScreen: React.FC<{ navigation?: any }> = ({ navigation
     setQaModalVisible(true);
   };
 
+  const handleOpenDocsModal = (proj: any) => {
+    setSelectedProject(proj);
+    setDocsModalVisible(true);
+  };
+
   const handleCall = (phone?: string) => {
     if (!phone) return;
     const clean = phone.replace(/[^0-9]/g, '');
@@ -96,16 +128,33 @@ export const FieldProjectsScreen: React.FC<{ navigation?: any }> = ({ navigation
   };
 
   const filteredProjects = projects.filter((p) => {
+    const subsidy = p.subsidies && p.subsidies.length > 0 ? p.subsidies[0] : null;
+    const consumerNo = p.consumerNumber || subsidy?.consumerNumber || p.customer?.consumerNumber || p.lead?.electricityConnection || '';
+
     const matchesSearch =
       (p.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (p.projectNumber || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
       (p.customer?.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (p.consumerNumber || '').includes(searchQuery);
+      (p.lead?.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      consumerNo.includes(searchQuery);
 
     if (!matchesSearch) return false;
-    if (activeFilter === 'PLANNING') return p.status === 'PLANNING' || p.status === 'SURVEY';
-    if (activeFilter === 'DISCOM') return p.status === 'DISCOM' || p.status === 'FEASIBILITY';
-    if (activeFilter === 'INSTALLATION') return p.status === 'INSTALLATION' || p.status === 'TESTING';
-    if (activeFilter === 'COMPLETED') return p.status === 'COMPLETED' || p.status === 'SYNCHRONIZED';
+
+    const stage = (p.currentStage || '').toUpperCase();
+    const stat = (p.status || '').toUpperCase();
+
+    if (activeFilter === 'PLANNING') {
+      return stage === 'PLANNING' || stat === 'PLANNING' || stat === 'SURVEY' || stat === 'NOT STARTED';
+    }
+    if (activeFilter === 'DISCOM') {
+      return stage === 'DESIGN' || stage === 'PROCUREMENT' || stat === 'DISCOM' || stat === 'FEASIBILITY';
+    }
+    if (activeFilter === 'INSTALLATION') {
+      return stage === 'INSTALLATION' || stage === 'TESTING' || stat === 'INSTALLATION' || stat === 'TESTING' || (stat === 'IN PROGRESS' && stage !== 'COMPLETED');
+    }
+    if (activeFilter === 'COMPLETED') {
+      return stage === 'COMPLETED' || stage === 'HANDOVER' || stat === 'COMPLETED' || stat === 'SYNCHRONIZED';
+    }
     return true;
   });
 
@@ -185,6 +234,10 @@ export const FieldProjectsScreen: React.FC<{ navigation?: any }> = ({ navigation
               <View key={p.id} style={styles.projectCard}>
                 <View style={styles.cardTopRow}>
                   <View style={styles.cardHeaderInfo}>
+                    <View style={styles.badgeRow}>
+                      <Text style={styles.projectNumberBadge}>{p.projectNumber || 'PRJ-NEW'}</Text>
+                      <Text style={styles.stageTag}>{p.currentStage || p.status || 'Planning'}</Text>
+                    </View>
                     <Text style={styles.projectName}>{p.name}</Text>
                     <Text style={styles.clientDetail}>
                       👤 {custName} | 📞 {phone || 'N/A'}
@@ -208,7 +261,7 @@ export const FieldProjectsScreen: React.FC<{ navigation?: any }> = ({ navigation
                 <View style={styles.milestoneBox}>
                   <View style={styles.milestoneHeader}>
                     <Text style={styles.milestoneTitle}>Stage Progress</Text>
-                    <Text style={styles.milestoneStatus}>{p.status || 'PLANNING'}</Text>
+                    <Text style={styles.milestoneStatus}>{p.currentStage || p.status || 'PLANNING'}</Text>
                   </View>
                   <View style={styles.progressBarTrack}>
                     <View
@@ -216,11 +269,11 @@ export const FieldProjectsScreen: React.FC<{ navigation?: any }> = ({ navigation
                         styles.progressBarFill,
                         {
                           width:
-                            p.status === 'COMPLETED'
+                            (p.currentStage === 'Completed' || p.status === 'COMPLETED')
                               ? '100%'
-                              : p.status === 'INSTALLATION'
+                              : (p.currentStage === 'Installation' || p.status === 'INSTALLATION')
                               ? '75%'
-                              : p.status === 'DISCOM'
+                              : (p.currentStage === 'Design' || p.status === 'DISCOM')
                               ? '45%'
                               : '25%',
                         },
@@ -229,7 +282,7 @@ export const FieldProjectsScreen: React.FC<{ navigation?: any }> = ({ navigation
                   </View>
                 </View>
 
-                {/* 3 FIELD ACTION CTAS */}
+                {/* 4 FIELD ACTION CTAS */}
                 <View style={styles.cardActionsCol}>
                   <View style={styles.actionRowTop}>
                     <TouchableOpacity
@@ -241,12 +294,21 @@ export const FieldProjectsScreen: React.FC<{ navigation?: any }> = ({ navigation
                     </TouchableOpacity>
 
                     <TouchableOpacity
+                      style={styles.docsBtn}
+                      onPress={() => handleOpenDocsModal(p)}
+                      activeOpacity={0.8}
+                    >
+                      <FileText size={14} color="#7c3aed" />
+                      <Text style={styles.docsBtnText}>Docs ({(p.Document || []).length})</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
                       style={styles.barcodeBtn}
                       onPress={() => handleOpenBarcodeModal({ ...p, consumerNumber: consumerNo, capacity: cap })}
                       activeOpacity={0.8}
                     >
                       <QrCode size={14} color="#2563eb" />
-                      <Text style={styles.barcodeBtnText}>Scan Barcodes</Text>
+                      <Text style={styles.barcodeBtnText}>Barcodes</Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity
@@ -255,7 +317,7 @@ export const FieldProjectsScreen: React.FC<{ navigation?: any }> = ({ navigation
                       activeOpacity={0.8}
                     >
                       <ShieldCheck size={14} color="#16a34a" />
-                      <Text style={styles.qaBtnText}>QA & Testing</Text>
+                      <Text style={styles.qaBtnText}>QA Test</Text>
                     </TouchableOpacity>
                   </View>
 
@@ -300,6 +362,75 @@ export const FieldProjectsScreen: React.FC<{ navigation?: any }> = ({ navigation
           onClose={() => setQaModalVisible(false)}
           onSuccess={fetchProjects}
         />
+      )}
+
+      {/* FIELD DOCUMENTS VIEWER MODAL */}
+      {selectedProject && (
+        <Modal
+          visible={docsModalVisible}
+          animationType="slide"
+          transparent={false}
+          onRequestClose={() => setDocsModalVisible(false)}
+        >
+          <View style={styles.docModalContainer}>
+            <View style={styles.docModalHeader}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.docModalTitle}>Project Documents</Text>
+                <Text style={styles.docModalSubtitle}>
+                  {selectedProject.projectNumber || 'PRJ'} • {selectedProject.name}
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setDocsModalVisible(false)}
+                style={styles.closeBtn}
+                activeOpacity={0.7}
+              >
+                <X size={20} color="#64748b" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={{ flex: 1, padding: 16 }}>
+              {(!selectedProject.Document || selectedProject.Document.length === 0) ? (
+                <View style={styles.emptyDocsBox}>
+                  <FileText size={40} color="#94a3b8" />
+                  <Text style={styles.emptyDocsTitle}>No Uploaded Documents</Text>
+                  <Text style={styles.emptyDocsSub}>
+                    Documents attached by field representatives during onboarding (Electricity bill, Aadhaar, PAN, Roof photos) will be listed here.
+                  </Text>
+                </View>
+              ) : (
+                selectedProject.Document.map((doc: any) => (
+                  <View key={doc.id} style={styles.docItemCard}>
+                    <View style={styles.docItemLeft}>
+                      <View style={styles.docItemIconCircle}>
+                        <FileText size={18} color="#2563eb" />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.docItemTitle}>{doc.title}</Text>
+                        <Text style={styles.docItemCategory}>
+                          {doc.category || 'Customer KYC'} • {new Date(doc.createdAt).toLocaleDateString()}
+                        </Text>
+                        <Text style={styles.docItemStatus}>
+                          Status: <Text style={{ color: doc.status === 'VERIFIED' ? '#16a34a' : '#d97706', fontWeight: 'bold' }}>{doc.status || 'UPLOADED'}</Text>
+                        </Text>
+                      </View>
+                    </View>
+                    {doc.fileUrl && (
+                      <TouchableOpacity
+                        style={styles.docOpenBtn}
+                        onPress={() => openDocumentUrl(doc.fileUrl)}
+                        activeOpacity={0.7}
+                      >
+                        <ExternalLink size={14} color="#2563eb" />
+                        <Text style={styles.docOpenText}>View</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                ))
+              )}
+            </ScrollView>
+          </View>
+        </Modal>
       )}
     </View>
   );
@@ -561,6 +692,154 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '800',
     color: '#16a34a',
+  },
+  badgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 4,
+  },
+  projectNumberBadge: {
+    fontSize: 10,
+    fontWeight: '800',
+    backgroundColor: '#eff6ff',
+    color: '#1d4ed8',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+  },
+  stageTag: {
+    fontSize: 10,
+    fontWeight: '700',
+    backgroundColor: '#f1f5f9',
+    color: '#475569',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  docsBtn: {
+    flex: 1,
+    backgroundColor: '#faf5ff',
+    borderWidth: 1,
+    borderColor: '#e9d5ff',
+    borderRadius: 8,
+    paddingVertical: 9,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+  },
+  docsBtnText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#7c3aed',
+  },
+  docModalContainer: {
+    flex: 1,
+    backgroundColor: '#f8fafc',
+  },
+  docModalHeader: {
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 20,
+    paddingTop: 54,
+    paddingBottom: 16,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+  },
+  docModalTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#0f172a',
+  },
+  docModalSubtitle: {
+    fontSize: 12,
+    color: '#64748b',
+    marginTop: 2,
+  },
+  closeBtn: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: '#f1f5f9',
+  },
+  emptyDocsBox: {
+    paddingTop: 80,
+    alignItems: 'center',
+    paddingHorizontal: 24,
+  },
+  emptyDocsTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#0f172a',
+    marginTop: 12,
+  },
+  emptyDocsSub: {
+    fontSize: 12,
+    color: '#64748b',
+    textAlign: 'center',
+    marginTop: 6,
+    lineHeight: 18,
+  },
+  docItemCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  docItemLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  docItemIconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    backgroundColor: '#eff6ff',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  docItemTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#0f172a',
+  },
+  docItemCategory: {
+    fontSize: 11,
+    color: '#64748b',
+    marginTop: 2,
+  },
+  docItemStatus: {
+    fontSize: 10,
+    color: '#94a3b8',
+    marginTop: 2,
+  },
+  docOpenBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    backgroundColor: '#eff6ff',
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+    marginLeft: 8,
+  },
+  docOpenText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#2563eb',
   },
   discomCta: {
     backgroundColor: '#0f172a',

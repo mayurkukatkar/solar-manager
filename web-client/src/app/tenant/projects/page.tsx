@@ -79,7 +79,7 @@ export default function ProjectsDashboard() {
     return projects.filter(p => {
       // 1. Status Filter
       if (selectedStatus === 'IN_PROGRESS') {
-        const inProgressStages = ['Design', 'Procurement', 'Installation', 'Testing'];
+        const inProgressStages = ['Planning', 'Design', 'Procurement', 'Installation', 'Testing'];
         if (!inProgressStages.includes(p.currentStage) || p.status === 'Delayed') return false;
       } else if (selectedStatus === 'DELAYED') {
         if (p.status !== 'Delayed') return false;

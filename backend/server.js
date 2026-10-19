@@ -33,9 +33,13 @@ app.use(cors({
   },
   credentials: true
 }));
+const path = require('path');
 app.use(express.json({ limit: '25mb' }));
 app.use(express.urlencoded({ extended: true, limit: '25mb' }));
 app.use(cookieParser());
+
+// Static file serving for uploads (KYC, documents, photos, invoices)
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 
 // AUTH

@@ -206,6 +206,7 @@ router.post('/api/tenant/leads/:id/convert', requireTenantAuth, async (req, res)
   try {
     const { id } = req.params;
     const tenantId = req.user.tenantId;
+    const userId = req.user.userId || req.user.id;
 
     const lead = await prisma.lead.findUnique({ where: { id, tenantId } });
     if (!lead) return res.status(404).json({ error: 'Lead not found' });
@@ -223,38 +224,86 @@ router.post('/api/tenant/leads/:id/convert', requireTenantAuth, async (req, res)
         data: {
           tenantId,
           leadId: id,
-          name: lead.name,
-          email: lead.email,
-          mobile: lead.mobile,
+          name: req.body.customerName || lead.name,
+          email: req.body.email || lead.email,
+          mobile: req.body.mobile || lead.mobile,
           company: lead.company,
-          address: lead.address,
-          city: lead.city,
+          address: req.body.address || lead.address,
+          city: req.body.city || lead.city || 'Pune',
+          customerType: req.body.customerType || lead.customerType || 'RESIDENTIAL'
         }
       });
+    }
+
+    // Auto-link latest quotation if any exists for this lead
+    const latestQuote = await prisma.quotation.findFirst({
+      where: { leadId: id, tenantId },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    if (latestQuote) {
+      await prisma.quotation.update({
+        where: { id: latestQuote.id },
+        data: { status: 'ACCEPTED', customerId: customer.id, isLocked: true }
+      }).catch(() => {});
     }
 
     // Phase 9 Sync: Auto-Initialize Site Survey
     const surveyDate = new Date();
     surveyDate.setDate(surveyDate.getDate() + 3); // 3 days SLA
 
-    const survey = await prisma.siteSurvey.create({
-      data: {
-        tenantId,
-        customerId: customer.id,
-        leadId: id,
-        surveyDate,
-        status: 'SCHEDULED'
-      }
+    let survey = await prisma.siteSurvey.findFirst({
+      where: { leadId: id, tenantId }
     });
+    if (!survey) {
+      survey = await prisma.siteSurvey.create({
+        data: {
+          tenantId,
+          customerId: customer.id,
+          leadId: id,
+          surveyDate,
+          status: 'SCHEDULED'
+        }
+      });
+    }
+
+    // Generate unique project number
+    const projectCount = await prisma.project.count({ where: { tenantId } });
+    let projectNumber = `PRJ-${(projectCount + 1).toString().padStart(5, '0')}`;
+    const existingNum = await prisma.project.findFirst({ where: { tenantId, projectNumber } });
+    if (existingNum) {
+      projectNumber = `PRJ-${Date.now().toString().slice(-5)}`;
+    }
+
+    const capacityVal = parseFloat(req.body.capacity) || (latestQuote ? latestQuote.systemCapacity : null) || lead.estimatedCap || 3.3;
+    const systemTypeVal = req.body.systemType || (latestQuote ? latestQuote.systemType : null) || lead.systemType || 'On-Grid';
+    const estimatedValueVal = parseFloat(req.body.estimatedValue) || (latestQuote ? latestQuote.total : null) || lead.estimatedValue || Math.round(capacityVal * 55000);
+    const estimatedCostVal = Math.round(estimatedValueVal * 0.72);
 
     const project = await prisma.project.create({
       data: {
         tenantId,
+        projectNumber,
         customerId: customer.id,
         leadId: id,
         surveyId: survey.id,
-        name: req.body.projectName || `${lead.name} Project`,
-        status: 'PLANNING'
+        quotationId: latestQuote ? latestQuote.id : null,
+        name: req.body.projectName || `${projectNumber}: ${lead.name} (${capacityVal} kWp)`,
+        capacity: capacityVal,
+        capacityUnit: 'kWp',
+        systemType: systemTypeVal,
+        projectType: req.body.projectType || lead.customerType || 'Residential',
+        installationAddress: req.body.address || lead.address || 'Site Roof',
+        city: req.body.city || lead.city || 'Pune',
+        state: req.body.state || lead.state || 'Maharashtra',
+        pincode: req.body.pincode || lead.pincode || '411001',
+        currentStage: 'Planning',
+        status: 'In Progress',
+        progressPercent: 15,
+        estimatedValue: estimatedValueVal,
+        estimatedCost: estimatedCostVal,
+        startDate: new Date(),
+        createdBy: userId
       }
     });
 
@@ -291,15 +340,40 @@ router.post('/api/tenant/leads/:id/convert', requireTenantAuth, async (req, res)
       console.warn('Discom tracking skipped:', e.message);
     }
 
+    // Auto-initialize Subsidy Application & Consumer CA Number
+    try {
+      const defaultSubsidy = capacityVal >= 3 ? 78000 : capacityVal >= 2 ? 60000 : 30000;
+      await prisma.subsidyApplication.create({
+        data: {
+          tenantId,
+          projectId: project.id,
+          customerId: customer.id,
+          consumerNumber: req.body.consumerNumber || lead.electricityConnection || '410022120526',
+          discomName: req.body.discomName || 'MSEDCL',
+          proposedCapacity: capacityVal,
+          centralSubsidyAmount: defaultSubsidy,
+          amount: defaultSubsidy,
+          bankName: req.body.bankName || null,
+          accountNumber: req.body.accountNumber || null,
+          ifscCode: req.body.ifscCode || null,
+          accountHolderName: req.body.accountHolderName || lead.name || null,
+          status: 'APPLICATION_SUBMITTED',
+          portalStage: 'CONSUMER_SELECTION'
+        }
+      });
+    } catch (sErr) {
+      console.warn('Subsidy tracking auto-init warning:', sErr.message);
+    }
+
     // Phase 2 Sync: Log timeline event
     try {
       await prisma.projectTimelineEvent.create({
         data: {
           projectId: project.id,
           title: 'Project Created',
-          description: `Project auto-created from direct Lead Conversion`,
+          description: `Project auto-created from direct Lead Conversion: ${project.name}`,
           eventType: 'STATUS_UPDATE',
-          createdBy: req.user.id
+          createdBy: userId
         }
       });
     } catch (e) {
@@ -307,40 +381,61 @@ router.post('/api/tenant/leads/:id/convert', requireTenantAuth, async (req, res)
     }
 
     // Phase 8 Sync: Auto-request Mandatory Documents
-    const requiredDocTypes = await prisma.documentType.findMany({
-      where: { tenantId, isRequired: true }
-    });
-
-    if (requiredDocTypes.length > 0) {
-      const dueDate = new Date();
-      dueDate.setDate(dueDate.getDate() + 7);
-
-      await prisma.documentRequest.createMany({
-        data: requiredDocTypes.map(docType => ({
-          tenantId,
-          documentTypeId: docType.id,
-          customerId: customer.id,
-          projectId: project.id,
-          status: 'PENDING',
-          dueDate,
-          message: 'Auto-requested upon project creation.'
-        }))
+    try {
+      const requiredDocTypes = await prisma.documentType.findMany({
+        where: { tenantId, isRequired: true }
       });
+
+      if (requiredDocTypes.length > 0) {
+        const dueDate = new Date();
+        dueDate.setDate(dueDate.getDate() + 7);
+
+        await prisma.documentRequest.createMany({
+          data: requiredDocTypes.map(docType => ({
+            tenantId,
+            documentTypeId: docType.id,
+            customerId: customer.id,
+            projectId: project.id,
+            status: 'PENDING',
+            dueDate,
+            message: 'Auto-requested upon project creation.'
+          }))
+        });
+      }
+    } catch (dErr) {
+      console.warn('Document request skipped:', dErr.message);
     }
 
-    await prisma.leadActivity.create({
-      data: {
-        leadId: lead.id,
-        type: 'STATUS_CHANGE',
-        description: `Lead won and converted to Customer & Project: ${project.name}`,
-        performedBy: req.user.id
+    try {
+      await prisma.leadActivity.create({
+        data: {
+          leadId: lead.id,
+          type: 'STATUS_CHANGE',
+          description: `Lead won and converted to Customer & Project: ${project.name}`,
+          performedBy: userId
+        }
+      });
+    } catch (actErr) {
+      console.warn('Lead activity skipped:', actErr.message);
+    }
+
+    // Return populated project
+    const fullProject = await prisma.project.findUnique({
+      where: { id: project.id },
+      include: {
+        customer: true,
+        lead: true,
+        quotation: true,
+        discomApplication: true,
+        subsidies: true,
+        Document: true
       }
     });
 
-    res.json({ lead: updatedLead, customer, project });
+    res.json({ lead: updatedLead, customer, project: fullProject });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Failed to convert lead' });
+    console.error('Lead conversion error:', error);
+    res.status(500).json({ error: error.message || 'Failed to convert lead' });
   }
 });
 
@@ -922,6 +1017,9 @@ router.get('/api/tenant/projects', requireTenantAuth, async (req, res) => {
         },
         discomApplication: true,
         subsidies: true,
+        Document: {
+          select: { id: true, title: true, fileUrl: true, fileType: true, category: true, status: true, createdAt: true }
+        },
         _count: {
           select: {
             tasks: true,
@@ -947,7 +1045,7 @@ router.get('/api/tenant/projects', requireTenantAuth, async (req, res) => {
       testing: allTenantProjects.filter(p => p.currentStage === 'Testing').length,
       handover: allTenantProjects.filter(p => p.currentStage === 'Handover').length,
       completed: allTenantProjects.filter(p => p.currentStage === 'Completed').length,
-      inProgress: allTenantProjects.filter(p => ['Design', 'Procurement', 'Installation', 'Testing'].includes(p.currentStage) && p.status !== 'Delayed').length,
+      inProgress: allTenantProjects.filter(p => ['Planning', 'Design', 'Procurement', 'Installation', 'Testing'].includes(p.currentStage) && p.status !== 'Delayed').length,
       delayed: allTenantProjects.filter(p => p.status === 'Delayed').length,
       totalCapacity: Math.round(allTenantProjects.reduce((acc, p) => acc + (p.capacity || 0), 0) * 10) / 10,
       totalValue: allTenantProjects.reduce((acc, p) => acc + (p.estimatedValue || 0), 0),
@@ -1162,7 +1260,11 @@ router.get('/api/tenant/projects/:id', requireTenantAuth, async (req, res) => {
         discomApplication: true,
         subsidies: true,
         amcs: true,
-        InstallationJob: true
+        InstallationJob: true,
+        Document: {
+          include: { user: { select: { name: true, email: true } } },
+          orderBy: { createdAt: 'desc' }
+        }
       }
     });
     if (!project) return res.status(404).json({ error: 'Project not found' });

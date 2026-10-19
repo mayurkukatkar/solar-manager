@@ -107,8 +107,8 @@ export const crmApi = {
     const res = await apiClient.patch(`/api/tenant/leads/${id}/stage`, { stage });
     return res.data;
   },
-  convertLead: async (id: string) => {
-    const res = await apiClient.post(`/api/tenant/leads/${id}/convert`);
+  convertLead: async (id: string, data?: any) => {
+    const res = await apiClient.post(`/api/tenant/leads/${id}/convert`, data || {});
     return res.data;
   },
 };
@@ -334,6 +334,34 @@ export const ocrApi = {
   },
   fetchConsumer: async (consumerNumber: string, bu?: string, billAmount?: number) => {
     const res = await apiClient.post('/api/tenant/ocr/fetch-consumer', { consumerNumber, bu, billAmount });
+    return res.data;
+  },
+};
+
+// ==========================================
+// 16. DOCUMENTS SERVICE
+// ==========================================
+export const documentsApi = {
+  uploadDocument: async (formData: FormData) => {
+    const res = await apiClient.post('/api/tenant/documents/upload', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return res.data;
+  },
+  getDocuments: async (params?: { projectId?: string; customerId?: string; category?: string }) => {
+    let url = '/api/tenant/documents';
+    const queryParts: string[] = [];
+    if (params?.projectId) queryParts.push(`projectId=${params.projectId}`);
+    if (params?.customerId) queryParts.push(`customerId=${params.customerId}`);
+    if (params?.category) queryParts.push(`category=${params.category}`);
+    if (queryParts.length > 0) url += `?${queryParts.join('&')}`;
+    const res = await apiClient.get(url);
+    return res.data;
+  },
+  getChecklist: async (projectId: string) => {
+    const res = await apiClient.get(`/api/tenant/projects/${projectId}/document-checklist`);
     return res.data;
   },
 };

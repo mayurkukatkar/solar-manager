@@ -414,6 +414,7 @@ export const PipelineScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
 
       {selectedLead && (
         <QuotationBuilderModal
+          key={`quote-${selectedLead.id}`}
           visible={quoteModalVisible}
           lead={selectedLead}
           onClose={() => setQuoteModalVisible(false)}
@@ -423,6 +424,7 @@ export const PipelineScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
 
       {selectedLead && (
         <CustomerOnboardingModal
+          key={`onboard-${selectedLead.id}`}
           visible={onboardingModalVisible}
           lead={selectedLead}
           quotationData={activeQuotationData}

@@ -3,6 +3,7 @@ const router = express.Router();
 const prisma = require('../../db');
 const { requireTenantAuth } = require('../../middleware/auth');
 const upload = require('../../middleware/upload');
+const { uploadFileBuffer } = require('../../services/storageService');
 const crypto = require('crypto');
 
 // Utility to track document activity
@@ -142,6 +143,10 @@ router.post('/api/tenant/documents/upload', requireTenantAuth, upload.single('fi
     }
 
     let finalTitle = title || (req.file ? req.file.originalname : 'Untitled Document');
+    let uploadedMeta = null;
+    if (req.file) {
+      uploadedMeta = await uploadFileBuffer(req.file, 'documents', req);
+    }
 
     const document = await prisma.document.create({
       data: {
@@ -150,9 +155,10 @@ router.post('/api/tenant/documents/upload', requireTenantAuth, upload.single('fi
         title: finalTitle,
         description,
         category,
-        fileUrl: req.file ? req.file.path : null,
-        fileType: req.file ? req.file.mimetype : null,
-        fileSize: req.file ? req.file.size : null,
+        fileUrl: uploadedMeta ? uploadedMeta.fileUrl : null,
+        fileType: uploadedMeta ? uploadedMeta.fileType : null,
+        fileSize: uploadedMeta ? uploadedMeta.fileSize : null,
+        storageKey: uploadedMeta ? uploadedMeta.storageKey : null,
         entityType,
         entityId,
         customerId: customerId || null,
@@ -160,7 +166,7 @@ router.post('/api/tenant/documents/upload', requireTenantAuth, upload.single('fi
         documentDate: documentDate ? new Date(documentDate) : null,
         expiryDate: expiryDate ? new Date(expiryDate) : null,
         uploadedBy: userId,
-        status: req.file ? 'UPLOADED' : 'PENDING_UPLOAD',
+        status: uploadedMeta ? 'UPLOADED' : 'PENDING_UPLOAD',
         version: 1
       }
     });
@@ -287,13 +293,19 @@ router.post('/api/tenant/documents/:id/version', requireTenantAuth, upload.singl
       }
     });
 
+    let uploadedMeta = null;
+    if (req.file) {
+      uploadedMeta = await uploadFileBuffer(req.file, 'documents', req);
+    }
+
     // Update main document
     const updatedDoc = await prisma.document.update({
       where: { id: existingDoc.id },
       data: {
-        fileUrl: req.file.path,
-        fileType: req.file.mimetype,
-        fileSize: req.file.size,
+        fileUrl: uploadedMeta ? uploadedMeta.fileUrl : existingDoc.fileUrl,
+        fileType: uploadedMeta ? uploadedMeta.fileType : existingDoc.fileType,
+        fileSize: uploadedMeta ? uploadedMeta.fileSize : existingDoc.fileSize,
+        storageKey: uploadedMeta ? uploadedMeta.storageKey : existingDoc.storageKey,
         version: existingDoc.version + 1,
         status: 'UPLOADED',
         uploadedBy: req.user.userId

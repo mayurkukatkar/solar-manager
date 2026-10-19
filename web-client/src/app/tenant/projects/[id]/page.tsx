@@ -176,6 +176,44 @@ export default function ProjectDetails() {
   const [showMaterialModal, setShowMaterialModal] = useState(false);
   const [newMaterial, setNewMaterial] = useState({ productId: '', description: '', quantity: 1 });
 
+  // PROJECT DOCUMENTS TAB & UPLOAD STATE
+  const [showDocUploadModal, setShowDocUploadModal] = useState(false);
+  const [docUploadFile, setDocUploadFile] = useState<File | null>(null);
+  const [docUploadTitle, setDocUploadTitle] = useState('');
+  const [docUploadCategory, setDocUploadCategory] = useState('Customer KYC');
+  const [docUploading, setDocUploading] = useState(false);
+
+  const handleUploadProjectDoc = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!docUploadFile && !docUploadTitle) return;
+    setDocUploading(true);
+    try {
+      const formData = new FormData();
+      if (docUploadFile) formData.append('file', docUploadFile);
+      formData.append('title', docUploadTitle || docUploadFile?.name || 'Document');
+      formData.append('category', docUploadCategory);
+      formData.append('projectId', project.id);
+      formData.append('entityType', 'PROJECT');
+      formData.append('entityId', project.id);
+      if (project.customerId) formData.append('customerId', project.customerId);
+
+      await axios.post(
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/documents/upload`,
+        formData,
+        { withCredentials: true, headers: { 'Content-Type': 'multipart/form-data' } }
+      );
+      setShowDocUploadModal(false);
+      setDocUploadFile(null);
+      setDocUploadTitle('');
+      fetchProject();
+    } catch (err: any) {
+      console.error(err);
+      alert(err.response?.data?.error || 'Failed to upload document');
+    } finally {
+      setDocUploading(false);
+    }
+  };
+
   const fetchProject = async () => {
     try {
       const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/projects/${params.id}`, { withCredentials: true });
@@ -788,6 +826,18 @@ export default function ProjectDetails() {
               <FileText size={18} /> Generate MSEDCL Forms
             </button>
             
+            <button 
+              onClick={() => setActiveTab('DOCUMENTS')} 
+              className={`w-full flex items-center justify-between px-5 py-3.5 text-sm font-semibold transition-colors border-b border-slate-100 ${
+                activeTab === 'DOCUMENTS' 
+                  ? 'bg-emerald-50 text-emerald-700 border-l-4 border-l-emerald-600' 
+                  : 'text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              <div className="flex items-center gap-3"><FileText size={18} /> Project Documents</div>
+              <span className="bg-slate-100 text-slate-600 py-0.5 px-2 rounded-full text-xs font-bold">{project.Document?.length || 0}</span>
+            </button>
+
             <button 
               onClick={() => setActiveTab('SERVICE')} 
               className={`w-full flex items-center gap-3 px-5 py-3.5 text-sm font-semibold transition-colors ${
@@ -1648,10 +1698,164 @@ export default function ProjectDetails() {
               )}
             </div>
           )}
+
+          {/* DOCUMENTS TAB */}
+          {activeTab === 'DOCUMENTS' && (
+            <div className="p-6 md:p-8 space-y-6 animate-in fade-in duration-300">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-5">
+                <div>
+                  <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+                    <FileText className="text-emerald-600" size={22} /> Project Documents & KYC Archive
+                  </h2>
+                  <p className="text-sm text-slate-500 mt-1">
+                    Central repository of field KYC documents, electricity bills, terrace photos, and statutory approvals.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowDocUploadModal(true)}
+                  className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-xl transition shadow-sm flex items-center gap-2 shrink-0 cursor-pointer"
+                >
+                  <Plus size={16} /> Upload Document
+                </button>
+              </div>
+
+              {(!project.Document || project.Document.length === 0) ? (
+                <div className="text-center py-16 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200">
+                  <FileText size={44} className="text-slate-300 mx-auto mb-3" />
+                  <h3 className="text-base font-bold text-slate-800">No Documents Uploaded Yet</h3>
+                  <p className="text-xs text-slate-500 max-w-md mx-auto mt-1 mb-5">
+                    Field representatives can capture Electricity Bills, Aadhaar, PAN, and Roof Photos from the Mobile App, or you can upload them directly here.
+                  </p>
+                  <button
+                    onClick={() => setShowDocUploadModal(true)}
+                    className="px-4 py-2 bg-emerald-600 text-white text-xs font-bold rounded-lg hover:bg-emerald-700 transition"
+                  >
+                    Upload First Document
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {project.Document.map((doc: any) => (
+                    <div key={doc.id} className="border border-slate-200 rounded-2xl p-5 bg-white hover:border-emerald-300 hover:shadow-sm transition-all flex flex-col justify-between">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <span className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold shrink-0">
+                            <FileText size={20} />
+                          </span>
+                          <div>
+                            <h4 className="font-bold text-slate-900 text-sm">{doc.title}</h4>
+                            <span className="text-[11px] text-slate-500 block mt-0.5">
+                              {doc.category || 'Customer KYC'} • {new Date(doc.createdAt).toLocaleDateString()}
+                            </span>
+                          </div>
+                        </div>
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                          doc.status === 'VERIFIED' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                        }`}>
+                          {doc.status || 'UPLOADED'}
+                        </span>
+                      </div>
+
+                      <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
+                        <span className="text-xs text-slate-400">
+                          {doc.user?.name ? `Uploaded by ${doc.user.name}` : 'Field App Upload'}
+                        </span>
+                        {doc.fileUrl ? (
+                          <a
+                            href={doc.fileUrl.startsWith('http') ? doc.fileUrl : `http://localhost:5000${doc.fileUrl.startsWith('/') ? '' : '/'}${doc.fileUrl}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 text-slate-700 rounded-lg text-xs font-bold transition"
+                          >
+                            <ExternalLink size={13} /> View File
+                          </a>
+                        ) : (
+                          <span className="text-xs text-slate-400 italic">Placeholder (Pending File)</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
       {/* MODALS */}
+      {showDocUploadModal && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
+            <div className="p-5 border-b border-slate-100 flex items-center justify-between">
+              <h2 className="font-bold text-slate-900">Upload Project Document</h2>
+              <button onClick={() => setShowDocUploadModal(false)} className="text-slate-400 hover:text-slate-700">✕</button>
+            </div>
+            <form onSubmit={handleUploadProjectDoc} className="p-5 space-y-4">
+              <div className="space-y-1">
+                <label className="text-sm font-semibold text-slate-700">Document Title *</label>
+                <input
+                  required
+                  type="text"
+                  value={docUploadTitle}
+                  onChange={e => setDocUploadTitle(e.target.value)}
+                  placeholder="e.g. Electricity Bill, Aadhaar, Net Metering NOC"
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none text-sm"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-sm font-semibold text-slate-700">Category</label>
+                <select
+                  value={docUploadCategory}
+                  onChange={e => setDocUploadCategory(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none text-sm bg-white"
+                >
+                  <option value="Customer KYC">Customer KYC</option>
+                  <option value="Electricity / DISCOM">Electricity / DISCOM</option>
+                  <option value="Property">Property & Roof Proof</option>
+                  <option value="Solar Project">Solar Project / Engineering</option>
+                  <option value="Commissioning">Commissioning & WCR</option>
+                  <option value="Subsidy">Subsidy & DBT</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-sm font-semibold text-slate-700">Select File (PDF or Image) *</label>
+                <input
+                  required
+                  type="file"
+                  accept="image/*,application/pdf"
+                  onChange={e => {
+                    if (e.target.files && e.target.files[0]) {
+                      setDocUploadFile(e.target.files[0]);
+                      if (!docUploadTitle) setDocUploadTitle(e.target.files[0].name);
+                    }
+                  }}
+                  className="w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-4 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setShowDocUploadModal(false)}
+                  className="flex-1 py-2.5 text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl font-medium transition-colors text-sm"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={docUploading}
+                  className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-medium shadow-sm transition-colors text-sm disabled:opacity-50"
+                >
+                  {docUploading ? 'Uploading...' : 'Save Document'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
       {showTicketModal && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
