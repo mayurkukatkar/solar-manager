@@ -24,6 +24,7 @@ import {
   TrendingDown,
   Percent,
   Eye,
+  Send,
 } from 'lucide-react-native';
 import {
   generateQuotationHtml,
@@ -35,6 +36,7 @@ import {
 } from '../../services/pdfService';
 import { openWhatsAppWithPitch } from '../../services/whatsappService';
 import { crmApi, quotationsApi } from '../../api/endpoints';
+import { ProposalPreviewModal } from '../../components/ProposalPreviewModal';
 
 interface QuotationBuilderModalProps {
   visible: boolean;
@@ -51,8 +53,10 @@ export const QuotationBuilderModal: React.FC<QuotationBuilderModalProps> = ({
   onSuccess,
   onProceedToOnboarding,
 }) => {
+  const [showVisualPreview, setShowVisualPreview] = useState(false);
   const [generatingPdf, setGeneratingPdf] = useState(false);
   const [sharingWhatsApp, setSharingWhatsApp] = useState(false);
+  const [sendingPitchText, setSendingPitchText] = useState(false);
   const [sharingPdf, setSharingPdf] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [syncedQuote, setSyncedQuote] = useState<any>(null);
@@ -195,22 +199,11 @@ export const QuotationBuilderModal: React.FC<QuotationBuilderModalProps> = ({
     return null;
   };
 
-  const handlePreviewPdf = async () => {
-    setGeneratingPdf(true);
-    try {
-      // 1. Trigger background sync to web module if not synced
-      if (!syncedQuote) {
-        syncToBackend('VIEWED').catch(() => {});
-      }
-      // 2. Open full-screen native interactive print/PDF previewer directly
-      const payload = buildPdfPayload();
-      const html = generateQuotationHtml(payload);
-      await previewPdf(html);
-    } catch (err: any) {
-      Alert.alert('PDF Preview Error', err.message || 'Could not launch document preview');
-    } finally {
-      setGeneratingPdf(false);
+  const handlePreviewPdf = () => {
+    if (!syncedQuote) {
+      syncToBackend('VIEWED').catch(() => {});
     }
+    setShowVisualPreview(true);
   };
 
   const handlePrintPdf = async () => {
@@ -223,7 +216,7 @@ export const QuotationBuilderModal: React.FC<QuotationBuilderModalProps> = ({
     }
   };
 
-  const handleShareWhatsApp = async () => {
+  const handleShareWhatsAppPdf = async () => {
     setSharingWhatsApp(true);
     try {
       // 1. Sync quotation to backend database so it appears in web module
@@ -233,7 +226,27 @@ export const QuotationBuilderModal: React.FC<QuotationBuilderModalProps> = ({
       const payload = buildPdfPayload();
       payload.quotationNumber = quoteNum;
 
-      // 2. Open WhatsApp directly with personalized pitch (without share sheet blocking)
+      // 2. Export PDF and open WhatsApp document share
+      const html = generateQuotationHtml(payload);
+      const fileName = `Solar_Proposal_${payload.customerName.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
+      await sharePdfFile(html, fileName);
+
+      // 3. Mark stage advancement in CRM
+      if (lead?.id) {
+        crmApi.advanceLeadStage(lead.id, 'PROPOSAL_SENT').catch(() => {});
+      }
+    } catch (err: any) {
+      Alert.alert('WhatsApp PDF Share Error', err.message || 'Failed to dispatch quotation PDF via WhatsApp');
+    } finally {
+      setSharingWhatsApp(false);
+    }
+  };
+
+  const handleSendTextPitch = async () => {
+    setSendingPitchText(true);
+    try {
+      await syncToBackend('SENT');
+      const payload = buildPdfPayload();
       await openWhatsAppWithPitch({
         customerName: payload.customerName,
         customerPhone: payload.customerPhone,
@@ -248,18 +261,13 @@ export const QuotationBuilderModal: React.FC<QuotationBuilderModalProps> = ({
         language,
       });
 
-      // 3. Mark stage advancement in CRM
       if (lead?.id) {
-        try {
-          await crmApi.advanceLeadStage(lead.id, 'PROPOSAL_SENT');
-        } catch (e) {
-          console.warn('Lead stage update notice:', e);
-        }
+        crmApi.advanceLeadStage(lead.id, 'PROPOSAL_SENT').catch(() => {});
       }
     } catch (err: any) {
-      Alert.alert('WhatsApp Dispatch Error', err.message || 'Failed to dispatch quotation via WhatsApp');
+      Alert.alert('WhatsApp Text Pitch Error', err.message || 'Could not launch WhatsApp');
     } finally {
-      setSharingWhatsApp(false);
+      setSendingPitchText(false);
     }
   };
 
@@ -271,7 +279,7 @@ export const QuotationBuilderModal: React.FC<QuotationBuilderModalProps> = ({
       }
       const payload = buildPdfPayload();
       const html = generateQuotationHtml(payload);
-      await sharePdfFile(html, `Solar_Proposal_${payload.customerName.replace(/\s+/g, '_')}.pdf`);
+      await sharePdfFile(html, `Solar_Proposal_${payload.customerName.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`);
     } catch (err: any) {
       Alert.alert('PDF Share Error', err.message || 'Could not export proposal PDF file');
     } finally {
@@ -487,22 +495,15 @@ export const QuotationBuilderModal: React.FC<QuotationBuilderModalProps> = ({
             <TouchableOpacity
               style={styles.pdfBtn}
               onPress={handlePreviewPdf}
-              disabled={generatingPdf}
               activeOpacity={0.8}
             >
-              {generatingPdf ? (
-                <ActivityIndicator size="small" color="#0f172a" />
-              ) : (
-                <>
-                  <Eye size={16} color="#0f172a" />
-                  <Text style={styles.pdfBtnText}>Preview PDF</Text>
-                </>
-              )}
+              <Eye size={16} color="#0f172a" />
+              <Text style={styles.pdfBtnText}>Preview Proposal</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               style={styles.whatsAppBtn}
-              onPress={handleShareWhatsApp}
+              onPress={handleShareWhatsAppPdf}
               disabled={sharingWhatsApp}
               activeOpacity={0.85}
             >
@@ -510,24 +511,24 @@ export const QuotationBuilderModal: React.FC<QuotationBuilderModalProps> = ({
                 <ActivityIndicator size="small" color="#ffffff" />
               ) : (
                 <>
-                  <MessageCircle size={18} color="#ffffff" />
-                  <Text style={styles.whatsAppBtnText}>Send WhatsApp</Text>
+                  <MessageCircle size={17} color="#ffffff" />
+                  <Text style={styles.whatsAppBtnText}>WhatsApp PDF</Text>
                 </>
               )}
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={styles.shareFileBtn}
-              onPress={handleSharePdfFile}
-              disabled={sharingPdf}
-              activeOpacity={0.8}
+              style={styles.pitchTextBtn}
+              onPress={handleSendTextPitch}
+              disabled={sendingPitchText}
+              activeOpacity={0.85}
             >
-              {sharingPdf ? (
-                <ActivityIndicator size="small" color="#334155" />
+              {sendingPitchText ? (
+                <ActivityIndicator size="small" color="#16a34a" />
               ) : (
                 <>
-                  <Share2 size={16} color="#334155" />
-                  <Text style={styles.shareFileBtnText}>Share PDF</Text>
+                  <Send size={14} color="#16a34a" />
+                  <Text style={styles.pitchTextBtnText}>Text Pitch</Text>
                 </>
               )}
             </TouchableOpacity>
@@ -543,6 +544,21 @@ export const QuotationBuilderModal: React.FC<QuotationBuilderModalProps> = ({
             <ArrowRight size={18} color="#ffffff" />
           </TouchableOpacity>
         </View>
+
+        {/* IN-APP VISUAL PROPOSAL PREVIEW MODAL */}
+        {showVisualPreview && (
+          <ProposalPreviewModal
+            visible={showVisualPreview}
+            onClose={() => setShowVisualPreview(false)}
+            data={buildPdfPayload()}
+            isSynced={Boolean(syncedQuote)}
+            onWhatsAppSent={() => {
+              if (lead?.id) {
+                crmApi.advanceLeadStage(lead.id, 'PROPOSAL_SENT').catch(() => {});
+              }
+            }}
+          />
+        )}
       </View>
     </Modal>
   );
@@ -949,6 +965,23 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '800',
     color: '#ffffff',
+  },
+  pitchTextBtn: {
+    flex: 1,
+    backgroundColor: '#f0fdf4',
+    borderRadius: 10,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    borderWidth: 1.5,
+    borderColor: '#86efac',
+  },
+  pitchTextBtnText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#15803d',
   },
   convertCtaBtn: {
     backgroundColor: '#0f172a',

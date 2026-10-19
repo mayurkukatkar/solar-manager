@@ -46,6 +46,7 @@ import { generateQuotationHtml, previewPdf } from '../../services/pdfService';
 import { openWhatsAppDirect } from '../../services/whatsappService';
 import { useAuth } from '../../context/AuthContext';
 import { Quotation, Tenant, SiteSurvey, Invoice, SubsidyApplication } from '../../types';
+import { ProposalPreviewModal } from '../../components/ProposalPreviewModal';
 
 export const ModulesScreen: React.FC<{ route?: any; navigation?: any }> = ({ route, navigation }) => {
   const { user } = useAuth();
@@ -56,6 +57,7 @@ export const ModulesScreen: React.FC<{ route?: any; navigation?: any }> = ({ rou
       ? 'QUOTES'
       : route?.params?.screen || null
   );
+  const [previewQuoteData, setPreviewQuoteData] = useState<any>(null);
 
   // Sync with route params on navigation
   useEffect(() => {
@@ -343,7 +345,7 @@ export const ModulesScreen: React.FC<{ route?: any; navigation?: any }> = ({ rou
     }
   };
 
-  const handlePreviewSavedQuote = async (q: any) => {
+  const handlePreviewSavedQuote = (q: any) => {
     try {
       const cap = q.systemCapacity || 3.3;
       const total = q.total || 195000;
@@ -353,7 +355,7 @@ export const ModulesScreen: React.FC<{ route?: any; navigation?: any }> = ({ rou
       const annualUnits = Math.round(cap * 1460);
       const monthlySavings = Math.round(monthlyUnits * 8.5);
 
-      const html = generateQuotationHtml({
+      setPreviewQuoteData({
         quotationNumber: q.qNumber || 'QT-PROPOSAL',
         quotationDate: new Date(q.date || Date.now()).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
         validUntil: new Date(Date.now() + 15 * 86400000).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
@@ -380,11 +382,16 @@ export const ModulesScreen: React.FC<{ route?: any; navigation?: any }> = ({ rou
         paybackYears: 3.5,
         co2ReductionKg: Math.round(annualUnits * 0.82),
         treeEquivalent: Math.round((annualUnits * 0.82) / 20),
+        bankDetails: {
+          accountName: 'SolarManager Solutions Pvt Ltd',
+          bankName: 'HDFC Bank',
+          accountNumber: '50200088992211',
+          ifsc: 'HDFC0001234',
+          upiId: 'solarmanager@hdfcbank',
+        },
       });
-
-      await previewPdf(html);
     } catch (err: any) {
-      Alert.alert('Preview Error', err.message || 'Could not preview quotation');
+      Alert.alert('Preview Error', err.message || 'Could not load quotation preview');
     }
   };
 
@@ -1238,6 +1245,16 @@ Let's schedule your 3D roof survey!`;
           </View>
         </View>
       </Modal>
+
+      {/* SAVED QUOTATION VISUAL PROPOSAL PREVIEW MODAL */}
+      {previewQuoteData && (
+        <ProposalPreviewModal
+          visible={Boolean(previewQuoteData)}
+          onClose={() => setPreviewQuoteData(null)}
+          data={previewQuoteData}
+          isSynced={true}
+        />
+      )}
     </View>
   );
 };

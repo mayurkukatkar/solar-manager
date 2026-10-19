@@ -712,24 +712,42 @@ export async function previewPdf(html: string): Promise<boolean> {
 export async function sharePdfFile(html: string, fileName: string): Promise<string | null> {
   try {
     const { uri } = await Print.printToFileAsync({ html });
-    const isAvailable = await Sharing.isAvailableAsync();
+    
+    // Attempt Expo Sharing first
+    const isAvailable = await Sharing.isAvailableAsync().catch(() => false);
     if (isAvailable) {
       await Sharing.shareAsync(uri, {
-        UTI: '.pdf',
         mimeType: 'application/pdf',
         dialogTitle: `Share ${fileName}`,
+        UTI: 'com.adobe.pdf',
       });
-    } else {
-      Alert.alert('PDF Exported', `File saved at ${uri}`);
+      return uri;
     }
+
+    // Fallback to React Native core Share
+    try {
+      const { Share } = await import('react-native');
+      await Share.share({
+        title: fileName,
+        url: uri,
+        message: `Proposal: ${fileName}`,
+      });
+      return uri;
+    } catch (shareErr) {
+      console.warn('React Native Share fallback error:', shareErr);
+    }
+
+    Alert.alert('PDF Exported', `Proposal PDF saved at: ${uri}`);
     return uri;
   } catch (err: any) {
+    console.error('PDF generation error:', err);
     Alert.alert('PDF Export Error', err.message || 'Failed to generate PDF document');
     return null;
   }
 }
 
 export const createAndSharePdf = sharePdfFile;
+export const sharePdfToWhatsApp = sharePdfFile;
 
 export async function printDirectly(html: string): Promise<void> {
   try {

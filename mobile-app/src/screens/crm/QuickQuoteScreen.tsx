@@ -20,10 +20,12 @@ import {
   Percent,
   Eye,
   CheckCircle2,
+  Send,
 } from 'lucide-react-native';
-import { generateQuotationHtml, previewPdf, sharePdfFile, createAndSharePdf } from '../../services/pdfService';
+import { generateQuotationHtml, sharePdfFile, printDirectly } from '../../services/pdfService';
 import { openWhatsAppWithPitch } from '../../services/whatsappService';
 import { quotationsApi } from '../../api/endpoints';
+import { ProposalPreviewModal } from '../../components/ProposalPreviewModal';
 
 export const QuickQuoteScreen: React.FC<{ route?: any }> = ({ route }) => {
   const initialParams = route?.params || {};
@@ -36,8 +38,9 @@ export const QuickQuoteScreen: React.FC<{ route?: any }> = ({ route }) => {
   const [systemCost, setSystemCost] = useState(
     initialParams.systemCost || String(Math.round(initialCapNum * 58000))
   );
-  const [generatingPdf, setGeneratingPdf] = useState(false);
-  const [sharingWhatsApp, setSharingWhatsApp] = useState(false);
+  const [showVisualPreview, setShowVisualPreview] = useState(false);
+  const [sharingWhatsAppPdf, setSharingWhatsAppPdf] = useState(false);
+  const [sendingPitchText, setSendingPitchText] = useState(false);
   const [sharingPdf, setSharingPdf] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [syncedQuote, setSyncedQuote] = useState<any>(null);
@@ -164,38 +167,47 @@ export const QuickQuoteScreen: React.FC<{ route?: any }> = ({ route }) => {
     return null;
   };
 
-  const handlePreviewPdf = async () => {
+  const handlePreviewPdf = () => {
     if (!prospectName.trim()) {
       Alert.alert('Customer Name', 'Please enter a prospect name for the proposal');
       return;
     }
-    setGeneratingPdf(true);
-    try {
-      if (!syncedQuote) {
-        syncToBackend('VIEWED').catch(() => {});
-      }
-      const payload = buildPdfPayload();
-      const html = generateQuotationHtml(payload);
-      await previewPdf(html);
-    } catch (err: any) {
-      Alert.alert('Preview Error', err.message || 'Could not launch PDF preview');
-    } finally {
-      setGeneratingPdf(false);
+    if (!syncedQuote) {
+      syncToBackend('VIEWED').catch(() => {});
     }
+    setShowVisualPreview(true);
   };
 
-  const handleSendWhatsApp = async () => {
+  const handleShareWhatsAppPdf = async () => {
     if (!prospectName.trim()) {
       Alert.alert('Customer Name', 'Please enter a prospect name for the proposal');
       return;
     }
-    setSharingWhatsApp(true);
+    setSharingWhatsAppPdf(true);
     try {
       const saved = await syncToBackend('SENT');
       const quoteNumber = saved?.qNumber || syncedQuote?.qNumber || `QQ-${Date.now().toString().slice(-6)}`;
       const payload = buildPdfPayload();
       payload.quotationNumber = quoteNumber;
 
+      const html = generateQuotationHtml(payload);
+      const fileName = `Solar_Proposal_${prospectName.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
+      await sharePdfFile(html, fileName);
+    } catch (err: any) {
+      Alert.alert('WhatsApp PDF Share Error', err.message || 'Could not export proposal PDF');
+    } finally {
+      setSharingWhatsAppPdf(false);
+    }
+  };
+
+  const handleSendTextPitch = async () => {
+    if (!prospectName.trim()) {
+      Alert.alert('Customer Name', 'Please enter a prospect name for the proposal');
+      return;
+    }
+    setSendingPitchText(true);
+    try {
+      await syncToBackend('SENT');
       await openWhatsAppWithPitch({
         customerName: prospectName,
         customerPhone: prospectPhone,
@@ -210,9 +222,9 @@ export const QuickQuoteScreen: React.FC<{ route?: any }> = ({ route }) => {
         language: 'EN',
       });
     } catch (err: any) {
-      Alert.alert('WhatsApp Dispatch Error', err.message || 'Could not launch WhatsApp');
+      Alert.alert('WhatsApp Text Pitch Error', err.message || 'Could not launch WhatsApp');
     } finally {
-      setSharingWhatsApp(false);
+      setSendingPitchText(false);
     }
   };
 
@@ -371,52 +383,55 @@ export const QuickQuoteScreen: React.FC<{ route?: any }> = ({ route }) => {
           <TouchableOpacity
             style={styles.pdfBtn}
             onPress={handlePreviewPdf}
-            disabled={generatingPdf}
             activeOpacity={0.8}
           >
-            {generatingPdf ? (
-              <ActivityIndicator size="small" color="#0f172a" />
-            ) : (
-              <>
-                <Eye size={16} color="#0f172a" />
-                <Text style={styles.pdfBtnText}>Preview PDF</Text>
-              </>
-            )}
+            <Eye size={16} color="#0f172a" />
+            <Text style={styles.pdfBtnText}>Preview Proposal</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.whatsAppBtn}
-            onPress={handleSendWhatsApp}
-            disabled={sharingWhatsApp}
+            onPress={handleShareWhatsAppPdf}
+            disabled={sharingWhatsAppPdf}
             activeOpacity={0.85}
           >
-            {sharingWhatsApp ? (
+            {sharingWhatsAppPdf ? (
               <ActivityIndicator size="small" color="#ffffff" />
             ) : (
               <>
-                <MessageCircle size={18} color="#ffffff" />
-                <Text style={styles.whatsAppBtnText}>Send WhatsApp</Text>
+                <MessageCircle size={17} color="#ffffff" />
+                <Text style={styles.whatsAppBtnText}>WhatsApp PDF</Text>
               </>
             )}
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.shareFileBtn}
-            onPress={handleSharePdfFile}
-            disabled={sharingPdf}
-            activeOpacity={0.8}
+            style={styles.pitchTextBtn}
+            onPress={handleSendTextPitch}
+            disabled={sendingPitchText}
+            activeOpacity={0.85}
           >
-            {sharingPdf ? (
-              <ActivityIndicator size="small" color="#334155" />
+            {sendingPitchText ? (
+              <ActivityIndicator size="small" color="#16a34a" />
             ) : (
               <>
-                <Share2 size={16} color="#334155" />
-                <Text style={styles.shareFileBtnText}>Share PDF</Text>
+                <Send size={14} color="#16a34a" />
+                <Text style={styles.pitchTextBtnText}>Text Pitch</Text>
               </>
             )}
           </TouchableOpacity>
         </View>
       </View>
+
+      {/* IN-APP VISUAL PROPOSAL PREVIEW MODAL */}
+      {showVisualPreview && (
+        <ProposalPreviewModal
+          visible={showVisualPreview}
+          onClose={() => setShowVisualPreview(false)}
+          data={buildPdfPayload()}
+          isSynced={Boolean(syncedQuote)}
+        />
+      )}
     </View>
   );
 };
@@ -699,6 +714,23 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '800',
     color: '#ffffff',
+  },
+  pitchTextBtn: {
+    flex: 1,
+    backgroundColor: '#f0fdf4',
+    borderRadius: 10,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    borderWidth: 1.5,
+    borderColor: '#86efac',
+  },
+  pitchTextBtnText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#15803d',
   },
   shareFileBtn: {
     flex: 1,
