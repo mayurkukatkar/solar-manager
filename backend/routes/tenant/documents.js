@@ -92,7 +92,14 @@ router.get('/api/tenant/documents/projects-summary', requireTenantAuth, async (r
         currentStage: true,
         status: true,
         customer: {
-          select: { id: true, name: true, mobile: true, email: true, consumerNumber: true }
+          select: { id: true, name: true, mobile: true, email: true }
+        },
+        lead: {
+          select: { id: true, electricityConnection: true }
+        },
+        subsidies: {
+          select: { consumerNumber: true },
+          take: 1
         },
         Document: {
           select: {
@@ -130,10 +137,10 @@ router.get('/api/tenant/documents/projects-summary', requireTenantAuth, async (r
         const pending = docs.filter(d => ['PENDING_UPLOAD', 'UPLOADED', 'UNDER_REVIEW'].includes(d.status)).length;
 
         // Essential checklist items for Indian Solar EPC
-        const hasBill = docs.some(d => d.title.toLowerCase().includes('bill') || d.category === 'Electricity / DISCOM');
-        const hasKyc = docs.some(d => d.title.toLowerCase().includes('aadhaar') || d.title.toLowerCase().includes('pan') || d.category === 'Customer KYC');
-        const hasBank = docs.some(d => d.title.toLowerCase().includes('cheque') || d.title.toLowerCase().includes('passbook') || d.title.toLowerCase().includes('bank'));
-        const hasPhotos = docs.some(d => d.title.toLowerCase().includes('photo') || d.title.toLowerCase().includes('roof') || d.title.toLowerCase().includes('site'));
+        const hasBill = docs.some(d => (d.title || '').toLowerCase().includes('bill') || d.category === 'Electricity / DISCOM');
+        const hasKyc = docs.some(d => (d.title || '').toLowerCase().includes('aadhaar') || (d.title || '').toLowerCase().includes('pan') || d.category === 'Customer KYC');
+        const hasBank = docs.some(d => (d.title || '').toLowerCase().includes('cheque') || (d.title || '').toLowerCase().includes('passbook') || (d.title || '').toLowerCase().includes('bank') || d.category === 'Bank Cheque / Passbook (DBT)');
+        const hasPhotos = docs.some(d => (d.title || '').toLowerCase().includes('photo') || (d.title || '').toLowerCase().includes('roof') || (d.title || '').toLowerCase().includes('site') || d.category === 'Rooftop Survey Photos');
 
         let readinessScore = 0;
         if (hasBill) readinessScore += 30;
@@ -147,6 +154,9 @@ router.get('/api/tenant/documents/projects-summary', requireTenantAuth, async (r
         if (!hasBank) missingChecklist.push('Bank Cheque / Passbook (DBT)');
         if (!hasPhotos) missingChecklist.push('Rooftop Survey Photos');
 
+        const consumerNo = p.subsidies?.[0]?.consumerNumber || p.lead?.electricityConnection || '';
+        const customerWithConsumer = p.customer ? { ...p.customer, consumerNumber: consumerNo } : null;
+
         return {
           id: p.id,
           name: p.name,
@@ -154,7 +164,7 @@ router.get('/api/tenant/documents/projects-summary', requireTenantAuth, async (r
           capacity: p.capacity,
           currentStage: p.currentStage,
           status: p.status,
-          customer: p.customer,
+          customer: customerWithConsumer,
           totalDocuments: total,
           verifiedDocuments: verified,
           pendingDocuments: pending,
