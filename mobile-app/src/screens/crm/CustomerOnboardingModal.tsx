@@ -29,7 +29,7 @@ import {
 } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
-import { crmApi, documentsApi } from '../../api/endpoints';
+import { crmApi, documentsApi, tenantApi } from '../../api/endpoints';
 
 interface CustomerOnboardingModalProps {
   visible: boolean;
@@ -261,21 +261,39 @@ export const CustomerOnboardingModal: React.FC<CustomerOnboardingModalProps> = (
       // 1. Convert Lead to Client & Project in live backend with all financial & site metadata
       let projectResult: any = null;
       if (lead?.id) {
-        const convertRes = await crmApi.convertLead(lead.id, {
-          customerName: legalName.trim(),
-          mobile: mobile.trim(),
-          email: email.trim() || undefined,
-          address: address.trim() || undefined,
-          city: city.trim() || undefined,
-          pincode: pincode.trim() || undefined,
-          capacity: parseFloat(capacity) || quotationData?.capacityKw || lead?.estimatedCap || 3.3,
-          bankName,
-          accountNumber,
-          ifscCode,
-          accountHolderName,
-          consumerNumber: consumerNumber.trim() || lead?.consumerNumber || '410022120526',
-        });
-        projectResult = convertRes.project;
+        try {
+          const convertRes = await crmApi.convertLead(lead.id, {
+            customerName: legalName.trim(),
+            mobile: mobile.trim(),
+            email: email.trim() || undefined,
+            address: address.trim() || undefined,
+            city: city.trim() || undefined,
+            pincode: pincode.trim() || undefined,
+            capacity: parseFloat(capacity) || quotationData?.capacityKw || lead?.estimatedCap || 3.3,
+            bankName,
+            accountNumber,
+            ifscCode,
+            accountHolderName,
+            consumerNumber: consumerNumber.trim() || lead?.consumerNumber || '410022120526',
+          });
+          projectResult = convertRes?.project;
+        } catch (apiErr: any) {
+          console.warn('Convert API notice:', apiErr.message);
+          // Network recovery: check if project was provisioned despite the timeout/drop
+          try {
+            const projectsRes = await tenantApi.getProjects();
+            const existing = (projectsRes?.projects || []).find(
+              (p: any) => p.leadId === lead.id || (p.customer?.mobile && p.customer.mobile === mobile.trim())
+            );
+            if (existing) {
+              projectResult = existing;
+            } else {
+              throw apiErr;
+            }
+          } catch {
+            throw apiErr;
+          }
+        }
       }
 
       if (!projectResult) {

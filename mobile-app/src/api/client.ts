@@ -88,7 +88,7 @@ export const setApiBaseUrl = async (newUrl: string): Promise<void> => {
 // Create main production Axios Instance
 export const apiClient: AxiosInstance = axios.create({
   baseURL: currentBaseUrl,
-  timeout: 15000,
+  timeout: 45000,
   headers: {
     'Content-Type': 'application/json',
     Accept: 'application/json',
@@ -126,7 +126,9 @@ apiClient.interceptors.response.use(
       error.response?.data?.error ||
       error.response?.data?.message ||
       (error.code === 'ECONNABORTED'
-        ? 'Network request timed out. Please check your internet connection.'
+        ? 'Request timed out due to slow network. Please retry.'
+        : error.message === 'Network Error'
+        ? 'Network connection issue. Please verify internet connectivity.'
         : error.message || 'Network request failed.');
 
     return Promise.reject(new Error(message));
