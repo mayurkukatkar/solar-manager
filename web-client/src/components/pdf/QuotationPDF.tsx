@@ -831,6 +831,31 @@ export function QuotationPDF({ data, livePreview = false }: { data: QuotationDat
               </div>
             </div>
 
+            {/* CINEMATIC SITE AUDIT & FEASIBILITY PHOTO BANNER */}
+            <div className="w-full h-36 rounded-2xl overflow-hidden mb-6 relative border border-[#071C11]/10 bg-[#FAF8F5] shadow-xs">
+              <img 
+                src="/assets/solar-quotation/audit-drone.jpg" 
+                alt="Architectural Site Audit and Solar Feasibility Analysis"
+                className="w-full h-full object-cover object-center"
+                onError={(e: any) => { e.target.src = "/assets/solar-quotation/rooftop.jpg"; }}
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#071C11]/90 via-[#071C11]/35 to-transparent flex items-end p-4">
+                <div className="flex items-center justify-between w-full">
+                  <div>
+                    <span className="text-[9px] font-extrabold uppercase tracking-[0.2em] text-[#C5A059] block mb-0.5">
+                      Digital Solar Shadow & Irradiance Analysis
+                    </span>
+                    <span className="text-xs font-bold text-white tracking-wide">
+                      Optimal 15° South-Facing Orientation • 100% Shadow-Free Solar Access
+                    </span>
+                  </div>
+                  <div className="bg-[#C5A059] text-[#071C11] text-[9px] font-black px-3 py-1 rounded-full uppercase tracking-widest font-mono">
+                    Audit Verified
+                  </div>
+                </div>
+              </div>
+            </div>
+
             {/* ELEGANT BEFORE VS AFTER POWER BALANCE INFOGRAPHIC */}
             <div className="bg-white p-5 rounded-2xl border border-[#071C11]/10 mb-8">
               <h3 className="text-xs font-bold text-[#071C11] uppercase tracking-wider mb-4 flex items-center gap-2">
@@ -1173,20 +1198,41 @@ export function QuotationPDF({ data, livePreview = false }: { data: QuotationDat
               </table>
             </div>
 
-            {/* ENVIRONMENTAL IMPACT BANNER */}
-            <div className="p-4 rounded-2xl bg-gradient-to-r from-[#071C11] to-[#0B2014] text-white flex items-center justify-between text-xs">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-400/30 flex items-center justify-center">
-                  <Leaf size={20} />
-                </div>
-                <div>
-                  <h4 className="font-bold text-white text-xs">Certified Environmental Leadership</h4>
-                  <p className="text-[11px] text-stone-300">Your clean power generation avoids {data.co2_reduction} Tons of CO2 and equals planting ~{data.tree_equivalent} mature trees.</p>
+            {/* ENVIRONMENTAL IMPACT BANNER WITH EDITORIAL PHOTOGRAPHY */}
+            <div className="rounded-2xl border border-[#071C11]/10 overflow-hidden bg-white shadow-xs grid grid-cols-12 mb-6">
+              <div className="col-span-5 relative min-h-[110px]">
+                <img 
+                  src="/assets/solar-quotation/sustainable-home.jpg" 
+                  alt="Sustainable Solar Residence & Green Living"
+                  className="w-full h-full object-cover object-center absolute inset-0"
+                  onError={(e: any) => { e.target.src = "/assets/solar-quotation/environment.jpg"; }}
+                />
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent to-black/20" />
+                <div className="absolute top-2.5 left-3 bg-[#071C11]/85 backdrop-blur-md px-2 py-0.5 rounded text-[8px] font-mono font-bold text-[#C5A059] uppercase tracking-wider">
+                  Clean Living
                 </div>
               </div>
-              <span className="text-[10px] font-mono text-[#C5A059] font-bold tracking-widest uppercase">
-                100% Green
-              </span>
+              <div className="col-span-7 p-4 bg-gradient-to-br from-[#071C11] to-[#0B2014] text-white flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <h4 className="font-bold text-white text-xs font-['Manrope']">Certified Environmental Leadership</h4>
+                    <span className="text-[9px] font-mono text-[#C5A059] font-bold tracking-widest uppercase">100% Green</span>
+                  </div>
+                  <p className="text-[10px] text-stone-300 leading-relaxed">
+                    Your proposed solar installation eliminates fossil-fuel reliance and creates a permanent carbon offset legacy for your family.
+                  </p>
+                </div>
+                <div className="grid grid-cols-2 gap-2 pt-2 border-t border-white/10 mt-2">
+                  <div className="flex items-center gap-2">
+                    <Leaf size={14} className="text-emerald-400 flex-shrink-0" />
+                    <span className="text-[10px] font-mono text-emerald-300 font-bold">{data.co2_reduction} Tons CO₂ Avoided</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Trees size={14} className="text-emerald-400 flex-shrink-0" />
+                    <span className="text-[10px] font-mono text-emerald-300 font-bold">~{data.tree_equivalent} Trees Planted</span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -1361,6 +1407,31 @@ export function QuotationPDF({ data, livePreview = false }: { data: QuotationDat
               <p className="text-xs text-[#64748B] leading-relaxed">
                 Our structured 5-phase execution methodology guarantees safe installation, rigorous DISCOM testing, and seamless net-meter commissioning.
               </p>
+            </div>
+
+            {/* ENGINEERING CRAFTSMANSHIP PHOTO BANNER */}
+            <div className="w-full h-32 rounded-2xl overflow-hidden mb-6 relative border border-[#071C11]/10 bg-[#FAF8F5] shadow-xs">
+              <img 
+                src="/assets/solar-quotation/craftsmanship.jpg" 
+                alt="Certified Solar EPC Engineering Installation Craftsmanship"
+                className="w-full h-full object-cover object-center"
+                onError={(e: any) => { e.target.src = "/assets/solar-quotation/installation.jpg"; }}
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#071C11]/90 via-[#071C11]/30 to-transparent flex items-end p-3.5">
+                <div className="flex items-center justify-between w-full">
+                  <div>
+                    <span className="text-[9px] font-extrabold uppercase tracking-[0.2em] text-[#C5A059] block mb-0.5">
+                      Certified EPC Engineering Protocol
+                    </span>
+                    <span className="text-xs font-bold text-white tracking-wide">
+                      Strict Adherence to IEC 62548, IS 3043 & CEIG Statutory Electrical Safety Norms
+                    </span>
+                  </div>
+                  <div className="bg-[#059669] text-white text-[9px] font-bold px-3 py-1 rounded-full uppercase tracking-wider font-mono">
+                    Zero Incident Certified
+                  </div>
+                </div>
+              </div>
             </div>
 
             {/* 5-STAGE ARCHITECTURAL INSTALLATION TIMELINE */}

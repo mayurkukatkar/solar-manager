@@ -581,6 +581,36 @@ export function generateQuotationHtml(data: QuotationPdfProps): string {
     .bar-fill-peak {
       background: #c5a059;
     }
+
+    /* EDITORIAL PHOTOGRAPHY BANNERS */
+    .editorial-banner {
+      width: 100%;
+      height: 105px;
+      border-radius: 12px;
+      overflow: hidden;
+      margin-bottom: 14px;
+      position: relative;
+      border: 1px solid rgba(7, 28, 17, 0.1);
+      background: #faf8f5;
+    }
+    .editorial-banner img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .editorial-banner-overlay {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      padding: 8px 12px;
+      background: linear-gradient(180deg, rgba(7,28,17,0) 0%, rgba(7,28,17,0.88) 100%);
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      color: #ffffff;
+    }
   </style>
 </head>
 <body>
@@ -588,7 +618,13 @@ export function generateQuotationHtml(data: QuotationPdfProps): string {
   <!-- ========================================================================= -->
   <!-- PAGE 1: CINEMATIC COVER PAGE                                              -->
   <!-- ========================================================================= -->
-  <div class="a4-page cover-page">
+  <div class="a4-page cover-page" style="overflow: hidden;">
+    <!-- BACKGROUND LUXURY ROOFTOP PHOTO -->
+    <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1;">
+      <img src="${data.coverImageUrl || 'http://localhost:3000/assets/solar-quotation/luxury-villa-cover.jpg'}" style="width: 100%; height: 100%; object-fit: cover;" alt="Villa" />
+      <div style="position: absolute; inset: 0; background: linear-gradient(180deg, rgba(7, 28, 17, 0.45) 0%, rgba(7, 28, 17, 0.72) 40%, rgba(7, 28, 17, 0.96) 80%, #071c11 100%);"></div>
+    </div>
+
     <div class="cover-top-bar">
       <div style="display: flex; align-items: center; gap: 10px;">
         ${data.companyLogoUrl ? `<img src="${data.companyLogoUrl}" style="height: 36px; object-fit: contain;" alt="${data.companyName}" />` : `
@@ -708,6 +744,18 @@ export function generateQuotationHtml(data: QuotationPdfProps): string {
         </div>
       </div>
 
+      <!-- AERIAL DRONE AUDIT BANNER -->
+      <div class="editorial-banner">
+        <img src="http://localhost:3000/assets/solar-quotation/audit-drone.jpg" alt="Drone Solar Audit" />
+        <div class="editorial-banner-overlay">
+          <div>
+            <div style="font-size: 6.5pt; font-weight: 800; color: #dfbf78; text-transform: uppercase; letter-spacing: 1px;">Digital Solar Shadow & Irradiance Analysis</div>
+            <div style="font-size: 8pt; font-weight: 700; color: #ffffff;">Optimal 15° South-Facing Orientation • 100% Shadow-Free Solar Access</div>
+          </div>
+          <span style="font-size: 6.5pt; font-weight: 900; background: #c5a059; color: #071c11; padding: 2px 8px; border-radius: 10px; text-transform: uppercase; letter-spacing: 0.5px;">Audit Verified</span>
+        </div>
+      </div>
+
       <!-- BEFORE VS AFTER COMPARISON -->
       <div class="card-white" style="margin-bottom: 14px;">
         <div style="font-size: 8pt; font-weight: 800; color: #071c11; text-transform: uppercase; margin-bottom: 10px;">
@@ -787,6 +835,18 @@ export function generateQuotationHtml(data: QuotationPdfProps): string {
       <span class="section-kicker">Industrial-Grade Engineering</span>
       <h2 class="section-title">Masterfully Integrated. Crafted for 25-Year Reliability.</h2>
       <p class="section-subtitle">Tier-1 ALMM certified power generation components engineered to withstand harsh weather conditions.</p>
+
+      <!-- STUDIO HARDWARE BANNER -->
+      <div class="editorial-banner" style="height: 110px;">
+        <img src="http://localhost:3000/assets/solar-quotation/hardware-studio.jpg" alt="Industrial Hardware" />
+        <div class="editorial-banner-overlay">
+          <div>
+            <div style="font-size: 6.5pt; font-weight: 800; color: #dfbf78; text-transform: uppercase; letter-spacing: 1px;">Industrial-Grade Hardware</div>
+            <div style="font-size: 8pt; font-weight: 700; color: #ffffff;">Integrated ALMM N-Type TopCon & Dual-MPPT Inverter Architecture</div>
+          </div>
+          <span style="font-size: 6.5pt; font-weight: 900; background: #059669; color: #ffffff; padding: 2px 8px; border-radius: 10px; text-transform: uppercase;">Tier-1 Standard</span>
+        </div>
+      </div>
 
       <div class="grid-2">
         <!-- MODULES -->
@@ -991,6 +1051,29 @@ export function generateQuotationHtml(data: QuotationPdfProps): string {
       </table>
     </div>
 
+    <!-- SUSTAINABLE LIFESTYLE & ENVIRONMENTAL CARD -->
+    <div style="border-radius: 12px; border: 1px solid rgba(7,28,17,0.1); overflow: hidden; background: #ffffff; display: flex; margin-bottom: 14px; height: 95px;">
+      <div style="width: 38%; position: relative; overflow: hidden;">
+        <img src="http://localhost:3000/assets/solar-quotation/sustainable-home.jpg" style="width: 100%; height: 100%; object-fit: cover;" alt="Sustainable Living" />
+        <div style="position: absolute; top: 6px; left: 8px; background: rgba(7,28,17,0.85); color: #dfbf78; font-size: 6pt; font-weight: 800; padding: 2px 6px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.5px;">Clean Living</div>
+      </div>
+      <div style="width: 62%; background: linear-gradient(135deg, #071c11 0%, #0b2014 100%); color: #ffffff; padding: 10px 14px; display: flex; flex-direction: column; justify-content: space-between;">
+        <div>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px;">
+            <span style="font-size: 8pt; font-weight: 800; color: #ffffff;">Certified Environmental Leadership</span>
+            <span style="font-size: 6.5pt; font-weight: 800; color: #dfbf78; text-transform: uppercase; letter-spacing: 0.8px;">100% Green</span>
+          </div>
+          <div style="font-size: 7pt; color: #cbd5e1; line-height: 1.35;">
+            Eliminates fossil reliance and creates a permanent carbon offset legacy for your family.
+          </div>
+        </div>
+        <div style="border-top: 1px solid rgba(255,255,255,0.1); padding-top: 6px; display: flex; justify-content: space-between; font-size: 7.2pt; color: #6ee7b7; font-family: monospace; font-weight: bold;">
+          <span>🍃 ${data.co2ReductionKg || Math.round(cap * 32)} Tons CO₂ Avoided</span>
+          <span>🌳 ~${data.treeEquivalent || Math.round(cap * 48)} Trees Planted</span>
+        </div>
+      </div>
+    </div>
+
     ${renderPageFooter()}
   </div>
 
@@ -1111,6 +1194,18 @@ export function generateQuotationHtml(data: QuotationPdfProps): string {
       <span class="section-kicker">Execution Guarantee</span>
       <h2 class="section-title">From Engineering Survey to Solar Power in 21 Days</h2>
       <p class="section-subtitle">Structured 5-phase execution methodology guaranteeing safe installation and seamless net-meter commissioning.</p>
+
+      <!-- ENGINEERING CRAFTSMANSHIP BANNER -->
+      <div class="editorial-banner" style="height: 105px;">
+        <img src="http://localhost:3000/assets/solar-quotation/craftsmanship.jpg" alt="Engineering Craftsmanship" />
+        <div class="editorial-banner-overlay">
+          <div>
+            <div style="font-size: 6.5pt; font-weight: 800; color: #dfbf78; text-transform: uppercase; letter-spacing: 1px;">Certified EPC Engineering Protocol</div>
+            <div style="font-size: 8pt; font-weight: 700; color: #ffffff;">Strict Adherence to IEC 62548, IS 3043 & CEIG Statutory Electrical Safety Norms</div>
+          </div>
+          <span style="font-size: 6.5pt; font-weight: 900; background: #059669; color: #ffffff; padding: 2px 8px; border-radius: 10px; text-transform: uppercase;">Zero Incident Certified</span>
+        </div>
+      </div>
 
       <!-- 5-PHASE ROADMAP -->
       <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-bottom: 14px;">

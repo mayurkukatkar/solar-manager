@@ -2576,6 +2576,9 @@ export function QuotationWizardModal({
                           className="bg-transparent font-bold text-slate-800 outline-none text-xs cursor-pointer"
                         >
                           <option value="/assets/solar-quotation/luxury-villa-cover.jpg">Modern Indian Villa (Sunset)</option>
+                          <option value="/assets/solar-quotation/audit-drone.jpg">Architectural Rooftop Estate</option>
+                          <option value="/assets/solar-quotation/sustainable-home.jpg">Sustainable Pergola Living</option>
+                          <option value="/assets/solar-quotation/craftsmanship.jpg">Solar Engineering Precision</option>
                           <option value="/assets/solar-quotation/cover.jpg">Contemporary Rooftop Villa</option>
                           <option value="/assets/solar-quotation/rooftop.jpg">Industrial Solar Array</option>
                         </select>
