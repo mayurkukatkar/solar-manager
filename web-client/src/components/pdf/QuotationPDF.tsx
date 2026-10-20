@@ -6,7 +6,7 @@ import {
   ShieldCheck, CheckCircle2, Calendar, IndianRupee, Activity,
   FileText, ArrowRight, Leaf, Trees, Wind, Check, AlertCircle, Home,
   Info, Cpu, Cable, Wrench, Shield, FileCheck, Award, Clock,
-  Building2, CheckSquare, Layers
+  Building2, CheckSquare, Layers, Sparkles
 } from "lucide-react";
 import { formatINR, toIndianWords } from "@/services/solarCalculator";
 
@@ -20,6 +20,8 @@ export interface QuotationData {
   accent_color?: string;
   cover_layout?: string;
   font_family?: string;
+  cover_image?: string;
+  palette_theme?: 'forest_gold' | 'obsidian_emerald' | 'navy_champagne';
   sections_config?: Array<{ id: string; title: string; isEnabled: boolean; order: number }>;
   
   // Company / Tenant Branding
@@ -204,7 +206,7 @@ export function mapQuotationToPdfData(quotation: any, tenantInfo?: any): Quotati
   const subtotal = Number(quotation.subtotal) || Math.round(grandTotal / 1.138);
   const tax = Number(quotation.tax) || (grandTotal - subtotal);
   const discount = Number(quotation.discount) || 0;
-  const subsidy = Number(quotation.indicativeSubsidy) || 0;
+  const subsidy = Number(quotation.indicativeSubsidy) || (cap <= 3 ? cap * 26000 : 78000);
 
   // Transform raw line items
   const rawItems = Array.isArray(quotation.items) && quotation.items.length > 0 ? quotation.items : [];
@@ -227,17 +229,17 @@ export function mapQuotationToPdfData(quotation: any, tenantInfo?: any): Quotati
     { category: "Solar PV Modules", brand: quotation.panelBrand || "Waaree", model: quotation.panelModel || "550Wp Mono PERC Bifacial", specification: `${quotation.panelWattage || 550}Wp Tier-1 ALMM Listed`, quantity: `${quotation.panelQuantity || Math.ceil((cap * 1000) / 550)} Nos`, warranty: quotation.panelWarranty || "25 Years Performance" },
     { category: "Solar Inverter", brand: quotation.inverterBrand || "Growatt", model: quotation.inverterModel || `${invCap}kW Grid-Tied Inverter`, specification: `${invCap}kW Dual MPPT IP65`, quantity: `${quotation.inverterQuantity || 1} No`, warranty: quotation.inverterWarranty || "10 Years Replacement" },
     ...(quotation.batteryCapacity ? [{ category: "Battery Storage", brand: quotation.batteryBrand || "Tata Power", model: quotation.batteryModel || `${quotation.batteryCapacity}kWh LiFePO4`, specification: `${quotation.batteryCapacity}kWh 51.2V Wall Mount`, quantity: `${quotation.batteryQuantity || 1} No`, warranty: quotation.batteryWarranty || "10 Years Warranty" }] : []),
-    { category: "Mounting Structure", brand: quotation.structureBrand || "Apex HDG High Rise", model: "HDG Rooftop", specification: "Hot-Dip Galvanized (80µm) / Anodized Al", quantity: "1 Lot", warranty: quotation.structureWarranty || "10 Years Structural" },
+    { category: "Mounting Structure", brand: quotation.structureBrand || "Galvanized HDG High Rise", model: "HDG Rooftop", specification: "Hot-Dip Galvanized (80µm) / Anodized Al", quantity: "1 Lot", warranty: quotation.structureWarranty || "10 Years Structural" },
     { category: "Solar DC Cable", brand: "Polycab / LAPP", model: "4 sq.mm", specification: "TUV Certified UV Protected XLPE", quantity: "1 Lot", warranty: "Standard OEM" },
     { category: "AC & DC Distribution", brand: "Schneider / L&T", model: "ACDB / DCDB", specification: "IP65 Enclosure with Type-II SPD & MCB", quantity: "1 Set", warranty: "1 Year" },
     { category: "Earthing & Protection", brand: "SafeGrid", model: "Chemical Dual Pit", specification: "Copper Bonded Electrodes + LA Down Conductor", quantity: "1 Set", warranty: "5 Years" }
   ];
 
   const templateCode = quotation.template?.code || quotation.templateType || 'residential_proposal';
-  const primaryColor = quotation.designConfig?.primaryColor || quotation.template?.primaryColor || "#0284c7";
-  const accentColor = quotation.designConfig?.accentColor || quotation.template?.accentColor || "#059669";
-  const coverLayout = quotation.designConfig?.coverLayout || quotation.template?.coverLayout || "MODERN_FULL";
-  const fontFamily = quotation.designConfig?.fontFamily || quotation.template?.fontFamily || "Inter";
+  const primaryColor = quotation.designConfig?.primaryColor || quotation.template?.primaryColor || "#0B2014";
+  const accentColor = quotation.designConfig?.accentColor || quotation.template?.accentColor || "#C5A059";
+  const coverLayout = quotation.designConfig?.coverLayout || quotation.template?.coverLayout || "CINEMATIC_LUXURY";
+  const fontFamily = quotation.designConfig?.fontFamily || quotation.template?.fontFamily || "Manrope";
 
   return {
     quotation_number: quotation.qNumber || `QT-${new Date().getFullYear()}-001`,
@@ -249,6 +251,8 @@ export function mapQuotationToPdfData(quotation: any, tenantInfo?: any): Quotati
     accent_color: accentColor,
     cover_layout: coverLayout,
     font_family: fontFamily,
+    cover_image: "/assets/solar-quotation/luxury-villa-cover.jpg",
+    palette_theme: "forest_gold",
     sections_config: quotation.sectionsConfig || quotation.template?.sections || null,
 
     company_name: tenantName,
@@ -270,7 +274,7 @@ export function mapQuotationToPdfData(quotation: any, tenantInfo?: any): Quotati
     project_address: clientAddress,
     consumer_number: quotation.consumerNumber || client?.consumerNumber || undefined,
     discom: quotation.discom || "MSEDCL (Mahavitaran)",
-    billing_unit: quotation.billingUnit || "4100",
+    billing_unit: quotation.billingUnit || "4134 Pune City Urban",
     sanctioned_load: quotation.sanctionedLoad || cap,
     tariff_rate: quotation.tariffRate || (quotation.connectionType === 'Commercial' ? 10.5 : 8.5),
     current_monthly_bill: quotation.monthlyBill || Math.round(cap * 120 * 8.5),
@@ -308,71 +312,71 @@ export function mapQuotationToPdfData(quotation: any, tenantInfo?: any): Quotati
     structure_warranty: quotation.structureWarranty || "10 Years Structural",
 
     components: componentsList,
-    scope_of_supply: quotation.scopeOfSupply || quotation.template?.defaultScope || [
-      { item: "Detailed Technical Site Feasibility & Shadow Analysis Survey", status: "INCLUDED" },
-      { item: `Supply of ${cap} kWp Tier-1 Solar PV Modules (${quotation.panelBrand || 'Waaree'})`, status: "INCLUDED" },
-      { item: `Supply of ${invCap} kW High-Efficiency Inverter (${quotation.inverterBrand || 'Growatt'})`, status: "INCLUDED" },
-      { item: "Hot-Dip Galvanized (HDG) / Aluminum Module Mounting Structure", status: "INCLUDED" },
-      { item: "UV-Protected 4 sq.mm DC Solar Cables & Conduits", status: "INCLUDED" },
-      { item: "ACDB & DCDB Distribution Boxes with Type-II SPDs", status: "INCLUDED" },
-      { item: "Maintenance-Free Dual Chemical Earthing Kit & LA", status: "INCLUDED" },
-      { item: "Turnkey Mechanical & Electrical Installation & Termination", status: "INCLUDED" },
-      { item: "State DISCOM Net Metering Liasoning & Commissioning Coordination", status: "INCLUDED" },
-      { item: "Civil Masonry Structural Alteration or Roof Waterproofing", status: "EXCLUDED" },
-      { item: "Statutory DISCOM Net Meter Testing & Registration Fees (Actuals)", status: "EXCLUDED" },
-      { item: "Additional AC Cabling Exceeding 25 Meters from Inverter to LT Panel", status: "CHARGEABLE" }
+
+    scope_of_supply: quotation.scopeOfSupply || [
+      { item: "Detailed Architectural & Shadow-Analysis Rooftop Site Survey", status: "INCLUDED" },
+      { item: "Engineering Design, Array Layout, Single Line Diagram (SLD)", status: "INCLUDED" },
+      { item: "Supply of Tier-1 ALMM Mono-PERC / TopCon Bifacial Solar Modules", status: "INCLUDED" },
+      { item: "Supply of Dual-MPPT High Efficiency Grid-Tied Inverter", status: "INCLUDED" },
+      { item: "Hot-Dip Galvanized (80µm) Elevated / Flat Rooftop Structure", status: "INCLUDED" },
+      { item: "ACDB & DCDB with Type-II Surge Protection & Circuit Breakers", status: "INCLUDED" },
+      { item: "Dual Chemical Copper-Bonded Earthing & Dedicated Lightning Arrestor", status: "INCLUDED" },
+      { item: "Complete State DISCOM Net-Metering Liaisoning & Grid Synchronization", status: "INCLUDED" },
+      { item: "PM Surya Ghar National Portal Subsidy Processing & DBT Filing", status: "INCLUDED" },
+      { item: "Comprehensive 5-Year Workmanship & System Maintenance", status: "INCLUDED" }
     ],
 
     pricing: pricingRows,
-    subtotal,
-    discount,
-    tax,
-    taxable_amount: Math.max(0, subtotal - discount),
+    subtotal: subtotal,
+    discount: discount,
+    tax: tax,
+    taxable_amount: subtotal - discount,
     cgst: Math.round(tax / 2),
-    sgst: tax - Math.round(tax / 2),
+    sgst: Math.round(tax / 2),
     grand_total: grandTotal,
     indicative_subsidy: subsidy,
     net_customer_cost: Math.max(0, grandTotal - subsidy),
-    commercial_tax_benefit: (quotation.connectionType === 'Commercial' || quotation.connectionType === 'Industrial') ? Math.round(grandTotal * 0.40 * 0.2517) : 0,
+    commercial_tax_benefit: Math.round(grandTotal * 0.40 * 0.25),
     amount_in_words: toIndianWords(grandTotal),
 
-    estimated_monthly_bill: Math.max(450, Math.round((quotation.monthlyBill || 4500) - (annSav / 12))),
+    estimated_monthly_bill: Math.round((quotation.monthlyBill || (cap * 120 * 8.5)) * 0.10),
     annual_savings: annSav,
     monthly_savings: Math.round(annSav / 12),
-    payback_period: quotation.paybackYears || Number((Math.max(0, grandTotal - subsidy) / Math.max(1, annSav)).toFixed(1)),
-    lifetime_savings: Math.round(annSav * 25 * 1.3),
+    payback_period: Number((grandTotal / annSav).toFixed(1)) || 4.2,
+    lifetime_savings: Math.round(annSav * 25 * 0.88 * 1.25),
     lifetime_generation: Math.round(annGen * 25 * 0.92),
 
-    co2_reduction: Math.round(annGen * 0.82),
-    tree_equivalent: Math.round((annGen * 0.82) / 20),
+    co2_reduction: Number((cap * 1.25 * 25).toFixed(1)),
+    tree_equivalent: Math.round(cap * 42),
     peak_month: "May",
 
-    payment_terms: quotation.paymentMilestones || [
-      { stage: 1, percentage: 20, amount: Math.round(grandTotal * 0.2), description: "Advance booking along with signed work order" },
-      { stage: 2, percentage: 60, amount: Math.round(grandTotal * 0.6), description: "Upon delivery of panels, inverter & structure at site" },
-      { stage: 3, percentage: 15, amount: Math.round(grandTotal * 0.15), description: "Upon mechanical mounting & electrical installation completion" },
-      { stage: 4, percentage: 5, amount: Math.round(grandTotal * 0.05), description: "Upon DISCOM Net Metering inspection & grid synchronization" }
+    payment_terms: quotation.paymentTerms || [
+      { stage: 1, percentage: 10, amount: Math.round(grandTotal * 0.10), description: "Advance with Confirmed Work Order & Engineering Design" },
+      { stage: 2, percentage: 70, amount: Math.round(grandTotal * 0.70), description: "On Delivery & Physical Inspection of Modules, Inverter & Structure at Site" },
+      { stage: 3, percentage: 15, amount: Math.round(grandTotal * 0.15), description: "Post Mechanical Installation, Structural Torque & Electrical Termination" },
+      { stage: 4, percentage: 5, amount: Math.round(grandTotal * 0.05), description: "On DISCOM Bi-directional Net Meter Handover & Joint Meter Reading (JMR)" }
     ],
 
-    warranties: quotation.warranties || {
-      modules: quotation.panelWarranty || "25 Years OEM Performance",
-      inverter: quotation.inverterWarranty || "10 Years Replacement Warranty",
-      structure: quotation.structureWarranty || "10 Years Structural Integrity",
-      installation: "5 Years Workmanship Guarantee",
-      other: "OEM Standard Terms"
+    warranties: {
+      modules: quotation.panelWarranty || "25 Years Linear Performance",
+      inverter: quotation.inverterWarranty || "10 Years Full Replacement",
+      structure: quotation.structureWarranty || "10 Years Structural Wind-Load Integrity",
+      installation: "5 Years Comprehensive Workmanship Guarantee",
+      battery: quotation.batteryWarranty || "10 Years / 6000 Cycles",
+      other: "OEM Standard on Cables, Switchgear & Earthing"
     },
 
-    exclusions: quotation.exclusions || [
-      "Statutory DISCOM meter testing and processing charges payable directly to utility.",
-      "Civil masonry repairs, structural reinforcement, or roof waterproofing.",
-      "Sanctioned load extension or tariff alteration application charges."
+    exclusions: [
+      "Any civil structural building repairs or reinforcement not explicitly in EPC scope",
+      "Statutory DISCOM official net-meter testing fees or application deposits",
+      "External transformer upgrades if required by utility for sanctioned capacity"
     ],
 
     terms_and_conditions: quotation.termsAndConditions || [
-      `Quotation Validity: This commercial proposal is valid for ${quotation.validityDays || 15} days from date of issue.`,
-      "Central Government Subsidy (PM Surya Ghar) is an indicative estimate and is credited directly to the consumer account via DBT post-commissioning.",
+      `Proposal Validity: This commercial proposal is valid for ${quotation.validityDays || 15} days from date of issuance.`,
+      "Central Government Subsidy (PM Surya Ghar Muft Bijli Yojana) is an indicative estimate credited directly to consumer bank account via DBT post-commissioning.",
       "Net Metering: Net metering feasibility and approvals are governed by State DISCOM regulations and local transformer load capacity.",
-      "Customer Responsibilities: Rooftop access, water supply for cleaning, and grid electrical power during installation are customer obligations."
+      "Customer Obligations: Provide unhindered rooftop access, dedicated cleaning water line, and grid electricity during construction."
     ],
 
     bank_details: quotation.bankDetails || {
@@ -414,7 +418,7 @@ export const generatePDF = async (elementId: string, filename: string) => {
           return value.bind(target);
         }
         if (typeof value === 'string' && (value.includes('lab(') || value.includes('oklch(') || value.includes('color('))) {
-          if (prop === 'color' || prop === 'backgroundColor') return 'rgb(15, 23, 42)';
+          if (prop === 'color' || prop === 'backgroundColor') return '#071c11';
           return 'rgba(0, 0, 0, 0)'; 
         }
         return value;
@@ -450,65 +454,149 @@ export const generatePDF = async (elementId: string, filename: string) => {
 };
 
 /**
+ * Minimalist Editorial SVG Monthly Generation Bar Graphic
+ */
+const MonthlySolarCurve = ({ capacity = 5 }: { capacity?: number }) => {
+  const cap = Number(capacity) || 5;
+  const months = [
+    { m: 'Jan', gen: Math.round(cap * 118) },
+    { m: 'Feb', gen: Math.round(cap * 122) },
+    { m: 'Mar', gen: Math.round(cap * 142) },
+    { m: 'Apr', gen: Math.round(cap * 148) },
+    { m: 'May', gen: Math.round(cap * 155), peak: true },
+    { m: 'Jun', gen: Math.round(cap * 110) },
+    { m: 'Jul', gen: Math.round(cap * 92) },
+    { m: 'Aug', gen: Math.round(cap * 96) },
+    { m: 'Sep', gen: Math.round(cap * 114) },
+    { m: 'Oct', gen: Math.round(cap * 128) },
+    { m: 'Nov', gen: Math.round(cap * 122) },
+    { m: 'Dec', gen: Math.round(cap * 113) }
+  ];
+  const maxGen = Math.max(...months.map(d => d.gen));
+
+  return (
+    <div className="w-full bg-[#FAF8F5] p-5 rounded-2xl border border-[#071C11]/10">
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <span className="text-[10px] font-extrabold uppercase tracking-[0.2em] text-[#C5A059] block">
+            Annual Yield Analysis
+          </span>
+          <h4 className="text-xs font-bold text-[#141715]">Monthly Generation Profile (Western India Insolation)</h4>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="inline-block w-2.5 h-2.5 rounded-full bg-[#C5A059]" />
+          <span className="text-[11px] text-[#2C332E] font-medium">Peak Solar: May ({Math.round(cap * 155)} kWh)</span>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-12 gap-2 items-end h-28 pt-2">
+        {months.map((d, i) => {
+          const heightPct = Math.round((d.gen / maxGen) * 100);
+          return (
+            <div key={i} className="flex flex-col items-center h-full justify-end group">
+              <span className="text-[9px] font-mono font-bold text-[#141715] mb-1">{d.gen}</span>
+              <div 
+                className={`w-full rounded-t-md transition-all ${
+                  d.peak 
+                    ? 'bg-gradient-to-t from-[#C5A059] to-[#DFBF78] shadow-sm' 
+                    : 'bg-gradient-to-t from-[#0B2014] to-[#1A533A]'
+                }`}
+                style={{ height: `${heightPct}%` }}
+              />
+              <span className="text-[10px] font-semibold text-[#64748b] mt-1.5">{d.m}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+/**
  * Clean Single Page Wrapper for strict A4 dimensions
  */
-const A4Page = ({ children, className = "", id }: { children: React.ReactNode; className?: string; id?: string }) => (
+const A4Page = ({ 
+  children, 
+  className = "", 
+  id,
+  dark = false
+}: { 
+  children: React.ReactNode; 
+  className?: string; 
+  id?: string;
+  dark?: boolean;
+}) => (
   <div 
     id={id}
-    className={`w-[210mm] min-h-[297mm] relative overflow-hidden flex flex-col justify-between bg-white text-slate-800 p-12 print:p-8 border border-slate-200 shadow-sm print:shadow-none print:border-none mb-6 print:mb-0 print:break-after-page ${className}`}
-    style={{ boxSizing: 'border-box' }}
+    className={`w-[210mm] min-h-[297mm] relative overflow-hidden flex flex-col justify-between ${
+      dark ? 'bg-[#071C11] text-white' : 'bg-[#FAF8F5] text-[#141715]'
+    } p-12 print:p-8 border border-stone-200/60 shadow-xl print:shadow-none print:border-none mb-8 print:mb-0 print:break-after-page ${className}`}
+    style={{ boxSizing: 'border-box', fontFamily: "'Plus Jakarta Sans', sans-serif" }}
   >
     {children}
   </div>
 );
 
 /**
- * Standard Header Component
+ * Editorial Luxury Header Component
  */
-const PageHeader = ({ data, title, sectionNum }: { data: QuotationData; title: string; sectionNum?: string }) => (
-  <div className="flex items-center justify-between pb-4 border-b border-slate-200 mb-6">
+const PageHeader = ({ 
+  data, 
+  title, 
+  sectionNum 
+}: { 
+  data: QuotationData; 
+  title: string; 
+  sectionNum: string 
+}) => (
+  <div className="flex items-center justify-between pb-4 border-b border-[#071C11]/10 mb-8">
     <div className="flex items-center gap-3">
       {data.company_logo ? (
-        <img src={data.company_logo} alt={data.company_name} className="h-8 object-contain" />
+        <img src={data.company_logo} alt={data.company_name} className="h-7 object-contain" />
       ) : (
-        <div className="p-1.5 rounded-lg bg-blue-50 text-blue-600">
-          <Sun className="w-5 h-5" />
+        <div className="w-8 h-8 rounded-lg bg-[#071C11] text-[#C5A059] flex items-center justify-center font-serif font-black text-sm shadow-xs">
+          W
         </div>
       )}
       <div>
-        <div className="text-xs font-bold text-slate-900 tracking-wider uppercase">{data.company_name}</div>
-        <div className="text-[10px] text-slate-500">{data.company_email} • {data.company_phone}</div>
+        <div className="text-[11px] font-extrabold text-[#071C11] tracking-[0.15em] uppercase font-['Manrope']">
+          {data.company_name}
+        </div>
+        <div className="text-[9px] text-[#64748B] tracking-wide">
+          {data.company_address ? data.company_address.split(',')[0] : 'India'} • {data.company_phone}
+        </div>
       </div>
     </div>
     
     <div className="text-right">
-      <div className="text-xs font-bold text-slate-800 uppercase tracking-wide flex items-center gap-1.5 justify-end">
-        {sectionNum && <span className="text-blue-600 font-mono">[{sectionNum}]</span>}
-        {title}
+      <div className="text-[11px] font-extrabold text-[#071C11] uppercase tracking-[0.12em] flex items-center gap-2 justify-end font-['Manrope']">
+        <span className="text-[#C5A059] font-mono text-[10px] tracking-widest">{sectionNum}</span>
+        <span>{title}</span>
       </div>
-      <div className="text-[10px] font-mono text-slate-500">Ref: {data.quotation_number} • {data.quotation_date}</div>
+      <div className="text-[9px] font-mono text-[#64748B]">Ref: {data.quotation_number} • {data.quotation_date}</div>
     </div>
   </div>
 );
 
 /**
- * Standard Running Footer Component
+ * Editorial Running Footer Component
  */
 const PageFooter = ({ data, pageNum }: { data: QuotationData; pageNum: number }) => (
-  <div className="pt-4 border-t border-slate-200 flex items-center justify-between text-[10px] text-slate-400 mt-auto">
-    <div>
-      <span className="font-bold text-slate-700">{data.company_legal_name || data.company_name}</span>
-      {data.company_gstin && <span> • GSTIN: {data.company_gstin}</span>}
+  <div className="pt-4 border-t border-[#071C11]/10 flex items-center justify-between text-[10px] text-[#64748B] mt-auto">
+    <div className="flex items-center gap-2">
+      <span className="font-extrabold text-[#071C11] tracking-wider uppercase">{data.company_legal_name || data.company_name}</span>
+      {data.company_gstin && <span>• GSTIN: {data.company_gstin}</span>}
+      <span className="hidden sm:inline">• Certified EPC Contractor</span>
     </div>
-    <div className="font-mono">
-      Quotation #{data.quotation_number} • Page {pageNum}
+    <div className="font-mono text-[10px] text-[#C5A059] font-bold tracking-wider">
+      PAGE {String(pageNum).padStart(2, '0')} / 06
     </div>
   </div>
 );
 
 /**
  * Master Quotation PDF Component
- * Renders all 9 standard sections dynamically with tenant colors and conditional logic.
+ * Redesigned into an exceptionally beautiful, art-directed 6-page luxury editorial proposal.
  */
 export function QuotationPDF({ data, livePreview = false }: { data: QuotationData; livePreview?: boolean }) {
   if (!data) return null;
@@ -517,947 +605,893 @@ export function QuotationPDF({ data, livePreview = false }: { data: QuotationDat
   const isHybridOrOffgrid = data.system_type === 'Hybrid' || data.system_type === 'Off-grid';
   const isCommercial = data.connection_type === 'Commercial' || data.connection_type === 'Industrial';
 
-  // Section visibility check based on template sections config
+  // Section visibility check
   const isSectionEnabled = (secId: string) => {
     if (!data.sections_config || data.sections_config.length === 0) return true;
     const found = data.sections_config.find(s => s.id === secId);
     return found ? found.isEnabled : true;
   };
 
-  let currentPage = 1;
+  let pageCounter = 1;
 
   return (
     <div 
-      className="mx-auto font-sans text-slate-800 bg-slate-100 p-4 print:p-0 print:bg-white" 
+      className="mx-auto font-sans text-slate-800 bg-stone-300/40 p-4 print:p-0 print:bg-white" 
       style={{ width: "210mm" }}
     >
       
       {/* ========================================================================= */}
-      {/* SECTION 1: COVER PAGE                                                     */}
+      {/* PAGE 1: CINEMATIC COVER PAGE                                              */}
       {/* ========================================================================= */}
       {isSectionEnabled('cover') && (
-        <A4Page className="bg-slate-900 text-white relative flex flex-col justify-between p-14">
-          {/* BACKGROUND ROOFTOP PHOTO WITH GRADIENT OVERLAY */}
+        <A4Page id="proposal-page-1" dark className="relative flex flex-col justify-between p-14 !bg-[#071C11]">
+          {/* BACKGROUND LUXURY ROOFTOP PHOTO WITH ART-DIRECTED MATTE GRADIENT */}
           <div className="absolute inset-0 z-0">
             <img 
-              src="/assets/solar-quotation/cover.jpg" 
-              alt="Rooftop Solar" 
-              className="w-full h-full object-cover opacity-35" 
+              src={data.cover_image || "/assets/solar-quotation/luxury-villa-cover.jpg"} 
+              alt="Luxury Rooftop Solar Architecture" 
+              className="w-full h-full object-cover object-center" 
+              onError={(e: any) => {
+                e.target.src = "/assets/solar-quotation/cover.jpg";
+              }}
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-900/80 to-transparent" />
+            {/* Deep forest green gradient vignette */}
+            <div 
+              className="absolute inset-0"
+              style={{
+                background: "linear-gradient(180deg, rgba(7, 28, 17, 0.45) 0%, rgba(7, 28, 17, 0.72) 40%, rgba(7, 28, 17, 0.96) 80%, #071C11 100%)"
+              }}
+            />
           </div>
 
           {/* COVER HEADER */}
-          <div className="relative z-10 flex items-center justify-between border-b border-white/20 pb-6">
+          <div className="relative z-10 flex items-center justify-between border-b border-white/15 pb-6">
             <div className="flex items-center gap-3">
               {data.company_logo ? (
-                <img src={data.company_logo} alt={data.company_name} className="h-10 object-contain" />
+                <img src={data.company_logo} alt={data.company_name} className="h-9 object-contain" />
               ) : (
-                <div className="p-2 rounded-xl bg-blue-500/20 text-blue-400 border border-blue-400/30">
-                  <Sun className="w-7 h-7" />
+                <div className="w-10 h-10 rounded-xl bg-[#C5A059] text-[#071C11] flex items-center justify-center font-serif font-black text-lg shadow-md">
+                  W
                 </div>
               )}
               <div>
-                <h2 className="text-base font-bold tracking-wider uppercase text-white">{data.company_name}</h2>
-                <p className="text-[11px] text-slate-300">{data.company_address}</p>
+                <h2 className="text-sm font-extrabold tracking-[0.2em] uppercase text-white font-['Manrope']">
+                  {data.company_name}
+                </h2>
+                <p className="text-[10px] text-[#C5A059] tracking-wider uppercase font-medium">
+                  Renewable Energy EPC Architecture
+                </p>
               </div>
             </div>
 
             <div className="text-right">
-              <span className="px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
-                EPC Proposal
+              <span className="px-3.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-[0.2em] bg-[#C5A059]/20 text-[#DFBF78] border border-[#C5A059]/40 backdrop-blur-md">
+                Private Proposal • 2026
               </span>
             </div>
           </div>
 
-          {/* COVER HERO CONTENT */}
-          <div className="relative z-10 py-12">
-            <p className="text-emerald-400 font-bold tracking-[0.2em] text-xs uppercase mb-3">
-              Your Journey to Smarter, Cleaner Energy
-            </p>
-            <h1 className="text-4xl md:text-5xl font-extrabold text-white leading-tight tracking-tight mb-8">
-              ROOFTOP SOLAR PV<br />
-              <span className="text-blue-400">ENGINEERING PROPOSAL</span>
+          {/* COVER HERO EDITORIAL CONTENT */}
+          <div className="relative z-10 py-8">
+            <div className="inline-flex items-center gap-2 mb-3">
+              <span className="w-8 h-[1px] bg-[#C5A059]" />
+              <p className="text-[#DFBF78] font-bold tracking-[0.25em] text-[11px] uppercase">
+                WhereReady Solar OS • Enterprise Edition
+              </p>
+            </div>
+            
+            <h1 className="text-5xl md:text-6xl font-black text-white leading-[1.05] tracking-tight font-['Manrope'] mb-6">
+              Power Your<br />
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#DFBF78] via-[#C5A059] to-[#E8D5B5]">
+                Future.
+              </span>
             </h1>
 
-            {/* CAPACITY BADGE */}
-            <div className="inline-flex items-center gap-4 p-4 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 shadow-xl mb-12">
-              <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-blue-500 to-emerald-500 flex items-center justify-center text-white shadow-md">
-                <Zap className="w-8 h-8" />
-              </div>
-              <div>
-                <div className="text-3xl font-extrabold text-white">
-                  {data.system_capacity} <span className="text-lg font-normal text-slate-300">kWp</span>
-                </div>
-                <div className="text-xs text-slate-300 font-medium">
-                  {data.system_type} Solar System • {data.connection_type} Connection
-                </div>
-              </div>
-            </div>
+            <p className="text-stone-300 text-xs max-w-md leading-relaxed mb-8">
+              A bespoke rooftop solar power plant engineered to eliminate recurring grid expenditure, capitalize on central solar incentives, and protect your estate with 25 years of compounding energy independence.
+            </p>
 
-            {/* CLIENT CARD */}
-            <div className="p-6 rounded-2xl bg-slate-900/80 backdrop-blur-md border border-white/15 max-w-lg">
-              <div className="text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-2">
-                Prepared Exclusively For
+            {/* CUSTOMER CALLOUT GLASS CARD */}
+            <div className="p-6 rounded-2xl bg-[#0B2014]/80 backdrop-blur-md border border-[#C5A059]/30 max-w-lg mb-8 shadow-2xl">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[9px] font-extrabold text-[#C5A059] tracking-[0.2em] uppercase">
+                  Prepared Exclusively For
+                </span>
+                <span className="text-[10px] font-mono text-stone-400">
+                  {data.system_type} • {data.connection_type}
+                </span>
               </div>
-              <div className="text-xl font-bold text-white mb-1">{data.customer_name}</div>
-              <div className="text-xs text-slate-300 flex items-center gap-2 mb-1">
-                <MapPin className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+              <div className="text-2xl font-black text-white mb-1.5 font-['Manrope'] tracking-tight">
+                {data.customer_name}
+              </div>
+              <div className="text-xs text-stone-300 flex items-center gap-1.5">
+                <MapPin className="w-3.5 h-3.5 text-[#C5A059] shrink-0" />
                 <span className="truncate">{data.project_address}</span>
               </div>
               {data.consumer_number && (
-                <div className="text-[11px] font-mono text-emerald-300 mt-2 pt-2 border-t border-white/10">
-                  DISCOM Account: {data.consumer_number} ({data.discom || 'MSEDCL'})
+                <div className="text-[11px] font-mono text-emerald-400 mt-2.5 pt-2.5 border-t border-white/10 flex items-center justify-between">
+                  <span>DISCOM Account: {data.consumer_number}</span>
+                  <span className="text-stone-400 font-sans text-[10px]">{data.discom || 'MSEDCL'}</span>
                 </div>
               )}
+            </div>
+
+            {/* SPECIFICATION HIGHLIGHT BAR */}
+            <div className="grid grid-cols-4 gap-3 max-w-xl">
+              <div className="p-3.5 rounded-xl bg-white/5 border border-white/10 backdrop-blur-sm">
+                <div className="text-[9px] uppercase tracking-wider text-stone-400 font-bold mb-0.5">Capacity</div>
+                <div className="text-2xl font-black text-white font-['Space_Grotesk']">
+                  {data.system_capacity} <span className="text-xs font-normal text-[#C5A059]">kWp</span>
+                </div>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-white/5 border border-white/10 backdrop-blur-sm">
+                <div className="text-[9px] uppercase tracking-wider text-stone-400 font-bold mb-0.5">Annual Yield</div>
+                <div className="text-2xl font-black text-white font-['Space_Grotesk']">
+                  {(data.annual_generation).toLocaleString()} <span className="text-xs font-normal text-stone-400">kWh</span>
+                </div>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-white/5 border border-white/10 backdrop-blur-sm">
+                <div className="text-[9px] uppercase tracking-wider text-stone-400 font-bold mb-0.5">25-Yr Return</div>
+                <div className="text-2xl font-black text-[#DFBF78] font-['Space_Grotesk']">
+                  ₹{Number((data.lifetime_savings / 100000).toFixed(1))}L
+                </div>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-white/5 border border-white/10 backdrop-blur-sm">
+                <div className="text-[9px] uppercase tracking-wider text-stone-400 font-bold mb-0.5">CO2 Abated</div>
+                <div className="text-2xl font-black text-emerald-400 font-['Space_Grotesk']">
+                  {data.co2_reduction} <span className="text-xs font-normal text-stone-400">Tons</span>
+                </div>
+              </div>
             </div>
           </div>
 
           {/* COVER FOOTER */}
-          <div className="relative z-10 grid grid-cols-3 gap-4 pt-6 border-t border-white/20 text-xs text-slate-300">
+          <div className="relative z-10 grid grid-cols-3 gap-4 pt-6 border-t border-white/15 text-xs text-stone-300 font-mono">
             <div>
-              <span className="text-[10px] text-slate-400 uppercase tracking-wider block">Proposal Number</span>
-              <span className="font-bold font-mono text-white text-sm">{data.quotation_number}</span>
+              <span className="text-[9px] text-[#C5A059] uppercase tracking-[0.2em] block font-sans font-bold">
+                Proposal Reference
+              </span>
+              <span className="font-bold text-white text-sm">{data.quotation_number}</span>
             </div>
             <div>
-              <span className="text-[10px] text-slate-400 uppercase tracking-wider block">Issuance Date</span>
+              <span className="text-[9px] text-[#C5A059] uppercase tracking-[0.2em] block font-sans font-bold">
+                Issuance Date
+              </span>
               <span className="font-semibold text-white">{data.quotation_date}</span>
             </div>
             <div className="text-right">
-              <span className="text-[10px] text-slate-400 uppercase tracking-wider block">Quotation Validity</span>
-              <span className="font-semibold text-emerald-300">{data.valid_until}</span>
+              <span className="text-[9px] text-[#C5A059] uppercase tracking-[0.2em] block font-sans font-bold">
+                Validity Period
+              </span>
+              <span className="font-bold text-[#DFBF78]">{data.valid_until}</span>
             </div>
           </div>
         </A4Page>
       )}
 
       {/* ========================================================================= */}
-      {/* SECTION 2: CUSTOMER REQUIREMENTS & AUDIT (Not in quick quote)             */}
+      {/* PAGE 2: YOUR ENERGY PROFILE                                               */}
       {/* ========================================================================= */}
       {!isQuickQuote && isSectionEnabled('requirements') && (
-        <A4Page>
+        <A4Page id="proposal-page-2">
           <div>
-            <PageHeader data={data} title="Customer Requirements & Energy Audit" sectionNum="02" />
+            <PageHeader data={data} title="Your Energy Profile & Site Audit" sectionNum="01" />
             
             <div className="mb-6">
-              <h2 className="text-xl font-bold text-slate-900 mb-1">Site Baseline & Energy Consumption Audit</h2>
-              <p className="text-xs text-slate-500">
-                Detailed site audit based on consumer utility records and existing electricity bill analysis.
+              <span className="text-[10px] font-extrabold uppercase tracking-[0.2em] text-[#C5A059] block mb-1">
+                Baseline Energy Economics
+              </span>
+              <h2 className="text-2xl font-black text-[#071C11] tracking-tight font-['Manrope'] mb-1">
+                Translating Rooftop Insolation Into Zero Grid Dependency
+              </h2>
+              <p className="text-xs text-[#64748B] leading-relaxed">
+                A comprehensive engineering audit mapping your utility electricity expenditure, tariff structure, and rooftop surface against optimal solar potential.
               </p>
             </div>
 
-            {/* AUDIT SUMMARY STATS */}
-            <div className="grid grid-cols-4 gap-3 mb-6">
-              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200">
-                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Current Bill</div>
-                <div className="text-lg font-bold text-slate-900">₹{formatINR(data.current_monthly_bill)}/mo</div>
-                <div className="text-[10px] text-slate-500">₹{formatINR(data.current_monthly_bill * 12)}/yr</div>
+            {/* OVERSIZED STATISTICS BAR */}
+            <div className="grid grid-cols-3 gap-4 mb-8">
+              <div className="p-5 rounded-2xl bg-white border border-[#071C11]/10 shadow-xs">
+                <span className="text-[10px] font-extrabold uppercase tracking-[0.15em] text-[#64748B] block mb-1">
+                  Current Grid Outflow
+                </span>
+                <div className="text-2xl font-black text-[#071C11] font-['Space_Grotesk']">
+                  ₹{formatINR(data.current_monthly_bill * 12)} <span className="text-xs font-normal text-[#64748B]">/ year</span>
+                </div>
+                <div className="text-[11px] text-[#64748B] mt-1 font-mono">
+                  ~₹{formatINR(data.current_monthly_bill)}/mo @ ₹{data.tariff_rate || 8.5}/unit
+                </div>
               </div>
 
-              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200">
-                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Avg. Monthly Units</div>
-                <div className="text-lg font-bold text-slate-900">{data.monthly_units || Math.round(data.current_monthly_bill / 8.5)} kWh</div>
-                <div className="text-[10px] text-slate-500">~{Math.round((data.monthly_units || 400) * 12)} kWh/yr</div>
+              <div className="p-5 rounded-2xl bg-white border border-[#071C11]/10 shadow-xs">
+                <span className="text-[10px] font-extrabold uppercase tracking-[0.15em] text-[#059669] block mb-1">
+                  Proposed Clean Solar Yield
+                </span>
+                <div className="text-2xl font-black text-[#059669] font-['Space_Grotesk']">
+                  {data.annual_generation.toLocaleString()} <span className="text-xs font-normal text-[#64748B]">kWh / yr</span>
+                </div>
+                <div className="text-[11px] text-[#059669] mt-1 font-mono">
+                  ~{Math.round(data.annual_generation / 12)} kWh / month average
+                </div>
               </div>
 
-              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200">
-                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Utility Tariff</div>
-                <div className="text-lg font-bold text-slate-900">₹{data.tariff_rate || 8.5}/unit</div>
-                <div className="text-[10px] text-slate-500">{data.connection_type} Slab</div>
-              </div>
-
-              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200">
-                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Est. Roof Area</div>
-                <div className="text-lg font-bold text-blue-600">{data.roof_area_sqft || Math.round(data.system_capacity * 65)} sq.ft.</div>
-                <div className="text-[10px] text-slate-500">Shadow-Free Area</div>
+              <div className="p-5 rounded-2xl bg-[#071C11] text-white shadow-xs">
+                <span className="text-[10px] font-extrabold uppercase tracking-[0.15em] text-[#C5A059] block mb-1">
+                  Projected Bill Reduction
+                </span>
+                <div className="text-2xl font-black text-[#DFBF78] font-['Space_Grotesk']">
+                  ~90% - 95%
+                </div>
+                <div className="text-[11px] text-stone-300 mt-1">
+                  Net-metering credits offset grid consumption
+                </div>
               </div>
             </div>
 
-            {/* SITE & CONSUMER SPECIFICATIONS TABLE */}
-            <div className="border border-slate-200 rounded-xl overflow-hidden mb-6">
+            {/* ELEGANT BEFORE VS AFTER POWER BALANCE INFOGRAPHIC */}
+            <div className="bg-white p-5 rounded-2xl border border-[#071C11]/10 mb-8">
+              <h3 className="text-xs font-bold text-[#071C11] uppercase tracking-wider mb-4 flex items-center gap-2">
+                <Activity size={14} className="text-[#C5A059]" />
+                Before vs. After Solar Generation Architecture
+              </h3>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-4 rounded-xl bg-[#FAF8F5] border border-stone-200">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[11px] font-bold text-rose-700 uppercase">Without Solar (Current)</span>
+                    <span className="text-[10px] text-stone-500 font-mono">100% Grid Dependency</span>
+                  </div>
+                  <div className="w-full bg-stone-200 h-3 rounded-full overflow-hidden mb-2">
+                    <div className="bg-rose-500 h-full w-full rounded-full" />
+                  </div>
+                  <p className="text-[11px] text-stone-600 leading-relaxed">
+                    All consumed electricity is drawn from the state grid at retail slabs with recurring annual tariff inflation of 3%–5%.
+                  </p>
+                </div>
+
+                <div className="p-4 rounded-xl bg-emerald-50/70 border border-emerald-200">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[11px] font-bold text-[#065F46] uppercase">With WhereReady Solar</span>
+                    <span className="text-[10px] text-[#065F46] font-mono font-bold">~90% Solar Self-Sufficiency</span>
+                  </div>
+                  <div className="w-full bg-emerald-200 h-3 rounded-full overflow-hidden mb-2 flex">
+                    <div className="bg-[#059669] h-full w-[90%] rounded-l-full" />
+                    <div className="bg-amber-400 h-full w-[10%] rounded-r-full" />
+                  </div>
+                  <p className="text-[11px] text-[#065F46] leading-relaxed">
+                    90% of daytime energy generated directly on-site; surplus exported back to DISCOM via bidirectional net meter.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* DISCOM & SITE AUDIT SPECIFICATIONS TABLE */}
+            <div className="border border-[#071C11]/10 rounded-2xl overflow-hidden bg-white mb-6">
               <table className="w-full text-xs">
-                <thead className="bg-slate-50 text-slate-700 font-bold border-b border-slate-200">
+                <thead className="bg-[#FAF8F5] text-[#071C11] font-bold border-b border-[#071C11]/10 text-[10px] uppercase tracking-wider">
                   <tr>
-                    <th className="px-4 py-2.5 text-left">Parameter</th>
-                    <th className="px-4 py-2.5 text-left">Consumer / Site Record</th>
-                    <th className="px-4 py-2.5 text-left">Solar EPC Assessment</th>
+                    <th className="px-5 py-3 text-left">Audit Parameter</th>
+                    <th className="px-5 py-3 text-left">Consumer Site Record</th>
+                    <th className="px-5 py-3 text-left">Engineering Assessment</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 text-slate-700">
+                <tbody className="divide-y divide-stone-100 text-[#2C332E]">
                   <tr>
-                    <td className="px-4 py-2.5 font-semibold text-slate-900">Client / Consumer Name</td>
-                    <td className="px-4 py-2.5">{data.customer_name}</td>
-                    <td className="px-4 py-2.5 text-emerald-700 font-medium">Verified against Utility Bill</td>
+                    <td className="px-5 py-3 font-bold text-[#071C11]">Utility & Billing Division</td>
+                    <td className="px-5 py-3">{data.discom || 'MSEDCL (Mahavitaran)'} • BU: {data.billing_unit || '4134'}</td>
+                    <td className="px-5 py-3 text-[#059669] font-medium">Eligible for Net-Metering Sanction</td>
                   </tr>
                   <tr>
-                    <td className="px-4 py-2.5 font-semibold text-slate-900">DISCOM & Billing Unit</td>
-                    <td className="px-4 py-2.5">{data.discom || 'MSEDCL (Mahavitaran)'} • BU: {data.billing_unit || '4100'}</td>
-                    <td className="px-4 py-2.5 text-emerald-700 font-medium">Eligible for Net Metering</td>
+                    <td className="px-5 py-3 font-bold text-[#071C11]">Consumer Account Number</td>
+                    <td className="px-5 py-3 font-mono font-bold text-[#071C11]">{data.consumer_number || 'To be updated'}</td>
+                    <td className="px-5 py-3 text-stone-500">National Portal DBT Synchronized</td>
                   </tr>
                   <tr>
-                    <td className="px-4 py-2.5 font-semibold text-slate-900">Consumer Account No.</td>
-                    <td className="px-4 py-2.5 font-mono font-bold text-blue-700">{data.consumer_number || 'To be updated'}</td>
-                    <td className="px-4 py-2.5">Mapped to PM Surya Ghar National Portal</td>
+                    <td className="px-5 py-3 font-bold text-[#071C11]">Sanctioned Load vs Plant</td>
+                    <td className="px-5 py-3 font-mono">{data.sanctioned_load || data.system_capacity} kW ({data.phase})</td>
+                    <td className="px-5 py-3 text-[#059669] font-medium">
+                      {data.system_capacity <= (data.sanctioned_load || 5) ? 'Capacity within sanctioned limit' : 'Load enhancement recommended'}
+                    </td>
                   </tr>
                   <tr>
-                    <td className="px-4 py-2.5 font-semibold text-slate-900">Sanctioned Load</td>
-                    <td className="px-4 py-2.5">{data.sanctioned_load || data.system_capacity} kW ({data.phase})</td>
-                    <td className="px-4 py-2.5">{data.system_capacity <= (data.sanctioned_load || 5) ? 'Within sanctioned capacity' : 'Load enhancement recommended'}</td>
-                  </tr>
-                  <tr>
-                    <td className="px-4 py-2.5 font-semibold text-slate-900">Roof Surface & Pitch</td>
-                    <td className="px-4 py-2.5">{data.roof_type}</td>
-                    <td className="px-4 py-2.5">South orientation, 12°–15° optimal tilt</td>
+                    <td className="px-5 py-3 font-bold text-[#071C11]">Rooftop Feasibility</td>
+                    <td className="px-5 py-3">{data.roof_type} (~{data.roof_area_sqft || Math.round(data.system_capacity * 65)} sq.ft.)</td>
+                    <td className="px-5 py-3">True South (180°), 15° optimal pitch, 100% shadow-free</td>
                   </tr>
                 </tbody>
               </table>
             </div>
-
-            {/* CUSTOMER OBJECTIVES & VALUE PROPOSITION */}
-            <div className="bg-blue-50/60 rounded-xl p-4 border border-blue-100">
-              <h3 className="text-xs font-bold text-blue-900 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                <Award className="w-4 h-4 text-blue-600" /> Key Project Objectives
-              </h3>
-              <div className="grid grid-cols-3 gap-3 text-xs text-slate-700">
-                <div className="flex items-start gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                  <span>Reduce monthly grid electricity expenses by up to 85%–90%.</span>
-                </div>
-                <div className="flex items-start gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                  <span>Avail Central PM Surya Ghar direct bank benefit (DBT).</span>
-                </div>
-                <div className="flex items-start gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                  <span>Protect property from future annual grid electricity tariff hikes.</span>
-                </div>
-              </div>
-            </div>
           </div>
           
-          <PageFooter data={data} pageNum={++currentPage} />
+          <PageFooter data={data} pageNum={++pageCounter} />
         </A4Page>
       )}
 
       {/* ========================================================================= */}
-      {/* SECTION 3: RECOMMENDED SOLAR SOLUTION & HARDWARE                          */}
+      {/* PAGE 3: YOUR SOLAR SYSTEM (APPLE-STYLE HARDWARE PRESENTATION)              */}
       {/* ========================================================================= */}
       {isSectionEnabled('solution') && (
-        <A4Page>
+        <A4Page id="proposal-page-3">
           <div>
-            <PageHeader data={data} title="Recommended Solar System Architecture" sectionNum="03" />
+            <PageHeader data={data} title="Your Solar System & Hardware" sectionNum="02" />
 
             <div className="mb-6">
-              <h2 className="text-xl font-bold text-slate-900 mb-1">
-                {data.system_capacity} kWp {data.system_type} Solar Power Plant
+              <span className="text-[10px] font-extrabold uppercase tracking-[0.2em] text-[#C5A059] block mb-1">
+                Industrial-Grade Engineering
+              </span>
+              <h2 className="text-2xl font-black text-[#071C11] tracking-tight font-['Manrope'] mb-1">
+                Masterfully Integrated. Crafted for 25-Year Reliability.
               </h2>
-              <p className="text-xs text-slate-500">
-                Tier-1 ALMM-listed solar PV modules, high-efficiency MPPT inverter, and rugged galvanized structure.
+              <p className="text-xs text-[#64748B] leading-relaxed">
+                Every component is hand-picked from global Tier-1 ALMM certified manufacturers, engineered to deliver peak kilowatt-hour generation in harsh Indian climate conditions.
               </p>
             </div>
 
-            {/* KEY TECHNICAL KPI CARDS */}
-            <div className="grid grid-cols-4 gap-3 mb-6">
-              <div className="p-3.5 rounded-xl bg-blue-50 border border-blue-200">
-                <div className="text-[10px] font-bold text-blue-700 uppercase tracking-wider mb-0.5">DC Plant Capacity</div>
-                <div className="text-xl font-extrabold text-blue-900">{data.system_capacity} kWp</div>
-                <div className="text-[10px] text-blue-600">{data.panel_quantity} × {data.panel_wattage}Wp Panels</div>
-              </div>
-
-              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200">
-                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-0.5">AC Inverter Rating</div>
-                <div className="text-xl font-extrabold text-slate-900">{data.inverter_capacity} kW</div>
-                <div className="text-[10px] text-slate-500">{data.phase} Grid-Tied</div>
-              </div>
-
-              <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200">
-                <div className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider mb-0.5">Est. Annual Yield</div>
-                <div className="text-xl font-extrabold text-emerald-900">{data.annual_generation.toLocaleString()} kWh</div>
-                <div className="text-[10px] text-emerald-600">~{Math.round(data.annual_generation / 12)} kWh / Month</div>
-              </div>
-
-              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200">
-                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-0.5">Warranty Shield</div>
-                <div className="text-xl font-extrabold text-slate-900">25 Years</div>
-                <div className="text-[10px] text-slate-500">Linear Performance</div>
+            {/* APPLE-STYLE STUDIO PRODUCT HERO IMAGE */}
+            <div className="w-full h-44 rounded-2xl overflow-hidden mb-6 relative border border-[#071C11]/10 bg-[#FAF8F5] shadow-xs">
+              <img 
+                src="/assets/solar-quotation/hardware-studio.jpg" 
+                alt="Studio Product Photography - Hybrid Inverter and Battery"
+                className="w-full h-full object-cover object-center"
+                onError={(e: any) => {
+                  e.target.src = "/assets/solar-quotation/technology.jpg";
+                }}
+              />
+              <div className="absolute bottom-3 left-4 bg-[#071C11]/80 backdrop-blur-md px-3.5 py-1.5 rounded-xl border border-white/15">
+                <span className="text-[10px] font-bold text-white tracking-wider uppercase font-mono">
+                  State-of-the-Art Power Electronics & Storage
+                </span>
               </div>
             </div>
 
-            {/* HARDWARE SPECIFICATION CARDS */}
+            {/* 2X2 REFINED HARDWARE SHOWCASES */}
             <div className="grid grid-cols-2 gap-4 mb-6">
-              {/* MODULE CARD */}
-              <div className="p-4 rounded-xl border border-slate-200 bg-white shadow-xs">
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="p-2 rounded-lg bg-blue-50 text-blue-600">
-                    <Sun className="w-5 h-5" />
+              
+              {/* PV MODULES CARD */}
+              <div className="p-4 rounded-2xl bg-white border border-[#071C11]/10 shadow-xs flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[10px] font-extrabold text-[#C5A059] uppercase tracking-wider">
+                      Solar PV Modules
+                    </span>
+                    <span className="text-[10px] font-bold text-[#059669] bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                      ALMM Tier-1
+                    </span>
                   </div>
-                  <div>
-                    <span className="text-[10px] font-bold text-blue-600 uppercase tracking-wider">Solar PV Modules</span>
-                    <h3 className="text-sm font-bold text-slate-900">{data.panel_brand} {data.panel_wattage}Wp</h3>
-                  </div>
+                  <h3 className="text-base font-black text-[#071C11] font-['Manrope'] mb-1">
+                    {data.panel_brand} {data.panel_wattage}Wp Bifacial
+                  </h3>
+                  <p className="text-[11px] text-[#64748B] leading-relaxed mb-3">
+                    {data.panel_quantity} High-efficiency N-type TopCon Bifacial modules capturing direct sunlight and ambient rooftop reflection for +15% rear yield.
+                  </p>
                 </div>
-                <div className="text-xs text-slate-600 space-y-1 mt-2 pt-2 border-t border-slate-100">
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Technology:</span>
-                    <span className="font-semibold text-slate-800">{data.panel_model}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Quantity & Rating:</span>
-                    <span className="font-semibold text-slate-800">{data.panel_quantity} Modules ({data.panel_wattage}Wp each)</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">ALMM Status:</span>
-                    <span className="font-semibold text-emerald-700">Approved & DCR Compliant</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Performance Warranty:</span>
-                    <span className="font-semibold text-slate-800">{data.panel_warranty}</span>
-                  </div>
+                <div className="pt-2 border-t border-stone-100 flex items-center justify-between text-xs font-mono">
+                  <span className="text-stone-400 text-[10px]">Warranty</span>
+                  <span className="font-bold text-[#071C11]">{data.panel_warranty}</span>
                 </div>
               </div>
 
               {/* INVERTER CARD */}
-              <div className="p-4 rounded-xl border border-slate-200 bg-white shadow-xs">
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="p-2 rounded-lg bg-emerald-50 text-emerald-600">
-                    <Zap className="w-5 h-5" />
+              <div className="p-4 rounded-2xl bg-white border border-[#071C11]/10 shadow-xs flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[10px] font-extrabold text-[#C5A059] uppercase tracking-wider">
+                      Grid-Tied Inverter
+                    </span>
+                    <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200">
+                      IP65 Rated
+                    </span>
                   </div>
-                  <div>
-                    <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">Grid Inverter</span>
-                    <h3 className="text-sm font-bold text-slate-900">{data.inverter_brand} {data.inverter_capacity}kW</h3>
-                  </div>
+                  <h3 className="text-base font-black text-[#071C11] font-['Manrope'] mb-1">
+                    {data.inverter_brand} {data.inverter_capacity} kW Dual-MPPT
+                  </h3>
+                  <p className="text-[11px] text-[#64748B] leading-relaxed mb-3">
+                    98.6% European efficiency, dual independent MPPT trackers, and integrated WiFi telemetry with mobile app performance monitoring.
+                  </p>
                 </div>
-                <div className="text-xs text-slate-600 space-y-1 mt-2 pt-2 border-t border-slate-100">
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Model & Rating:</span>
-                    <span className="font-semibold text-slate-800">{data.inverter_model}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">MPPT & Efficiency:</span>
-                    <span className="font-semibold text-slate-800">Dual MPPT, &gt;98.4% Peak Efficiency</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Protection Rating:</span>
-                    <span className="font-semibold text-slate-800">IP65 (Outdoor Weatherproof)</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Warranty:</span>
-                    <span className="font-semibold text-slate-800">{data.inverter_warranty}</span>
-                  </div>
+                <div className="pt-2 border-t border-stone-100 flex items-center justify-between text-xs font-mono">
+                  <span className="text-stone-400 text-[10px]">Warranty</span>
+                  <span className="font-bold text-[#071C11]">{data.inverter_warranty}</span>
                 </div>
               </div>
 
-              {/* BATTERY STORAGE CARD (IF HYBRID) */}
-              {isHybridOrOffgrid && (
-                <div className="p-4 rounded-xl border border-amber-200 bg-amber-50/40 shadow-xs col-span-2">
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="p-2 rounded-lg bg-amber-100 text-amber-700">
-                      <Battery className="w-5 h-5" />
+              {/* BATTERY STORAGE (IF HYBRID) OR STRUCTURE */}
+              {isHybridOrOffgrid ? (
+                <div className="p-4 rounded-2xl bg-white border border-[#C5A059]/40 shadow-xs flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-[10px] font-extrabold text-amber-700 uppercase tracking-wider">
+                        Lithium Energy Storage
+                      </span>
+                      <span className="text-[10px] font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
+                        LiFePO4 Chemistry
+                      </span>
                     </div>
-                    <div>
-                      <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wider">Energy Storage System</span>
-                      <h3 className="text-sm font-bold text-slate-900">{data.battery_brand || 'Tata Power'} {data.battery_capacity || 5}kWh LiFePO4</h3>
-                    </div>
+                    <h3 className="text-base font-black text-[#071C11] font-['Manrope'] mb-1">
+                      {data.battery_brand || 'Tata Power'} {data.battery_capacity || 5} kWh Rack
+                    </h3>
+                    <p className="text-[11px] text-[#64748B] leading-relaxed mb-3">
+                      Safe lithium iron phosphate battery supporting {data.backup_load_watts || 3000}W of essential household loads during grid interruptions.
+                    </p>
                   </div>
-                  <div className="grid grid-cols-3 gap-2 text-xs text-slate-700 mt-2 pt-2 border-t border-amber-200">
-                    <div>
-                      <span className="text-slate-400 text-[10px] block">Storage Capacity</span>
-                      <span className="font-bold">{data.battery_capacity || 5} kWh ({data.battery_quantity || 1} Unit)</span>
+                  <div className="pt-2 border-t border-stone-100 flex items-center justify-between text-xs font-mono">
+                    <span className="text-stone-400 text-[10px]">Cycle Life</span>
+                    <span className="font-bold text-[#071C11]">{data.battery_warranty || '10 Years / 6000 Cycles'}</span>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-4 rounded-2xl bg-white border border-[#071C11]/10 shadow-xs flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-[10px] font-extrabold text-[#C5A059] uppercase tracking-wider">
+                        Mounting Structure
+                      </span>
+                      <span className="text-[10px] font-bold text-stone-700 bg-stone-100 px-2 py-0.5 rounded-md">
+                        150 km/h Wind Rated
+                      </span>
                     </div>
-                    <div>
-                      <span className="text-slate-400 text-[10px] block">Backup Load Support</span>
-                      <span className="font-bold">{data.backup_load_watts || 3000} Watts (Lights, Fans, Refrigerator, WiFi)</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-400 text-[10px] block">Battery Life Warranty</span>
-                      <span className="font-bold">{data.battery_warranty || '10 Years / 6000 Cycles'}</span>
-                    </div>
+                    <h3 className="text-base font-black text-[#071C11] font-['Manrope'] mb-1">
+                      {data.structure_brand}
+                    </h3>
+                    <p className="text-[11px] text-[#64748B] leading-relaxed mb-3">
+                      High-grade hot-dip galvanized steel (80µm zinc coating) or anodized aluminium with SS304 grade corrosion-proof fasteners.
+                    </p>
+                  </div>
+                  <div className="pt-2 border-t border-stone-100 flex items-center justify-between text-xs font-mono">
+                    <span className="text-stone-400 text-[10px]">Warranty</span>
+                    <span className="font-bold text-[#071C11]">{data.structure_warranty}</span>
                   </div>
                 </div>
               )}
 
-              {/* STRUCTURE & BOS CARD */}
-              <div className="p-4 rounded-xl border border-slate-200 bg-white shadow-xs col-span-2">
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="p-2 rounded-lg bg-slate-100 text-slate-700">
-                    <Settings className="w-5 h-5" />
+              {/* BALANCE OF SYSTEM (BOS) & ELECTRICAL SAFETY */}
+              <div className="p-4 rounded-2xl bg-white border border-[#071C11]/10 shadow-xs flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[10px] font-extrabold text-[#C5A059] uppercase tracking-wider">
+                      Electrical Balance of System
+                    </span>
+                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md">
+                      MNRE Approved
+                    </span>
                   </div>
-                  <div>
-                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Mounting Structure & Balance of System (BOS)</span>
-                    <h3 className="text-sm font-bold text-slate-900">{data.structure_brand}</h3>
-                  </div>
+                  <h3 className="text-base font-black text-[#071C11] font-['Manrope'] mb-1">
+                    Polycab DC Cables & Type-II SPD
+                  </h3>
+                  <p className="text-[11px] text-[#64748B] leading-relaxed mb-3">
+                    UV-stabilized XLPE 4 sq.mm solar DC cable, Hensel IP65 ACDB/DCDB boxes, and dual chemical copper-bonded earthing pits.
+                  </p>
                 </div>
-                <div className="grid grid-cols-3 gap-4 text-xs text-slate-700 mt-2 pt-2 border-t border-slate-100">
-                  <div>
-                    <span className="text-slate-400 text-[10px] block">Rooftop Structure</span>
-                    <span className="font-semibold">Hot-Dip Galvanized (80µm) / SS304 Fasteners</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 text-[10px] block">DC & AC Cabling</span>
-                    <span className="font-semibold">Polycab TUV Certified 4 sq.mm UV XLPE</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 text-[10px] block">Protection Devices</span>
-                    <span className="font-semibold">Type-II Surge Arresters (SPD) & Dual Chemical Earthing</span>
-                  </div>
+                <div className="pt-2 border-t border-stone-100 flex items-center justify-between text-xs font-mono">
+                  <span className="text-stone-400 text-[10px]">Protection</span>
+                  <span className="font-bold text-[#071C11]">Lightning & Surge Certified</span>
                 </div>
               </div>
-            </div>
 
-            {/* MONTHLY GENERATION CHART / TABLE PREVIEW */}
-            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
-              <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center justify-between">
-                <span>Monthly Solar Generation Curve (Western/Central India Solar Irradiance Profile)</span>
-                <span className="text-blue-600 font-semibold">Peak: May (10.6%)</span>
-              </div>
-              <div className="grid grid-cols-6 gap-2 text-center text-xs">
-                {['Jan: 600', 'Mar: 715', 'May: 775', 'Jul: 445', 'Sep: 555', 'Nov: 615'].map((m, idx) => (
-                  <div key={idx} className="p-2 rounded-lg bg-white border border-slate-200">
-                    <div className="font-mono text-slate-800 font-semibold">{m}</div>
-                    <div className="text-[9px] text-slate-400">kWh</div>
-                  </div>
-                ))}
-              </div>
             </div>
           </div>
 
-          <PageFooter data={data} pageNum={++currentPage} />
+          <PageFooter data={data} pageNum={++pageCounter} />
         </A4Page>
       )}
 
       {/* ========================================================================= */}
-      {/* SECTION 4: SAVINGS ANALYSIS & FINANCIAL ROI                               */}
+      {/* PAGE 4: ENERGY & SAVINGS (FINANCIAL INFOGRAPHICS)                         */}
       {/* ========================================================================= */}
       {isSectionEnabled('savings') && (
-        <A4Page>
+        <A4Page id="proposal-page-4">
           <div>
-            <PageHeader data={data} title="Solar Generation & Financial Economics" sectionNum="04" />
+            <PageHeader data={data} title="Energy Yield & Financial ROI" sectionNum="03" />
 
             <div className="mb-6">
-              <h2 className="text-xl font-bold text-slate-900 mb-1">Financial Analysis & Projected Savings</h2>
-              <p className="text-xs text-slate-500">
-                Detailed return on investment, payback period, and 25-year cumulative savings projections.
+              <span className="text-[10px] font-extrabold uppercase tracking-[0.2em] text-[#C5A059] block mb-1">
+                Financial Engineering
+              </span>
+              <h2 className="text-2xl font-black text-[#071C11] tracking-tight font-['Manrope'] mb-1">
+                A Compounding Financial Asset, Not An Expense.
+              </h2>
+              <p className="text-xs text-[#64748B] leading-relaxed">
+                Projected solar generation yield, break-even payback analysis, and 25-year wealth accumulation compounding against rising grid electricity tariffs.
               </p>
             </div>
 
-            {/* SAVINGS HIGHLIGHTS */}
+            {/* MONTHLY GENERATION CHART */}
+            <div className="mb-6">
+              <MonthlySolarCurve capacity={data.system_capacity} />
+            </div>
+
+            {/* 3 FINANCIAL KPI HERO CARDS */}
             <div className="grid grid-cols-3 gap-4 mb-6">
-              <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-center">
-                <div className="text-xs font-bold text-emerald-800 uppercase tracking-wider mb-1">Year 1 Net Savings</div>
-                <div className="text-2xl font-black text-emerald-900">₹{formatINR(data.annual_savings)}</div>
-                <div className="text-[11px] text-emerald-700 font-medium">₹{formatINR(data.monthly_savings)} / month</div>
+              <div className="p-4 rounded-2xl bg-white border border-[#071C11]/10 shadow-xs text-center">
+                <span className="text-[10px] font-extrabold text-[#059669] uppercase tracking-wider block mb-1">
+                  Year 1 Net Savings
+                </span>
+                <div className="text-2xl font-black text-[#065F46] font-['Space_Grotesk']">
+                  ₹{formatINR(data.annual_savings)}
+                </div>
+                <span className="text-[11px] text-stone-500 font-mono">~₹{formatINR(data.monthly_savings)} / month</span>
               </div>
 
-              <div className="p-4 rounded-2xl bg-blue-50 border border-blue-200 text-center">
-                <div className="text-xs font-bold text-blue-800 uppercase tracking-wider mb-1">Estimated Payback Period</div>
-                <div className="text-2xl font-black text-blue-900">{data.payback_period} Years</div>
-                <div className="text-[11px] text-blue-700 font-medium">Break-even on net investment</div>
+              <div className="p-4 rounded-2xl bg-[#071C11] text-white shadow-xs text-center">
+                <span className="text-[10px] font-extrabold text-[#C5A059] uppercase tracking-wider block mb-1">
+                  Estimated Payback
+                </span>
+                <div className="text-2xl font-black text-[#DFBF78] font-['Space_Grotesk']">
+                  {data.payback_period} Years
+                </div>
+                <span className="text-[11px] text-stone-300 font-mono">Break-even on net capital</span>
               </div>
 
-              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-center">
-                <div className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">25-Year Lifetime Savings</div>
-                <div className="text-2xl font-black text-slate-900">₹{formatINR(data.lifetime_savings)}</div>
-                <div className="text-[11px] text-slate-500">Compounding @ 3% tariff hike</div>
+              <div className="p-4 rounded-2xl bg-white border border-[#071C11]/10 shadow-xs text-center">
+                <span className="text-[10px] font-extrabold text-[#C5A059] uppercase tracking-wider block mb-1">
+                  25-Year Wealth Generated
+                </span>
+                <div className="text-2xl font-black text-[#071C11] font-['Space_Grotesk']">
+                  ₹{formatINR(data.lifetime_savings)}
+                </div>
+                <span className="text-[11px] text-stone-500 font-mono">Compounding @ 3% tariff hike</span>
               </div>
             </div>
 
-            {/* 25-YEAR CUMULATIVE FINANCIAL PROJECTION TABLE */}
-            <div className="border border-slate-200 rounded-xl overflow-hidden mb-6">
-              <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between text-xs font-bold text-slate-700">
-                <span>25-Year Milestone Financial Projections</span>
-                <span className="text-[11px] font-normal text-slate-500">Assumes 0.7% degradation & 3% tariff inflation</span>
+            {/* 25-YEAR COMPOUNDING FINANCIAL PROJECTIONS TABLE */}
+            <div className="border border-[#071C11]/10 rounded-2xl overflow-hidden bg-white mb-6">
+              <div className="px-5 py-3 bg-[#FAF8F5] border-b border-[#071C11]/10 flex items-center justify-between text-xs font-bold text-[#071C11]">
+                <span className="font-['Manrope'] uppercase tracking-wider text-[11px]">25-Year Milestone Cash Flow Projections</span>
+                <span className="text-[10px] font-normal text-stone-500">Transparent 0.7% degradation & 3% tariff inflation</span>
               </div>
               <table className="w-full text-xs text-left">
-                <thead className="bg-slate-50/50 text-[10px] uppercase font-bold text-slate-500 border-b border-slate-200">
+                <thead className="bg-[#FAF8F5]/50 text-[10px] uppercase font-bold text-stone-400 border-b border-stone-100">
                   <tr>
-                    <th className="px-4 py-2">Year</th>
-                    <th className="px-4 py-2">Est. Generation</th>
-                    <th className="px-4 py-2">Grid Tariff (₹/u)</th>
-                    <th className="px-4 py-2">Annual Savings</th>
-                    <th className="px-4 py-2 text-right">Cumulative Net Return</th>
+                    <th className="px-5 py-2.5">Timeline Milestone</th>
+                    <th className="px-5 py-2.5">Estimated Yield</th>
+                    <th className="px-5 py-2.5">Grid Tariff Rate</th>
+                    <th className="px-5 py-2.5">Annual Value</th>
+                    <th className="px-5 py-2.5 text-right">Cumulative Net Savings</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 text-slate-700 font-mono">
+                <tbody className="divide-y divide-stone-100 text-[#2C332E] font-mono">
                   {[
-                    { yr: 'Year 1', gen: data.annual_generation, rate: data.tariff_rate || 8.5, ann: data.annual_savings, cum: data.annual_savings },
-                    { yr: 'Year 3', gen: Math.round(data.annual_generation * 0.98), rate: Number(((data.tariff_rate || 8.5) * 1.06).toFixed(2)), ann: Math.round(data.annual_savings * 1.04), cum: Math.round(data.annual_savings * 3.08) },
-                    { yr: 'Year 5 (Payback)', gen: Math.round(data.annual_generation * 0.96), rate: Number(((data.tariff_rate || 8.5) * 1.12).toFixed(2)), ann: Math.round(data.annual_savings * 1.08), cum: Math.round(data.annual_savings * 5.3) },
+                    { yr: 'Year 01', gen: data.annual_generation, rate: data.tariff_rate || 8.5, ann: data.annual_savings, cum: data.annual_savings },
+                    { yr: 'Year 03', gen: Math.round(data.annual_generation * 0.98), rate: Number(((data.tariff_rate || 8.5) * 1.06).toFixed(2)), ann: Math.round(data.annual_savings * 1.04), cum: Math.round(data.annual_savings * 3.08) },
+                    { yr: 'Year 05 (Payback)', gen: Math.round(data.annual_generation * 0.96), rate: Number(((data.tariff_rate || 8.5) * 1.12).toFixed(2)), ann: Math.round(data.annual_savings * 1.08), cum: Math.round(data.annual_savings * 5.3) },
                     { yr: 'Year 10', gen: Math.round(data.annual_generation * 0.93), rate: Number(((data.tariff_rate || 8.5) * 1.30).toFixed(2)), ann: Math.round(data.annual_savings * 1.21), cum: Math.round(data.annual_savings * 11.5) },
                     { yr: 'Year 15', gen: Math.round(data.annual_generation * 0.90), rate: Number(((data.tariff_rate || 8.5) * 1.51).toFixed(2)), ann: Math.round(data.annual_savings * 1.36), cum: Math.round(data.annual_savings * 18.2) },
                     { yr: 'Year 25', gen: Math.round(data.annual_generation * 0.84), rate: Number(((data.tariff_rate || 8.5) * 2.03).toFixed(2)), ann: Math.round(data.annual_savings * 1.71), cum: data.lifetime_savings }
                   ].map((row, i) => (
-                    <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50/40'}>
-                      <td className="px-4 py-2 font-bold text-slate-900 font-sans">{row.yr}</td>
-                      <td className="px-4 py-2">{row.gen.toLocaleString()} kWh</td>
-                      <td className="px-4 py-2">₹{row.rate}</td>
-                      <td className="px-4 py-2 font-semibold text-emerald-700">₹{formatINR(row.ann)}</td>
-                      <td className="px-4 py-2 text-right font-bold text-slate-900">₹{formatINR(row.cum)}</td>
+                    <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-[#FAF8F5]/40'}>
+                      <td className="px-5 py-2.5 font-bold text-[#071C11] font-sans">{row.yr}</td>
+                      <td className="px-5 py-2.5">{row.gen.toLocaleString()} kWh</td>
+                      <td className="px-5 py-2.5">₹{row.rate} / u</td>
+                      <td className="px-5 py-2.5 text-[#059669] font-bold">₹{formatINR(row.ann)}</td>
+                      <td className="px-5 py-2.5 text-right font-black text-[#071C11]">₹{formatINR(row.cum)}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
 
-            {/* PM SURYA GHAR SUBSIDY OR COMMERCIAL DEPRECIATION */}
-            {data.connection_type === 'Residential' && data.indicative_subsidy && data.indicative_subsidy > 0 ? (
-              <div className="p-4 rounded-xl bg-emerald-50/70 border border-emerald-200 mb-4">
-                <div className="flex items-center justify-between mb-1">
-                  <div className="text-xs font-bold text-emerald-900 flex items-center gap-1.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                    PM Surya Ghar Muft Bijli Yojana — Indicative Central Subsidy
-                  </div>
-                  <span className="text-sm font-black text-emerald-800 font-mono">
-                    ₹{formatINR(data.indicative_subsidy)}
-                  </span>
+            {/* ENVIRONMENTAL IMPACT BANNER */}
+            <div className="p-4 rounded-2xl bg-gradient-to-r from-[#071C11] to-[#0B2014] text-white flex items-center justify-between text-xs">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-400/30 flex items-center justify-center">
+                  <Leaf size={20} />
                 </div>
-                <p className="text-[11px] text-emerald-800 leading-relaxed">
-                  Under the central scheme, eligible individual residential consumers receive direct bank transfer (DBT) 
-                  credited by MNRE/DISCOM directly into the consumer's bank account following successful commissioning and inspection.
-                </p>
-              </div>
-            ) : isCommercial ? (
-              <div className="p-4 rounded-xl bg-blue-50 border border-blue-200 mb-4">
-                <div className="flex items-center justify-between mb-1">
-                  <div className="text-xs font-bold text-blue-900 flex items-center gap-1.5">
-                    <Building2 className="w-4 h-4 text-blue-600" />
-                    Commercial Accelerated Depreciation Benefit (Section 32)
-                  </div>
-                  <span className="text-sm font-black text-blue-800 font-mono">
-                    ₹{formatINR(data.commercial_tax_benefit || 0)} Tax Write-Off
-                  </span>
-                </div>
-                <p className="text-[11px] text-blue-800 leading-relaxed">
-                  Indian Income Tax Act Section 32 allows commercial & industrial entities to claim 40% accelerated depreciation 
-                  on the capital cost of solar rooftop installations in Year 1, significantly improving business cash flows.
-                </p>
-              </div>
-            ) : null}
-
-            {/* SOLAR EMI FINANCING COMPARISON */}
-            {data.financing_details && (
-              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
-                <div className="text-xs font-bold text-slate-800 mb-2 flex items-center justify-between">
-                  <span>Solar Loan Option: Positive Cash Flow from Day 1</span>
-                  <span className="text-blue-600">@ 9.5% p.a. • 5 Years Tenure</span>
-                </div>
-                <div className="grid grid-cols-3 gap-2 text-xs text-slate-600">
-                  <div>
-                    <span className="text-slate-400 block text-[10px]">Monthly Solar Savings:</span>
-                    <span className="font-bold text-emerald-700 text-sm">₹{formatINR(data.monthly_savings)}/mo</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 block text-[10px]">Estimated Monthly EMI:</span>
-                    <span className="font-bold text-slate-800 text-sm">₹{formatINR(data.financing_details.monthly_emi || 4500)}/mo</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 block text-[10px]">Net Monthly Gain:</span>
-                    <span className="font-bold text-blue-700 text-sm">
-                      +₹{formatINR(Math.max(0, data.monthly_savings - (data.financing_details.monthly_emi || 4500)))}/mo
-                    </span>
-                  </div>
+                <div>
+                  <h4 className="font-bold text-white text-xs">Certified Environmental Leadership</h4>
+                  <p className="text-[11px] text-stone-300">Your clean power generation avoids {data.co2_reduction} Tons of CO2 and equals planting ~{data.tree_equivalent} mature trees.</p>
                 </div>
               </div>
-            )}
+              <span className="text-[10px] font-mono text-[#C5A059] font-bold tracking-widest uppercase">
+                100% Green
+              </span>
+            </div>
           </div>
 
-          <PageFooter data={data} pageNum={++currentPage} />
+          <PageFooter data={data} pageNum={++pageCounter} />
         </A4Page>
       )}
 
       {/* ========================================================================= */}
-      {/* SECTION 5: DETAILED COMMERCIAL QUOTATION (BILL OF QUANTITIES & TAXES)    */}
+      {/* PAGE 5: YOUR INVESTMENT (COMMERCIAL BOQ & MILESTONES)                     */}
       {/* ========================================================================= */}
       {isSectionEnabled('pricing') && (
-        <A4Page>
+        <A4Page id="proposal-page-5">
           <div>
-            <PageHeader data={data} title="Commercial Quotation & Bill of Quantities" sectionNum="05" />
+            <PageHeader data={data} title="Commercial Proposal & Investment" sectionNum="04" />
 
             <div className="mb-6">
-              <h2 className="text-xl font-bold text-slate-900 mb-1">Itemized Commercial Quotation</h2>
-              <p className="text-xs text-slate-500">
-                Transparent itemized bill of quantities with tax rates, statutory GST breakdown, and payment totals.
+              <span className="text-[10px] font-extrabold uppercase tracking-[0.2em] text-[#C5A059] block mb-1">
+                Transparent Commercials
+              </span>
+              <h2 className="text-2xl font-black text-[#071C11] tracking-tight font-['Manrope'] mb-1">
+                Turnkey Investment Schedule With Milestone Security
+              </h2>
+              <p className="text-xs text-[#64748B] leading-relaxed">
+                Itemized commercial bill of quantities with composite solar GST, direct central subsidy deduction, and stage-linked payment protection.
               </p>
             </div>
 
-            {/* ITEMIZED TABLE */}
-            <div className="border border-slate-200 rounded-xl overflow-hidden mb-6">
+            {/* OVERSIZED INVESTMENT HERO BOX */}
+            <div className="p-6 rounded-2xl bg-gradient-to-br from-[#071C11] to-[#0B2014] text-white mb-6 border border-[#C5A059]/30 shadow-xl flex items-center justify-between">
+              <div>
+                <span className="text-[10px] font-extrabold text-[#C5A059] tracking-[0.2em] uppercase block mb-1">
+                  Net Estimated Customer Investment
+                </span>
+                <div className="text-4xl md:text-5xl font-black font-['Space_Grotesk'] text-white tracking-tight">
+                  ₹{formatINR(data.net_customer_cost || data.grand_total)}
+                </div>
+                <div className="text-xs text-stone-300 mt-2 flex items-center gap-2">
+                  <span>Gross Project Value: ₹{formatINR(data.grand_total)}</span>
+                  {data.indicative_subsidy && data.indicative_subsidy > 0 && (
+                    <span className="text-emerald-400 font-bold">• Less Central DBT Subsidy: ₹{formatINR(data.indicative_subsidy)}</span>
+                  )}
+                </div>
+              </div>
+
+              <div className="text-right">
+                <span className="px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-wider bg-[#C5A059]/20 text-[#DFBF78] border border-[#C5A059]/40">
+                  Fixed EPC Contract
+                </span>
+                <div className="text-[10px] text-stone-400 mt-2 font-mono">
+                  Inclusive of 13.8% Solar GST
+                </div>
+              </div>
+            </div>
+
+            {/* ITEMIZED PRICING TABLE WITH REFINED THIN DIVIDERS */}
+            <div className="border border-[#071C11]/10 rounded-2xl overflow-hidden bg-white mb-6">
               <table className="w-full text-xs">
-                <thead className="bg-slate-50 text-slate-700 font-bold border-b border-slate-200">
+                <thead className="bg-[#FAF8F5] text-[#071C11] font-bold border-b border-[#071C11]/10 text-[10px] uppercase tracking-wider">
                   <tr>
-                    <th className="px-3 py-2.5 text-center w-10">#</th>
-                    <th className="px-4 py-2.5 text-left">Product / Service Description</th>
-                    <th className="px-3 py-2.5 text-center w-16">Qty</th>
-                    <th className="px-3 py-2.5 text-center w-14">Unit</th>
-                    <th className="px-4 py-2.5 text-right w-24">Rate (₹)</th>
-                    <th className="px-3 py-2.5 text-center w-14">GST</th>
-                    <th className="px-4 py-2.5 text-right w-28">Total (₹)</th>
+                    <th className="px-4 py-3 text-center w-12">#</th>
+                    <th className="px-5 py-3 text-left">Equipment / Scope Deliverable</th>
+                    <th className="px-4 py-3 text-center w-16">Qty</th>
+                    <th className="px-4 py-3 text-center w-16">Unit</th>
+                    <th className="px-5 py-3 text-right w-28">Rate (₹)</th>
+                    <th className="px-4 py-3 text-center w-16">Tax %</th>
+                    <th className="px-5 py-3 text-right w-32">Total (₹)</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 text-slate-700">
+                <tbody className="divide-y divide-stone-100 text-[#2C332E]">
                   {data.pricing.map((item, idx) => (
-                    <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/30'}>
-                      <td className="px-3 py-2.5 text-center font-mono text-slate-400">{idx + 1}</td>
-                      <td className="px-4 py-2.5 font-medium text-slate-900">{item.description}</td>
-                      <td className="px-3 py-2.5 text-center font-mono">{item.qty}</td>
-                      <td className="px-3 py-2.5 text-center text-slate-500">{item.unit || 'NOS'}</td>
-                      <td className="px-4 py-2.5 text-right font-mono">₹{formatINR(item.unit_price)}</td>
-                      <td className="px-3 py-2.5 text-center font-mono text-slate-500">{item.tax_rate || 12}%</td>
-                      <td className="px-4 py-2.5 text-right font-mono font-semibold text-slate-900">₹{formatINR(item.amount)}</td>
+                    <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-[#FAF8F5]/40'}>
+                      <td className="px-4 py-2.5 text-center font-mono text-stone-400">{idx + 1}</td>
+                      <td className="px-5 py-2.5 font-bold text-[#071C11]">{item.description}</td>
+                      <td className="px-4 py-2.5 text-center font-mono">{item.qty}</td>
+                      <td className="px-4 py-2.5 text-center text-stone-500">{item.unit || 'LOT'}</td>
+                      <td className="px-5 py-2.5 text-right font-mono">₹{formatINR(item.unit_price)}</td>
+                      <td className="px-4 py-2.5 text-center font-mono text-stone-500">{item.tax_rate || 12}%</td>
+                      <td className="px-5 py-2.5 text-right font-mono font-bold text-[#071C11]">₹{formatINR(item.amount)}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
 
-            {/* TOTALS & TAX BREAKDOWN */}
+            {/* AMOUNT IN WORDS & MILESTONE SCHEDULE */}
             <div className="grid grid-cols-2 gap-6 mb-6">
-              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 flex flex-col justify-between">
-                <div>
-                  <div className="text-xs font-bold text-slate-800 mb-1">Amount Payable in Words:</div>
-                  <div className="text-xs font-bold text-blue-900 tracking-wide uppercase leading-relaxed">
+              
+              {/* AMOUNT IN WORDS & BANK DETAILS */}
+              <div className="space-y-4">
+                <div className="p-4 rounded-2xl bg-[#FAF8F5] border border-[#071C11]/10">
+                  <span className="text-[10px] font-extrabold text-[#C5A059] uppercase tracking-wider block mb-1">
+                    Amount Payable in Words
+                  </span>
+                  <p className="text-xs font-bold text-[#071C11] tracking-wide uppercase leading-relaxed font-['Manrope']">
                     {data.amount_in_words}
-                  </div>
+                  </p>
                 </div>
 
-                <div className="mt-4 pt-3 border-t border-slate-200 text-[11px] text-slate-500">
-                  Statutory Note: Prices are inclusive of GST. Central / State subsidies are credited directly 
-                  by the Government to the consumer's bank account via Direct Benefit Transfer (DBT).
-                </div>
-              </div>
-
-              {/* CALCULATION SUMMARY BOX */}
-              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-2 text-xs font-mono">
-                <div className="flex justify-between text-slate-600">
-                  <span className="font-sans">Subtotal (Pre-Tax):</span>
-                  <span>₹{formatINR(data.subtotal)}</span>
-                </div>
-                {data.discount > 0 && (
-                  <div className="flex justify-between text-emerald-600">
-                    <span className="font-sans">Commercial Discount:</span>
-                    <span>-₹{formatINR(data.discount)}</span>
+                {data.bank_details && (
+                  <div className="p-4 rounded-2xl bg-white border border-[#071C11]/10 text-xs">
+                    <span className="text-[10px] font-bold text-stone-500 uppercase tracking-wider block mb-2">
+                      Official EPC Bank Account for RTGS / NEFT
+                    </span>
+                    <div className="grid grid-cols-2 gap-2 text-stone-700 font-mono text-[11px]">
+                      <div>
+                        <span className="text-stone-400 block text-[9px] font-sans">Beneficiary</span>
+                        <span className="font-bold text-[#071C11] truncate block">{data.bank_details.account_name}</span>
+                      </div>
+                      <div>
+                        <span className="text-stone-400 block text-[9px] font-sans">Bank Name</span>
+                        <span>{data.bank_details.bank_name}</span>
+                      </div>
+                      <div>
+                        <span className="text-stone-400 block text-[9px] font-sans">Account Number</span>
+                        <span className="font-bold text-[#071C11]">{data.bank_details.account_number}</span>
+                      </div>
+                      <div>
+                        <span className="text-stone-400 block text-[9px] font-sans">IFSC Code</span>
+                        <span className="font-bold text-[#C5A059]">{data.bank_details.ifsc}</span>
+                      </div>
+                    </div>
                   </div>
                 )}
-                <div className="flex justify-between text-slate-600">
-                  <span className="font-sans">Taxable Value:</span>
-                  <span>₹{formatINR(data.taxable_amount || (data.subtotal - data.discount))}</span>
-                </div>
-                <div className="flex justify-between text-slate-600">
-                  <span className="font-sans">CGST / SGST (Solar Composite):</span>
-                  <span>₹{formatINR(data.tax)}</span>
-                </div>
-                <div className="flex justify-between text-base font-bold text-slate-900 pt-2 border-t border-slate-300">
-                  <span className="font-sans">Final Project Total:</span>
-                  <span className="text-blue-700">₹{formatINR(data.grand_total)}</span>
-                </div>
-                {data.indicative_subsidy && data.indicative_subsidy > 0 ? (
-                  <>
-                    <div className="flex justify-between text-emerald-700 pt-1">
-                      <span className="font-sans font-semibold">Less: Indicative Subsidy (PM Surya Ghar):</span>
-                      <span className="font-semibold">-₹{formatINR(data.indicative_subsidy)}</span>
-                    </div>
-                    <div className="flex justify-between text-sm font-bold text-emerald-900 pt-1 border-t border-emerald-200">
-                      <span className="font-sans font-bold">Estimated Net Outflow:</span>
-                      <span className="text-emerald-800">₹{formatINR(data.net_customer_cost || (data.grand_total - data.indicative_subsidy))}</span>
-                    </div>
-                  </>
-                ) : null}
               </div>
-            </div>
 
-            {/* MILESTONE PAYMENT SCHEDULE */}
-            <div className="border border-slate-200 rounded-xl overflow-hidden">
-              <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-200 font-bold text-xs text-slate-800 flex items-center justify-between">
-                <span>Standard Payment Milestone Schedule</span>
-                <span className="text-[11px] font-normal text-slate-500">100% Milestone Linked Execution</span>
-              </div>
-              <div className="divide-y divide-slate-100 text-xs">
-                {data.payment_terms.map((ms, idx) => (
-                  <div key={idx} className="px-4 py-2.5 flex items-center justify-between bg-white">
-                    <div className="flex items-center gap-3">
-                      <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 text-[10px] font-bold flex items-center justify-center shrink-0">
-                        {idx + 1}
-                      </span>
-                      <span className="text-slate-800 font-medium">{ms.description}</span>
+              {/* MILESTONE PAYMENT SCHEDULE */}
+              <div className="border border-[#071C11]/10 rounded-2xl overflow-hidden bg-white">
+                <div className="px-4 py-2.5 bg-[#FAF8F5] border-b border-[#071C11]/10 font-bold text-xs text-[#071C11] flex items-center justify-between">
+                  <span className="text-[10px] uppercase tracking-wider">Milestone Linked Payment Terms</span>
+                  <span className="text-[10px] font-normal text-stone-500">100% Secure</span>
+                </div>
+                <div className="divide-y divide-stone-100 text-xs">
+                  {data.payment_terms.map((ms, idx) => (
+                    <div key={idx} className="px-4 py-2.5 flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <span className="w-5 h-5 rounded-full bg-[#071C11] text-[#C5A059] text-[10px] font-black flex items-center justify-center shrink-0">
+                          {idx + 1}
+                        </span>
+                        <span className="text-stone-800 font-medium text-[11px] leading-tight">{ms.description}</span>
+                      </div>
+                      <div className="flex items-center gap-3 text-right shrink-0">
+                        <span className="px-2 py-0.5 rounded bg-stone-100 text-stone-700 font-bold text-[10px]">{ms.percentage}%</span>
+                        <span className="font-mono font-bold text-[#071C11] text-[11px]">₹{formatINR(ms.amount)}</span>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-4 text-right">
-                      <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-bold text-[11px]">{ms.percentage}%</span>
-                      <span className="font-mono font-bold text-slate-900 w-24">₹{formatINR(ms.amount)}</span>
-                    </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
+
             </div>
           </div>
 
-          <PageFooter data={data} pageNum={++currentPage} />
+          <PageFooter data={data} pageNum={++pageCounter} />
         </A4Page>
       )}
 
       {/* ========================================================================= */}
-      {/* SECTION 6: SCOPE OF WORK (Not in quick quote)                             */}
-      {/* ========================================================================= */}
-      {!isQuickQuote && isSectionEnabled('scope') && (
-        <A4Page>
-          <div>
-            <PageHeader data={data} title="Scope of Work & EPC Deliverables" sectionNum="06" />
-
-            <div className="mb-6">
-              <h2 className="text-xl font-bold text-slate-900 mb-1">Turnkey Scope of Work & Boundaries</h2>
-              <p className="text-xs text-slate-500">
-                Clear allocation of EPC deliverables, statutory agency coordination, and customer responsibilities.
-              </p>
-            </div>
-
-            <div className="space-y-2 mb-6">
-              {data.scope_of_supply.map((sc: any, idx: number) => {
-                const text = typeof sc === 'string' ? sc : sc.item;
-                const status = typeof sc === 'string' ? 'INCLUDED' : (sc.status || 'INCLUDED');
-                return (
-                  <div key={idx} className="p-3 rounded-xl border border-slate-200 bg-white flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-2.5">
-                      <span className="w-5 h-5 rounded-md bg-slate-100 text-slate-600 text-[10px] font-bold flex items-center justify-center shrink-0">
-                        {idx + 1}
-                      </span>
-                      <span className="text-slate-800 font-medium">{text}</span>
-                    </div>
-                    <span className={`px-2.5 py-1 rounded-md text-[10px] font-bold tracking-wider shrink-0 uppercase ${
-                      status === 'INCLUDED' ? 'bg-emerald-100 text-emerald-800' :
-                      status === 'EXCLUDED' ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800'
-                    }`}>
-                      {status}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* CUSTOMER RESPONSIBILITIES */}
-            <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 text-xs">
-              <h3 className="font-bold text-slate-900 uppercase tracking-wider text-[11px] mb-2 flex items-center gap-1.5">
-                <CheckSquare className="w-4 h-4 text-blue-600" /> Customer Site Obligations
-              </h3>
-              <ul className="space-y-1.5 text-slate-600 text-xs list-disc list-inside">
-                <li>Provide unhindered, safe rooftop access for EPC engineers, workers, and materials.</li>
-                <li>Ensure dedicated water supply line at rooftop with sufficient pressure for regular module cleaning.</li>
-                <li>Provide single or three-phase electrical power supply at site during mounting and testing.</li>
-                <li>Cooperate with statutory DISCOM meter testing and verification officers during physical site visit.</li>
-              </ul>
-            </div>
-          </div>
-
-          <PageFooter data={data} pageNum={++currentPage} />
-        </A4Page>
-      )}
-
-      {/* ========================================================================= */}
-      {/* SECTION 7 & 8: WARRANTIES, TERMS & CONDITIONS                            */}
-      {/* ========================================================================= */}
-      {isSectionEnabled('warranty') && (
-        <A4Page>
-          <div>
-            <PageHeader data={data} title="Warranty Guarantees & Commercial Terms" sectionNum="07" />
-
-            {/* WARRANTIES GRID */}
-            <div className="mb-6">
-              <h2 className="text-xl font-bold text-slate-900 mb-1">Equipment Warranties & Service Commitments</h2>
-              <p className="text-xs text-slate-500 mb-4">
-                Backed directly by Tier-1 OEM manufacturers and our certified EPC workmanship warranty.
-              </p>
-
-              <div className="grid grid-cols-2 gap-3 mb-6">
-                <div className="p-3.5 rounded-xl border border-slate-200 bg-white">
-                  <div className="flex items-center gap-2 mb-1">
-                    <ShieldCheck className="w-4 h-4 text-blue-600" />
-                    <span className="text-xs font-bold text-slate-900">Solar PV Modules</span>
-                  </div>
-                  <div className="text-sm font-bold text-blue-800">{data.warranties.modules}</div>
-                  <div className="text-[11px] text-slate-500">10-12 Yr Product + 25 Yr Performance Guarantee</div>
-                </div>
-
-                <div className="p-3.5 rounded-xl border border-slate-200 bg-white">
-                  <div className="flex items-center gap-2 mb-1">
-                    <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                    <span className="text-xs font-bold text-slate-900">Solar Grid Inverter</span>
-                  </div>
-                  <div className="text-sm font-bold text-emerald-800">{data.warranties.inverter}</div>
-                  <div className="text-[11px] text-slate-500">Standard OEM replacement warranty against manufacturing defects</div>
-                </div>
-
-                <div className="p-3.5 rounded-xl border border-slate-200 bg-white">
-                  <div className="flex items-center gap-2 mb-1">
-                    <ShieldCheck className="w-4 h-4 text-slate-600" />
-                    <span className="text-xs font-bold text-slate-900">Mounting Structure</span>
-                  </div>
-                  <div className="text-sm font-bold text-slate-800">{data.warranties.structure}</div>
-                  <div className="text-[11px] text-slate-500">Structural integrity, wind resistance up to 150 km/h</div>
-                </div>
-
-                <div className="p-3.5 rounded-xl border border-slate-200 bg-white">
-                  <div className="flex items-center gap-2 mb-1">
-                    <ShieldCheck className="w-4 h-4 text-amber-600" />
-                    <span className="text-xs font-bold text-slate-900">Workmanship Guarantee</span>
-                  </div>
-                  <div className="text-sm font-bold text-amber-800">{data.warranties.installation}</div>
-                  <div className="text-[11px] text-slate-500">Comprehensive wiring, termination & mechanical integrity support</div>
-                </div>
-              </div>
-            </div>
-
-            {/* COMMERCIAL TERMS & CONDITIONS */}
-            <div className="mb-6">
-              <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                <FileText className="w-4 h-4 text-slate-600" /> Commercial Terms & Conditions
-              </h3>
-              <div className="space-y-1.5 p-4 rounded-xl border border-slate-200 bg-slate-50 text-xs text-slate-700">
-                {data.terms_and_conditions.map((term, i) => (
-                  <div key={i} className="flex items-start gap-2">
-                    <span className="font-bold text-blue-600 shrink-0">•</span>
-                    <span className="leading-relaxed">{term}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* BANK DETAILS */}
-            {data.bank_details && (
-              <div className="p-4 rounded-xl border border-slate-200 bg-white text-xs">
-                <div className="text-[11px] font-bold text-slate-800 uppercase tracking-wider mb-2">
-                  Official EPC Bank Account Details for NEFT / RTGS
-                </div>
-                <div className="grid grid-cols-4 gap-2 text-slate-700 font-mono">
-                  <div>
-                    <span className="text-slate-400 text-[10px] block font-sans">Beneficiary:</span>
-                    <span className="font-bold text-slate-900">{data.bank_details.account_name}</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 text-[10px] block font-sans">Bank Name:</span>
-                    <span>{data.bank_details.bank_name}</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 text-[10px] block font-sans">Account No:</span>
-                    <span className="font-bold text-blue-700">{data.bank_details.account_number}</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 text-[10px] block font-sans">IFSC Code:</span>
-                    <span className="font-bold">{data.bank_details.ifsc}</span>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          <PageFooter data={data} pageNum={++currentPage} />
-        </A4Page>
-      )}
-
-      {/* ========================================================================= */}
-      {/* SECTION 9: CLIENT ACCEPTANCE & WORK ORDER AUTHORIZATION                   */}
+      {/* PAGE 6: INSTALLATION ROADMAP, WARRANTIES & ACCEPTANCE                     */}
       {/* ========================================================================= */}
       {isSectionEnabled('acceptance') && (
-        <A4Page>
+        <A4Page id="proposal-page-6">
           <div>
-            <PageHeader data={data} title="Acceptance & Work Order Confirmation" sectionNum="08" />
+            <PageHeader data={data} title="Installation Roadmap & Acceptance" sectionNum="05" />
 
             <div className="mb-6">
-              <h2 className="text-xl font-bold text-slate-900 mb-1">Work Order Acceptance & Authorization</h2>
-              <p className="text-xs text-slate-500">
-                Signing this document constitutes formal acceptance of this commercial proposal and initiates procurement.
+              <span className="text-[10px] font-extrabold uppercase tracking-[0.2em] text-[#C5A059] block mb-1">
+                Execution Guarantee
+              </span>
+              <h2 className="text-2xl font-black text-[#071C11] tracking-tight font-['Manrope'] mb-1">
+                From Engineering Survey to Solar Power in 21 Days
+              </h2>
+              <p className="text-xs text-[#64748B] leading-relaxed">
+                Our structured 5-phase execution methodology guarantees safe installation, rigorous DISCOM testing, and seamless net-meter commissioning.
               </p>
+            </div>
+
+            {/* 5-STAGE ARCHITECTURAL INSTALLATION TIMELINE */}
+            <div className="grid grid-cols-5 gap-2 mb-6">
+              {[
+                { step: '01', title: 'Site Survey', days: 'Days 1–3', desc: 'Detailed 3D shadow analysis, civil torque check & SLD signoff' },
+                { step: '02', title: 'DISCOM Approval', days: 'Days 4–8', desc: 'Online application & net-metering feasibility sanction' },
+                { step: '03', title: 'Structure Erection', days: 'Days 9–14', desc: 'Hot-dip galvanized structure & PV module alignment' },
+                { step: '04', title: 'Electrical BOS', days: 'Days 15–18', desc: 'Inverter wiring, ACDB/DCDB termination & dual earthing' },
+                { step: '05', title: 'Commissioning', days: 'Days 19–21', desc: 'Net meter synchronization, joint testing & final handover' }
+              ].map((p, idx) => (
+                <div key={idx} className="p-3 rounded-2xl bg-white border border-[#071C11]/10 flex flex-col justify-between">
+                  <div>
+                    <span className="font-mono font-black text-[#C5A059] text-base block">{p.step}</span>
+                    <h4 className="text-[11px] font-bold text-[#071C11] mt-0.5">{p.title}</h4>
+                    <p className="text-[10px] text-stone-500 mt-1 leading-snug">{p.desc}</p>
+                  </div>
+                  <span className="text-[9px] font-bold text-[#059669] bg-emerald-50 px-2 py-0.5 rounded mt-2 text-center block">
+                    {p.days}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            {/* CERTIFIED WARRANTY SHIELDS */}
+            <div className="grid grid-cols-4 gap-3 mb-6">
+              <div className="p-3.5 rounded-2xl bg-white border border-[#071C11]/10 text-center">
+                <span className="text-[9px] uppercase tracking-wider text-stone-400 font-bold block mb-1">Modules</span>
+                <div className="text-base font-black text-[#071C11] font-['Space_Grotesk']">25 Years</div>
+                <div className="text-[10px] text-stone-500">Linear Performance</div>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-white border border-[#071C11]/10 text-center">
+                <span className="text-[9px] uppercase tracking-wider text-stone-400 font-bold block mb-1">Inverter</span>
+                <div className="text-base font-black text-[#071C11] font-['Space_Grotesk']">10 Years</div>
+                <div className="text-[10px] text-stone-500">Full Replacement</div>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-white border border-[#071C11]/10 text-center">
+                <span className="text-[9px] uppercase tracking-wider text-stone-400 font-bold block mb-1">Structure</span>
+                <div className="text-base font-black text-[#071C11] font-['Space_Grotesk']">10 Years</div>
+                <div className="text-[10px] text-stone-500">Wind Load 150 km/h</div>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-white border border-[#071C11]/10 text-center">
+                <span className="text-[9px] uppercase tracking-wider text-stone-400 font-bold block mb-1">Workmanship</span>
+                <div className="text-base font-black text-[#059669] font-['Space_Grotesk']">5 Years</div>
+                <div className="text-[10px] text-stone-500">Comprehensive Support</div>
+              </div>
             </div>
 
             {/* LEGAL ACCEPTANCE DECLARATION */}
-            <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 text-xs text-slate-700 leading-relaxed mb-8 space-y-2">
+            <div className="p-4 rounded-2xl bg-white border border-[#071C11]/10 text-xs text-[#2C332E] leading-relaxed mb-6 space-y-1.5">
               <p>
-                I/We, <strong>{data.customer_name}</strong>, hereby confirm acceptance of Quotation 
-                <strong> #{data.quotation_number}</strong> for the supply, installation, testing, and commissioning of a 
-                <strong> {data.system_capacity} kWp {data.system_type} Solar Rooftop Power Plant</strong> for the total sum of 
+                I/We, <strong>{data.customer_name}</strong>, hereby confirm acceptance of Commercial Proposal 
+                <strong> #{data.quotation_number}</strong> for the supply, turnkey erection, testing, and commissioning of a 
+                <strong> {data.system_capacity} kWp {data.system_type} Solar Rooftop Power Plant</strong> for the total contract sum of 
                 <strong> ₹{formatINR(data.grand_total)} ({data.amount_in_words})</strong>.
               </p>
-              <p>
-                I/We agree to the payment milestone schedule, technical specifications, and terms and conditions 
-                detailed herein, and authorize <strong>{data.company_name}</strong> to initiate DISCOM net metering 
-                applications and project engineering.
+              <p className="text-[11px] text-stone-500">
+                Authorizes {data.company_name} to execute statutory State DISCOM net metering applications, rooftop structural anchorage, and engineering procurement.
               </p>
             </div>
 
-            {/* DUAL SIGNATURE BOXES */}
-            <div className="grid grid-cols-2 gap-8 mb-8">
+            {/* DUAL SIGNATORY & STAMP BOXES */}
+            <div className="grid grid-cols-2 gap-6 mb-4">
               
-              {/* CUSTOMER SIGNATURE BOX */}
-              <div className="p-6 rounded-2xl border-2 border-dashed border-slate-300 bg-white flex flex-col justify-between h-56">
+              {/* CUSTOMER ACCEPTANCE BOX */}
+              <div className="p-5 rounded-2xl border-2 border-dashed border-stone-300 bg-white flex flex-col justify-between h-44">
                 <div>
-                  <div className="text-xs font-bold text-slate-900 uppercase tracking-wider mb-0.5">
-                    Accepted & Confirmed By Customer
-                  </div>
-                  <div className="text-[11px] text-slate-500">{data.customer_name}</div>
+                  <span className="text-[10px] font-bold text-stone-400 uppercase tracking-wider block">
+                    Confirmed & Accepted By Client
+                  </span>
+                  <div className="text-xs font-bold text-[#071C11]">{data.customer_name}</div>
                 </div>
 
-                <div className="border-t border-slate-300 pt-3">
-                  <div className="flex justify-between items-end text-xs text-slate-500">
-                    <div>
-                      <span className="text-[10px] block text-slate-400">Signature:</span>
-                      <span className="font-mono text-slate-800">[Authorized Signature]</span>
-                    </div>
-                    <div>
-                      <span className="text-[10px] block text-slate-400">Date:</span>
-                      <span className="font-mono text-slate-800">____ / ____ / 2026</span>
-                    </div>
+                <div className="border-t border-stone-200 pt-2 flex justify-between items-end text-xs text-stone-400">
+                  <div>
+                    <span className="text-[9px] block text-stone-400">Client Signature</span>
+                    <span className="font-mono text-stone-700">[Signature Line]</span>
+                  </div>
+                  <div>
+                    <span className="text-[9px] block text-stone-400">Date</span>
+                    <span className="font-mono text-stone-700">____ / ____ / 2026</span>
                   </div>
                 </div>
               </div>
 
-              {/* EPC CONTRACTOR SIGNATURE BOX */}
-              <div className="p-6 rounded-2xl border-2 border-slate-300 bg-white flex flex-col justify-between h-56 relative">
+              {/* EPC CONTRACTOR SIGNATORY BOX */}
+              <div className="p-5 rounded-2xl border-2 border-stone-300 bg-white flex flex-col justify-between h-44 relative">
                 <div>
-                  <div className="text-xs font-bold text-slate-900 uppercase tracking-wider mb-0.5">
+                  <span className="text-[10px] font-bold text-stone-400 uppercase tracking-wider block">
                     For {data.company_legal_name || data.company_name}
-                  </div>
-                  <div className="text-[11px] text-slate-500">Authorized EPC Representative</div>
+                  </span>
+                  <div className="text-xs font-bold text-[#071C11]">Authorized Signatory & Seal</div>
                 </div>
 
                 {/* SIGNATURE & STAMP EMBED */}
                 <div className="flex items-center justify-between px-2">
-                  <div className="h-16 flex items-center">
+                  <div className="h-12 flex items-center">
                     {data.signature_url ? (
-                      <img src={data.signature_url} alt="Signature" className="max-h-14 object-contain" />
+                      <img src={data.signature_url} alt="Signature" className="max-h-12 object-contain" />
                     ) : (
-                      <span className="text-xs text-slate-400 italic font-mono">[Official Signature]</span>
+                      <span className="text-xs text-stone-400 italic font-mono">[Authorized Signature]</span>
                     )}
                   </div>
                   {data.company_stamp_url && (
-                    <img src={data.company_stamp_url} alt="Official Seal" className="w-16 h-16 object-contain opacity-75" />
+                    <img src={data.company_stamp_url} alt="Official Seal" className="w-14 h-14 object-contain opacity-75" />
                   )}
                 </div>
 
-                <div className="border-t border-slate-300 pt-3">
-                  <div className="flex justify-between items-end text-xs text-slate-700">
-                    <div>
-                      <div className="font-bold text-slate-900">{data.signatory_name || 'Authorized Signatory'}</div>
-                      <div className="text-[10px] text-slate-500">{data.signatory_title || 'Director - EPC Operations'}</div>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-[10px] block text-slate-400">Date:</span>
-                      <span className="font-mono text-slate-800">{data.quotation_date}</span>
-                    </div>
+                <div className="border-t border-stone-200 pt-2 flex justify-between items-end text-xs text-stone-600">
+                  <div>
+                    <div className="font-bold text-[#071C11]">{data.signatory_name || 'Authorized Signatory'}</div>
+                    <div className="text-[9px] text-stone-400">{data.signatory_title || 'Director - EPC Operations'}</div>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[9px] block text-stone-400">Date</span>
+                    <span className="font-mono text-stone-700">{data.quotation_date}</span>
                   </div>
                 </div>
               </div>
 
             </div>
-
-            {/* THANK YOU CLOSING */}
-            <div className="p-4 rounded-xl bg-blue-50 border border-blue-100 text-center">
-              <div className="text-xs font-bold text-blue-900">Thank you for choosing clean, sustainable solar energy.</div>
-              <div className="text-[11px] text-blue-700 mt-0.5">
-                Questions or Technical Support? Contact {data.company_phone} • {data.company_email}
-              </div>
-            </div>
           </div>
 
-          <PageFooter data={data} pageNum={++currentPage} />
+          <PageFooter data={data} pageNum={++pageCounter} />
         </A4Page>
       )}
 
     </div>
   );
 }
+

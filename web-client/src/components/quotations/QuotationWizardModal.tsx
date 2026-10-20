@@ -12,7 +12,7 @@ import {
   Award, Clock, ArrowDownRight, Layers2, Maximize2,
   Minimize2, FileCheck, Upload, Scan, Battery, Download,
   Eye, Share2, Printer, MessageSquare, ZoomIn, ZoomOut,
-  RotateCcw, ShieldCheck, Cpu, Cable, Wrench, Info
+  RotateCcw, ShieldCheck, Cpu, Cable, Wrench, Info, Activity
 } from 'lucide-react';
 import { 
   QuotationPDF, 
@@ -257,6 +257,13 @@ export function QuotationWizardModal({
   const [previewZoom, setPreviewZoom] = useState<number>(100);
   const [isOcrScanning, setIsOcrScanning] = useState(false);
   const [isFetchingConsumer, setIsFetchingConsumer] = useState(false);
+
+  // LIVE VISUAL DOCUMENT STUDIO CONTROLS
+  const [editorTheme, setEditorTheme] = useState<'forest_gold' | 'obsidian_emerald' | 'navy_champagne'>('forest_gold');
+  const [editorCoverImage, setEditorCoverImage] = useState<string>('/assets/solar-quotation/luxury-villa-cover.jpg');
+  const [editorFont, setEditorFont] = useState<string>('Manrope');
+  const [activeEditorPage, setActiveEditorPage] = useState<number>(1);
+  const [showLiveTweakDrawer, setShowLiveTweakDrawer] = useState<boolean>(false);
 
   // FORM STATE
   const [formData, setFormData] = useState({
@@ -848,7 +855,9 @@ export function QuotationWizardModal({
       primary_color: formData.primaryColor,
       accent_color: formData.accentColor,
       cover_layout: formData.coverLayout,
-      font_family: formData.fontFamily,
+      font_family: editorFont,
+      cover_image: editorCoverImage,
+      palette_theme: editorTheme,
       sections_config: formData.sections.map(s => ({
         id: s.id,
         title: s.title,
@@ -2536,58 +2545,105 @@ export function QuotationWizardModal({
             )}
 
             {/* ======================================================== */}
-            {/* STEP 6: REAL-TIME LIVE DOCUMENT PREVIEW & PDF ISSUE */}
+            {/* STEP 6: REAL-TIME LIVE DOCUMENT PREVIEW & STUDIO EDITOR */}
             {/* ======================================================== */}
             {currentStep === 6 && (
-              <div className="space-y-6 animate-in fade-in duration-200">
-                <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-6">
+              <div className="space-y-4 animate-in fade-in duration-200">
+                <div className="bg-white p-5 sm:p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
                   
-                  {/* PREVIEW TOOLBAR */}
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+                  {/* STUDIO PREVIEW TOOLBAR */}
+                  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b border-slate-100 pb-4">
                     <div>
-                      <h3 className="text-lg font-black text-slate-900 flex items-center gap-2">
-                        <FileCheck size={20} className="text-emerald-600" /> Live Paginated Document Preview & Issue
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                        <span className="text-[10px] font-extrabold uppercase tracking-[0.2em] text-[#C5A059]">
+                          WhereReady Solar OS • Live Document Studio
+                        </span>
+                      </div>
+                      <h3 className="text-xl font-black text-slate-900 tracking-tight font-['Manrope'] mt-0.5">
+                        Interactive Proposal Art-Direction & Export
                       </h3>
-                      <p className="text-xs text-slate-500 mt-0.5">
-                        High-resolution A4 multi-page document rendered with company branding, authorized signatory, and commercial BOM.
-                      </p>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    {/* STUDIO CONTROLS */}
+                    <div className="flex flex-wrap items-center gap-2">
+                      {/* COVER IMAGE SWITCHER */}
+                      <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-xl text-xs">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase">Cover:</span>
+                        <select
+                          value={editorCoverImage}
+                          onChange={e => setEditorCoverImage(e.target.value)}
+                          className="bg-transparent font-bold text-slate-800 outline-none text-xs cursor-pointer"
+                        >
+                          <option value="/assets/solar-quotation/luxury-villa-cover.jpg">Modern Indian Villa (Sunset)</option>
+                          <option value="/assets/solar-quotation/cover.jpg">Contemporary Rooftop Villa</option>
+                          <option value="/assets/solar-quotation/rooftop.jpg">Industrial Solar Array</option>
+                        </select>
+                      </div>
+
+                      {/* THEME PALETTE SWITCHER */}
+                      <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-xl text-xs">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase">Theme:</span>
+                        <select
+                          value={editorTheme}
+                          onChange={e => setEditorTheme(e.target.value as any)}
+                          className="bg-transparent font-bold text-slate-800 outline-none text-xs cursor-pointer"
+                        >
+                          <option value="forest_gold">Deep Forest Green & Gold</option>
+                          <option value="obsidian_emerald">Obsidian & Emerald</option>
+                          <option value="navy_champagne">Royal Navy & Bronze</option>
+                        </select>
+                      </div>
+
+                      {/* ZOOM CONTROLS */}
                       <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
                         <button
                           type="button"
-                          onClick={() => setPreviewZoom(prev => Math.max(60, prev - 15))}
-                          className="p-1.5 hover:bg-white rounded-lg text-slate-600"
+                          onClick={() => setPreviewZoom(prev => Math.max(55, prev - 15))}
+                          className="p-1.5 hover:bg-white rounded-lg text-slate-600 transition-colors"
                           title="Zoom Out"
                         >
-                          <ZoomOut size={15} />
+                          <ZoomOut size={14} />
                         </button>
-                        <span className="text-xs font-bold px-2 text-slate-700">{previewZoom}%</span>
+                        <span className="text-[11px] font-mono font-bold px-1.5 text-slate-700">{previewZoom}%</span>
                         <button
                           type="button"
                           onClick={() => setPreviewZoom(prev => Math.min(130, prev + 15))}
-                          className="p-1.5 hover:bg-white rounded-lg text-slate-600"
+                          className="p-1.5 hover:bg-white rounded-lg text-slate-600 transition-colors"
                           title="Zoom In"
                         >
-                          <ZoomIn size={15} />
+                          <ZoomIn size={14} />
                         </button>
                       </div>
 
+                      {/* QUICK TWEAK DRAWER TOGGLE */}
+                      <button
+                        type="button"
+                        onClick={() => setShowLiveTweakDrawer(prev => !prev)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border flex items-center gap-1.5 ${
+                          showLiveTweakDrawer
+                            ? 'bg-[#071C11] text-[#DFBF78] border-[#071C11]'
+                            : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200'
+                        }`}
+                      >
+                        <Sliders size={13} /> Live Tweak
+                      </button>
+
+                      {/* ACTION BUTTONS */}
                       <button
                         type="button"
                         onClick={handleDownloadA4Pdf}
-                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 shadow-sm"
+                        className="px-4 py-2 bg-[#071C11] hover:bg-[#0B2014] text-[#DFBF78] border border-[#C5A059]/40 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm"
                       >
-                        <Download size={15} /> Download PDF
+                        <Download size={14} /> Export A4 PDF
                       </button>
 
                       <button
                         type="button"
                         onClick={handleShareWhatsApp}
-                        className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5"
+                        className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm"
                       >
-                        <MessageSquare size={15} /> Share WhatsApp
+                        <MessageSquare size={14} /> WhatsApp
                       </button>
                     </div>
                   </div>
@@ -2606,19 +2662,126 @@ export function QuotationWizardModal({
                     </div>
                   )}
 
-                  {/* REAL-TIME PAGINATED DOCUMENT PREVIEW CONTAINER */}
-                  <div className="bg-slate-200/80 p-6 rounded-3xl border border-slate-300/80 overflow-x-auto flex justify-center max-h-[720px] overflow-y-auto">
+                  {/* 2-COLUMN STUDIO WORKSPACE: THUMBNAILS NAVIGATOR (LEFT) + REALISTIC A4 CANVAS (RIGHT) */}
+                  <div className="grid grid-cols-12 gap-5 items-start">
+                    
+                    {/* LEFT SIDEBAR: PAGE THUMBNAILS NAVIGATOR */}
+                    <div className="col-span-12 lg:col-span-3 space-y-2 bg-slate-50 p-3.5 rounded-2xl border border-slate-200">
+                      <div className="flex items-center justify-between pb-2 border-b border-slate-200 mb-1">
+                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">
+                          Document Pages (06)
+                        </span>
+                        <span className="text-[10px] text-slate-400 font-mono">Jump to Page</span>
+                      </div>
+
+                      {[
+                        { num: 1, title: 'Cinematic Cover', subtitle: 'Power Your Future', icon: Sparkles },
+                        { num: 2, title: 'Energy Profile', subtitle: 'Audit & Power Flow', icon: Activity },
+                        { num: 3, title: 'Your Solar System', subtitle: 'Apple-Style Hardware', icon: Cpu },
+                        { num: 4, title: 'Energy & Savings', subtitle: '25-Yr Wealth & Yield', icon: IndianRupee },
+                        { num: 5, title: 'Your Investment', subtitle: 'Commercial BOQ & Terms', icon: FileText },
+                        { num: 6, title: 'Roadmap & Signatures', subtitle: '21-Day Erection & Seal', icon: ShieldCheck }
+                      ].map(pg => {
+                        const Icon = pg.icon;
+                        const isActive = activeEditorPage === pg.num;
+                        return (
+                          <button
+                            key={pg.num}
+                            type="button"
+                            onClick={() => {
+                              setActiveEditorPage(pg.num);
+                              const target = document.getElementById(`proposal-page-${pg.num}`);
+                              if (target) {
+                                target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                              }
+                            }}
+                            className={`w-full p-2.5 rounded-xl text-left transition-all border flex items-center gap-3 ${
+                              isActive
+                                ? 'bg-[#071C11] text-white border-[#071C11] shadow-md ring-2 ring-[#C5A059]/30'
+                                : 'bg-white hover:bg-slate-100/70 text-slate-800 border-slate-200'
+                            }`}
+                          >
+                            <span className={`w-7 h-7 rounded-lg flex items-center justify-center font-mono font-black text-xs shrink-0 ${
+                              isActive ? 'bg-[#C5A059] text-[#071C11]' : 'bg-slate-100 text-slate-700'
+                            }`}>
+                              {String(pg.num).padStart(2, '0')}
+                            </span>
+                            <div className="min-w-0 flex-1">
+                              <p className={`font-bold text-xs truncate ${isActive ? 'text-white' : 'text-slate-900'}`}>
+                                {pg.title}
+                              </p>
+                              <p className={`text-[10px] truncate ${isActive ? 'text-[#DFBF78]' : 'text-slate-400'}`}>
+                                {pg.subtitle}
+                              </p>
+                            </div>
+                            <Icon size={14} className={isActive ? 'text-[#DFBF78]' : 'text-slate-400'} />
+                          </button>
+                        );
+                      })}
+
+                      {/* CONTEXT TWEAK DRAWER IN SIDEBAR */}
+                      {showLiveTweakDrawer && (
+                        <div className="mt-4 pt-4 border-t border-slate-200 space-y-3 animate-in fade-in">
+                          <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 block">
+                            Quick Live Overrides
+                          </span>
+
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-bold text-slate-500 uppercase">Customer Name</label>
+                            <input
+                              type="text"
+                              value={customerMode === 'new' ? formData.newCustomer.name : clientName}
+                              onChange={e => {
+                                if (customerMode === 'new') {
+                                  setFormData(prev => ({ ...prev, newCustomer: { ...prev.newCustomer, name: e.target.value } }));
+                                }
+                              }}
+                              className="w-full px-2.5 py-1.5 bg-white rounded-lg border border-slate-200 text-xs font-bold text-slate-800"
+                            />
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-bold text-slate-500 uppercase">Capacity (kWp)</label>
+                            <input
+                              type="number"
+                              step="0.5"
+                              value={formData.systemCapacity}
+                              onChange={e => handleCapacityChange(Number(e.target.value))}
+                              className="w-full px-2.5 py-1.5 bg-white rounded-lg border border-slate-200 text-xs font-bold text-slate-800"
+                            />
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-bold text-slate-500 uppercase">Commercial Discount (₹)</label>
+                            <input
+                              type="number"
+                              value={formData.headerDiscount}
+                              onChange={e => setFormData(prev => ({ ...prev, headerDiscount: Number(e.target.value) }))}
+                              className="w-full px-2.5 py-1.5 bg-white rounded-lg border border-slate-200 text-xs font-bold text-slate-800"
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* CENTER CANVAS: REALISTIC LUXURY A4 MAGAZINE WORKSPACE */}
                     <div 
-                      style={{ 
-                        transform: `scale(${previewZoom / 100})`, 
-                        transformOrigin: 'top center',
-                        transition: 'transform 0.15s ease-out'
-                      }}
+                      id="wizard-studio-canvas-scroll"
+                      className="col-span-12 lg:col-span-9 bg-[#121513] p-4 sm:p-8 rounded-3xl border border-stone-800/80 shadow-2xl flex justify-center max-h-[760px] overflow-y-auto custom-scrollbar"
                     >
-                      <div id="wizard-live-pdf-preview">
-                        <QuotationPDF data={livePdfData} livePreview={true} />
+                      <div 
+                        style={{ 
+                          transform: `scale(${previewZoom / 100})`, 
+                          transformOrigin: 'top center',
+                          transition: 'transform 0.15s ease-out'
+                        }}
+                      >
+                        <div id="wizard-live-pdf-preview" className="shadow-[0_25px_60px_-15px_rgba(0,0,0,0.7)] rounded-sm">
+                          <QuotationPDF data={livePdfData} livePreview={true} />
+                        </div>
                       </div>
                     </div>
+
                   </div>
 
                 </div>

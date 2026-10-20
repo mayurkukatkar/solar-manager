@@ -19,6 +19,7 @@ export interface QuotationPdfProps {
   companyLogoUrl?: string;
   primaryColor?: string;
   accentColor?: string;
+  coverImageUrl?: string;
   signatoryName?: string;
   signatoryTitle?: string;
   signatureUrl?: string;
@@ -117,36 +118,45 @@ export interface QuotationPdfProps {
     inverter?: string;
     structure?: string;
     installation?: string;
+    battery?: string;
     other?: string;
   };
-
   termsAndConditions?: string[];
-  exclusions?: string[];
 
-  // Financing (Solar Loan)
+  // Official EPC Bank Details
+  bankDetails?: {
+    account_name?: string;
+    accountName?: string;
+    bank_name?: string;
+    bankName?: string;
+    account_number?: string;
+    accountNumber?: string;
+    ifsc?: string;
+    upi_id?: string;
+    upiId?: string;
+    branch?: string;
+  };
+
   financingDetails?: {
-    down_payment?: number;
+    monthly_emi?: number;
     loan_amount?: number;
     interest_rate?: number;
     tenure_years?: number;
-    monthly_emi?: number;
-  };
-
-  bankDetails?: {
-    accountName: string;
-    bankName: string;
-    accountNumber: string;
-    ifsc: string;
-    upiId?: string;
   };
 }
 
-export function formatIndianCurrency(n: number): string {
-  return Math.round(n || 0).toLocaleString('en-IN');
+/**
+ * Format number as Indian Rupee string
+ */
+export function formatINR(val: number): string {
+  if (isNaN(val)) return '0';
+  return Math.round(val).toLocaleString('en-IN');
 }
 
+/**
+ * Generates an exceptionally beautiful, art-directed A4 multi-page HTML string matching the Next.js web client.
+ */
 export function generateQuotationHtml(data: QuotationPdfProps): string {
-  const formatInr = formatIndianCurrency;
   const isQuickQuote = data.templateType === 'quick_quote';
   const isHybridOrOffgrid =
     data.systemType === 'Hybrid' ||
@@ -158,33 +168,39 @@ export function generateQuotationHtml(data: QuotationPdfProps): string {
     data.connectionType === 'Industrial' ||
     data.templateType === 'commercial_epc';
 
-  const primaryColor = data.primaryColor || '#0284c7';
-  const accentColor = data.accentColor || '#059669';
-
-  const cap = data.systemCapacityKw || 3.3;
+  const cap = data.systemCapacityKw || 5.0;
   const invCap = data.inverterCapacityKw || cap;
-  const panelWatt = data.panelWattage || 540;
+  const panelWatt = data.panelWattage || 550;
   const panelQty = data.panelQuantity || Math.ceil((cap * 1000) / panelWatt);
-  const monthlyUnits = data.monthlyGenerationUnits || Math.round(cap * 120);
   const annualUnits = data.annualGenerationUnits || Math.round(cap * 1460);
   const tariff = data.tariffRate || (isCommercial ? 10.5 : 8.5);
-  const monthlySavings = data.monthlySavings || Math.round(monthlyUnits * tariff);
+  const monthlySavings = data.monthlySavings || Math.round((annualUnits / 12) * tariff);
   const annualSavings = Math.round(annualUnits * tariff);
   const lifetimeSavings = data.lifetimeSavings || Math.round(annualSavings * 25 * 1.3);
-  const gross = data.grossAmount || 0;
+  const gross = data.grossAmount || 275000;
   const discount = data.discount || 0;
-  const subsidy = data.subsidyAmount || 0;
+  const subsidy = data.subsidyAmount || (cap <= 3 ? cap * 26000 : 78000);
   const net = data.netPayable || Math.max(0, gross - subsidy);
   const subtotal = data.subtotal || Math.round(gross / 1.138);
   const tax = data.taxAmount || Math.round(gross - subtotal);
-  const payback = data.paybackYears && !isNaN(data.paybackYears) ? data.paybackYears : 3.5;
-  const roofArea = data.roofAreaSqFt || Math.round(cap * 65);
-  const currentBill = data.currentMonthlyBill || Math.round(monthlySavings * 1.15);
-  const newBill = data.estimatedMonthlyBill || Math.round(Math.max(150, currentBill - monthlySavings));
-  const commercialBenefit = data.commercialTaxBenefit || (isCommercial ? Math.round(gross * 0.4 * 0.2517) : 0);
+  const payback = data.paybackYears && !isNaN(data.paybackYears) ? data.paybackYears : 4.2;
 
-  // EMI: 5-year loan at 9.5% (~₹21 per ₹1,000)
-  const monthlyEmi = data.financingDetails?.monthly_emi || Math.round(net * 0.021);
+  // Monthly generation data
+  const months = [
+    { m: 'Jan', gen: Math.round(cap * 118) },
+    { m: 'Feb', gen: Math.round(cap * 122) },
+    { m: 'Mar', gen: Math.round(cap * 142) },
+    { m: 'Apr', gen: Math.round(cap * 148) },
+    { m: 'May', gen: Math.round(cap * 155), peak: true },
+    { m: 'Jun', gen: Math.round(cap * 110) },
+    { m: 'Jul', gen: Math.round(cap * 92) },
+    { m: 'Aug', gen: Math.round(cap * 96) },
+    { m: 'Sep', gen: Math.round(cap * 114) },
+    { m: 'Oct', gen: Math.round(cap * 128) },
+    { m: 'Nov', gen: Math.round(cap * 122) },
+    { m: 'Dec', gen: Math.round(cap * 113) }
+  ];
+  const maxGen = Math.max(...months.map(d => d.gen));
 
   // Default items if not provided
   const rawPricing = data.pricingItems && data.pricingItems.length > 0
@@ -230,35 +246,29 @@ export function generateQuotationHtml(data: QuotationPdfProps): string {
   const rawMilestones = data.paymentTerms && data.paymentTerms.length > 0
     ? data.paymentTerms
     : [
-        { stage: 1, percentage: 20, amount: Math.round(gross * 0.2), description: 'Token Advance upon proposal sign-off & portal booking' },
-        { stage: 2, percentage: 60, amount: Math.round(gross * 0.6), description: 'Upon delivery of panels, inverter & structure to site' },
-        { stage: 3, percentage: 15, amount: Math.round(gross * 0.15), description: 'Upon mechanical mounting & electrical installation completion' },
-        { stage: 4, percentage: 5, amount: Math.round(gross * 0.05), description: 'Upon DISCOM Net Metering inspection & grid synchronization' },
+        { stage: 1, percentage: 10, amount: Math.round(gross * 0.10), description: 'Advance with Confirmed Work Order & Engineering Design' },
+        { stage: 2, percentage: 70, amount: Math.round(gross * 0.70), description: 'On Material Dispatch & Site Delivery of Modules, Inverter & Structure' },
+        { stage: 3, percentage: 15, amount: Math.round(gross * 0.15), description: 'Post Mechanical Mounting, Electrical Termination & Safety Earthing' },
+        { stage: 4, percentage: 5, amount: Math.round(gross * 0.05), description: 'On State DISCOM Net-Metering Inspection & Bi-directional Meter Handover' },
       ];
 
-  // Warranties
-  const modWarranty = data.warranties?.modules || data.panelWarranty || '25 Years OEM Performance Guarantee';
-  const invWarranty = data.warranties?.inverter || data.inverterWarranty || '10 Years Standard Replacement Warranty';
-  const strWarranty = data.warranties?.structure || data.structureWarranty || '10 Years Structural Integrity (150 km/h)';
-  const insWarranty = data.warranties?.installation || '5 Years Workmanship & Work Integrity Guarantee';
-
   // Total pages count
-  const totalPages = isQuickQuote ? 3 : 8;
+  const totalPages = isQuickQuote ? 3 : 6;
   let pageCounter = 0;
 
   const renderPageHeader = (title: string, sectionNum: string) => `
     <div class="page-header">
       <div class="header-left">
         ${data.companyLogoUrl ? `<img src="${data.companyLogoUrl}" class="header-logo" alt="${data.companyName}" />` : `
-        <div class="header-icon-box">☀️</div>`}
+        <div class="header-icon-box">W</div>`}
         <div>
           <div class="header-comp-name">${data.companyName}</div>
-          <div class="header-comp-contact">${data.companyEmail} • 📞 ${data.companyPhone}</div>
+          <div class="header-comp-contact">${data.companyAddress ? data.companyAddress.split(',')[0] : 'India'} • 📞 ${data.companyPhone}</div>
         </div>
       </div>
       <div class="header-right">
         <div class="header-section-title"><span class="section-tag">[${sectionNum}]</span> ${title}</div>
-        <div class="header-quote-meta">Ref: <strong>${data.quotationNumber}</strong> • Date: ${data.quotationDate}</div>
+        <div class="header-quote-meta">Ref: <strong>${data.quotationNumber}</strong> • ${data.quotationDate}</div>
       </div>
     </div>
   `;
@@ -270,9 +280,10 @@ export function generateQuotationHtml(data: QuotationPdfProps): string {
         <div>
           <strong>${data.companyLegalName || data.companyName}</strong>
           ${data.companyGstin ? ` • GSTIN: ${data.companyGstin}` : ''}
+          • Certified EPC Contractor
         </div>
         <div class="footer-page-num">
-          Quotation #${data.quotationNumber} • Page ${pageCounter} of ${totalPages}
+          PAGE 0${pageCounter} / 0${totalPages}
         </div>
       </div>
     `;
@@ -283,8 +294,10 @@ export function generateQuotationHtml(data: QuotationPdfProps): string {
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Solar Proposal - ${data.customerName}</title>
+  <title>WhereReady Solar OS Proposal - ${data.customerName}</title>
   <style>
+    @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800;900&family=Space+Grotesk:wght@500;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+
     @page {
       size: A4 portrait;
       margin: 0;
@@ -295,13 +308,13 @@ export function generateQuotationHtml(data: QuotationPdfProps): string {
       print-color-adjust: exact;
     }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      color: #0f172a;
-      background: #ffffff;
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      color: #141715;
+      background: #faf8f5;
       margin: 0;
       padding: 0;
-      font-size: 9pt;
-      line-height: 1.4;
+      font-size: 8.5pt;
+      line-height: 1.45;
     }
     .a4-page {
       width: 210mm;
@@ -314,18 +327,20 @@ export function generateQuotationHtml(data: QuotationPdfProps): string {
       flex-direction: column;
       justify-content: space-between;
       box-sizing: border-box;
-      background: #ffffff;
+      background: #faf8f5;
     }
     .a4-page:last-child {
       page-break-after: avoid;
     }
+
+    /* HEADER & FOOTER */
     .page-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding-bottom: 8px;
-      border-bottom: 1.5px solid #e2e8f0;
-      margin-bottom: 14px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid rgba(7, 28, 17, 0.12);
+      margin-bottom: 16px;
     }
     .header-left {
       display: flex;
@@ -333,28 +348,32 @@ export function generateQuotationHtml(data: QuotationPdfProps): string {
       gap: 10px;
     }
     .header-logo {
-      height: 32px;
+      height: 28px;
       object-fit: contain;
     }
     .header-icon-box {
-      width: 32px;
-      height: 32px;
-      border-radius: 8px;
-      background: #eff6ff;
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      background: #071c11;
+      color: #c5a059;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 16px;
+      font-weight: 900;
+      font-family: 'Manrope', serif;
+      font-size: 14px;
     }
     .header-comp-name {
-      font-size: 9.5pt;
+      font-size: 9pt;
       font-weight: 800;
-      color: #0f172a;
-      letter-spacing: 0.3px;
+      color: #071c11;
+      letter-spacing: 1px;
       text-transform: uppercase;
+      font-family: 'Manrope', sans-serif;
     }
     .header-comp-contact {
-      font-size: 7.5pt;
+      font-size: 7pt;
       color: #64748b;
     }
     .header-right {
@@ -363,161 +382,131 @@ export function generateQuotationHtml(data: QuotationPdfProps): string {
     .header-section-title {
       font-size: 8.5pt;
       font-weight: 800;
-      color: #0f172a;
+      color: #071c11;
       text-transform: uppercase;
       letter-spacing: 0.5px;
+      font-family: 'Manrope', sans-serif;
     }
     .section-tag {
-      color: ${primaryColor};
+      color: #c5a059;
       font-family: monospace;
     }
     .header-quote-meta {
       font-size: 7.5pt;
       color: #64748b;
-      margin-top: 2px;
+      margin-top: 1px;
+      font-family: monospace;
     }
     .page-footer {
       padding-top: 8px;
-      border-top: 1px solid #e2e8f0;
+      border-top: 1px solid rgba(7, 28, 17, 0.12);
       display: flex;
       justify-content: space-between;
       align-items: center;
       font-size: 7.5pt;
-      color: #94a3b8;
+      color: #64748b;
       margin-top: auto;
     }
     .footer-page-num {
       font-family: monospace;
-      font-weight: 600;
-      color: #64748b;
+      font-weight: 700;
+      color: #c5a059;
+      letter-spacing: 1px;
+    }
+
+    /* EDITORIAL TYPOGRAPHY & HEADINGS */
+    .section-kicker {
+      font-size: 7pt;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: #c5a059;
+      display: block;
+      margin-bottom: 2px;
     }
     .section-title {
-      font-size: 14pt;
-      font-weight: 800;
-      color: #0f172a;
+      font-size: 15pt;
+      font-weight: 900;
+      color: #071c11;
       letter-spacing: -0.3px;
       margin: 0 0 2px 0;
+      font-family: 'Manrope', sans-serif;
     }
     .section-subtitle {
-      font-size: 8pt;
+      font-size: 7.8pt;
       color: #64748b;
-      margin: 0 0 12px 0;
+      margin: 0 0 14px 0;
+      line-height: 1.4;
     }
-    .grid-4 {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 10px;
-      margin-bottom: 14px;
-    }
-    .grid-3 {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 10px;
-      margin-bottom: 14px;
-    }
-    .grid-2 {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 12px;
-      margin-bottom: 14px;
-    }
-    .card {
-      border: 1px solid #e2e8f0;
-      border-radius: 8px;
-      padding: 10px 12px;
+
+    /* LUXURY CARDS & GRIDS */
+    .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 14px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 14px; }
+    .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 14px; }
+    .card-white {
       background: #ffffff;
+      border: 1px solid rgba(7, 28, 17, 0.1);
+      border-radius: 12px;
+      padding: 12px 14px;
     }
-    .card-kpi {
-      background: #f8fafc;
-      border: 1px solid #e2e8f0;
-      border-radius: 8px;
-      padding: 10px;
+    .card-dark {
+      background: #071c11;
+      color: #ffffff;
+      border-radius: 12px;
+      padding: 12px 14px;
     }
     .kpi-title {
       font-size: 7pt;
       font-weight: 800;
       text-transform: uppercase;
-      letter-spacing: 0.5px;
+      letter-spacing: 0.8px;
       color: #64748b;
       margin-bottom: 2px;
     }
     .kpi-val {
-      font-size: 13pt;
+      font-size: 15pt;
       font-weight: 900;
-      color: #0f172a;
+      font-family: 'Space Grotesk', sans-serif;
+      color: #071c11;
     }
-    .kpi-sub {
-      font-size: 7pt;
-      color: #64748b;
-      margin-top: 2px;
-    }
+
+    /* TABLES */
     table {
       width: 100%;
       border-collapse: collapse;
       margin-bottom: 14px;
-      font-size: 8pt;
+      font-size: 7.8pt;
+      background: #ffffff;
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid rgba(7, 28, 17, 0.1);
     }
     th {
-      background: #f8fafc;
-      color: #334155;
+      background: #faf8f5;
+      color: #071c11;
       font-weight: 800;
       text-align: left;
-      padding: 6px 10px;
-      border: 1px solid #e2e8f0;
+      padding: 7px 10px;
+      border-bottom: 1px solid rgba(7, 28, 17, 0.1);
       text-transform: uppercase;
-      font-size: 7pt;
-      letter-spacing: 0.4px;
+      font-size: 6.8pt;
+      letter-spacing: 0.5px;
     }
     td {
-      padding: 6px 10px;
-      border: 1px solid #e2e8f0;
+      padding: 7px 10px;
+      border-bottom: 1px solid #f1f5f9;
       color: #1e293b;
     }
-    tr:nth-child(even) td {
-      background: #fafafa;
-    }
-    .badge {
-      display: inline-block;
-      padding: 2px 6px;
-      border-radius: 4px;
-      font-size: 7pt;
-      font-weight: 800;
-      text-transform: uppercase;
-      letter-spacing: 0.3px;
-    }
-    .badge-included { background: #dcfce7; color: #15803d; }
-    .badge-excluded { background: #ffe4e6; color: #be123c; }
-    .badge-chargeable { background: #fef3c7; color: #b45309; }
-    .badge-green { background: #dcfce7; color: #15803d; }
-    .badge-blue { background: #eff6ff; color: #1d4ed8; }
-    .badge-amber { background: #fffbeb; color: #b45309; }
-    .subsidy-callout {
-      background: #f0fdf4;
-      border: 1px solid #bbf7d0;
-      border-radius: 8px;
-      padding: 10px 14px;
-      margin-bottom: 12px;
-    }
-    .commercial-tax-callout {
-      background: #eff6ff;
-      border: 1px solid #bfdbfe;
-      border-radius: 8px;
-      padding: 10px 14px;
-      margin-bottom: 12px;
-    }
-    .loan-callout-box {
-      background: #f8fafc;
-      border: 1px solid #e2e8f0;
-      border-radius: 8px;
-      padding: 10px 14px;
-      margin-bottom: 14px;
+    tr:last-child td {
+      border-bottom: none;
     }
 
     /* COVER PAGE STYLING */
     .cover-page {
-      background: linear-gradient(145deg, #090d16 0%, #0f172a 45%, #1e293b 100%);
+      background: #071c11;
       color: #ffffff;
-      padding: 20mm 18mm;
+      padding: 16mm 16mm;
+      position: relative;
     }
     .cover-top-bar {
       display: flex;
@@ -525,45 +514,29 @@ export function generateQuotationHtml(data: QuotationPdfProps): string {
       align-items: center;
       border-bottom: 1px solid rgba(255,255,255,0.15);
       padding-bottom: 14px;
-    }
-    .cover-hero-tag {
-      font-size: 8pt;
-      font-weight: 800;
-      color: #38bdf8;
-      text-transform: uppercase;
-      letter-spacing: 2px;
-      margin-bottom: 8px;
+      position: relative;
+      z-index: 2;
     }
     .cover-main-title {
-      font-size: 26pt;
+      font-size: 32pt;
       font-weight: 900;
-      line-height: 1.15;
+      line-height: 1.05;
       color: #ffffff;
       letter-spacing: -0.5px;
-      margin: 0 0 20px 0;
+      margin: 0 0 16px 0;
+      font-family: 'Manrope', sans-serif;
     }
-    .cover-capacity-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 14px;
-      background: rgba(255,255,255,0.08);
-      border: 1px solid rgba(255,255,255,0.2);
-      border-radius: 12px;
-      padding: 10px 16px;
-      margin-bottom: 30px;
-    }
-    .cover-kw-num {
-      font-size: 24pt;
-      font-weight: 900;
-      color: #38bdf8;
+    .cover-gold-text {
+      color: #dfbf78;
     }
     .cover-client-card {
-      background: rgba(15, 23, 42, 0.85);
-      border: 1px solid rgba(255,255,255,0.15);
-      border-radius: 12px;
+      background: rgba(11, 32, 20, 0.85);
+      border: 1px solid rgba(197, 160, 89, 0.4);
+      border-radius: 14px;
       padding: 16px 20px;
-      max-width: 140mm;
-      margin-bottom: 30px;
+      max-width: 150mm;
+      margin-bottom: 24px;
+      backdrop-filter: blur(10px);
     }
     .cover-footer {
       display: grid;
@@ -571,419 +544,500 @@ export function generateQuotationHtml(data: QuotationPdfProps): string {
       gap: 16px;
       border-top: 1px solid rgba(255,255,255,0.15);
       padding-top: 14px;
-      font-size: 8pt;
+      font-size: 7.5pt;
       color: #94a3b8;
+      position: relative;
+      z-index: 2;
+    }
+
+    /* MONTHLY BARS */
+    .chart-container {
+      background: #ffffff;
+      border: 1px solid rgba(7, 28, 17, 0.1);
+      border-radius: 12px;
+      padding: 12px 14px;
+      margin-bottom: 14px;
+    }
+    .bars-row {
+      display: flex;
+      align-items: flex-end;
+      height: 70px;
+      gap: 6px;
+      padding-top: 10px;
+    }
+    .bar-col {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      height: 100%;
+      justify-content: flex-end;
+    }
+    .bar-fill {
+      width: 100%;
+      border-radius: 3px 3px 0 0;
+      background: #0b2014;
+    }
+    .bar-fill-peak {
+      background: #c5a059;
     }
   </style>
 </head>
 <body>
 
   <!-- ========================================================================= -->
-  <!-- PAGE 1: EXECUTIVE COVER PAGE                                              -->
+  <!-- PAGE 1: CINEMATIC COVER PAGE                                              -->
   <!-- ========================================================================= -->
   <div class="a4-page cover-page">
     <div class="cover-top-bar">
       <div style="display: flex; align-items: center; gap: 10px;">
-        ${data.companyLogoUrl ? `<img src="${data.companyLogoUrl}" style="height: 38px; object-fit: contain;" alt="${data.companyName}" />` : `
-        <div style="width: 38px; height: 38px; border-radius: 8px; background: rgba(56, 189, 248, 0.2); display: flex; align-items: center; justify-content: center; font-size: 20px;">☀️</div>`}
+        ${data.companyLogoUrl ? `<img src="${data.companyLogoUrl}" style="height: 36px; object-fit: contain;" alt="${data.companyName}" />` : `
+        <div style="width: 36px; height: 36px; border-radius: 8px; background: #c5a059; color: #071c11; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 900;">W</div>`}
         <div>
-          <div style="font-size: 11pt; font-weight: 900; letter-spacing: 0.5px; text-transform: uppercase;">${data.companyName}</div>
-          <div style="font-size: 7.5pt; color: #94a3b8;">${data.companyAddress}</div>
+          <div style="font-size: 10.5pt; font-weight: 900; letter-spacing: 1px; text-transform: uppercase; font-family: 'Manrope', sans-serif;">${data.companyName}</div>
+          <div style="font-size: 7pt; color: #c5a059; text-transform: uppercase; letter-spacing: 0.5px;">Renewable Energy EPC Architecture</div>
         </div>
       </div>
       <div>
-        <span style="display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 7.5pt; font-weight: 800; background: rgba(52, 211, 153, 0.2); color: #34d399; border: 1px solid rgba(52, 211, 153, 0.3); text-transform: uppercase; letter-spacing: 0.5px;">
-          EPC Engineering Proposal
+        <span style="display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 7pt; font-weight: 800; background: rgba(197, 160, 89, 0.2); color: #dfbf78; border: 1px solid rgba(197, 160, 89, 0.4); text-transform: uppercase; letter-spacing: 0.8px;">
+          Private EPC Proposal • 2026
         </span>
       </div>
     </div>
 
-    <div style="padding: 25mm 0 10mm 0;">
-      <div class="cover-hero-tag">Your Journey to Smarter, Cleaner Energy</div>
+    <div style="padding: 18mm 0 10mm 0; position: relative; z-index: 2;">
+      <div style="font-size: 8pt; font-weight: 800; color: #dfbf78; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 6px;">
+        WhereReady Solar OS • Enterprise Edition
+      </div>
       <h1 class="cover-main-title">
-        ROOFTOP SOLAR PV<br>
-        <span style="color: #38bdf8;">TURNKEY ENGINEERING PROPOSAL</span>
+        Power Your<br>
+        <span class="cover-gold-text">Future.</span>
       </h1>
 
-      <div class="cover-capacity-badge">
-        <div style="width: 44px; height: 44px; border-radius: 10px; background: linear-gradient(135deg, #0284c7 0%, #059669 100%); display: flex; align-items: center; justify-content: center; font-size: 22px;">⚡</div>
-        <div>
-          <div class="cover-kw-num">${cap} <span style="font-size: 12pt; color: #cbd5e1; font-weight: 600;">kWp</span></div>
-          <div style="font-size: 8pt; color: #cbd5e1;">${data.systemType || 'On-Grid'} Solar System • ${data.connectionType || 'Residential'} Profile</div>
-        </div>
-      </div>
-
       <div class="cover-client-card">
-        <div style="font-size: 7pt; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px;">Prepared Exclusively For</div>
-        <div style="font-size: 14pt; font-weight: 800; color: #ffffff; margin-bottom: 4px;">${data.customerName}</div>
-        <div style="font-size: 8pt; color: #cbd5e1; line-height: 1.4;">
+        <div style="font-size: 7pt; font-weight: 800; color: #c5a059; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 4px;">
+          Prepared Exclusively For
+        </div>
+        <div style="font-size: 15pt; font-weight: 900; color: #ffffff; margin-bottom: 4px; font-family: 'Manrope', sans-serif;">
+          ${data.customerName}
+        </div>
+        <div style="font-size: 7.8pt; color: #cbd5e1; line-height: 1.4;">
           📍 ${data.customerAddress}<br>
           📞 Phone: ${data.customerPhone} ${data.customerEmail ? `| ✉️ ${data.customerEmail}` : ''}
           ${data.consumerNumber ? `<br><strong style="color: #4ade80;">DISCOM Account No:</strong> ${data.consumerNumber} (${data.discomName || 'DISCOM'})` : ''}
+        </div>
+      </div>
+
+      <!-- SPECS RIBBON -->
+      <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; max-width: 150mm;">
+        <div style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; padding: 10px;">
+          <div style="font-size: 6.8pt; text-transform: uppercase; color: #94a3b8; font-weight: 800;">Plant Rating</div>
+          <div style="font-size: 15pt; font-weight: 900; color: #ffffff; font-family: 'Space Grotesk', sans-serif;">
+            ${cap} <span style="font-size: 8pt; color: #c5a059;">kWp</span>
+          </div>
+        </div>
+
+        <div style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; padding: 10px;">
+          <div style="font-size: 6.8pt; text-transform: uppercase; color: #94a3b8; font-weight: 800;">Annual Yield</div>
+          <div style="font-size: 15pt; font-weight: 900; color: #ffffff; font-family: 'Space Grotesk', sans-serif;">
+            ${annualUnits.toLocaleString()} <span style="font-size: 8pt; color: #94a3b8;">kWh</span>
+          </div>
+        </div>
+
+        <div style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; padding: 10px;">
+          <div style="font-size: 6.8pt; text-transform: uppercase; color: #94a3b8; font-weight: 800;">25-Yr Return</div>
+          <div style="font-size: 15pt; font-weight: 900; color: #dfbf78; font-family: 'Space Grotesk', sans-serif;">
+            ₹${(lifetimeSavings / 100000).toFixed(1)}L
+          </div>
+        </div>
+
+        <div style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; padding: 10px;">
+          <div style="font-size: 6.8pt; text-transform: uppercase; color: #94a3b8; font-weight: 800;">CO2 Abated</div>
+          <div style="font-size: 15pt; font-weight: 900; color: #34d399; font-family: 'Space Grotesk', sans-serif;">
+            ${data.co2ReductionKg || Math.round(cap * 32)} <span style="font-size: 8pt; color: #94a3b8;">Tons</span>
+          </div>
         </div>
       </div>
     </div>
 
     <div class="cover-footer">
       <div>
-        <span style="font-size: 7pt; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; display: block;">Proposal Number</span>
-        <strong style="color: #ffffff; font-family: monospace; font-size: 9.5pt;">${data.quotationNumber}</strong>
+        <span style="font-size: 6.8pt; color: #c5a059; text-transform: uppercase; letter-spacing: 1px; display: block;">Proposal Number</span>
+        <strong style="color: #ffffff; font-family: monospace; font-size: 9pt;">${data.quotationNumber}</strong>
       </div>
       <div>
-        <span style="font-size: 7pt; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; display: block;">Issuance Date</span>
+        <span style="font-size: 6.8pt; color: #c5a059; text-transform: uppercase; letter-spacing: 1px; display: block;">Issuance Date</span>
         <strong style="color: #ffffff;">${data.quotationDate}</strong>
       </div>
       <div style="text-align: right;">
-        <span style="font-size: 7pt; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; display: block;">Quotation Validity</span>
-        <strong style="color: #34d399;">${data.validUntil}</strong>
+        <span style="font-size: 6.8pt; color: #c5a059; text-transform: uppercase; letter-spacing: 1px; display: block;">Validity Period</span>
+        <strong style="color: #dfbf78;">${data.validUntil}</strong>
       </div>
     </div>
   </div>
 
   ${!isQuickQuote ? `
   <!-- ========================================================================= -->
-  <!-- PAGE 2: CUSTOMER REQUIREMENTS & AUDIT                                     -->
+  <!-- PAGE 2: YOUR ENERGY PROFILE                                               -->
   <!-- ========================================================================= -->
   <div class="a4-page">
     <div>
-      ${renderPageHeader('Customer Requirements & Energy Audit', '02')}
+      ${renderPageHeader('Energy Profile & Site Audit', '01')}
 
-      <div class="section-title">Site Baseline & Energy Consumption Audit</div>
-      <div class="section-subtitle">Detailed site audit based on consumer utility records and existing electricity bill analysis.</div>
+      <span class="section-kicker">Baseline Economics</span>
+      <h2 class="section-title">Translating Rooftop Insolation Into Zero Grid Dependency</h2>
+      <p class="section-subtitle">Detailed energy consumption audit and utility tariff mapping establishing pre-solar baseline.</p>
 
-      <div class="grid-4">
-        <div class="card-kpi">
-          <div class="kpi-title">Current Bill</div>
-          <div class="kpi-val">₹${formatInr(currentBill)}<span style="font-size: 8pt; color: #64748b;">/mo</span></div>
-          <div class="kpi-sub">₹${formatInr(currentBill * 12)} / year</div>
+      <div class="grid-3">
+        <div class="card-white">
+          <div class="kpi-title">Current Grid Outflow</div>
+          <div class="kpi-val">₹${formatINR(data.currentMonthlyBill * 12)} <span style="font-size: 8pt; color: #64748b;">/ yr</span></div>
+          <div style="font-size: 7.5pt; color: #64748b; margin-top: 2px;">~₹${formatINR(data.currentMonthlyBill)}/mo @ ₹${tariff}/unit</div>
         </div>
-        <div class="card-kpi">
-          <div class="kpi-title">Monthly Units</div>
-          <div class="kpi-val">${monthlyUnits} <span style="font-size: 8pt; color: #64748b;">kWh</span></div>
-          <div class="kpi-sub">~${annualUnits} kWh / year</div>
+
+        <div class="card-white">
+          <div class="kpi-title" style="color: #059669;">Proposed Clean Yield</div>
+          <div class="kpi-val" style="color: #059669;">${annualUnits.toLocaleString()} <span style="font-size: 8pt; color: #64748b;">kWh / yr</span></div>
+          <div style="font-size: 7.5pt; color: #059669; margin-top: 2px;">~${Math.round(annualUnits / 12)} kWh / mo clean power</div>
         </div>
-        <div class="card-kpi">
-          <div class="kpi-title">Utility Tariff</div>
-          <div class="kpi-val">₹${tariff}<span style="font-size: 8pt; color: #64748b;">/u</span></div>
-          <div class="kpi-sub">${data.connectionType || 'LT-I'} Slab</div>
-        </div>
-        <div class="card-kpi">
-          <div class="kpi-title">Est. Roof Area</div>
-          <div class="kpi-val" style="color: ${primaryColor};">${roofArea} <span style="font-size: 8pt; color: #64748b;">sq.ft</span></div>
-          <div class="kpi-sub">Shadow-Free Surface</div>
+
+        <div class="card-dark">
+          <div class="kpi-title" style="color: #c5a059;">Projected Bill Reduction</div>
+          <div class="kpi-val" style="color: #dfbf78;">~90% - 95%</div>
+          <div style="font-size: 7.5pt; color: #cbd5e1; margin-top: 2px;">Net-metering credits offset grid consumption</div>
         </div>
       </div>
 
-      <div style="font-weight: 800; font-size: 8.5pt; color: #0f172a; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.4px;">
-        Site & Utility Parameters Assessment
+      <!-- BEFORE VS AFTER COMPARISON -->
+      <div class="card-white" style="margin-bottom: 14px;">
+        <div style="font-size: 8pt; font-weight: 800; color: #071c11; text-transform: uppercase; margin-bottom: 10px;">
+          ⚡ Before vs After Solar Power Balance
+        </div>
+        <div class="grid-2">
+          <div style="background: #faf8f5; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px;">
+            <div style="display: flex; justify-content: space-between; font-size: 7.5pt; font-weight: 800; color: #b91c1c; margin-bottom: 4px;">
+              <span>WITHOUT SOLAR (CURRENT)</span>
+              <span>100% GRID DEPENDENCE</span>
+            </div>
+            <div style="width: 100%; height: 6px; background: #fee2e2; border-radius: 10px; overflow: hidden; margin-bottom: 4px;">
+              <div style="width: 100%; height: 100%; background: #ef4444;"></div>
+            </div>
+            <div style="font-size: 7.2pt; color: #64748b;">All units drawn from fossil grid at escalating retail slabs.</div>
+          </div>
+
+          <div style="background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 8px; padding: 10px;">
+            <div style="display: flex; justify-content: space-between; font-size: 7.5pt; font-weight: 800; color: #065f46; margin-bottom: 4px;">
+              <span>WITH WHEREREADY SOLAR</span>
+              <span>~90% SELF-SUFFICIENCY</span>
+            </div>
+            <div style="width: 100%; height: 6px; background: #a7f3d0; border-radius: 10px; overflow: hidden; margin-bottom: 4px; display: flex;">
+              <div style="width: 90%; height: 100%; background: #059669;"></div>
+              <div style="width: 10%; height: 100%; background: #f59e0b;"></div>
+            </div>
+            <div style="font-size: 7.2pt; color: #065f46;">90% daytime solar self-consumption; surplus exported via net meter.</div>
+          </div>
+        </div>
       </div>
+
+      <!-- AUDIT TABLE -->
       <table>
         <thead>
           <tr>
-            <th style="width: 32%;">Parameter</th>
-            <th style="width: 38%;">Consumer / Site Record</th>
-            <th style="width: 30%;">EPC Verification Status</th>
+            <th>Audit Parameter</th>
+            <th>Consumer Record</th>
+            <th>Engineering Assessment</th>
           </tr>
         </thead>
         <tbody>
           <tr>
-            <td><strong>Client / Consumer Name</strong></td>
-            <td>${data.customerName}</td>
-            <td style="color: #15803d; font-weight: 700;">Verified against Utility Record</td>
+            <td><strong>DISCOM & Billing Division</strong></td>
+            <td>${data.discomName || 'MSEDCL (Mahavitaran)'} • BU: ${data.billingUnit || '4134'}</td>
+            <td style="color: #059669; font-weight: 600;">Eligible for Bi-directional Net Metering</td>
           </tr>
           <tr>
-            <td><strong>DISCOM & Billing Unit</strong></td>
-            <td>${data.discomName || 'MSEDCL (Mahavitaran)'} • BU: ${data.billingUnit || '4100'}</td>
-            <td style="color: #15803d; font-weight: 700;">Eligible for Net-Metering</td>
+            <td><strong>Consumer Account Number</strong></td>
+            <td><strong style="font-family: monospace;">${data.consumerNumber || 'To be updated'}</strong></td>
+            <td style="color: #64748b;">National Portal PM Surya Ghar DBT Synchronized</td>
           </tr>
           <tr>
-            <td><strong>Consumer Account No.</strong></td>
-            <td><strong style="font-family: monospace; color: ${primaryColor};">${data.consumerNumber || 'To be updated'}</strong></td>
-            <td>PM Surya Ghar Portal Mapped</td>
-          </tr>
-          <tr>
-            <td><strong>Sanctioned Load & Phase</strong></td>
+            <td><strong>Sanctioned Load vs Plant</strong></td>
             <td>${data.sanctionedLoad || cap} kW (${data.phase || 'Single Phase'})</td>
-            <td>${cap <= (data.sanctionedLoad || 5) ? 'Within sanctioned load' : 'Load enhancement recommended'}</td>
+            <td style="color: #059669; font-weight: 600;">${cap <= (data.sanctionedLoad || 5) ? 'Within sanctioned capacity' : 'Load enhancement recommended'}</td>
           </tr>
           <tr>
-            <td><strong>Roof Type & Orientation</strong></td>
-            <td>${data.roofType || 'Flat RCC Roof'}</td>
-            <td>South facing, 12°–15° optimal pitch</td>
+            <td><strong>Rooftop Space & Orientation</strong></td>
+            <td>${data.roofType || 'RCC Flat Roof'} (~${data.roofAreaSqFt || Math.round(cap * 65)} sq.ft.)</td>
+            <td>True South, 15° optimal pitch, 100% shadow-free</td>
           </tr>
         </tbody>
       </table>
-
-      <div class="card" style="background: #f8fafc; margin-top: 10px;">
-        <div style="font-weight: 800; font-size: 8pt; color: ${primaryColor}; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">
-          Key Project Objectives & Benefits
-        </div>
-        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; font-size: 8pt; color: #334155;">
-          <div>✅ <strong>Reduce Bill by 85–90%</strong><br><span style="color: #64748b;">Hedge against recurring annual utility tariff hikes.</span></div>
-          <div>✅ <strong>Direct Bank Subsidy</strong><br><span style="color: #64748b;">Avail PM Surya Ghar direct cash benefit credit.</span></div>
-          <div>✅ <strong>Clean Capital Asset</strong><br><span style="color: #64748b;">Generate inflation-proof electricity for 25+ years.</span></div>
-        </div>
-      </div>
     </div>
+
     ${renderPageFooter()}
   </div>
   ` : ''}
 
   <!-- ========================================================================= -->
-  <!-- PAGE 3: RECOMMENDED SOLAR SOLUTION ARCHITECTURE                           -->
+  <!-- PAGE 3: YOUR SOLAR SYSTEM (APPLE-STYLE HARDWARE SHOWCASE)                 -->
   <!-- ========================================================================= -->
   <div class="a4-page">
     <div>
-      ${renderPageHeader('Recommended Solar Solution Architecture', '03')}
+      ${renderPageHeader('Your Solar System & Hardware', '02')}
 
-      <div class="section-title">${cap} kWp ${data.systemType || 'On-Grid'} Solar Power Plant</div>
-      <div class="section-subtitle">Tier-1 ALMM-listed solar PV modules, high-efficiency MPPT inverter, and rugged galvanized structure.</div>
-
-      <div class="grid-4">
-        <div class="card-kpi" style="border-color: #bfdbfe; background: #eff6ff;">
-          <div class="kpi-title" style="color: #1d4ed8;">DC Plant Capacity</div>
-          <div class="kpi-val" style="color: #1e3a8a;">${cap} <span style="font-size: 8pt; font-weight: 600;">kWp</span></div>
-          <div class="kpi-sub" style="color: #2563eb;">${panelQty} × ${panelWatt}Wp Panels</div>
-        </div>
-        <div class="card-kpi">
-          <div class="kpi-title">AC Inverter Rating</div>
-          <div class="kpi-val">${invCap} <span style="font-size: 8pt; font-weight: 600;">kW</span></div>
-          <div class="kpi-sub">${data.phase || 'Single Phase'} Grid-Tied</div>
-        </div>
-        <div class="card-kpi" style="border-color: #bbf7d0; background: #f0fdf4;">
-          <div class="kpi-title" style="color: #15803d;">Est. Annual Yield</div>
-          <div class="kpi-val" style="color: #14532d;">~${formatInr(annualUnits)} <span style="font-size: 8pt; font-weight: 600;">kWh</span></div>
-          <div class="kpi-sub" style="color: #16a34a;">~${formatInr(monthlyUnits)} kWh / month</div>
-        </div>
-        <div class="card-kpi">
-          <div class="kpi-title">Warranty Shield</div>
-          <div class="kpi-val">25 Years</div>
-          <div class="kpi-sub">Linear Performance</div>
-        </div>
-      </div>
+      <span class="section-kicker">Industrial-Grade Engineering</span>
+      <h2 class="section-title">Masterfully Integrated. Crafted for 25-Year Reliability.</h2>
+      <p class="section-subtitle">Tier-1 ALMM certified power generation components engineered to withstand harsh weather conditions.</p>
 
       <div class="grid-2">
-        <!-- MODULE SPEC CARD -->
-        <div class="card">
-          <div style="font-size: 7.5pt; font-weight: 800; color: ${primaryColor}; text-transform: uppercase;">Solar PV Modules</div>
-          <div style="font-size: 11pt; font-weight: 800; color: #0f172a; margin: 2px 0 6px 0;">
-            ${data.panelBrand || 'Waaree 540Wp Mono PERC Bifacial'}
+        <!-- MODULES -->
+        <div class="card-white">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <span style="font-size: 7pt; font-weight: 800; color: #c5a059; text-transform: uppercase;">Solar PV Modules</span>
+            <span style="font-size: 6.8pt; font-weight: 800; color: #065f46; background: #ecfdf5; padding: 2px 6px; border-radius: 4px;">ALMM Tier-1</span>
           </div>
-          <table style="margin: 0; font-size: 7.5pt;">
-            <tr><td style="color: #64748b; width: 40%;">Technology</td><td><strong>${data.panelModel || 'Mono Half-Cut Bifacial ALMM DCR'}</strong></td></tr>
-            <tr><td style="color: #64748b;">Quantity & Rating</td><td>${panelQty} Modules (${panelWatt}Wp each)</td></tr>
-            <tr><td style="color: #64748b;">Performance Warranty</td><td><strong style="color: #15803d;">${modWarranty}</strong></td></tr>
-          </table>
+          <div style="font-size: 11pt; font-weight: 900; color: #071c11; font-family: 'Manrope', sans-serif; margin-bottom: 4px;">
+            ${data.panelBrand || 'Waaree'} ${panelWatt}Wp Bifacial
+          </div>
+          <div style="font-size: 7.5pt; color: #64748b; line-height: 1.4; margin-bottom: 8px;">
+            ${panelQty} N-type TopCon Bifacial solar modules with dual-glass architecture generating up to +15% rear gain from rooftop albedo.
+          </div>
+          <div style="border-top: 1px solid #f1f5f9; padding-top: 6px; display: flex; justify-content: space-between; font-size: 7.2pt;">
+            <span style="color: #94a3b8;">Warranty:</span>
+            <strong style="color: #071c11;">${data.warranties?.modules || '25 Years Linear Performance'}</strong>
+          </div>
         </div>
 
-        <!-- INVERTER SPEC CARD -->
-        <div class="card">
-          <div style="font-size: 7.5pt; font-weight: 800; color: ${accentColor}; text-transform: uppercase;">Grid-Tied Solar Inverter</div>
-          <div style="font-size: 11pt; font-weight: 800; color: #0f172a; margin: 2px 0 6px 0;">
-            ${data.inverterBrand || 'Growatt / Solis'} ${invCap}kW
+        <!-- INVERTER -->
+        <div class="card-white">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <span style="font-size: 7pt; font-weight: 800; color: #c5a059; text-transform: uppercase;">Grid Inverter</span>
+            <span style="font-size: 6.8pt; font-weight: 800; color: #1e40af; background: #eff6ff; padding: 2px 6px; border-radius: 4px;">IP65 Rated</span>
           </div>
-          <table style="margin: 0; font-size: 7.5pt;">
-            <tr><td style="color: #64748b; width: 40%;">Efficiency & MPPT</td><td>Dual MPPT, &gt;98.4% Peak Efficiency</td></tr>
-            <tr><td style="color: #64748b;">Enclosure Rating</td><td>IP65 Outdoor Weatherproof & Wi-Fi</td></tr>
-            <tr><td style="color: #64748b;">Warranty Duration</td><td><strong style="color: #15803d;">${invWarranty}</strong></td></tr>
-          </table>
+          <div style="font-size: 11pt; font-weight: 900; color: #071c11; font-family: 'Manrope', sans-serif; margin-bottom: 4px;">
+            ${data.inverterBrand || 'Growatt'} ${invCap} kW Dual-MPPT
+          </div>
+          <div style="font-size: 7.5pt; color: #64748b; line-height: 1.4; margin-bottom: 8px;">
+            98.6% European efficiency, dual independent MPPT channels, and cloud telemetry for real-time mobile app yield monitoring.
+          </div>
+          <div style="border-top: 1px solid #f1f5f9; padding-top: 6px; display: flex; justify-content: space-between; font-size: 7.2pt;">
+            <span style="color: #94a3b8;">Warranty:</span>
+            <strong style="color: #071c11;">${data.warranties?.inverter || '10 Years Replacement'}</strong>
+          </div>
         </div>
 
+        <!-- BATTERY OR STRUCTURE -->
         ${isHybridOrOffgrid ? `
-        <!-- BATTERY CARD FOR HYBRID -->
-        <div class="card" style="grid-column: span 2; background: #fffbeb; border-color: #fde68a;">
-          <div style="font-size: 7.5pt; font-weight: 800; color: #b45309; text-transform: uppercase;">Energy Storage System (Battery Backup)</div>
-          <div style="font-size: 11pt; font-weight: 800; color: #78350f; margin: 2px 0 6px 0;">
-            ${data.batteryBrand || 'Tata Power / Growatt'} ${data.batteryCapacity || 5} kWh LiFePO4
+        <div class="card-white" style="border-color: rgba(197, 160, 89, 0.4);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <span style="font-size: 7pt; font-weight: 800; color: #b45309; text-transform: uppercase;">Lithium Battery Storage</span>
+            <span style="font-size: 6.8pt; font-weight: 800; color: #92400e; background: #fef3c7; padding: 2px 6px; border-radius: 4px;">LiFePO4 Chemistry</span>
           </div>
-          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; font-size: 8pt; color: #78350f;">
-            <div>Capacity: <strong>${data.batteryCapacity || 5} kWh (${data.batteryQuantity || 1} Unit)</strong></div>
-            <div>Backup Load: <strong>${data.backupLoadWatts || 3000} Watts (Lights, Fans, Refrigerator)</strong></div>
-            <div>Warranty: <strong>${data.batteryWarranty || '10 Years / 6,000 Cycles'}</strong></div>
+          <div style="font-size: 11pt; font-weight: 900; color: #071c11; font-family: 'Manrope', sans-serif; margin-bottom: 4px;">
+            ${data.batteryBrand || 'Tata Power'} ${data.batteryCapacity || 5} kWh Rack
+          </div>
+          <div style="font-size: 7.5pt; color: #64748b; line-height: 1.4; margin-bottom: 8px;">
+            High-safety lithium iron phosphate chemistry supporting ${data.backupLoadWatts || 3000}W of critical household circuits during blackouts.
+          </div>
+          <div style="border-top: 1px solid #f1f5f9; padding-top: 6px; display: flex; justify-content: space-between; font-size: 7.2pt;">
+            <span style="color: #94a3b8;">Cycle Life:</span>
+            <strong style="color: #071c11;">${data.warranties?.battery || '10 Years / 6000 Cycles'}</strong>
           </div>
         </div>
-        ` : ''}
+        ` : `
+        <div class="card-white">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <span style="font-size: 7pt; font-weight: 800; color: #c5a059; text-transform: uppercase;">Mounting Structure</span>
+            <span style="font-size: 6.8pt; font-weight: 800; color: #334155; background: #f1f5f9; padding: 2px 6px; border-radius: 4px;">150 km/h Wind Rated</span>
+          </div>
+          <div style="font-size: 11pt; font-weight: 900; color: #071c11; font-family: 'Manrope', sans-serif; margin-bottom: 4px;">
+            ${data.structureBrand || 'Galvanized HDG High Rise'}
+          </div>
+          <div style="font-size: 7.5pt; color: #64748b; line-height: 1.4; margin-bottom: 8px;">
+            Heavy-duty hot-dip galvanized steel (80µm zinc coat) engineered to withstand cyclone-grade 150 km/h wind shear.
+          </div>
+          <div style="border-top: 1px solid #f1f5f9; padding-top: 6px; display: flex; justify-content: space-between; font-size: 7.2pt;">
+            <span style="color: #94a3b8;">Warranty:</span>
+            <strong style="color: #071c11;">${data.warranties?.structure || '10 Years Structural'}</strong>
+          </div>
+        </div>
+        `}
 
-        <!-- STRUCTURE & BOS CARD -->
-        <div class="card" style="grid-column: span ${isHybridOrOffgrid ? 2 : 2};">
-          <div style="font-size: 7.5pt; font-weight: 800; color: #64748b; text-transform: uppercase;">Mounting Structure & Balance of System (BOS)</div>
-          <div style="font-size: 10pt; font-weight: 800; color: #0f172a; margin: 2px 0 6px 0;">
-            ${data.structureBrand || data.structureType || 'Hot-Dip Galvanized (HDG) / Aluminum High Rise Structure'}
+        <!-- BALANCE OF SYSTEM -->
+        <div class="card-white">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <span style="font-size: 7pt; font-weight: 800; color: #c5a059; text-transform: uppercase;">Balance of System (BOS)</span>
+            <span style="font-size: 6.8pt; font-weight: 800; color: #065f46; background: #ecfdf5; padding: 2px 6px; border-radius: 4px;">MNRE Standard</span>
           </div>
-          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; font-size: 7.5pt; color: #334155;">
-            <div><strong>Structure:</strong> Hot-Dip Galvanized 80µm, wind rated up to 150 km/h. Warranty: ${strWarranty}.</div>
-            <div><strong>DC / AC Cables:</strong> Polycab / Havells 4 sq.mm TUV certified UV XLPE cables with conduits.</div>
-            <div><strong>Safety:</strong> ACDB & DCDB with Type-II SPDs and Dual Chemical Earthing pits.</div>
+          <div style="font-size: 11pt; font-weight: 900; color: #071c11; font-family: 'Manrope', sans-serif; margin-bottom: 4px;">
+            Polycab Cables & Type-II SPD
           </div>
-        </div>
-      </div>
-
-      <div class="card" style="background: #f8fafc;">
-        <div style="display: flex; justify-content: space-between; font-size: 7.5pt; font-weight: 800; color: #64748b; text-transform: uppercase; margin-bottom: 6px;">
-          <span>Monthly Solar Generation Profile (Western / Central India Irradiance)</span>
-          <span style="color: ${primaryColor};">Peak: May (~10.8%)</span>
-        </div>
-        <div style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; text-align: center; font-size: 7.5pt;">
-          <div class="card" style="padding: 4px;"><strong>Jan:</strong> ${Math.round(annualUnits * 0.082)} kWh</div>
-          <div class="card" style="padding: 4px;"><strong>Mar:</strong> ${Math.round(annualUnits * 0.098)} kWh</div>
-          <div class="card" style="padding: 4px; border-color: ${primaryColor};"><strong>May:</strong> ${Math.round(annualUnits * 0.108)} kWh</div>
-          <div class="card" style="padding: 4px;"><strong>Jul:</strong> ${Math.round(annualUnits * 0.062)} kWh</div>
-          <div class="card" style="padding: 4px;"><strong>Sep:</strong> ${Math.round(annualUnits * 0.076)} kWh</div>
-          <div class="card" style="padding: 4px;"><strong>Nov:</strong> ${Math.round(annualUnits * 0.084)} kWh</div>
+          <div style="font-size: 7.5pt; color: #64748b; line-height: 1.4; margin-bottom: 8px;">
+            TUV-certified 4 sq.mm UV XLPE DC cable, IP65 ACDB/DCDB enclosures, and dual chemical copper-bonded earthing with lightning arrester.
+          </div>
+          <div style="border-top: 1px solid #f1f5f9; padding-top: 6px; display: flex; justify-content: space-between; font-size: 7.2pt;">
+            <span style="color: #94a3b8;">Protection:</span>
+            <strong style="color: #071c11;">Lightning & Surge Certified</strong>
+          </div>
         </div>
       </div>
     </div>
+
     ${renderPageFooter()}
   </div>
 
   <!-- ========================================================================= -->
-  <!-- PAGE 4: SAVINGS ANALYSIS & FINANCIAL ROI                                  -->
+  <!-- PAGE 4: ENERGY & SAVINGS (FINANCIAL INFOGRAPHICS)                         -->
   <!-- ========================================================================= -->
   <div class="a4-page">
     <div>
-      ${renderPageHeader('Solar Generation & Financial Economics', '04')}
+      ${renderPageHeader('Energy Yield & 25-Year Wealth', '03')}
 
-      <div class="section-title">Financial Analysis & Projected Savings</div>
-      <div class="section-subtitle">Detailed return on investment, payback period, and 25-year cumulative savings projections.</div>
+      <span class="section-kicker">Financial Engineering</span>
+      <h2 class="section-title">A Compounding Asset, Not An Expense.</h2>
+      <p class="section-subtitle">25-year compounding wealth generation and payback analysis against grid tariff inflation.</p>
 
+      <!-- MONTHLY CHART -->
+      <div class="chart-container">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <div>
+            <span style="font-size: 6.8pt; font-weight: 800; color: #c5a059; text-transform: uppercase; letter-spacing: 1px;">Yield Profile</span>
+            <div style="font-size: 8.5pt; font-weight: 800; color: #071c11;">Monthly Solar Generation Curve (kWh)</div>
+          </div>
+          <div style="font-size: 7.2pt; font-weight: 700; color: #c5a059;">Peak Month: May (${Math.round(cap * 155)} kWh)</div>
+        </div>
+        <div class="bars-row">
+          ${months.map(d => {
+            const h = Math.round((d.gen / maxGen) * 100);
+            return `
+              <div class="bar-col">
+                <span style="font-size: 6.2pt; font-family: monospace; font-weight: bold; margin-bottom: 2px;">${d.gen}</span>
+                <div class="bar-fill ${d.peak ? 'bar-fill-peak' : ''}" style="height: ${h}%;"></div>
+                <span style="font-size: 6.5pt; color: #64748b; margin-top: 3px; font-weight: 600;">${d.m}</span>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+
+      <!-- 3 KPIS -->
       <div class="grid-3">
-        <div class="card-kpi" style="border-color: #bbf7d0; background: #f0fdf4; text-align: center;">
-          <div class="kpi-title" style="color: #15803d;">Year 1 Net Savings</div>
-          <div class="kpi-val" style="color: #14532d; font-size: 15pt;">₹${formatInr(annualSavings)}</div>
-          <div class="kpi-sub" style="color: #16a34a;">₹${formatInr(monthlySavings)} / month</div>
+        <div class="card-white" style="text-align: center;">
+          <div class="kpi-title" style="color: #059669;">Year 1 Net Savings</div>
+          <div class="kpi-val" style="color: #065f46;">₹${formatINR(annualSavings)}</div>
+          <div style="font-size: 7.2pt; color: #64748b; font-family: monospace;">~₹${formatINR(monthlySavings)} / mo</div>
         </div>
-        <div class="card-kpi" style="border-color: #bfdbfe; background: #eff6ff; text-align: center;">
-          <div class="kpi-title" style="color: #1d4ed8;">Estimated Payback</div>
-          <div class="kpi-val" style="color: #1e3a8a; font-size: 15pt;">${payback} Years</div>
-          <div class="kpi-sub" style="color: #2563eb;">Break-even on net investment</div>
+
+        <div class="card-dark" style="text-align: center;">
+          <div class="kpi-title" style="color: #c5a059;">Break-Even Payback</div>
+          <div class="kpi-val" style="color: #dfbf78;">${payback} Years</div>
+          <div style="font-size: 7.2pt; color: #cbd5e1; font-family: monospace;">Return on net capital</div>
         </div>
-        <div class="card-kpi" style="text-align: center;">
-          <div class="kpi-title">25-Yr Cumulative Savings</div>
-          <div class="kpi-val" style="font-size: 15pt;">₹${formatInr(lifetimeSavings)}</div>
-          <div class="kpi-sub">Compounding @ 3% tariff hike</div>
+
+        <div class="card-white" style="text-align: center;">
+          <div class="kpi-title" style="color: #c5a059;">25-Yr Net Wealth</div>
+          <div class="kpi-val">₹${formatINR(lifetimeSavings)}</div>
+          <div style="font-size: 7.2pt; color: #64748b; font-family: monospace;">Compounding @ 3% tariff</div>
         </div>
       </div>
 
-      <div style="font-weight: 800; font-size: 8.5pt; color: #0f172a; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.4px;">
-        25-Year Milestone Financial Cash Flow Projections
-      </div>
+      <!-- 25-YEAR MILESTONE TABLE -->
       <table>
         <thead>
           <tr>
-            <th style="width: 20%;">Milestone Year</th>
-            <th style="width: 20%;">Annual Gen. (kWh)</th>
-            <th style="width: 20%;">Grid Tariff (₹/u)</th>
-            <th style="width: 20%;">Annual Savings (₹)</th>
-            <th style="width: 20%; text-align: right;">Cumulative Net Return (₹)</th>
+            <th>Milestone</th>
+            <th>Est. Yield</th>
+            <th>Tariff Rate</th>
+            <th>Annual Value</th>
+            <th style="text-align: right;">Cumulative Net Savings</th>
           </tr>
         </thead>
         <tbody style="font-family: monospace;">
           <tr>
-            <td style="font-family: inherit;"><strong>Year 1</strong></td>
-            <td>${formatInr(annualUnits)} kWh</td>
-            <td>₹${tariff.toFixed(1)}</td>
-            <td style="color: #15803d; font-weight: 700;">₹${formatInr(annualSavings)}</td>
-            <td style="text-align: right; font-weight: 800;">₹${formatInr(annualSavings)}</td>
+            <td><strong style="font-family: sans-serif;">Year 01</strong></td>
+            <td>${annualUnits.toLocaleString()} kWh</td>
+            <td>₹${tariff} / u</td>
+            <td style="color: #059669; font-weight: bold;">₹${formatINR(annualSavings)}</td>
+            <td style="text-align: right; font-weight: 900; color: #071c11;">₹${formatINR(annualSavings)}</td>
           </tr>
           <tr>
-            <td style="font-family: inherit;"><strong>Year 3</strong></td>
-            <td>${formatInr(annualUnits * 0.98)} kWh</td>
-            <td>₹${(tariff * 1.06).toFixed(2)}</td>
-            <td style="color: #15803d; font-weight: 700;">₹${formatInr(annualSavings * 1.04)}</td>
-            <td style="text-align: right; font-weight: 800;">₹${formatInr(annualSavings * 3.08)}</td>
-          </tr>
-          <tr style="background: #f0fdf4;">
-            <td style="font-family: inherit; color: #15803d;"><strong>Year 5 (Payback)</strong></td>
-            <td>${formatInr(annualUnits * 0.96)} kWh</td>
-            <td>₹${(tariff * 1.12).toFixed(2)}</td>
-            <td style="color: #15803d; font-weight: 700;">₹${formatInr(annualSavings * 1.08)}</td>
-            <td style="text-align: right; font-weight: 900; color: #15803d;">₹${formatInr(annualSavings * 5.3)}</td>
+            <td><strong style="font-family: sans-serif;">Year 03</strong></td>
+            <td>${Math.round(annualUnits * 0.98).toLocaleString()} kWh</td>
+            <td>₹${(tariff * 1.06).toFixed(2)} / u</td>
+            <td style="color: #059669; font-weight: bold;">₹${formatINR(annualSavings * 1.04)}</td>
+            <td style="text-align: right; font-weight: 900; color: #071c11;">₹${formatINR(annualSavings * 3.08)}</td>
           </tr>
           <tr>
-            <td style="font-family: inherit;"><strong>Year 10</strong></td>
-            <td>${formatInr(annualUnits * 0.93)} kWh</td>
-            <td>₹${(tariff * 1.30).toFixed(2)}</td>
-            <td style="color: #15803d; font-weight: 700;">₹${formatInr(annualSavings * 1.21)}</td>
-            <td style="text-align: right; font-weight: 800;">₹${formatInr(annualSavings * 11.5)}</td>
+            <td><strong style="font-family: sans-serif;">Year 05 (Payback)</strong></td>
+            <td>${Math.round(annualUnits * 0.96).toLocaleString()} kWh</td>
+            <td>₹${(tariff * 1.12).toFixed(2)} / u</td>
+            <td style="color: #059669; font-weight: bold;">₹${formatINR(annualSavings * 1.08)}</td>
+            <td style="text-align: right; font-weight: 900; color: #071c11;">₹${formatINR(annualSavings * 5.3)}</td>
           </tr>
           <tr>
-            <td style="font-family: inherit;"><strong>Year 15</strong></td>
-            <td>${formatInr(annualUnits * 0.90)} kWh</td>
-            <td>₹${(tariff * 1.51).toFixed(2)}</td>
-            <td style="color: #15803d; font-weight: 700;">₹${formatInr(annualSavings * 1.36)}</td>
-            <td style="text-align: right; font-weight: 800;">₹${formatInr(annualSavings * 18.2)}</td>
+            <td><strong style="font-family: sans-serif;">Year 10</strong></td>
+            <td>${Math.round(annualUnits * 0.93).toLocaleString()} kWh</td>
+            <td>₹${(tariff * 1.30).toFixed(2)} / u</td>
+            <td style="color: #059669; font-weight: bold;">₹${formatINR(annualSavings * 1.21)}</td>
+            <td style="text-align: right; font-weight: 900; color: #071c11;">₹${formatINR(annualSavings * 11.5)}</td>
           </tr>
-          <tr style="background: #eff6ff;">
-            <td style="font-family: inherit; color: #1e3a8a;"><strong>Year 25 (Life End)</strong></td>
-            <td>${formatInr(annualUnits * 0.84)} kWh</td>
-            <td>₹${(tariff * 2.03).toFixed(2)}</td>
-            <td style="color: #15803d; font-weight: 700;">₹${formatInr(annualSavings * 1.71)}</td>
-            <td style="text-align: right; font-weight: 900; color: #1e3a8a;">₹${formatInr(lifetimeSavings)}</td>
+          <tr>
+            <td><strong style="font-family: sans-serif;">Year 25</strong></td>
+            <td>${Math.round(annualUnits * 0.84).toLocaleString()} kWh</td>
+            <td>₹${(tariff * 2.03).toFixed(2)} / u</td>
+            <td style="color: #059669; font-weight: bold;">₹${formatINR(annualSavings * 1.71)}</td>
+            <td style="text-align: right; font-weight: 900; color: #071c11;">₹${formatINR(lifetimeSavings)}</td>
           </tr>
         </tbody>
       </table>
-
-      ${subsidy > 0 && !isCommercial ? `
-      <div class="subsidy-callout">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
-          <div style="font-weight: 800; font-size: 8.5pt; color: #14532d;">
-            🏛️ PM Surya Ghar Muft Bijli Yojana — Indicative Central Subsidy
-          </div>
-          <div style="font-size: 11pt; font-weight: 900; color: #15803d; font-family: monospace;">₹${formatInr(subsidy)}</div>
-        </div>
-        <div style="font-size: 7.5pt; color: #166534; line-height: 1.35;">
-          Direct Benefit Transfer (DBT): Central subsidy is credited directly by MNRE/DISCOM into the consumer's bank account following physical installation inspection and net-meter synchronization.
-        </div>
-      </div>
-      ` : isCommercial ? `
-      <div class="commercial-tax-callout">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
-          <div style="font-weight: 800; font-size: 8.5pt; color: #1e3a8a;">
-            🏢 Section 32 Accelerated Depreciation Tax Benefit
-          </div>
-          <div style="font-size: 11pt; font-weight: 900; color: #1d4ed8; font-family: monospace;">₹${formatInr(commercialBenefit)} Tax Write-off</div>
-        </div>
-        <div style="font-size: 7.5pt; color: #1e40af; line-height: 1.35;">
-          Commercial & Industrial entities in India can claim 40% accelerated depreciation on solar rooftop capital investments under Income Tax Act Section 32, boosting business cash flows from Year 1.
-        </div>
-      </div>
-      ` : ''}
-
-      <div class="loan-callout-box">
-        <div style="display: flex; justify-content: space-between; font-weight: 800; font-size: 8pt; color: #0f172a; margin-bottom: 4px;">
-          <span>💳 5-Year Solar Loan Option: Positive Cash Flow from Month 1</span>
-          <span style="color: ${primaryColor};">@ 9.5% p.a. • 60 Months Tenure</span>
-        </div>
-        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; font-size: 7.5pt; color: #475569;">
-          <div>Monthly Solar Savings: <strong style="color: #15803d;">₹${formatInr(monthlySavings)} / mo</strong></div>
-          <div>Estimated Monthly EMI: <strong style="color: #0f172a;">₹${formatInr(monthlyEmi)} / mo</strong></div>
-          <div>Net In-Hand Gain: <strong style="color: #1d4ed8;">+₹${formatInr(Math.max(0, monthlySavings - monthlyEmi))} / mo</strong></div>
-        </div>
-      </div>
     </div>
+
     ${renderPageFooter()}
   </div>
 
   <!-- ========================================================================= -->
-  <!-- PAGE 5: ITEMIZED COMMERCIAL QUOTATION & BOQ                               -->
+  <!-- PAGE 5: YOUR INVESTMENT (COMMERCIAL BOQ & MILESTONES)                     -->
   <!-- ========================================================================= -->
   <div class="a4-page">
     <div>
-      ${renderPageHeader('Commercial Quotation & Bill of Quantities', '05')}
+      ${renderPageHeader('Commercial Proposal & Investment', '04')}
 
-      <div class="section-title">Itemized Commercial Quotation</div>
-      <div class="section-subtitle">Transparent itemized bill of quantities with tax rates, statutory GST breakdown, and payment totals.</div>
+      <span class="section-kicker">Transparent Commercials</span>
+      <h2 class="section-title">Turnkey Investment Schedule With Milestone Security</h2>
+      <p class="section-subtitle">Itemized bill of quantities with composite solar GST, central DBT subsidy, and milestone-linked security.</p>
 
+      <!-- OVERSIZED INVESTMENT HERO -->
+      <div style="background: linear-gradient(135deg, #071c11 0%, #0b2014 100%); color: #ffffff; padding: 16px 20px; border-radius: 14px; border: 1px solid rgba(197, 160, 89, 0.4); margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center;">
+        <div>
+          <span style="font-size: 7pt; font-weight: 800; color: #c5a059; text-transform: uppercase; letter-spacing: 1.5px; display: block; margin-bottom: 2px;">
+            Net Estimated Customer Investment
+          </span>
+          <div style="font-size: 26pt; font-weight: 900; font-family: 'Space Grotesk', sans-serif; letter-spacing: -0.5px;">
+            ₹${formatINR(net)}
+          </div>
+          <div style="font-size: 7.5pt; color: #cbd5e1; margin-top: 4px;">
+            Gross Project Total: ₹${formatINR(gross)}
+            ${subsidy > 0 ? ` • <strong style="color: #4ade80;">Less Central Subsidy: ₹${formatINR(subsidy)}</strong>` : ''}
+          </div>
+        </div>
+        <div style="text-align: right;">
+          <span style="display: inline-block; padding: 4px 10px; border-radius: 12px; font-size: 7.5pt; font-weight: 800; background: rgba(197, 160, 89, 0.2); color: #dfbf78; border: 1px solid rgba(197, 160, 89, 0.4); text-transform: uppercase;">
+            Fixed EPC Contract
+          </span>
+          <div style="font-size: 7pt; color: #94a3b8; margin-top: 4px; font-family: monospace;">Inclusive of 13.8% Solar GST</div>
+        </div>
+      </div>
+
+      <!-- BOQ TABLE -->
       <table>
         <thead>
           <tr>
-            <th style="width: 5%; text-align: center;">#</th>
-            <th style="width: 47%;">Product / Service Description</th>
-            <th style="width: 8%; text-align: center;">Qty</th>
-            <th style="width: 8%; text-align: center;">Unit</th>
-            <th style="width: 14%; text-align: right;">Rate (₹)</th>
-            <th style="width: 8%; text-align: center;">GST</th>
-            <th style="width: 15%; text-align: right;">Total (₹)</th>
+            <th style="width: 25px; text-align: center;">#</th>
+            <th>Item & Description</th>
+            <th style="width: 45px; text-align: center;">Qty</th>
+            <th style="width: 45px; text-align: center;">Unit</th>
+            <th style="width: 70px; text-align: right;">Rate (₹)</th>
+            <th style="width: 50px; text-align: center;">GST</th>
+            <th style="width: 85px; text-align: right;">Total (₹)</th>
           </tr>
         </thead>
         <tbody>
@@ -993,250 +1047,155 @@ export function generateQuotationHtml(data: QuotationPdfProps): string {
               <td><strong>${item.description}</strong></td>
               <td style="text-align: center; font-family: monospace;">${item.qty || 1}</td>
               <td style="text-align: center; color: #64748b;">${item.unit || 'LOT'}</td>
-              <td style="text-align: right; font-family: monospace;">₹${formatInr(item.rate || item.unit_price || item.amount || 0)}</td>
-              <td style="text-align: center; color: #64748b;">${item.tax_rate || item.gstRate || 12}%</td>
-              <td style="text-align: right; font-weight: 700; font-family: monospace;">₹${formatInr(item.amount || item.total || 0)}</td>
+              <td style="text-align: right; font-family: monospace;">₹${formatINR(Number(item.rate || item.unit_price || 0))}</td>
+              <td style="text-align: center; font-family: monospace;">${item.tax_rate || item.gstRate || 12}%</td>
+              <td style="text-align: right; font-family: monospace; font-weight: 800; color: #071c11;">₹${formatINR(Number(item.amount || item.total || 0))}</td>
             </tr>
           `).join('')}
         </tbody>
       </table>
 
-      <div class="grid-2" style="margin-bottom: 12px;">
-        <div class="card" style="display: flex; flex-direction: column; justify-content: space-between; background: #f8fafc;">
-          <div>
-            <div style="font-size: 7.5pt; font-weight: 800; color: #64748b; text-transform: uppercase;">Amount Payable in Words</div>
-            <div style="font-size: 9pt; font-weight: 800; color: #0f172a; text-transform: uppercase; margin-top: 4px; line-height: 1.4;">
-              ${data.amountInWords || numberToWordsINR(gross)}
-            </div>
-          </div>
-          <div style="font-size: 7pt; color: #64748b; margin-top: 10px; border-top: 1px solid #e2e8f0; padding-top: 6px;">
-            Statutory Note: Turnkey price includes all applicable GST. Central PM Surya Ghar direct cash subsidy is credited via DBT into the customer's account post-commissioning.
-          </div>
-        </div>
-
-        <div class="card" style="background: #f8fafc;">
-          <table style="margin: 0; font-size: 8pt; border: none;">
-            <tr style="background: transparent;"><td style="border: none; color: #64748b;">Taxable Subtotal (Pre-Tax):</td><td style="border: none; text-align: right; font-family: monospace;">₹${formatInr(subtotal)}</td></tr>
-            ${discount > 0 ? `
-            <tr style="background: transparent;"><td style="border: none; color: #d97706;">Commercial Discount:</td><td style="border: none; text-align: right; font-family: monospace; color: #d97706;">-₹${formatInr(discount)}</td></tr>` : ''}
-            <tr style="background: transparent;"><td style="border: none; color: #64748b;">GST (CGST + SGST Solar Composite):</td><td style="border: none; text-align: right; font-family: monospace;">₹${formatInr(tax)}</td></tr>
-            <tr style="background: transparent; border-top: 1.5px solid #cbd5e1;"><td style="border: none; font-weight: 800; font-size: 9.5pt;">Final Project Total:</td><td style="border: none; text-align: right; font-weight: 900; font-size: 11pt; color: ${primaryColor}; font-family: monospace;">₹${formatInr(gross)}</td></tr>
-            ${subsidy > 0 ? `
-            <tr style="background: transparent;"><td style="border: none; color: #15803d; font-weight: 700;">Less: Central Subsidy (PM Surya Ghar DBT):</td><td style="border: none; text-align: right; font-weight: 800; color: #15803d; font-family: monospace;">-₹${formatInr(subsidy)}</td></tr>
-            <tr style="background: transparent; border-top: 1px solid #bbf7d0;"><td style="border: none; font-weight: 800; font-size: 9pt; color: #14532d;">Estimated Net Outflow:</td><td style="border: none; text-align: right; font-weight: 900; font-size: 11pt; color: #15803d; font-family: monospace;">₹${formatInr(net)}</td></tr>` : ''}
-          </table>
-        </div>
-      </div>
-
-      <div style="font-weight: 800; font-size: 8.5pt; color: #0f172a; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.4px;">
-        Milestone Payment Schedule (100% Milestone Linked)
-      </div>
-      <table>
-        <thead>
-          <tr>
-            <th style="width: 10%; text-align: center;">Stage</th>
-            <th style="width: 50%;">Milestone Description & Trigger</th>
-            <th style="width: 15%; text-align: center;">% Share</th>
-            <th style="width: 25%; text-align: right;">Amount (All GST Included)</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${rawMilestones.map((ms, idx) => `
-            <tr>
-              <td style="text-align: center; font-weight: 800; color: ${primaryColor};">${idx + 1}</td>
-              <td>${ms.description}</td>
-              <td style="text-align: center; font-weight: 700;"><span class="badge badge-blue">${ms.percentage}%</span></td>
-              <td style="text-align: right; font-weight: 800; font-family: monospace;">₹${formatInr(ms.amount)}</td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
-    </div>
-    ${renderPageFooter()}
-  </div>
-
-  ${!isQuickQuote ? `
-  <!-- ========================================================================= -->
-  <!-- PAGE 6: SCOPE OF WORK & EPC DELIVERABLES                                  -->
-  <!-- ========================================================================= -->
-  <div class="a4-page">
-    <div>
-      ${renderPageHeader('Scope of Work & EPC Deliverables', '06')}
-
-      <div class="section-title">Turnkey Scope of Work & Boundaries</div>
-      <div class="section-subtitle">Clear allocation of EPC deliverables, statutory agency coordination, and customer site obligations.</div>
-
-      <table>
-        <thead>
-          <tr>
-            <th style="width: 6%; text-align: center;">#</th>
-            <th style="width: 76%;">Scope Item / EPC Engineering Activity</th>
-            <th style="width: 18%; text-align: center;">Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${rawScope.map((sc: any, idx: number) => {
-            const itemText = typeof sc === 'string' ? sc : sc.item;
-            const itemStatus = typeof sc === 'string' ? 'INCLUDED' : (sc.status || 'INCLUDED');
-            const badgeClass = itemStatus === 'INCLUDED' ? 'badge-included' : itemStatus === 'EXCLUDED' ? 'badge-excluded' : 'badge-chargeable';
-            return `
-              <tr>
-                <td style="text-align: center; color: #94a3b8; font-family: monospace;">${idx + 1}</td>
-                <td>${itemText}</td>
-                <td style="text-align: center;"><span class="badge ${badgeClass}">${itemStatus}</span></td>
-              </tr>
-            `;
-          }).join('')}
-        </tbody>
-      </table>
-
-      <div class="card" style="background: #f8fafc; margin-top: 10px;">
-        <div style="font-weight: 800; font-size: 8pt; color: #0f172a; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">
-          Customer Site Obligations & Prerequisites
-        </div>
-        <ul style="margin: 0; padding-left: 18px; font-size: 7.5pt; color: #475569; line-height: 1.5;">
-          <li>Provide unhindered, safe rooftop access for EPC engineers, installation technicians, and equipment delivery.</li>
-          <li>Ensure dedicated water supply line at rooftop with sufficient pressure for regular module cleaning.</li>
-          <li>Provide single or three-phase electrical power supply at site during installation and testing.</li>
-          <li>Cooperate with statutory DISCOM meter testing and verification officers during physical site inspection.</li>
-        </ul>
-      </div>
-    </div>
-    ${renderPageFooter()}
-  </div>
-  ` : ''}
-
-  <!-- ========================================================================= -->
-  <!-- PAGE 7: WARRANTIES, TERMS & CONDITIONS                                    -->
-  <!-- ========================================================================= -->
-  <div class="a4-page">
-    <div>
-      ${renderPageHeader('Warranty Guarantees & Commercial Terms', '07')}
-
-      <div class="section-title">Equipment Warranties & Service Commitments</div>
-      <div class="section-subtitle">Backed directly by Tier-1 OEM manufacturers and our certified EPC workmanship warranty.</div>
-
+      <!-- WORDS & MILESTONES -->
       <div class="grid-2">
-        <div class="card">
-          <div style="font-size: 7.5pt; font-weight: 800; color: ${primaryColor}; text-transform: uppercase;">Solar PV Modules</div>
-          <div style="font-size: 11pt; font-weight: 800; color: #0f172a; margin: 2px 0 2px 0;">${modWarranty}</div>
-          <div style="font-size: 7.5pt; color: #64748b;">10-12 Yr Product Warranty + 25 Yr Linear Power Degradation Guarantee</div>
+        <div>
+          <div class="card-white" style="margin-bottom: 10px;">
+            <div style="font-size: 7pt; font-weight: 800; color: #c5a059; text-transform: uppercase; margin-bottom: 2px;">Amount in Words</div>
+            <div style="font-size: 7.8pt; font-weight: 800; color: #071c11; text-transform: uppercase; font-family: 'Manrope', sans-serif;">
+              ${data.amountInWords || 'Indian Rupees Only'}
+            </div>
+          </div>
+
+          ${data.bankDetails ? `
+          <div class="card-white" style="font-size: 7.5pt;">
+            <div style="font-size: 6.8pt; font-weight: 800; color: #64748b; text-transform: uppercase; margin-bottom: 4px;">Official EPC Bank Details</div>
+            <div style="font-family: monospace; line-height: 1.4;">
+              Beneficiary: <strong>${data.bankDetails.account_name}</strong><br>
+              Bank: ${data.bankDetails.bank_name} | A/C: <strong>${data.bankDetails.account_number}</strong><br>
+              IFSC: <strong style="color: #c5a059;">${data.bankDetails.ifsc}</strong>
+            </div>
+          </div>
+          ` : ''}
         </div>
 
-        <div class="card">
-          <div style="font-size: 7.5pt; font-weight: 800; color: ${accentColor}; text-transform: uppercase;">Solar Grid Inverter</div>
-          <div style="font-size: 11pt; font-weight: 800; color: #0f172a; margin: 2px 0 2px 0;">${invWarranty}</div>
-          <div style="font-size: 7.5pt; color: #64748b;">Standard OEM replacement warranty against manufacturing & electronic defects</div>
-        </div>
-
-        <div class="card">
-          <div style="font-size: 7.5pt; font-weight: 800; color: #64748b; text-transform: uppercase;">Mounting Structure</div>
-          <div style="font-size: 11pt; font-weight: 800; color: #0f172a; margin: 2px 0 2px 0;">${strWarranty}</div>
-          <div style="font-size: 7.5pt; color: #64748b;">Structural integrity, wind resistance up to 150 km/h, corrosion resistance</div>
-        </div>
-
-        <div class="card">
-          <div style="font-size: 7.5pt; font-weight: 800; color: #b45309; text-transform: uppercase;">Workmanship Guarantee</div>
-          <div style="font-size: 11pt; font-weight: 800; color: #0f172a; margin: 2px 0 2px 0;">${insWarranty}</div>
-          <div style="font-size: 7.5pt; color: #64748b;">Comprehensive wiring, termination, earthing & mechanical integrity support</div>
+        <div class="card-white">
+          <div style="font-size: 7.2pt; font-weight: 800; color: #071c11; text-transform: uppercase; margin-bottom: 6px; display: flex; justify-content: space-between;">
+            <span>Payment Milestones</span>
+            <span style="color: #64748b;">100% Milestone Linked</span>
+          </div>
+          <div style="font-size: 7.5pt; line-height: 1.4;">
+            ${rawMilestones.map((m, idx) => `
+              <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #f1f5f9;">
+                <div>
+                  <strong style="color: #c5a059;">Stage 0${idx + 1}:</strong> ${m.description}
+                </div>
+                <div style="text-align: right; font-family: monospace; font-weight: 800; white-space: nowrap; margin-left: 8px;">
+                  ${m.percentage}% (₹${formatINR(m.amount)})
+                </div>
+              </div>
+            `).join('')}
+          </div>
         </div>
       </div>
-
-      <div style="font-weight: 800; font-size: 8.5pt; color: #0f172a; margin: 12px 0 6px 0; text-transform: uppercase; letter-spacing: 0.4px;">
-        Commercial Terms & Conditions
-      </div>
-      <div class="card" style="background: #f8fafc; font-size: 7.5pt; color: #334155; line-height: 1.5;">
-        ${(data.termsAndConditions && data.termsAndConditions.length > 0 ? data.termsAndConditions : [
-          `Quotation Validity: This commercial proposal is valid for ${data.validUntil} from date of issue.`,
-          'Central Government Subsidy (PM Surya Ghar) is an indicative estimate and is credited directly to consumer account via DBT post-commissioning.',
-          'Net Metering: Net metering feasibility and approvals are governed by State DISCOM regulations and local transformer load capacity.',
-          'Customer Responsibilities: Rooftop access, water supply for cleaning, and grid electrical power during installation are customer obligations.',
-          'Statutory Fees: State DISCOM meter testing and registration fees are charged as per actual utility tariff notifications.',
-        ]).map((term) => `<div style="margin-bottom: 4px;">• ${term}</div>`).join('')}
-      </div>
-
-      ${data.bankDetails ? `
-      <div class="card" style="margin-top: 12px;">
-        <div style="font-size: 8pt; font-weight: 800; color: #0f172a; text-transform: uppercase; margin-bottom: 4px;">
-          Official EPC Bank Account for Advance Token Booking
-        </div>
-        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; font-size: 7.5pt; font-family: monospace; color: #334155;">
-          <div><span style="color: #64748b; font-family: sans-serif; display: block;">Beneficiary:</span><strong>${data.bankDetails.accountName}</strong></div>
-          <div><span style="color: #64748b; font-family: sans-serif; display: block;">Bank Name:</span>${data.bankDetails.bankName}</div>
-          <div><span style="color: #64748b; font-family: sans-serif; display: block;">Account No:</span><strong style="color: ${primaryColor};">${data.bankDetails.accountNumber}</strong></div>
-          <div><span style="color: #64748b; font-family: sans-serif; display: block;">IFSC Code:</span><strong>${data.bankDetails.ifsc}</strong></div>
-        </div>
-      </div>
-      ` : ''}
     </div>
+
     ${renderPageFooter()}
   </div>
 
   <!-- ========================================================================= -->
-  <!-- PAGE 8: ACCEPTANCE & SIGNATORY BLOCK                                      -->
+  <!-- PAGE 6: INSTALLATION ROADMAP, WARRANTIES & ACCEPTANCE                     -->
   <!-- ========================================================================= -->
   <div class="a4-page">
     <div>
-      ${renderPageHeader('Acceptance & Work Order Authorization', '08')}
+      ${renderPageHeader('Roadmap, Warranties & Acceptance', '05')}
 
-      <div class="section-title">Work Order Acceptance & Authorization</div>
-      <div class="section-subtitle">Signing this document constitutes formal acceptance of this commercial proposal and initiates project engineering.</div>
+      <span class="section-kicker">Execution Guarantee</span>
+      <h2 class="section-title">From Engineering Survey to Solar Power in 21 Days</h2>
+      <p class="section-subtitle">Structured 5-phase execution methodology guaranteeing safe installation and seamless net-meter commissioning.</p>
 
-      <div class="card" style="background: #f8fafc; font-size: 8pt; color: #334155; line-height: 1.5; margin-bottom: 20px;">
-        <p style="margin: 0 0 6px 0;">
-          I/We, <strong>${data.customerName}</strong>, hereby confirm acceptance of Quotation 
-          <strong> #${data.quotationNumber}</strong> for the supply, installation, testing, and commissioning of a 
-          <strong> ${cap} kWp ${data.systemType || 'On-Grid'} Solar Rooftop Power Plant</strong> for the total sum of 
-          <strong> ₹${formatInr(gross)} (${data.amountInWords || numberToWordsINR(gross)})</strong>.
-        </p>
-        <p style="margin: 0;">
-          I/We agree to the payment milestone schedule, technical specifications, and terms and conditions 
-          detailed herein, and authorize <strong>${data.companyName}</strong> to initiate DISCOM net-metering 
-          applications and turnkey project procurement.
-        </p>
+      <!-- 5-PHASE ROADMAP -->
+      <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-bottom: 14px;">
+        <div class="card-white" style="padding: 8px;">
+          <div style="font-size: 11pt; font-weight: 900; color: #c5a059; font-family: monospace;">01</div>
+          <div style="font-size: 7.5pt; font-weight: 800; color: #071c11;">Site Survey</div>
+          <div style="font-size: 6.8pt; color: #64748b; margin-top: 2px;">Days 1–3: Shadow analysis & SLD</div>
+        </div>
+        <div class="card-white" style="padding: 8px;">
+          <div style="font-size: 11pt; font-weight: 900; color: #c5a059; font-family: monospace;">02</div>
+          <div style="font-size: 7.5pt; font-weight: 800; color: #071c11;">DISCOM</div>
+          <div style="font-size: 6.8pt; color: #64748b; margin-top: 2px;">Days 4–8: Net-meter sanction</div>
+        </div>
+        <div class="card-white" style="padding: 8px;">
+          <div style="font-size: 11pt; font-weight: 900; color: #c5a059; font-family: monospace;">03</div>
+          <div style="font-size: 7.5pt; font-weight: 800; color: #071c11;">Structure</div>
+          <div style="font-size: 6.8pt; color: #64748b; margin-top: 2px;">Days 9–14: HDG erection & PV</div>
+        </div>
+        <div class="card-white" style="padding: 8px;">
+          <div style="font-size: 11pt; font-weight: 900; color: #c5a059; font-family: monospace;">04</div>
+          <div style="font-size: 7.5pt; font-weight: 800; color: #071c11;">Electrical</div>
+          <div style="font-size: 6.8pt; color: #64748b; margin-top: 2px;">Days 15–18: Inverter & BOS</div>
+        </div>
+        <div class="card-white" style="padding: 8px;">
+          <div style="font-size: 11pt; font-weight: 900; color: #059669; font-family: monospace;">05</div>
+          <div style="font-size: 7.5pt; font-weight: 800; color: #071c11;">Handover</div>
+          <div style="font-size: 6.8pt; color: #64748b; margin-top: 2px;">Days 19–21: Net-meter sync</div>
+        </div>
       </div>
 
-      <div class="grid-2" style="margin-bottom: 24px;">
-        <!-- CUSTOMER SIGNATURE BOX -->
-        <div class="card" style="height: 150px; display: flex; flex-direction: column; justify-content: space-between; border: 2px dashed #cbd5e1;">
-          <div>
-            <div style="font-size: 8pt; font-weight: 800; color: #0f172a; text-transform: uppercase;">Accepted & Confirmed By Customer</div>
-            <div style="font-size: 7.5pt; color: #64748b;">${data.customerName}</div>
-          </div>
-          <div style="border-top: 1px solid #cbd5e1; padding-top: 6px; display: flex; justify-content: space-between; font-size: 7.5pt; color: #64748b;">
-            <div>Signature: <strong style="color: #0f172a;">[Authorized Sign]</strong></div>
-            <div>Date: <strong style="color: #0f172a;">____ / ____ / 2026</strong></div>
+      <!-- WARRANTIES -->
+      <div class="grid-4" style="margin-bottom: 14px;">
+        <div class="card-white" style="text-align: center; padding: 10px;">
+          <div class="kpi-title">Modules</div>
+          <div style="font-size: 11pt; font-weight: 900; color: #071c11; font-family: 'Space Grotesk', sans-serif;">25 Years</div>
+          <div style="font-size: 6.8pt; color: #64748b;">Linear Output</div>
+        </div>
+        <div class="card-white" style="text-align: center; padding: 10px;">
+          <div class="kpi-title">Inverter</div>
+          <div style="font-size: 11pt; font-weight: 900; color: #071c11; font-family: 'Space Grotesk', sans-serif;">10 Years</div>
+          <div style="font-size: 6.8pt; color: #64748b;">Replacement</div>
+        </div>
+        <div class="card-white" style="text-align: center; padding: 10px;">
+          <div class="kpi-title">Structure</div>
+          <div style="font-size: 11pt; font-weight: 900; color: #071c11; font-family: 'Space Grotesk', sans-serif;">10 Years</div>
+          <div style="font-size: 6.8pt; color: #64748b;">150 km/h Wind</div>
+        </div>
+        <div class="card-white" style="text-align: center; padding: 10px;">
+          <div class="kpi-title">Workmanship</div>
+          <div style="font-size: 11pt; font-weight: 900; color: #059669; font-family: 'Space Grotesk', sans-serif;">5 Years</div>
+          <div style="font-size: 6.8pt; color: #64748b;">Comprehensive</div>
+        </div>
+      </div>
+
+      <!-- DECLARATION -->
+      <div class="card-white" style="font-size: 7.5pt; line-height: 1.45; margin-bottom: 14px;">
+        I/We, <strong>${data.customerName}</strong>, confirm acceptance of Proposal <strong>#${data.quotationNumber}</strong> for the turnkey installation of a <strong>${cap} kWp ${data.systemType || 'On-grid'} Solar Rooftop Power Plant</strong> for the total contract sum of <strong>₹${formatINR(gross)} (${data.amountInWords || 'Indian Rupees Only'})</strong>. Authorizes ${data.companyName} to execute statutory State DISCOM net metering applications and engineering procurement.
+      </div>
+
+      <!-- DUAL SIGNATURE BOXES -->
+      <div class="grid-2">
+        <div style="border: 1.5px dashed #cbd5e1; border-radius: 12px; padding: 12px; background: #ffffff; height: 95px; display: flex; flex-direction: column; justify-content: space-between;">
+          <div style="font-size: 7.2pt; font-weight: 800; color: #64748b; text-transform: uppercase;">Accepted By Customer: ${data.customerName}</div>
+          <div style="border-top: 1px solid #e2e8f0; padding-top: 4px; display: flex; justify-content: space-between; font-size: 7pt; color: #64748b;">
+            <span>Client Signature: ____________</span>
+            <span>Date: ___ / ___ / 2026</span>
           </div>
         </div>
 
-        <!-- EPC CONTRACTOR SIGNATURE BOX -->
-        <div class="card" style="height: 150px; display: flex; flex-direction: column; justify-content: space-between; border: 2px solid #cbd5e1; position: relative;">
-          <div>
-            <div style="font-size: 8pt; font-weight: 800; color: #0f172a; text-transform: uppercase;">For ${data.companyLegalName || data.companyName}</div>
-            <div style="font-size: 7.5pt; color: #64748b;">Authorized EPC Representative</div>
-          </div>
-
-          <div style="display: flex; align-items: center; justify-content: space-between; padding: 0 10px;">
-            <div>
-              ${data.signatureUrl ? `<img src="${data.signatureUrl}" style="height: 40px; object-fit: contain;" alt="Sign" />` : `<span style="font-size: 7.5pt; color: #94a3b8; font-style: italic;">[Digitally Verified Signature]</span>`}
+        <div style="border: 1.5px solid #cbd5e1; border-radius: 12px; padding: 12px; background: #ffffff; height: 95px; display: flex; flex-direction: column; justify-content: space-between; position: relative;">
+          <div style="font-size: 7.2pt; font-weight: 800; color: #071c11; text-transform: uppercase;">For ${data.companyLegalName || data.companyName}</div>
+          <div style="display: flex; align-items: center; justify-content: space-between;">
+            <div style="font-size: 7pt; font-style: italic; color: #94a3b8; font-family: monospace;">
+              ${data.signatureUrl ? `<img src="${data.signatureUrl}" style="height: 28px; object-fit: contain;" />` : '[Authorized Signature]'}
             </div>
-            ${data.companyStampUrl ? `<img src="${data.companyStampUrl}" style="height: 48px; object-fit: contain; opacity: 0.8;" alt="Stamp" />` : ''}
+            ${data.companyStampUrl ? `<img src="${data.companyStampUrl}" style="height: 32px; object-fit: contain; opacity: 0.8;" />` : ''}
           </div>
-
-          <div style="border-top: 1px solid #cbd5e1; padding-top: 6px; display: flex; justify-content: space-between; font-size: 7.5pt; color: #64748b;">
-            <div><strong>${data.signatoryName || 'Authorized Signatory'}</strong><br><span style="font-size: 6.5pt;">${data.signatoryTitle || 'Director - Solar Operations'}</span></div>
-            <div style="text-align: right;">Date:<br><strong style="color: #0f172a;">${data.quotationDate}</strong></div>
+          <div style="border-top: 1px solid #e2e8f0; padding-top: 4px; display: flex; justify-content: space-between; font-size: 7pt; color: #64748b;">
+            <span>${data.signatoryName || 'Authorized Signatory'}</span>
+            <span>Date: ${data.quotationDate}</span>
           </div>
-        </div>
-      </div>
-
-      <div class="card" style="background: #eff6ff; border-color: #bfdbfe; text-align: center; padding: 12px;">
-        <div style="font-weight: 800; font-size: 8.5pt; color: #1e3a8a;">Thank you for partnering with us for clean, sustainable solar energy.</div>
-        <div style="font-size: 7.5pt; color: #2563eb; margin-top: 2px;">
-          For Technical Liaisoning or Order Enquiries, contact 📞 ${data.companyPhone} • ✉️ ${data.companyEmail}
         </div>
       </div>
     </div>
+
     ${renderPageFooter()}
   </div>
 
@@ -1245,6 +1204,148 @@ export function generateQuotationHtml(data: QuotationPdfProps): string {
   `;
 }
 
+/**
+ * Universal Mobile Quotation PDF Generator & Sharer using Expo Print & Sharing
+ */
+export async function generateQuotationPdf(data: QuotationPdfProps): Promise<string> {
+  try {
+    const html = generateQuotationHtml(data);
+    const { uri } = await Print.printToFileAsync({
+      html,
+      base64: false,
+    });
+    return uri;
+  } catch (error: any) {
+    console.error('Error generating Quotation PDF:', error);
+    Alert.alert('PDF Generation Error', error?.message || 'Could not generate proposal PDF');
+    throw error;
+  }
+}
+
+export function formatIndianCurrency(num: number): string {
+  if (isNaN(num) || num === undefined || num === null) return '0';
+  return Math.round(num).toLocaleString('en-IN');
+}
+
+/**
+ * Universal Mobile Document Preview
+ */
+export async function previewPdf(html: string): Promise<boolean> {
+  try {
+    await Print.printAsync({ html });
+    return true;
+  } catch (err: any) {
+    console.warn('Native Print preview failed, falling back to share:', err?.message);
+    try {
+      const { uri, base64 } = await Print.printToFileAsync({ html, base64: true });
+      let shareUri = uri;
+      if (base64) {
+        try {
+          const docDir = (FileSystem as any).documentDirectory || (FileSystem as any).cacheDirectory || '';
+          const previewFileUri = `${docDir}Quotation_Preview.pdf`;
+          if ((FileSystem as any).writeAsStringAsync) {
+            await (FileSystem as any).writeAsStringAsync(previewFileUri, base64, {
+              encoding: 'base64',
+            });
+            shareUri = previewFileUri;
+          }
+        } catch (writeErr) {
+          console.warn('Preview writeAsStringAsync error:', writeErr);
+        }
+      }
+
+      const isAvailable = await Sharing.isAvailableAsync().catch(() => false);
+      if (isAvailable) {
+        await Sharing.shareAsync(shareUri, {
+          UTI: 'com.adobe.pdf',
+          mimeType: 'application/pdf',
+          dialogTitle: 'View / Save Document PDF',
+        });
+        return true;
+      }
+    } catch (fallbackErr) {
+      console.error('PDF Preview fallback failed:', fallbackErr);
+    }
+    Alert.alert('Preview Notice', err?.message || 'Could not launch document preview');
+    return false;
+  }
+}
+
+/**
+ * Universal Mobile Document Printer
+ */
+export async function printDirectly(html: string): Promise<void> {
+  try {
+    await Print.printAsync({ html });
+  } catch (err: any) {
+    Alert.alert('Print Error', err?.message || 'Failed to send document to printer');
+  }
+}
+
+/**
+ * Share PDF file or HTML directly through native sheet or WhatsApp
+ */
+export async function sharePdfFile(
+  htmlOrUri: string,
+  fileNameOrCustomer?: string,
+  customerPhone?: string
+): Promise<string | null> {
+  try {
+    const isAvailable = await Sharing.isAvailableAsync().catch(() => false);
+    if (!isAvailable) {
+      Alert.alert('Sharing Unavailable', 'Native file sharing is not supported on this device.');
+      return null;
+    }
+
+    let fileUri = htmlOrUri;
+    const isHtml = htmlOrUri.trim().startsWith('<') || htmlOrUri.includes('<!DOCTYPE') || htmlOrUri.includes('<html>');
+
+    if (isHtml) {
+      const { uri, base64 } = await Print.printToFileAsync({ html: htmlOrUri, base64: true });
+      fileUri = uri;
+      const cleanName = (fileNameOrCustomer || 'Solar_Document').replace(/\.pdf$/i, '').replace(/[^a-zA-Z0-9_-]/g, '_');
+      const targetUri = `${FileSystem.documentDirectory || ''}${cleanName}.pdf`;
+      try {
+        if (base64 && (FileSystem as any).writeAsStringAsync) {
+          await (FileSystem as any).writeAsStringAsync(targetUri, base64, { encoding: 'base64' });
+          fileUri = targetUri;
+        } else {
+          await FileSystem.copyAsync({ from: uri, to: targetUri });
+          fileUri = targetUri;
+        }
+      } catch {
+        fileUri = uri;
+      }
+    } else {
+      const cleanName = (fileNameOrCustomer || 'Solar_Proposal').replace(/[^a-zA-Z0-9_-]/g, '_');
+      const targetUri = `${FileSystem.documentDirectory || ''}${cleanName}_Quotation.pdf`;
+      try {
+        await FileSystem.copyAsync({ from: fileUri, to: targetUri });
+        fileUri = targetUri;
+      } catch {
+        // use fileUri
+      }
+    }
+
+    await Sharing.shareAsync(fileUri, {
+      mimeType: 'application/pdf',
+      dialogTitle: `Document for ${fileNameOrCustomer || 'Valued Customer'}`,
+      UTI: 'com.adobe.pdf',
+    });
+    return fileUri;
+  } catch (err: any) {
+    console.error('PDF sharing error:', err);
+    Alert.alert('Sharing Error', err?.message || 'Failed to share proposal PDF.');
+    return null;
+  }
+}
+
+export const createAndSharePdf = sharePdfFile;
+export const sharePdfToWhatsApp = sharePdfFile;
+
+/**
+ * DISCOM Net Metering Statutory Documents Generator
+ */
 export function generateDiscomHtml(type: string, data: any): string {
   const custName = data.customerName || 'SHRI CONSUMER';
   const consumerNo = data.consumerNumber || '123456789012';
@@ -1472,8 +1573,7 @@ export interface InvoicePdfProps {
     upiId?: string;
     branch?: string;
   };
-
-  terms?: string;
+  terms?: string | string[];
   notes?: string;
 }
 
@@ -1503,10 +1603,10 @@ function numberToWordsINR(amount: number): string {
   let hundreds = rem % 1000;
 
   let words = '';
-  if (crore > 0) words += convertTwoDigits(crore) + ' Crore ';
-  if (lakh > 0) words += convertTwoDigits(lakh) + ' Lakh ';
-  if (thousand > 0) words += convertTwoDigits(thousand) + ' Thousand ';
-  if (hundreds > 0) words += convertThreeDigits(hundreds) + ' ';
+  if (crore > 0) words += convertThreeDigits(crore) + ' Crore ';
+  if (lakh > 0) words += convertThreeDigits(lakh) + ' Lakh ';
+  if (thousand > 0) words += convertThreeDigits(thousand) + ' Thousand ';
+  if (hundreds > 0) words += convertThreeDigits(hundreds);
 
   return 'Rupees ' + words.trim() + ' Only';
 }
@@ -1646,25 +1746,6 @@ export function generateInvoiceHtml(data: InvoicePdfProps): string {
       font-size: 8.5pt;
       color: #334155;
       line-height: 1.4;
-    }
-    .project-banner {
-      background: #eff6ff;
-      border: 1px solid #bfdbfe;
-      border-radius: 6px;
-      padding: 8px 12px;
-      margin-bottom: 14px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    .project-banner-title {
-      font-size: 9.5pt;
-      font-weight: 800;
-      color: #1e40af;
-    }
-    .project-banner-sub {
-      font-size: 8.5pt;
-      color: #3b82f6;
     }
     .milestone-badge-bar {
       background: #ecfdf5;
@@ -1854,7 +1935,7 @@ export function generateInvoiceHtml(data: InvoicePdfProps): string {
     </tr>
   </table>
 
-  <!-- BILLING SCOPE BANNER -->
+  <!-- SCOPE BANNER -->
   <div class="milestone-badge-bar">
     <div class="milestone-title">📍 Scope / Description: ${data.milestoneTitle || 'Complete Turnkey Rooftop Solar PV Installation'}</div>
     <div class="milestone-sub">
@@ -1924,20 +2005,18 @@ export function generateInvoiceHtml(data: InvoicePdfProps): string {
           : ''
       }
       <tr>
-        <td class="totals-label" style="font-weight: 800; font-size: 10pt; color: #0f172a;">Balance Due</td>
-        <td class="totals-val" style="font-weight: 900; font-size: 11pt; color: ${data.balanceDue > 0 ? '#d97706' : '#059669'};">
+        <td class="totals-label" style="font-weight: 900; font-size: 10pt; color: #0f172a;">Balance Payable</td>
+        <td class="totals-val" style="font-weight: 900; font-size: 11pt; color: ${isPaid ? '#059669' : '#e11d48'};">
           ₹${formatInr(data.balanceDue)}
         </td>
       </tr>
     </table>
   </div>
 
-  <!-- AMOUNT IN WORDS -->
   <div class="words-box">
-    <strong>Invoice Amount in Words:</strong> ${amountInWords}
+    <strong>Total Invoice Amount in Words:</strong> ${amountInWords}
   </div>
 
-  <!-- PAYMENTS HISTORY (IF ANY) -->
   ${
     data.payments && data.payments.length > 0
       ? `
@@ -2013,128 +2092,4 @@ export function generateInvoiceHtml(data: InvoicePdfProps): string {
 </body>
 </html>
   `;
-}
-
-export async function previewPdf(html: string): Promise<boolean> {
-  try {
-    await Print.printAsync({ html });
-    return true;
-  } catch (err: any) {
-    console.warn('Native Print preview failed, falling back to share:', err?.message);
-    try {
-      const { uri, base64 } = await Print.printToFileAsync({ html, base64: true });
-      let shareUri = uri;
-      if (base64) {
-        try {
-          const docDir = FileSystem.documentDirectory || FileSystem.cacheDirectory || '';
-          const previewFileUri = `${docDir}Quotation_Preview.pdf`;
-          await FileSystem.writeAsStringAsync(previewFileUri, base64, {
-            encoding: 'base64',
-          });
-          shareUri = previewFileUri;
-        } catch (writeErr) {
-          console.warn('Preview writeAsStringAsync error:', writeErr);
-        }
-      }
-
-      const isAvailable = await Sharing.isAvailableAsync().catch(() => false);
-      if (isAvailable) {
-        await Sharing.shareAsync(shareUri, {
-          UTI: 'com.adobe.pdf',
-          mimeType: 'application/pdf',
-          dialogTitle: 'View / Save Proposal PDF',
-        });
-        return true;
-      }
-    } catch (fallbackErr) {
-      console.error('PDF Preview fallback failed:', fallbackErr);
-    }
-    Alert.alert('Preview Notice', err.message || 'Could not launch document preview');
-    return false;
-  }
-}
-
-export async function sharePdfFile(
-  html: string,
-  fileName: string,
-  customerPhone?: string
-): Promise<string | null> {
-  try {
-    const { uri, base64 } = await Print.printToFileAsync({ html, base64: true });
-    let shareableUri = uri;
-
-    const baseName = fileName.replace(/\.pdf$/i, '').replace(/[^a-zA-Z0-9_-]/g, '_');
-    const cleanFileName = `${baseName}.pdf`;
-
-    // Write Base64 string directly into FileSystem.documentDirectory (or cacheDirectory).
-    // Writing through FileSystem inside documentDirectory ensures 100% read permission for Android FileProvider and WhatsApp.
-    if (base64) {
-      let written = false;
-      try {
-        const docDir = FileSystem.documentDirectory || '';
-        if (docDir) {
-          const docUri = `${docDir}${cleanFileName}`;
-          await FileSystem.writeAsStringAsync(docUri, base64, {
-            encoding: 'base64',
-          });
-          const info = await FileSystem.getInfoAsync(docUri).catch(() => null);
-          if (info && info.exists && info.size > 0) {
-            shareableUri = docUri;
-            written = true;
-          }
-        }
-      } catch (docErr) {
-        console.warn('Writing to documentDirectory failed, trying cacheDirectory:', docErr);
-      }
-
-      if (!written) {
-        try {
-          const cacheDir = FileSystem.cacheDirectory || '';
-          if (cacheDir) {
-            const cacheUri = `${cacheDir}${cleanFileName}`;
-            await FileSystem.writeAsStringAsync(cacheUri, base64, {
-              encoding: 'base64',
-            });
-            const info = await FileSystem.getInfoAsync(cacheUri).catch(() => null);
-            if (info && info.exists && info.size > 0) {
-              shareableUri = cacheUri;
-              written = true;
-            }
-          }
-        } catch (cacheErr) {
-          console.warn('Writing to cacheDirectory failed:', cacheErr);
-        }
-      }
-    }
-
-    const isAvailable = await Sharing.isAvailableAsync().catch(() => false);
-    if (!isAvailable) {
-      Alert.alert('Sharing Unavailable', 'File sharing is not supported on this device.');
-      return null;
-    }
-
-    // Expo Sharing passes content URI via Android FileProvider so WhatsApp attaches the real PDF document
-    await Sharing.shareAsync(shareableUri, {
-      mimeType: 'application/pdf',
-      dialogTitle: `Share ${cleanFileName}`,
-      UTI: 'com.adobe.pdf',
-    });
-
-    return shareableUri;
-  } catch (err: any) {
-    console.error('PDF generation error:', err);
-    Alert.alert('PDF Export Error', err.message || 'Failed to generate PDF document');
-    return null;
-  }
-}
-
-export const createAndSharePdf = sharePdfFile;
-export const sharePdfToWhatsApp = sharePdfFile;
-
-export async function printDirectly(html: string): Promise<void> {
-  try {
-    await Print.printAsync({ html });
-  } catch (err: any) {
-    Alert.alert('Print Error', err.message || 'Failed to send document to printer');
-  }
 }

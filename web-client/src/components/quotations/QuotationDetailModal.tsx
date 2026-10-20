@@ -901,7 +901,7 @@ export function QuotationDetailModal({
                     }`}
                   >
                     <Sparkles size={13} />
-                    <span>18-Page Sales Proposal</span>
+                    <span>Luxury Editorial Proposal</span>
                   </button>
                 </div>
 
