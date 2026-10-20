@@ -58,6 +58,10 @@ app.use('/', crmRoutes);
 const quotationsRoutes = require('./routes/tenant/quotations');
 app.use('/', quotationsRoutes);
 
+// TENANT - Proposal Templates & Brand Settings
+const templatesRoutes = require('./routes/tenant/templates');
+app.use('/', templatesRoutes);
+
 // TENANT - Operations (Surveys, Quotations, Installations)
 const operationsRoutes = require('./routes/tenant/operations');
 app.use('/', operationsRoutes);

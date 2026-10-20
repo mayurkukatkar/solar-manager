@@ -62,10 +62,17 @@ export const QuotationBuilderModal: React.FC<QuotationBuilderModalProps> = ({
   const [syncedQuote, setSyncedQuote] = useState<any>(null);
   const [language, setLanguage] = useState<'EN' | 'HI' | 'MR'>('EN');
 
-  // Technical Specs
+  // Technical Specs & Site Details
   const initialCap = lead?.estimatedCap || lead?.recommendedKw || 3.3;
+  const [templateType, setTemplateType] = useState<string>('residential_proposal');
   const [capacityKw, setCapacityKw] = useState<string>(String(initialCap));
   const [systemType, setSystemType] = useState('On-Grid Rooftop');
+  const [consumerNumber, setConsumerNumber] = useState<string>(lead?.consumerNumber || '');
+  const [discomName, setDiscomName] = useState<string>(lead?.discomName || 'MSEDCL');
+  const [sanctionedLoad, setSanctionedLoad] = useState<string>(String(lead?.sanctionedLoad || initialCap));
+  const [batteryCapacity, setBatteryCapacity] = useState<string>('5');
+  const [backupLoadWatts, setBackupLoadWatts] = useState<string>('3000');
+
   const [panelBrand, setPanelBrand] = useState('Waaree 540W Mono PERC DCR');
   const [inverterBrand, setInverterBrand] = useState('Solis 3.3kW Grid-Tied Inverter');
   const [structureType, setStructureType] = useState('Elevated HDG GI Structure');
@@ -85,21 +92,36 @@ export const QuotationBuilderModal: React.FC<QuotationBuilderModalProps> = ({
       } else {
         setTotalSystemCost('');
       }
+      if (lead?.consumerNumber) setConsumerNumber(lead.consumerNumber);
+      if (lead?.discomName) setDiscomName(lead.discomName);
+      if (lead?.sanctionedLoad) setSanctionedLoad(String(lead.sanctionedLoad));
     }
   }, [visible, lead]);
 
   // Solar Economics Calculation
   const cap = parseFloat(capacityKw) || 3.3;
   const grossTotal = parseFloat(totalSystemCost) || 0;
+  const isHybrid = systemType === 'Hybrid' || systemType === 'Off-grid' || templateType === 'hybrid_offgrid';
+  const isComm = templateType === 'commercial_epc';
 
   const handleCapacityChange = (val: string) => {
     setCapacityKw(val);
-    // DO NOT overwrite or auto-calculate amount based on kW! User enters custom agreed amount.
+  };
+
+  const handleSelectTemplate = (tmpl: string) => {
+    setTemplateType(tmpl);
+    if (tmpl === 'hybrid_offgrid') {
+      setSystemType('Hybrid');
+    } else if (tmpl === 'commercial_epc') {
+      setSystemType('Commercial On-Grid');
+    } else {
+      setSystemType('On-Grid Rooftop');
+    }
   };
 
   // PM Surya Ghar Muft Bijli Yojana Central Subsidy
   const computeSubsidy = (kw: number): number => {
-    if (kw <= 0) return 0;
+    if (kw <= 0 || isComm) return 0;
     if (kw <= 1) return 30000;
     if (kw <= 2) return 60000;
     return 78000; // Cap at 78,000 for 3kW and above
@@ -111,14 +133,15 @@ export const QuotationBuilderModal: React.FC<QuotationBuilderModalProps> = ({
   // Generation & Savings
   const monthlyUnits = Math.round(cap * 120);
   const annualUnits = Math.round(cap * 1460);
-  const tariff = 8.5; // Average tariff ₹8.5/unit
+  const tariff = isComm ? 10.5 : 8.5;
   const monthlySavings = Math.round(monthlyUnits * tariff);
   const lifetimeSavings = Math.round(annualUnits * 25 * tariff * 0.92);
   const paybackYears = Number((netCustomerCost / (monthlySavings * 12)).toFixed(1));
 
-  // EMI Comparison
-  // 5 Year Solar Loan at 8.5% interest rate (~₹20.5 per ₹1000)
-  const approxMonthlyEmi = Math.round((netCustomerCost * 0.0205));
+  // EMI Comparison (9.5% for 5 years ~ ₹21/₹1,000)
+  const approxMonthlyEmi = Math.round(netCustomerCost * 0.021);
+  const subtotal = Math.round(grossTotal / 1.138);
+  const taxAmount = grossTotal - subtotal;
 
   const buildPdfPayload = (): QuotationPdfProps => ({
     quotationNumber: syncedQuote?.qNumber || `QT-${Date.now().toString().slice(-6)}`,
@@ -128,25 +151,44 @@ export const QuotationBuilderModal: React.FC<QuotationBuilderModalProps> = ({
       month: 'short',
       year: 'numeric',
     }),
-    companyName: 'SolarManager Solutions Pvt Ltd',
-    companyAddress: 'Corporate Tower, Tech Park, Pune 411038',
-    companyPhone: '+91 98765 43210',
-    companyEmail: 'contact@solarmanager.in',
+    templateType,
+    primaryColor: '#0284c7',
+    accentColor: '#059669',
+    companyName: 'WhereReady Solar OS',
+    companyLegalName: 'WhereReady Solar Technologies Pvt Ltd',
+    companyAddress: 'Corporate Tower, MIDC Tech Park, Pune 411038',
+    companyPhone: '+91 98220 12345',
+    companyEmail: 'proposals@wherereadysolar.com',
+    companyGstin: '27AAECW1234F1Z5',
     customerName: lead?.name || 'Valued Customer',
     customerPhone: lead?.mobile || lead?.phone || '',
     customerAddress: lead?.address || 'Site Location, Maharashtra',
-    consumerNumber: lead?.consumerNumber,
-    discomName: lead?.discomName || 'MSEDCL',
+    consumerNumber: consumerNumber || lead?.consumerNumber,
+    discomName: discomName || lead?.discomName || 'MSEDCL',
+    sanctionedLoad: parseFloat(sanctionedLoad) || cap,
+    tariffRate: tariff,
+    connectionType: isComm ? 'Commercial' : 'Residential',
     systemCapacityKw: cap,
-    systemType,
+    systemType: isHybrid ? 'Hybrid' : systemType,
+    inverterCapacityKw: cap,
     panelBrand,
     panelWattage: 540,
+    panelQuantity: Math.ceil((cap * 1000) / 540),
+    panelWarranty: '25 Years Performance',
     inverterBrand,
-    inverterCapacityKw: cap,
+    inverterWarranty: '10 Years Replacement',
     structureType,
+    structureWarranty: '10 Years Structural',
+    batteryBrand: isHybrid ? 'Tata Power LiFePO4' : undefined,
+    batteryCapacity: isHybrid ? (parseFloat(batteryCapacity) || 5) : undefined,
+    backupLoadWatts: isHybrid ? (parseFloat(backupLoadWatts) || 3000) : undefined,
+    batteryWarranty: isHybrid ? '10 Years / 6,000 Cycles' : undefined,
     grossAmount: grossTotal,
-    subsidyAmount: subsidy,
-    netPayable: netCustomerCost,
+    subtotal,
+    taxAmount,
+    subsidyAmount: isComm ? 0 : subsidy,
+    netPayable: isComm ? grossTotal : netCustomerCost,
+    commercialTaxBenefit: isComm ? Math.round(grossTotal * 0.4 * 0.2517) : 0,
     discount: 0,
     monthlyGenerationUnits: monthlyUnits,
     annualGenerationUnits: annualUnits,
@@ -158,11 +200,11 @@ export const QuotationBuilderModal: React.FC<QuotationBuilderModalProps> = ({
     co2ReductionKg: Math.round(annualUnits * 0.82),
     treeEquivalent: Math.round((annualUnits * 0.82) / 20),
     bankDetails: {
-      accountName: 'SolarManager Solutions Pvt Ltd',
-      bankName: 'HDFC Bank',
+      accountName: 'WhereReady Solar Technologies Pvt Ltd',
+      bankName: 'HDFC Bank Ltd',
       accountNumber: '50200088992211',
       ifsc: 'HDFC0001234',
-      upiId: 'solarmanager@hdfcbank',
+      upiId: 'solar@hdfcbank',
     },
   });
 
@@ -187,11 +229,20 @@ export const QuotationBuilderModal: React.FC<QuotationBuilderModalProps> = ({
         systemCapacity: cap,
         totalSystemCost: grossTotal,
         status: statusOverride,
+        templateType,
+        connectionType: isComm ? 'Commercial' : 'Residential',
+        consumerNumber: consumerNumber || lead?.consumerNumber,
+        discom: discomName || lead?.discomName,
+        sanctionedLoad: parseFloat(sanctionedLoad) || cap,
+        tariffRate: tariff,
         panelBrand,
         panelWattage: 540,
         inverterBrand,
         inverterCapacity: cap,
         structureBrand: structureType,
+        batteryCapacity: isHybrid ? (parseFloat(batteryCapacity) || 5) : undefined,
+        batteryBrand: isHybrid ? 'Tata Power LiFePO4' : undefined,
+        backupLoadWatts: isHybrid ? (parseFloat(backupLoadWatts) || 3000) : undefined,
         validityDays: 15,
       });
 
@@ -366,10 +417,115 @@ export const QuotationBuilderModal: React.FC<QuotationBuilderModalProps> = ({
             )}
           </View>
 
-          {/* SECTION 1: SYSTEM SIZING & HARDWARE */}
+          {/* PROPOSAL TEMPLATE SELECTOR */}
           <View style={styles.card}>
             <View style={styles.cardHeader}>
-              <Text style={styles.cardTitle}>1. System Capacity & Hardware</Text>
+              <Text style={styles.cardTitle}>1. Proposal Document Template</Text>
+              <Text style={styles.cardSubtitle}>Choose quotation template layout (unified with web)</Text>
+            </View>
+
+            <View style={styles.templateGrid}>
+              <TouchableOpacity
+                style={[styles.templateCard, templateType === 'residential_proposal' && styles.templateCardActive]}
+                onPress={() => handleSelectTemplate('residential_proposal')}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.templateCardTitle, templateType === 'residential_proposal' && styles.templateCardTitleActive]}>
+                  Residential Proposal
+                </Text>
+                <Text style={styles.templateCardDesc}>5–7 Pages • Full Financial ROI & BOQ</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.templateCard, templateType === 'quick_quote' && styles.templateCardActive]}
+                onPress={() => handleSelectTemplate('quick_quote')}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.templateCardTitle, templateType === 'quick_quote' && styles.templateCardTitleActive]}>
+                  Quick Quote
+                </Text>
+                <Text style={styles.templateCardDesc}>Concise 3 Pages • Summary & Payback</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.templateCard, templateType === 'commercial_epc' && styles.templateCardActive]}
+                onPress={() => handleSelectTemplate('commercial_epc')}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.templateCardTitle, templateType === 'commercial_epc' && styles.templateCardTitleActive]}>
+                  Commercial EPC
+                </Text>
+                <Text style={styles.templateCardDesc}>Sec 32 Depreciation • C&I Profile</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.templateCard, templateType === 'hybrid_offgrid' && styles.templateCardActive]}
+                onPress={() => handleSelectTemplate('hybrid_offgrid')}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.templateCardTitle, templateType === 'hybrid_offgrid' && styles.templateCardTitleActive]}>
+                  Hybrid / Storage
+                </Text>
+                <Text style={styles.templateCardDesc}>Battery Backup & Storage Sizing</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* UTILITY & DISCOM LIAISONING */}
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <Text style={styles.cardTitle}>2. Utility & DISCOM Liaisoning</Text>
+              <Text style={styles.cardSubtitle}>Consumer billing details & grid compliance</Text>
+            </View>
+
+            <View style={styles.formRow}>
+              <View style={styles.formCol}>
+                <Text style={styles.label}>Consumer Account No.</Text>
+                <TextInput
+                  style={styles.input}
+                  value={consumerNumber}
+                  onChangeText={setConsumerNumber}
+                  placeholder="e.g. 123456789012"
+                  keyboardType="numeric"
+                />
+              </View>
+              <View style={styles.formCol}>
+                <Text style={styles.label}>DISCOM Provider</Text>
+                <TextInput
+                  style={styles.input}
+                  value={discomName}
+                  onChangeText={setDiscomName}
+                  placeholder="e.g. MSEDCL"
+                />
+              </View>
+            </View>
+
+            <View style={styles.formRow}>
+              <View style={styles.formCol}>
+                <Text style={styles.label}>Sanctioned Load (kW)</Text>
+                <TextInput
+                  style={styles.input}
+                  value={sanctionedLoad}
+                  onChangeText={setSanctionedLoad}
+                  keyboardType="decimal-pad"
+                  placeholder="e.g. 5"
+                />
+              </View>
+              <View style={styles.formCol}>
+                <Text style={styles.label}>Tariff Rate (₹/kWh)</Text>
+                <TextInput
+                  style={[styles.input, { backgroundColor: '#f1f5f9' }]}
+                  value={String(tariff)}
+                  editable={false}
+                />
+              </View>
+            </View>
+          </View>
+
+          {/* SECTION 3: SYSTEM SIZING & HARDWARE */}
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <Text style={styles.cardTitle}>3. System Capacity & Hardware</Text>
               <Text style={styles.cardSubtitle}>Configure technical capacity & components</Text>
             </View>
 
@@ -401,7 +557,7 @@ export const QuotationBuilderModal: React.FC<QuotationBuilderModalProps> = ({
               placeholder="Module Make & Wattage"
             />
 
-            <Text style={styles.label}>On-Grid Inverter Make</Text>
+            <Text style={styles.label}>Solar Inverter Make</Text>
             <TextInput
               style={styles.input}
               value={inverterBrand}
@@ -416,6 +572,37 @@ export const QuotationBuilderModal: React.FC<QuotationBuilderModalProps> = ({
               onChangeText={setStructureType}
               placeholder="Elevated GI / Tin Shed / 10ft High"
             />
+
+            {/* BATTERY INPUTS IF HYBRID */}
+            {isHybrid && (
+              <View style={{ marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: '#f1f5f9' }}>
+                <Text style={[styles.label, { color: '#b45309', fontWeight: '800' }]}>
+                  ⚡ Battery Storage Sizing (Hybrid Mode)
+                </Text>
+                <View style={styles.formRow}>
+                  <View style={styles.formCol}>
+                    <Text style={styles.label}>Storage Capacity (kWh)</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={batteryCapacity}
+                      onChangeText={setBatteryCapacity}
+                      keyboardType="decimal-pad"
+                      placeholder="e.g. 5"
+                    />
+                  </View>
+                  <View style={styles.formCol}>
+                    <Text style={styles.label}>Backup Load (Watts)</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={backupLoadWatts}
+                      onChangeText={setBackupLoadWatts}
+                      keyboardType="numeric"
+                      placeholder="e.g. 3000"
+                    />
+                  </View>
+                </View>
+              </View>
+            )}
           </View>
 
           {/* SECTION 2: SOLAR SYSTEM COST (ALL GST INCLUDED) */}
@@ -1078,5 +1265,37 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
     color: '#2563eb',
+  },
+  templateGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 4,
+  },
+  templateCard: {
+    width: '48.5%',
+    backgroundColor: '#f8fafc',
+    borderWidth: 1.5,
+    borderColor: '#e2e8f0',
+    borderRadius: 8,
+    padding: 10,
+  },
+  templateCardActive: {
+    backgroundColor: '#eff6ff',
+    borderColor: '#0284c7',
+  },
+  templateCardTitle: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#334155',
+    marginBottom: 2,
+  },
+  templateCardTitleActive: {
+    color: '#0284c7',
+  },
+  templateCardDesc: {
+    fontSize: 8.5,
+    color: '#64748b',
+    lineHeight: 12,
   },
 });

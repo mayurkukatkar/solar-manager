@@ -46,6 +46,7 @@ model Tenant {
   customers      Customer[]
   siteSurveys    SiteSurvey[]
   quotations     Quotation[]
+  proposalTemplates ProposalTemplate[]
 
   purchaseOrders     PurchaseOrder[]
   stockLedgers       StockLedger[]
@@ -371,11 +372,84 @@ model Quotation {
   rejectedAt DateTime?
   viewCount  Int       @default(0)
 
+  // Proposal Template & Custom Dynamic Sections
+  templateId         String?
+  template           ProposalTemplate? @relation(fields: [templateId], references: [id])
+  templateType       String?           @default("RESIDENTIAL_PROPOSAL") // QUICK_QUOTE, RESIDENTIAL_PROPOSAL, COMMERCIAL_EPC, HYBRID_OFFGRID, CUSTOM
+  sectionsConfig     Json?             // Array of enabled sections, order, custom headings
+  designConfig       Json?             // Custom brand colors, font, cover layout
+
+  // Hybrid & Battery Details
+  batteryBrand       String?
+  batteryModel       String?
+  batteryCapacity    Float?            // in kWh
+  batteryQuantity    Int?
+  batteryWarranty    String?
+  backupLoadWatts    Float?
+
+  // Utility Bill & Site Details
+  consumerNumber     String?
+  discom             String?
+  billingUnit        String?
+  sanctionedLoad     Float?
+  tariffRate         Float?
+  monthlyBill        Float?
+  monthlyUnits       Float?
+  billDocumentUrl    String?
+  roofAreaSqFt       Float?
+
+  // Financial & Commercial Extras
+  financingDetails   Json?             // EMI, tenure, interest rate, down payment
+  commercialAnalysis Json?             // Accelerated depreciation, tax savings
+
   items    QuotationItem[]
   projects Project[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model ProposalTemplate {
+  id                  String      @id @default(uuid())
+  tenantId            String
+  tenant              Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  name                String
+  code                String      // quick_quote, residential_proposal, commercial_epc, hybrid_offgrid, custom_1
+  description         String?
+  projectType         String      @default("ALL") // ALL, RESIDENTIAL, COMMERCIAL, INDUSTRIAL, HYBRID
+  isDefault           Boolean     @default(false)
+
+  // Styling & Layout
+  primaryColor        String      @default("#0284c7")
+  accentColor         String      @default("#059669")
+  fontFamily          String      @default("Inter")
+  coverLayout         String      @default("MODERN_FULL") // MODERN_FULL, MINIMALIST, SPLIT_BANNER
+  showFinancialCharts Boolean     @default(true)
+  showEquipmentImages Boolean     @default(true)
+  headerText          String?
+  footerText          String?
+  showPageNumbers     Boolean     @default(true)
+
+  // Sections configuration
+  sections            Json        // Array of { id, title, subtitle, isEnabled, order, isRequired, config }
+
+  // Presets
+  defaultScope        Json?
+  defaultWarranties   Json?
+  defaultTerms        Json?
+  defaultMilestones   Json?
+  defaultExclusions   Json?
+
+  signatoryName       String?
+  signatoryTitle      String?
+  signatureUrl        String?
+  companyStampUrl     String?
+
+  quotations          Quotation[]
+
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
 }
 
 model QuotationItem {

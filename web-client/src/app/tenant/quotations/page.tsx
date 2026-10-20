@@ -13,6 +13,7 @@ import {
 import Link from 'next/link';
 import { QuotationWizardModal } from '@/components/quotations/QuotationWizardModal';
 import { QuotationDetailModal } from '@/components/quotations/QuotationDetailModal';
+import { TemplateDesignerModal } from '@/components/quotations/TemplateDesignerModal';
 import { QuotationPDF, QuotationData, mapQuotationToPdfData, generatePDF } from '@/components/pdf/QuotationPDF';
 import { StandardQuotationPDF } from '@/components/pdf/MsedclFormsPDF';
 
@@ -38,6 +39,8 @@ export default function QuotationsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('ALL');
   const [selectedCustomerId, setSelectedCustomerId] = useState('');
+  const [selectedCapacityFilter, setSelectedCapacityFilter] = useState('ALL');
+  const [selectedTypeFilter, setSelectedTypeFilter] = useState('ALL');
 
   // DATA LISTS FOR CREATION & INTERCONNECTIVITY
   const [leads, setLeads] = useState<any[]>([]);
@@ -50,6 +53,7 @@ export default function QuotationsPage() {
 
   // MODALS
   const [showWizard, setShowWizard] = useState(false);
+  const [showTemplateDesigner, setShowTemplateDesigner] = useState(false);
   const [selectedQuoteForDetail, setSelectedQuoteForDetail] = useState<any>(null);
   const [detailModalInitialTab, setDetailModalInitialTab] = useState<'overview' | 'preview' | 'milestones' | 'revisions'>('overview');
 
@@ -327,6 +331,24 @@ export default function QuotationsPage() {
     }
   };
 
+  // DUPLICATE QUOTATION HANDLER
+  const handleDuplicateQuotation = async (quote: any, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      setLoading(true);
+      const res = await axios.post(
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/quotations/${quote.id}/duplicate`,
+        {},
+        { withCredentials: true }
+      );
+      fetchData();
+    } catch (err: any) {
+      alert('Failed to duplicate quotation: ' + (err.response?.data?.error || err.message));
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // VIEW A4 PROPOSAL DOCUMENT / DOWNLOAD
   const handleOpenPreviewPdf = (quote: any, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
@@ -374,6 +396,21 @@ export default function QuotationsPage() {
     { id: 'EXPIRED', label: 'Expired', count: quotations.filter(q => q.status === 'EXPIRED').length }
   ], [quotations]);
 
+  // FILTERED QUOTATIONS
+  const filteredQuotations = useMemo(() => {
+    return quotations.filter(q => {
+      const cap = q.systemCapacity || 5;
+      if (selectedCapacityFilter === 'LT3' && cap > 3) return false;
+      if (selectedCapacityFilter === '3TO5' && (cap < 3 || cap > 5)) return false;
+      if (selectedCapacityFilter === '5TO10' && (cap < 5 || cap > 10)) return false;
+      if (selectedCapacityFilter === 'GT10' && cap <= 10) return false;
+
+      if (selectedTypeFilter !== 'ALL' && (q.systemType || 'On-grid') !== selectedTypeFilter) return false;
+
+      return true;
+    });
+  }, [quotations, selectedCapacityFilter, selectedTypeFilter]);
+
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12">
       
@@ -387,17 +424,26 @@ export default function QuotationsPage() {
             <h1 className="text-2xl font-black tracking-tight text-slate-900">Quotations & Proposals</h1>
           </div>
           <p className="text-xs text-slate-500 mt-1">
-            WhereReady Solar OS quotation engine for rooftop EPC vendors in Maharashtra. Configure systems, build pricing, and convert into projects.
+            WhereReady Solar OS dynamic proposal & quotation builder for rooftop EPC vendors in India.
           </p>
         </div>
 
-        <button 
-          type="button"
-          onClick={() => setShowWizard(true)}
-          className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-2xl font-bold text-xs transition-all flex items-center justify-center gap-2 shadow-sm hover:shadow-md cursor-pointer"
-        >
-          <Plus size={16} /> New Quotation
-        </button>
+        <div className="flex items-center gap-2.5">
+          <button 
+            type="button"
+            onClick={() => setShowTemplateDesigner(true)}
+            className="bg-white hover:bg-slate-50 text-slate-800 border border-slate-300 px-4 py-2.5 rounded-2xl font-bold text-xs transition-all flex items-center justify-center gap-2 shadow-sm cursor-pointer"
+          >
+            <Sparkles size={15} className="text-amber-500" /> Template Designer
+          </button>
+          <button 
+            type="button"
+            onClick={() => setShowWizard(true)}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-2xl font-bold text-xs transition-all flex items-center justify-center gap-2 shadow-sm hover:shadow-md cursor-pointer"
+          >
+            <Plus size={16} /> New Quotation
+          </button>
+        </div>
       </div>
 
       {/* DASHBOARD METRICS CARDS */}
@@ -475,12 +521,35 @@ export default function QuotationsPage() {
           <select
             value={selectedCustomerId}
             onChange={e => setSelectedCustomerId(e.target.value)}
-            className="w-full sm:w-64 px-4 py-2.5 rounded-2xl border border-slate-200 text-xs font-semibold bg-white outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
+            className="w-full sm:w-56 px-4 py-2.5 rounded-2xl border border-slate-200 text-xs font-semibold bg-white outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
           >
             <option value="">All Customers</option>
             {customers.map(c => (
               <option key={c.id} value={c.id}>{c.name}</option>
             ))}
+          </select>
+
+          <select
+            value={selectedCapacityFilter}
+            onChange={e => setSelectedCapacityFilter(e.target.value)}
+            className="w-full sm:w-44 px-3 py-2.5 rounded-2xl border border-slate-200 text-xs font-semibold bg-white outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
+          >
+            <option value="ALL">All Capacities</option>
+            <option value="LT3">&lt;= 3 kWp (Surya Ghar)</option>
+            <option value="3TO5">3 to 5 kWp</option>
+            <option value="5TO10">5 to 10 kWp</option>
+            <option value="GT10">&gt; 10 kWp (C&amp;I)</option>
+          </select>
+
+          <select
+            value={selectedTypeFilter}
+            onChange={e => setSelectedTypeFilter(e.target.value)}
+            className="w-full sm:w-44 px-3 py-2.5 rounded-2xl border border-slate-200 text-xs font-semibold bg-white outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
+          >
+            <option value="ALL">All Configurations</option>
+            <option value="On-grid">On-grid</option>
+            <option value="Hybrid">Hybrid</option>
+            <option value="Off-grid">Off-grid</option>
           </select>
 
           <button
@@ -557,7 +626,7 @@ export default function QuotationsPage() {
                   </td>
                 </tr>
               ) : (
-                quotations.map(quote => {
+                filteredQuotations.map(quote => {
                   const client = quote.customer || quote.lead;
                   const isDeleting = deletingQuoteId === quote.id;
 
@@ -668,7 +737,7 @@ export default function QuotationsPage() {
                           {/* ACTION 1: DIRECT DOWNLOAD A4 PROPOSAL PDF */}
                           <button
                             type="button"
-                            title="Download Full Proposal PDF (18 Pages)"
+                            title="Download Full Proposal PDF"
                             disabled={downloadingQuoteId === quote.id}
                             onClick={(e) => handleDirectDownloadPdf(quote, e)}
                             className="p-2 text-slate-400 hover:text-emerald-600 rounded-xl hover:bg-emerald-50 transition-colors cursor-pointer disabled:opacity-50"
@@ -680,7 +749,17 @@ export default function QuotationsPage() {
                             )}
                           </button>
 
-                          {/* ACTION 2: WHATSAPP SHARE MODAL */}
+                          {/* ACTION 2: DUPLICATE QUOTATION */}
+                          <button
+                            type="button"
+                            title="Duplicate Quotation as New Draft"
+                            onClick={(e) => handleDuplicateQuotation(quote, e)}
+                            className="p-2 text-slate-400 hover:text-blue-600 rounded-xl hover:bg-blue-50 transition-colors cursor-pointer"
+                          >
+                            <Copy size={16} />
+                          </button>
+
+                          {/* ACTION 3: WHATSAPP SHARE MODAL */}
                           <button
                             type="button"
                             title="Share Proposal on WhatsApp"
@@ -690,7 +769,7 @@ export default function QuotationsPage() {
                             <MessageSquare size={16} />
                           </button>
 
-                          {/* ACTION 3: DELETE QUOTATION */}
+                          {/* ACTION 4: DELETE QUOTATION */}
                           {(!quote.projects || quote.projects.length === 0) && (
                             <button
                               type="button"
@@ -703,7 +782,7 @@ export default function QuotationsPage() {
                             </button>
                           )}
 
-                          {/* ACTION 4: VIEW DETAILS */}
+                          {/* ACTION 5: VIEW DETAILS */}
                           <button
                             type="button"
                             title="View Proposal 360° Details"
@@ -723,7 +802,7 @@ export default function QuotationsPage() {
         </div>
       </div>
 
-      {/* 5-STEP GUIDED CREATION WIZARD */}
+      {/* 6-STEP GUIDED PROPOSAL BUILDER WIZARD */}
       <QuotationWizardModal
         isOpen={showWizard}
         onClose={() => {
@@ -738,8 +817,17 @@ export default function QuotationsPage() {
         customers={customers}
         products={products}
         surveys={surveys}
+        tenantInfo={tenantInfo}
         preselectedLeadId={preselectedLeadId}
         preselectedCustomerId={preselectedCustomerId}
+      />
+
+      {/* TEMPLATE DESIGNER & BRANDING MODAL */}
+      <TemplateDesignerModal
+        isOpen={showTemplateDesigner}
+        onClose={() => setShowTemplateDesigner(false)}
+        tenantInfo={tenantInfo}
+        onTemplateSaved={fetchData}
       />
 
       {/* QUOTATION DETAIL & ACTION MODAL */}

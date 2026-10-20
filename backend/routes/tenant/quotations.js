@@ -3,64 +3,36 @@ const router = express.Router();
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 const { requireTenantAuth } = require('../../middleware/auth');
+const solarCalc = require('../../services/solarCalculator');
 
-// Utility: Calculate solar generation and economics for Maharashtra
-function calculateSolarMetrics({ capacity, totalCost, connectionType = 'Residential' }) {
+// Utility: Calculate solar generation and economics using Centralized Calculation Engine
+function calculateSolarMetrics({ capacity, totalCost, connectionType = 'Residential', gridTariff, monthlyBill }) {
   const cap = Number(capacity) || 5;
-  // Maharashtra average: ~4.0 to 4.1 kWh per kWp per day -> ~1,460 to 1,500 kWh per kWp per year
-  const annualGeneration = Math.round(cap * 1460);
-  const lifetimeGeneration = Math.round(annualGeneration * 25 * 0.92); // Accounting for 0.7% annual degradation
-
-  // MSEDCL Average Domestic Tariff: ~₹8.5/unit, C&I: ~₹10.5/unit
-  const unitTariff = connectionType === 'Residential' ? 8.5 : 10.5;
-  const annualSavings = Math.round(annualGeneration * unitTariff);
-  const monthlySavings = Math.round(annualSavings / 12);
-  const lifetimeSavings = Math.round(lifetimeGeneration * unitTariff);
-
-  // Payback period
-  const cost = Number(totalCost) || (cap * 60000);
-  const paybackYears = annualSavings > 0 ? Number((cost / annualSavings).toFixed(1)) : 4.5;
-
-  // Environmental: 0.82 kg CO2 per kWh in Indian grid
-  const co2ReductionKg = Math.round(annualGeneration * 0.82);
-  const treeEquivalent = Math.round(co2ReductionKg / 20); // 1 tree absorbs ~20kg CO2/yr
-
-  // Indicative Central Subsidy (PM Surya Ghar Muft Bijli Yojana - Residential only)
-  let indicativeSubsidy = 0;
-  if (connectionType === 'Residential') {
-    if (cap <= 1) indicativeSubsidy = 30000;
-    else if (cap <= 2) indicativeSubsidy = 60000;
-    else indicativeSubsidy = 78000; // Cap at 78,000 for 3kW and above
-  }
-
-  // Monthly generation distribution (standard Maharashtra solar irradiance curve)
-  const monthlyDistribution = [
-    { month: 'January', generation: Math.round(annualGeneration * 0.082) },
-    { month: 'February', generation: Math.round(annualGeneration * 0.088) },
-    { month: 'March', generation: Math.round(annualGeneration * 0.098) },
-    { month: 'April', generation: Math.round(annualGeneration * 0.102) },
-    { month: 'May', generation: Math.round(annualGeneration * 0.106) }, // Peak month
-    { month: 'June', generation: Math.round(annualGeneration * 0.072) },
-    { month: 'July', generation: Math.round(annualGeneration * 0.061) }, // Monsoon low
-    { month: 'August', generation: Math.round(annualGeneration * 0.064) },
-    { month: 'September', generation: Math.round(annualGeneration * 0.076) },
-    { month: 'October', generation: Math.round(annualGeneration * 0.086) },
-    { month: 'November', generation: Math.round(annualGeneration * 0.084) },
-    { month: 'December', generation: Math.round(annualGeneration * 0.081) },
-  ];
+  const genData = solarCalc.calculateSolarGeneration({ capacityKw: cap });
+  const subsidyData = solarCalc.calculateIndicativeSubsidy({ capacityKw: cap, connectionType });
+  const roiData = solarCalc.calculateFinancialROI({
+    capacityKw: cap,
+    totalInvestment: totalCost,
+    connectionType,
+    currentMonthlyBill: monthlyBill,
+    gridTariff,
+    indicativeSubsidy: subsidyData.indicativeSubsidy
+  });
 
   return {
-    annualGeneration,
-    lifetimeGeneration,
-    annualSavings,
-    monthlySavings,
-    lifetimeSavings,
-    paybackYears,
-    co2ReductionKg,
-    treeEquivalent,
-    indicativeSubsidy,
-    monthlyDistribution,
-    peakMonth: 'May'
+    annualGeneration: genData.annualGeneration,
+    lifetimeGeneration: genData.lifetimeGeneration,
+    annualSavings: roiData.annualSavings,
+    monthlySavings: roiData.monthlySavings,
+    lifetimeSavings: roiData.lifetimeSavings,
+    paybackYears: roiData.paybackYears,
+    co2ReductionKg: genData.co2ReductionKg,
+    treeEquivalent: genData.treeEquivalent,
+    indicativeSubsidy: subsidyData.indicativeSubsidy,
+    monthlyDistribution: genData.monthlyDistribution,
+    financialProjections: roiData.financialProjections,
+    commercialTaxBenefit: roiData.commercialTaxBenefit,
+    peakMonth: genData.peakMonth
   };
 }
 
@@ -103,7 +75,8 @@ router.get('/api/tenant/quotations', requireTenantAuth, async (req, res) => {
           customer: true,
           lead: true,
           items: { include: { product: true } },
-          projects: true
+          projects: true,
+          template: true
         },
         orderBy: { createdAt: 'desc' }
       }),
@@ -188,7 +161,8 @@ router.get('/api/tenant/quotations/:id', requireTenantAuth, async (req, res) => 
           customer: true,
           lead: true,
           items: { include: { product: true } },
-          projects: true
+          projects: true,
+          template: true
         }
       }),
       prisma.tenant.findUnique({
@@ -230,6 +204,10 @@ router.post('/api/tenant/quotations', requireTenantAuth, async (req, res) => {
       customerId,
       leadId,
       newCustomer,
+      templateId,
+      templateType = 'RESIDENTIAL_PROPOSAL',
+      sectionsConfig,
+      designConfig,
       systemCapacity = 5.0,
       systemType = 'On-grid',
       connectionType = 'Residential',
@@ -247,6 +225,23 @@ router.post('/api/tenant/quotations', requireTenantAuth, async (req, res) => {
       inverterWarranty = '10 Years Replacement',
       structureBrand = 'Galvanized HDG High Rise',
       structureWarranty = '10 Years Structural',
+      batteryBrand,
+      batteryModel,
+      batteryCapacity,
+      batteryQuantity,
+      batteryWarranty,
+      backupLoadWatts,
+      consumerNumber,
+      discom,
+      billingUnit,
+      sanctionedLoad,
+      tariffRate,
+      monthlyBill,
+      monthlyUnits,
+      billDocumentUrl,
+      roofAreaSqFt,
+      financingDetails,
+      commercialAnalysis,
       items = [],
       subtotal = 0,
       tax = 0,
@@ -285,18 +280,52 @@ router.post('/api/tenant/quotations', requireTenantAuth, async (req, res) => {
       targetCustomerId = createdCustomer.id;
     }
 
-    // Auto calculate solar generation & financial ROI with all-inclusive GST pricing
-    let totalPayable = req.body.totalSystemCost || req.body.total;
+    // Auto calculate line pricing using Centralized Pricing Engine
     let finalSubtotal = Number(subtotal);
     let finalTax = Number(tax);
     let finalDiscount = Number(discount);
+    let totalPayable = req.body.totalSystemCost || req.body.total;
+    let lineItemsToCreate = [];
 
-    if (totalPayable) {
+    if (items && Array.isArray(items) && items.length > 0) {
+      const pricingResult = solarCalc.calculateCommercialPricing({
+        items,
+        overallDiscount: discount,
+        useCompositeSolarGST: req.body.useCompositeSolarGST || false
+      });
+      finalSubtotal = pricingResult.subtotal;
+      finalTax = pricingResult.tax;
+      finalDiscount = pricingResult.discount;
+      totalPayable = pricingResult.grandTotal;
+      lineItemsToCreate = pricingResult.items.map(it => ({
+        productId: it.productId || null,
+        description: it.description,
+        quantity: it.quantity,
+        unitPrice: it.unitPrice,
+        taxRate: it.taxRate,
+        total: it.total
+      }));
+    } else if (totalPayable) {
       totalPayable = Number(totalPayable);
-      // All-inclusive GST calculation: 13.8% composite solar GST (70% material @ 12% + 30% service @ 18%)
       finalSubtotal = Math.round(totalPayable / 1.138);
       finalTax = totalPayable - finalSubtotal;
       finalDiscount = 0;
+      lineItemsToCreate = [
+        {
+          description: `${systemCapacity} kWp Solar PV Power Plant Equipment (Modules, Inverter, Structure, Cables)`,
+          quantity: 1,
+          unitPrice: Math.round(Number(finalSubtotal) * 0.75),
+          taxRate: 12.0,
+          total: Math.round(Number(finalSubtotal) * 0.75)
+        },
+        {
+          description: 'Comprehensive Installation, Testing, Liasoning & Commissioning Services',
+          quantity: 1,
+          unitPrice: finalSubtotal - Math.round(Number(finalSubtotal) * 0.75),
+          taxRate: 18.0,
+          total: finalSubtotal - Math.round(Number(finalSubtotal) * 0.75)
+        }
+      ];
     } else {
       totalPayable = finalSubtotal + finalTax - finalDiscount;
     }
@@ -304,23 +333,20 @@ router.post('/api/tenant/quotations', requireTenantAuth, async (req, res) => {
     const solarMetrics = calculateSolarMetrics({
       capacity: systemCapacity,
       totalCost: totalPayable,
-      connectionType
+      connectionType,
+      gridTariff: tariffRate,
+      monthlyBill
     });
 
     const qNumber = `QT-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}-${Math.floor(1000 + Math.random() * 9000)}`;
 
-    // Default Milestone Schedule if not supplied
-    const defaultMilestones = paymentMilestones || [
-      { percentage: 20, amount: Math.round(totalPayable * 0.2), description: 'Advance booking along with signed work order' },
-      { percentage: 60, amount: Math.round(totalPayable * 0.6), description: 'Upon dispatch & delivery of modules, inverter and structure at site' },
-      { percentage: 15, amount: Math.round(totalPayable * 0.15), description: 'Upon completion of mechanical & electrical installation' },
-      { percentage: 5, amount: Math.round(totalPayable * 0.05), description: 'Upon MSEDCL Net Metering commissioning & project handover' }
-    ];
+    // Milestone schedule
+    const calculatedMilestones = solarCalc.generateMilestones(totalPayable, paymentMilestones);
 
     // Default Scope of Supply
     const defaultScope = scopeOfSupply || [
       `${systemCapacity} kWp Tier-1 Solar PV Modules (${panelBrand} ${panelWattage}Wp)`,
-      `${systemCapacity} kW High-Efficiency On-Grid Inverter (${inverterBrand})`,
+      `${systemCapacity} kW High-Efficiency Inverter (${inverterBrand})`,
       'Hot-Dip Galvanized / Anodized Aluminum Mounting Structure with SS304 Fasteners',
       'Solar Grade DC Cables (Polycab/LAPP 4 sq.mm) with UV Protection Conduits',
       'AC Distribution Box (ACDB) and DC Distribution Box (DCDB) with Type-II SPDs',
@@ -353,37 +379,6 @@ router.post('/api/tenant/quotations', requireTenantAuth, async (req, res) => {
       'Additional AC cable cabling exceeding 25 meters from inverter to LT distribution board.'
     ];
 
-    // Build line items
-    let lineItemsToCreate = [];
-    if (items && items.length > 0) {
-      lineItemsToCreate = items.map(item => ({
-        productId: item.productId || null,
-        description: item.description || 'Solar Equipment / Service',
-        quantity: Number(item.quantity) || 1,
-        unitPrice: Number(item.unitPrice) || 0,
-        taxRate: Number(item.taxRate) || 0,
-        total: Number(item.total) || (Number(item.quantity) * Number(item.unitPrice))
-      }));
-    } else {
-      // Default line items
-      lineItemsToCreate = [
-        {
-          description: `${systemCapacity} kWp Solar PV Power Plant Equipment (Modules, Inverter, Structure, Cables)`,
-          quantity: 1,
-          unitPrice: Math.round(Number(finalSubtotal) * 0.75),
-          taxRate: 12.0,
-          total: Math.round(Number(finalSubtotal) * 0.75)
-        },
-        {
-          description: 'Comprehensive Installation, Testing, Liasoning & Commissioning Services',
-          quantity: 1,
-          unitPrice: finalSubtotal - Math.round(Number(finalSubtotal) * 0.75),
-          taxRate: 18.0,
-          total: finalSubtotal - Math.round(Number(finalSubtotal) * 0.75)
-        }
-      ];
-    }
-
     const quotation = await prisma.quotation.create({
       data: {
         tenantId,
@@ -398,6 +393,12 @@ router.post('/api/tenant/quotations', requireTenantAuth, async (req, res) => {
         total: totalPayable,
         status: req.body.status || 'SENT',
         sentAt: (req.body.status === 'DRAFT') ? null : new Date(),
+
+        // Template and Layout bindings
+        templateId: templateId || null,
+        templateType: templateType || 'RESIDENTIAL_PROPOSAL',
+        sectionsConfig: sectionsConfig || null,
+        designConfig: designConfig || null,
 
         // System Configuration
         systemCapacity: Number(systemCapacity),
@@ -418,6 +419,25 @@ router.post('/api/tenant/quotations', requireTenantAuth, async (req, res) => {
         structureBrand,
         structureWarranty,
 
+        // Hybrid & Battery Specs
+        batteryBrand: batteryBrand || null,
+        batteryModel: batteryModel || null,
+        batteryCapacity: batteryCapacity ? Number(batteryCapacity) : null,
+        batteryQuantity: batteryQuantity ? Number(batteryQuantity) : null,
+        batteryWarranty: batteryWarranty || null,
+        backupLoadWatts: backupLoadWatts ? Number(backupLoadWatts) : null,
+
+        // Utility Bill & Site Data
+        consumerNumber: consumerNumber || null,
+        discom: discom || null,
+        billingUnit: billingUnit || null,
+        sanctionedLoad: sanctionedLoad ? Number(sanctionedLoad) : null,
+        tariffRate: tariffRate ? Number(tariffRate) : null,
+        monthlyBill: monthlyBill ? Number(monthlyBill) : null,
+        monthlyUnits: monthlyUnits ? Number(monthlyUnits) : null,
+        billDocumentUrl: billDocumentUrl || null,
+        roofAreaSqFt: roofAreaSqFt ? Number(roofAreaSqFt) : Math.round(Number(systemCapacity || 5) * 65),
+
         // Financial & Solar Metrics
         annualGeneration: solarMetrics.annualGeneration,
         lifetimeGeneration: solarMetrics.lifetimeGeneration,
@@ -431,12 +451,14 @@ router.post('/api/tenant/quotations', requireTenantAuth, async (req, res) => {
         netCustomerCost: Math.max(0, totalPayable - solarMetrics.indicativeSubsidy),
 
         // Structured JSON Fields
-        paymentMilestones: defaultMilestones,
+        paymentMilestones: calculatedMilestones,
         scopeOfSupply: defaultScope,
         warranties: defaultWarranties,
         termsAndConditions: defaultTerms,
         exclusions: defaultExclusions,
         bankDetails: bankDetails || null,
+        financingDetails: financingDetails || null,
+        commercialAnalysis: commercialAnalysis || null,
 
         version: 1,
         isLocked: false,
@@ -449,7 +471,8 @@ router.post('/api/tenant/quotations', requireTenantAuth, async (req, res) => {
       include: {
         customer: true,
         lead: true,
-        items: true
+        items: { include: { product: true } },
+        template: true
       }
     });
 
@@ -497,12 +520,15 @@ router.patch('/api/tenant/quotations/:id', requireTenantAuth, async (req, res) =
     if (!existingQuote) {
       return res.status(404).json({ error: 'Quotation not found' });
     }
-
     const {
       status,
       subtotal,
       tax,
       discount,
+      templateId,
+      templateType,
+      sectionsConfig,
+      designConfig,
       systemCapacity,
       systemType,
       connectionType,
@@ -520,6 +546,23 @@ router.patch('/api/tenant/quotations/:id', requireTenantAuth, async (req, res) =
       inverterWarranty,
       structureBrand,
       structureWarranty,
+      batteryBrand,
+      batteryModel,
+      batteryCapacity,
+      batteryQuantity,
+      batteryWarranty,
+      backupLoadWatts,
+      consumerNumber,
+      discom,
+      billingUnit,
+      sanctionedLoad,
+      tariffRate,
+      monthlyBill,
+      monthlyUnits,
+      billDocumentUrl,
+      roofAreaSqFt,
+      financingDetails,
+      commercialAnalysis,
       validityDays,
       paymentMilestones,
       scopeOfSupply,
@@ -546,7 +589,14 @@ router.patch('/api/tenant/quotations/:id', requireTenantAuth, async (req, res) =
 
       const updated = await prisma.quotation.update({
         where: { id, tenantId },
-        data: updateData
+        data: updateData,
+        include: {
+          customer: true,
+          lead: true,
+          items: { include: { product: true } },
+          projects: true,
+          template: true
+        }
       });
 
       if (existingQuote.leadId) {
@@ -582,6 +632,7 @@ router.patch('/api/tenant/quotations/:id', requireTenantAuth, async (req, res) =
           discount: existingQuote.discount,
           systemCapacity: existingQuote.systemCapacity,
           status: existingQuote.status,
+          templateType: existingQuote.templateType,
           items: existingQuote.items
         }
       });
@@ -589,10 +640,22 @@ router.patch('/api/tenant/quotations/:id', requireTenantAuth, async (req, res) =
     }
 
     // Recalculate totals and solar metrics if capacity or costs changed
-    const newSubtotal = subtotal !== undefined ? Number(subtotal) : existingQuote.subtotal;
-    const newTax = tax !== undefined ? Number(tax) : existingQuote.tax;
-    const newDiscount = discount !== undefined ? Number(discount) : existingQuote.discount;
-    const newTotal = newSubtotal + newTax - newDiscount;
+    let newSubtotal = subtotal !== undefined ? Number(subtotal) : existingQuote.subtotal;
+    let newTax = tax !== undefined ? Number(tax) : existingQuote.tax;
+    let newDiscount = discount !== undefined ? Number(discount) : existingQuote.discount;
+    let newTotal = newSubtotal + newTax - newDiscount;
+
+    if (items && Array.isArray(items) && items.length > 0) {
+      const pricingResult = solarCalc.calculateCommercialPricing({
+        items,
+        overallDiscount: newDiscount,
+        useCompositeSolarGST: req.body.useCompositeSolarGST || false
+      });
+      newSubtotal = pricingResult.subtotal;
+      newTax = pricingResult.tax;
+      newDiscount = pricingResult.discount;
+      newTotal = pricingResult.grandTotal;
+    }
 
     const newCap = systemCapacity !== undefined ? Number(systemCapacity) : (existingQuote.systemCapacity || 5.0);
     const newConn = connectionType || existingQuote.connectionType || 'Residential';
@@ -600,8 +663,14 @@ router.patch('/api/tenant/quotations/:id', requireTenantAuth, async (req, res) =
     const solarMetrics = calculateSolarMetrics({
       capacity: newCap,
       totalCost: newTotal,
-      connectionType: newConn
+      connectionType: newConn,
+      gridTariff: tariffRate !== undefined ? tariffRate : existingQuote.tariffRate,
+      monthlyBill: monthlyBill !== undefined ? monthlyBill : existingQuote.monthlyBill
     });
+
+    const calculatedMilestones = paymentMilestones !== undefined 
+      ? solarCalc.generateMilestones(newTotal, paymentMilestones)
+      : (existingQuote.paymentMilestones ? solarCalc.generateMilestones(newTotal, existingQuote.paymentMilestones) : null);
 
     const updateData = {
       subtotal: newSubtotal,
@@ -610,6 +679,10 @@ router.patch('/api/tenant/quotations/:id', requireTenantAuth, async (req, res) =
       total: newTotal,
       version: nextVersion,
       revisionHistory,
+      templateId: templateId !== undefined ? templateId : existingQuote.templateId,
+      templateType: templateType || existingQuote.templateType,
+      sectionsConfig: sectionsConfig !== undefined ? sectionsConfig : existingQuote.sectionsConfig,
+      designConfig: designConfig !== undefined ? designConfig : existingQuote.designConfig,
       systemCapacity: newCap,
       systemType: systemType || existingQuote.systemType,
       connectionType: newConn,
@@ -627,6 +700,21 @@ router.patch('/api/tenant/quotations/:id', requireTenantAuth, async (req, res) =
       inverterWarranty: inverterWarranty || existingQuote.inverterWarranty,
       structureBrand: structureBrand || existingQuote.structureBrand,
       structureWarranty: structureWarranty || existingQuote.structureWarranty,
+      batteryBrand: batteryBrand !== undefined ? batteryBrand : existingQuote.batteryBrand,
+      batteryModel: batteryModel !== undefined ? batteryModel : existingQuote.batteryModel,
+      batteryCapacity: batteryCapacity !== undefined ? Number(batteryCapacity) : existingQuote.batteryCapacity,
+      batteryQuantity: batteryQuantity !== undefined ? Number(batteryQuantity) : existingQuote.batteryQuantity,
+      batteryWarranty: batteryWarranty !== undefined ? batteryWarranty : existingQuote.batteryWarranty,
+      backupLoadWatts: backupLoadWatts !== undefined ? Number(backupLoadWatts) : existingQuote.backupLoadWatts,
+      consumerNumber: consumerNumber !== undefined ? consumerNumber : existingQuote.consumerNumber,
+      discom: discom !== undefined ? discom : existingQuote.discom,
+      billingUnit: billingUnit !== undefined ? billingUnit : existingQuote.billingUnit,
+      sanctionedLoad: sanctionedLoad !== undefined ? Number(sanctionedLoad) : existingQuote.sanctionedLoad,
+      tariffRate: tariffRate !== undefined ? Number(tariffRate) : existingQuote.tariffRate,
+      monthlyBill: monthlyBill !== undefined ? Number(monthlyBill) : existingQuote.monthlyBill,
+      monthlyUnits: monthlyUnits !== undefined ? Number(monthlyUnits) : existingQuote.monthlyUnits,
+      billDocumentUrl: billDocumentUrl !== undefined ? billDocumentUrl : existingQuote.billDocumentUrl,
+      roofAreaSqFt: roofAreaSqFt !== undefined ? Number(roofAreaSqFt) : existingQuote.roofAreaSqFt,
       validityDays: validityDays !== undefined ? Number(validityDays) : existingQuote.validityDays,
 
       // Recalculated metrics
@@ -641,12 +729,14 @@ router.patch('/api/tenant/quotations/:id', requireTenantAuth, async (req, res) =
       indicativeSubsidy: solarMetrics.indicativeSubsidy,
       netCustomerCost: Math.max(0, newTotal - solarMetrics.indicativeSubsidy),
 
-      paymentMilestones: paymentMilestones || existingQuote.paymentMilestones,
+      paymentMilestones: calculatedMilestones,
       scopeOfSupply: scopeOfSupply || existingQuote.scopeOfSupply,
       warranties: warranties || existingQuote.warranties,
       termsAndConditions: termsAndConditions || existingQuote.termsAndConditions,
       exclusions: exclusions || existingQuote.exclusions,
-      bankDetails: bankDetails !== undefined ? bankDetails : existingQuote.bankDetails
+      bankDetails: bankDetails !== undefined ? bankDetails : existingQuote.bankDetails,
+      financingDetails: financingDetails !== undefined ? financingDetails : existingQuote.financingDetails,
+      commercialAnalysis: commercialAnalysis !== undefined ? commercialAnalysis : existingQuote.commercialAnalysis
     };
 
     if (status) {
@@ -679,7 +769,8 @@ router.patch('/api/tenant/quotations/:id', requireTenantAuth, async (req, res) =
         customer: true, 
         lead: true, 
         items: { include: { product: true } },
-        projects: true 
+        projects: true,
+        template: true
       }
     });
 
@@ -1129,6 +1220,136 @@ router.post('/api/tenant/quotations/:id/revision', requireTenantAuth, async (req
   } catch (error) {
     console.error('Error creating revision:', error);
     res.status(500).json({ error: 'Failed to create revision', details: error.message });
+  }
+});
+
+// ----------------------------------------------------
+// 9. DUPLICATE QUOTATION
+// ----------------------------------------------------
+router.post('/api/tenant/quotations/:id/duplicate', requireTenantAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const tenantId = req.user.tenantId;
+
+    const source = await prisma.quotation.findFirst({
+      where: { id, tenantId },
+      include: { items: true, customer: true, lead: true }
+    });
+
+    if (!source) {
+      return res.status(404).json({ error: 'Source quotation not found' });
+    }
+
+    const qNumber = `QT-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+    const duplicated = await prisma.quotation.create({
+      data: {
+        tenantId,
+        customerId: source.customerId,
+        leadId: source.leadId,
+        qNumber,
+        date: new Date(),
+        validityDays: source.validityDays,
+        subtotal: source.subtotal,
+        tax: source.tax,
+        discount: source.discount,
+        total: source.total,
+        status: 'DRAFT',
+        templateId: source.templateId,
+        templateType: source.templateType,
+        sectionsConfig: source.sectionsConfig,
+        designConfig: source.designConfig,
+        systemCapacity: source.systemCapacity,
+        systemType: source.systemType,
+        connectionType: source.connectionType,
+        phase: source.phase,
+        roofType: source.roofType,
+        panelBrand: source.panelBrand,
+        panelModel: source.panelModel,
+        panelWattage: source.panelWattage,
+        panelQuantity: source.panelQuantity,
+        panelWarranty: source.panelWarranty,
+        inverterBrand: source.inverterBrand,
+        inverterModel: source.inverterModel,
+        inverterCapacity: source.inverterCapacity,
+        inverterQuantity: source.inverterQuantity,
+        inverterWarranty: source.inverterWarranty,
+        structureBrand: source.structureBrand,
+        structureWarranty: source.structureWarranty,
+        batteryBrand: source.batteryBrand,
+        batteryModel: source.batteryModel,
+        batteryCapacity: source.batteryCapacity,
+        batteryQuantity: source.batteryQuantity,
+        batteryWarranty: source.batteryWarranty,
+        backupLoadWatts: source.backupLoadWatts,
+        consumerNumber: source.consumerNumber,
+        discom: source.discom,
+        billingUnit: source.billingUnit,
+        sanctionedLoad: source.sanctionedLoad,
+        tariffRate: source.tariffRate,
+        monthlyBill: source.monthlyBill,
+        monthlyUnits: source.monthlyUnits,
+        billDocumentUrl: source.billDocumentUrl,
+        roofAreaSqFt: source.roofAreaSqFt,
+        annualGeneration: source.annualGeneration,
+        lifetimeGeneration: source.lifetimeGeneration,
+        monthlySavings: source.monthlySavings,
+        annualSavings: source.annualSavings,
+        lifetimeSavings: source.lifetimeSavings,
+        paybackYears: source.paybackYears,
+        co2ReductionKg: source.co2ReductionKg,
+        treeEquivalent: source.treeEquivalent,
+        indicativeSubsidy: source.indicativeSubsidy,
+        netCustomerCost: source.netCustomerCost,
+        paymentMilestones: source.paymentMilestones,
+        scopeOfSupply: source.scopeOfSupply,
+        warranties: source.warranties,
+        termsAndConditions: source.termsAndConditions,
+        exclusions: source.exclusions,
+        bankDetails: source.bankDetails,
+        financingDetails: source.financingDetails,
+        commercialAnalysis: source.commercialAnalysis,
+        version: 1,
+        isLocked: false,
+        revisionHistory: [],
+        items: {
+          create: source.items.map(it => ({
+            productId: it.productId,
+            description: it.description,
+            quantity: it.quantity,
+            unitPrice: it.unitPrice,
+            taxRate: it.taxRate,
+            total: it.total
+          }))
+        }
+      },
+      include: {
+        customer: true,
+        lead: true,
+        items: { include: { product: true } },
+        template: true
+      }
+    });
+
+    if (source.leadId) {
+      await prisma.leadActivity.create({
+        data: {
+          leadId: source.leadId,
+          type: 'QUOTE_SENT',
+          description: `Duplicated proposal from ${source.qNumber} to ${duplicated.qNumber}`,
+          performedBy: req.user.id
+        }
+      }).catch(() => {});
+    }
+
+    res.status(201).json({
+      success: true,
+      message: `Quotation duplicated as ${duplicated.qNumber}`,
+      quotation: duplicated
+    });
+  } catch (error) {
+    console.error('Error duplicating quotation:', error);
+    res.status(500).json({ error: 'Failed to duplicate quotation', details: error.message });
   }
 });
 

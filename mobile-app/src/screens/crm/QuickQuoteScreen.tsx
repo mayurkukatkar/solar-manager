@@ -22,7 +22,7 @@ import {
   CheckCircle2,
   Send,
 } from 'lucide-react-native';
-import { generateQuotationHtml, sharePdfFile, printDirectly } from '../../services/pdfService';
+import { generateQuotationHtml, sharePdfFile, printDirectly, QuotationPdfProps } from '../../services/pdfService';
 import { openWhatsAppWithPitch } from '../../services/whatsappService';
 import { quotationsApi } from '../../api/endpoints';
 import { ProposalPreviewModal } from '../../components/ProposalPreviewModal';
@@ -101,57 +101,85 @@ export const QuickQuoteScreen: React.FC<{ route?: any }> = ({ route }) => {
     }
   };
 
-  const buildPdfPayload = () => ({
-    quotationNumber: syncedQuote?.qNumber || `QQ-${Date.now().toString().slice(-6)}`,
-    quotationDate: new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
-    validUntil: new Date(Date.now() + 15 * 86400000).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
-    companyName: 'SolarManager Solutions Pvt Ltd',
-    companyAddress: 'Corporate Office, Pune 411038',
-    companyPhone: '+91 98765 43210',
-    companyEmail: 'contact@solarmanager.in',
-    customerName: prospectName,
-    customerPhone: prospectPhone || '',
-    customerAddress: 'Site Location, Maharashtra',
-    systemCapacityKw: cap,
-    grossAmount: gross,
-    subsidyAmount: subsidy,
-    netPayable: net,
-    monthlyGenerationUnits: monthlyUnits,
-    annualGenerationUnits: annualUnits,
-    currentMonthlyBill: parseFloat(monthlyBill) || monthlySavings,
-    estimatedMonthlyBill: 150,
-    monthlySavings,
-    lifetimeSavings,
-    paybackYears: isNaN(paybackYears) ? 3.5 : paybackYears,
-    co2ReductionKg: Math.round(annualUnits * 0.82),
-    treeEquivalent: Math.round((annualUnits * 0.82) / 20),
-    bankDetails: {
-      accountName: 'SolarManager Solutions Pvt Ltd',
-      bankName: 'HDFC Bank',
-      accountNumber: '50200088992211',
-      ifsc: 'HDFC0001234',
-      upiId: 'solarmanager@hdfcbank',
-    },
-  });
+  const buildPdfPayload = (): QuotationPdfProps => {
+    const subtotal = Math.round(gross / 1.138);
+    const taxAmount = gross - subtotal;
+    return {
+      quotationNumber: syncedQuote?.qNumber || `QQ-${Date.now().toString().slice(-6)}`,
+      quotationDate: new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
+      validUntil: new Date(Date.now() + 15 * 86400000).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
+      templateType: 'quick_quote',
+      primaryColor: '#0284c7',
+      accentColor: '#059669',
+      companyName: 'WhereReady Solar OS',
+      companyLegalName: 'WhereReady Solar Technologies Pvt Ltd',
+      companyAddress: 'Corporate Tower, MIDC Tech Park, Pune 411038',
+      companyPhone: '+91 98220 12345',
+      companyEmail: 'proposals@wherereadysolar.com',
+      companyGstin: '27AAECW1234F1Z5',
+      customerName: prospectName,
+      customerPhone: prospectPhone || '',
+      customerAddress: initialParams.lead?.address || 'Site Location, Maharashtra',
+      consumerNumber: initialParams.lead?.consumerNumber,
+      discomName: initialParams.lead?.discomName || 'MSEDCL',
+      systemCapacityKw: cap,
+      inverterCapacityKw: cap,
+      panelBrand: 'Waaree 540W Mono PERC Bifacial',
+      panelWattage: 540,
+      panelQuantity: Math.ceil((cap * 1000) / 540),
+      panelWarranty: '25 Years Performance',
+      inverterBrand: 'Solis / Growatt On-Grid Inverter',
+      inverterWarranty: '10 Years Replacement',
+      structureType: 'Elevated HDG Structure',
+      structureWarranty: '10 Years Structural',
+      grossAmount: gross,
+      subtotal,
+      taxAmount,
+      subsidyAmount: subsidy,
+      netPayable: net,
+      discount: 0,
+      monthlyGenerationUnits: monthlyUnits,
+      annualGenerationUnits: annualUnits,
+      currentMonthlyBill: parseFloat(monthlyBill) || monthlySavings,
+      estimatedMonthlyBill: 150,
+      monthlySavings,
+      lifetimeSavings,
+      paybackYears: isNaN(paybackYears) ? 3.5 : paybackYears,
+      co2ReductionKg: Math.round(annualUnits * 0.82),
+      treeEquivalent: Math.round((annualUnits * 0.82) / 20),
+      bankDetails: {
+        accountName: 'WhereReady Solar Technologies Pvt Ltd',
+        bankName: 'HDFC Bank Ltd',
+        accountNumber: '50200088992211',
+        ifsc: 'HDFC0001234',
+        upiId: 'solar@hdfcbank',
+      },
+    };
+  };
 
   const syncToBackend = async (statusOverride = 'SENT') => {
     if (!prospectName.trim()) return null;
     try {
       setSyncing(true);
       const res = await quotationsApi.createQuotation({
-        newCustomer: {
+        leadId: initialParams.lead?.id,
+        customerId: initialParams.lead?.customerId,
+        newCustomer: (!initialParams.lead?.id && !initialParams.lead?.customerId) ? {
           name: prospectName.trim(),
           mobile: prospectPhone.trim(),
-          address: 'Site Location, Maharashtra',
-        },
+          address: initialParams.lead?.address || 'Site Location, Maharashtra',
+        } : undefined,
         customerName: prospectName.trim(),
         customerPhone: prospectPhone.trim(),
         systemCapacity: cap,
         totalSystemCost: gross,
         status: statusOverride,
+        templateType: 'quick_quote',
         panelBrand: 'Waaree 540W Mono PERC Bifacial',
         inverterBrand: 'Solis 3.3kW On-Grid Inverter',
         structureBrand: 'Elevated HDG Structure',
+        consumerNumber: initialParams.lead?.consumerNumber,
+        discom: initialParams.lead?.discomName || 'MSEDCL',
         validityDays: 15,
       });
 

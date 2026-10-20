@@ -322,6 +322,25 @@ export function QuotationDetailModal({
     }
   };
 
+  // Handle Duplicate Quotation
+  const handleDuplicateQuotation = async () => {
+    setLoadingAction('duplicate');
+    try {
+      const res = await axios.post(
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/quotations/${quotation.id}/duplicate`,
+        {},
+        { withCredentials: true }
+      );
+      alert(`Success! Quotation duplicated as ${res.data.quotation?.qNumber || 'new draft'}.`);
+      onUpdate();
+      onClose();
+    } catch (err: any) {
+      alert('Failed to duplicate quotation: ' + (err.response?.data?.error || err.message));
+    } finally {
+      setLoadingAction(null);
+    }
+  };
+
   // Guard return immediately before JSX rendering (after all React hooks have run unconditionally)
   if (!isOpen || !quotation) return null;
 
@@ -365,6 +384,14 @@ export function QuotationDetailModal({
                   className="px-3.5 py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors"
                 >
                   <Edit3 size={14} /> Edit
+                </button>
+                <button
+                  onClick={handleDuplicateQuotation}
+                  disabled={loadingAction === 'duplicate'}
+                  title="Duplicate this quotation as a new editable draft"
+                  className="px-3.5 py-2.5 bg-blue-500/20 hover:bg-blue-500/30 text-blue-200 border border-blue-400/30 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors"
+                >
+                  <Copy size={14} /> Duplicate
                 </button>
                 <button
                   onClick={() => setShowRevisionModal(true)}
