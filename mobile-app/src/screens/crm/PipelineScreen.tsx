@@ -285,9 +285,9 @@ export const PipelineScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
       {/* VENDOR BRANDED HEADER */}
       <View style={styles.header}>
         <View style={{ flex: 1 }}>
-          <Text style={styles.headerTitle}>Solar Field Command</Text>
+          <Text style={styles.headerTitle}>WhereReady Sales Pipeline</Text>
           <Text style={styles.headerSubtitle}>
-            Vendor Sales Pipeline & PM Surya Ghar Sizing
+            Solar OS Turnkey EPC Pipeline & Sizing
           </Text>
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>

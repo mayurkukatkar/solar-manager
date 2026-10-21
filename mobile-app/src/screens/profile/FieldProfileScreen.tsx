@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Alert,
   Linking,
+  Image,
 } from 'react-native';
 import {
   User,
@@ -73,29 +74,31 @@ export const FieldProfileScreen: React.FC<{ navigation?: any }> = ({ navigation 
     <View style={styles.container}>
       {/* HEADER */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Vendor Command Center</Text>
-        <Text style={styles.headerSubtitle}>EPC Business Pulse, Cash Flow & Offline Sync</Text>
+        <Text style={styles.headerTitle}>WhereReady Command Center</Text>
+        <Text style={styles.headerSubtitle}>Solar OS Enterprise Pulse, Cash Flow & Offline Sync</Text>
       </View>
 
       <ScrollView style={styles.body} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {/* VENDOR PROFILE CARD */}
         <View style={styles.profileCard}>
           <View style={styles.profileTop}>
-            <View style={styles.avatarCircle}>
-              <Building size={32} color="#ffffff" />
-            </View>
+            <Image
+              source={require('../../assets/app-icon.png')}
+              style={styles.avatarLogo}
+              resizeMode="cover"
+            />
             <View style={styles.profileMeta}>
-              <Text style={styles.tenantName}>{user?.tenantName || 'Shree Ganesh Solar Solutions'}</Text>
+              <Text style={styles.tenantName}>{user?.tenantName || 'WhereReady Solar Partner'}</Text>
               <Text style={styles.userName}>👤 {user?.name || 'Solar Vendor Owner'}</Text>
               <View style={styles.roleBadge}>
-                <ShieldCheck size={13} color="#10b981" />
-                <Text style={styles.roleBadgeText}>Verified Solar EPC Vendor</Text>
+                <ShieldCheck size={13} color="#0066FF" />
+                <Text style={styles.roleBadgeText}>Verified Solar OS Vendor</Text>
               </View>
             </View>
           </View>
           <View style={styles.planBar}>
-            <Text style={styles.planText}>Plan: <Text style={styles.planBold}>SolarManager Enterprise (Active)</Text></Text>
-            <Text style={styles.planExpiry}>Renews: 2027</Text>
+            <Text style={styles.planText}>Platform: <Text style={styles.planBold}>WhereReady Solar OS Enterprise</Text></Text>
+            <Text style={styles.planExpiry}>Active • 2027</Text>
           </View>
         </View>
 
@@ -242,6 +245,17 @@ export const FieldProfileScreen: React.FC<{ navigation?: any }> = ({ navigation 
           </TouchableOpacity>
         </View>
 
+        {/* WHEREREADY BRAND & BUILD FOOTER */}
+        <View style={styles.brandFooterCard}>
+          <Image
+            source={require('../../assets/logo.png')}
+            style={styles.brandFooterLogo}
+            resizeMode="contain"
+          />
+          <Text style={styles.brandFooterVersion}>WhereReady Solar OS • v1.0.0 (Production APK Ready)</Text>
+          <Text style={styles.brandFooterCopy}>Enterprise Solar EPC Operations, Engineering & Field Asset Management</Text>
+        </View>
+
         {/* LOGOUT BUTTON */}
         <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout} activeOpacity={0.85}>
           <LogOut size={18} color="#ef4444" />
@@ -295,13 +309,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 14,
   },
-  avatarCircle: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#1e293b',
-    justifyContent: 'center',
-    alignItems: 'center',
+  avatarLogo: {
+    width: 58,
+    height: 58,
+    borderRadius: 16,
     borderWidth: 2,
     borderColor: '#38bdf8',
   },
@@ -535,6 +546,38 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 11,
     fontWeight: '800',
+  },
+  brandFooterCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 20,
+    alignItems: 'center',
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  brandFooterLogo: {
+    width: 220,
+    height: 50,
+    marginBottom: 10,
+  },
+  brandFooterVersion: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#0066FF',
+    letterSpacing: 0.3,
+  },
+  brandFooterCopy: {
+    fontSize: 10,
+    color: '#64748b',
+    marginTop: 4,
+    textAlign: 'center',
+    fontWeight: '500',
   },
   logoutBtn: {
     backgroundColor: '#fff1f2',

@@ -1,11 +1,16 @@
 export const colors = {
-  primary: '#059669', // Emerald 600
-  primaryDark: '#047857',
-  primaryLight: '#d1fae5',
-  primaryMuted: '#ecfdf5',
+  // WhereReady Brand Palette: Electric Blue & Solar Amber
+  primary: '#0066FF', // WhereReady Electric Blue
+  primaryDark: '#0052CC',
+  primaryLight: '#dbeafe',
+  primaryMuted: '#eff6ff',
 
-  accent: '#f59e0b', // Solar Amber
+  accent: '#f59e0b', // WhereReady Solar Sun
   accentLight: '#fef3c7',
+  accentDark: '#d97706',
+
+  navy: '#0b192c', // Deep Brand Navy
+  navyLight: '#1e293b',
 
   blue: '#2563eb',
   blueLight: '#eff6ff',
@@ -27,7 +32,8 @@ export const colors = {
   white: '#ffffff',
   black: '#000000',
 
-  success: '#10b981',
+  success: '#10b981', // Clean Grid Checkmark
+  successLight: '#d1fae5',
   warning: '#f59e0b',
   danger: '#ef4444',
   dangerLight: '#fee2e2',

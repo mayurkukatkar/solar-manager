@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Modal, TextInput } from 'react-native';
-import { Sun, Search, X, LogOut, ShieldCheck, ChevronRight } from 'lucide-react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Modal, TextInput, Image } from 'react-native';
+import { Search, X, LogOut, ShieldCheck, ChevronRight, Zap } from 'lucide-react-native';
 import { useAuth } from '../context/AuthContext';
 import { colors } from '../theme/colors';
 
@@ -19,14 +19,19 @@ export const Header: React.FC<{
       {/* TOP ROW */}
       <View style={styles.topRow}>
         <View style={styles.brandContainer}>
-          <View style={styles.sunBadge}>
-            <Sun size={18} color="#059669" strokeWidth={2.5} />
-          </View>
+          <Image
+            source={require('../../assets/app-icon.png')}
+            style={styles.brandLogoImage}
+            resizeMode="cover"
+          />
           <View>
-            <Text style={styles.companyName}>
-              {user?.tenantName || 'Solar Manager'}
+            <Text style={styles.companyName} numberOfLines={1}>
+              {user?.tenantName || 'WhereReady Solar OS'}
             </Text>
-            <Text style={styles.userName}>{user?.name || 'Administrator'}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <Text style={styles.userName}>{user?.name || 'Administrator'}</Text>
+              <Text style={styles.brandTag}>• SOLAR OS</Text>
+            </View>
           </View>
         </View>
 
@@ -52,7 +57,7 @@ export const Header: React.FC<{
           >
             <View style={styles.avatarCircle}>
               <Text style={styles.avatarLetter}>
-                {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}
+                {user?.name ? user.name.charAt(0).toUpperCase() : 'W'}
               </Text>
             </View>
           </TouchableOpacity>
@@ -185,13 +190,12 @@ const styles = StyleSheet.create({
     gap: 10,
     flex: 1,
   },
-  sunBadge: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
-    backgroundColor: '#ecfdf5',
-    justifyContent: 'center',
-    alignItems: 'center',
+  brandLogoImage: {
+    width: 36,
+    height: 36,
+    borderRadius: 9,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
   },
   companyName: {
     fontSize: 14,
@@ -200,10 +204,15 @@ const styles = StyleSheet.create({
     letterSpacing: -0.3,
   },
   userName: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#64748b',
-    fontWeight: '500',
-    marginTop: 1,
+    fontWeight: '600',
+  },
+  brandTag: {
+    fontSize: 9,
+    color: '#0066FF',
+    fontWeight: '800',
+    letterSpacing: 0.5,
   },
   actionsRow: {
     flexDirection: 'row',
@@ -238,7 +247,7 @@ const styles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 17,
-    backgroundColor: '#059669',
+    backgroundColor: '#0066FF',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -315,7 +324,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#059669',
+    backgroundColor: '#0066FF',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -336,7 +345,7 @@ const styles = StyleSheet.create({
   },
   accountRoleBadge: {
     alignSelf: 'flex-start',
-    backgroundColor: '#ecfdf5',
+    backgroundColor: '#eff6ff',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 6,
@@ -345,7 +354,7 @@ const styles = StyleSheet.create({
   accountRoleBadgeText: {
     fontSize: 9,
     fontWeight: '800',
-    color: '#059669',
+    color: '#0066FF',
     letterSpacing: 0.5,
   },
   sessionInfoBox: {

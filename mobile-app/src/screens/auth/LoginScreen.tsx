@@ -11,6 +11,7 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
+  Image,
 } from 'react-native';
 import {
   Sun,
@@ -110,13 +111,14 @@ export const LoginScreen: React.FC = () => {
         contentContainerStyle={styles.scrollContainer}
         keyboardShouldPersistTaps="handled"
       >
-        {/* BRANDING */}
+        {/* WHERE READY SOLAR OS BRANDING */}
         <View style={styles.brandBox}>
-          <View style={styles.logoBadge}>
-            <Sun size={28} color="#059669" strokeWidth={2.5} />
-          </View>
-          <Text style={styles.appName}>Solar ERP</Text>
-          <Text style={styles.appTagline}>Turnkey EPC Operations & Asset Management</Text>
+          <Image
+            source={require('../../../assets/logo.png')}
+            style={styles.logoBanner}
+            resizeMode="contain"
+          />
+          <Text style={styles.appTagline}>Enterprise Solar EPC & Asset Operating System</Text>
         </View>
 
         {/* SESSION TIMEOUT BANNER */}
@@ -151,7 +153,7 @@ export const LoginScreen: React.FC = () => {
         {/* LOGIN CARD */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Sign In</Text>
-          <Text style={styles.cardSubtitle}>Access your enterprise workspace</Text>
+          <Text style={styles.cardSubtitle}>Access your enterprise vendor workspace</Text>
 
           {/* EMAIL INPUT */}
           <Text style={styles.inputLabel}>WORK EMAIL</Text>
@@ -210,9 +212,9 @@ export const LoginScreen: React.FC = () => {
           </TouchableOpacity>
 
           <View style={styles.securityFooter}>
-            <ShieldCheck size={14} color="#059669" style={{ marginRight: 6 }} />
+            <ShieldCheck size={14} color="#0066FF" style={{ marginRight: 6 }} />
             <Text style={styles.securityFooterText}>
-              TLS 1.3 Encrypted • Cloud Synced
+              TLS 1.3 Verified • WhereReady Cloud Synced
             </Text>
           </View>
         </View>
@@ -291,30 +293,19 @@ const styles = StyleSheet.create({
   },
   brandBox: {
     alignItems: 'center',
-    marginBottom: 32,
+    marginBottom: 24,
   },
-  logoBadge: {
-    width: 60,
-    height: 60,
-    borderRadius: 20,
-    backgroundColor: '#ecfdf5',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#a7f3d0',
-  },
-  appName: {
-    fontSize: 24,
-    fontWeight: '900',
-    color: '#0f172a',
-    letterSpacing: -0.5,
+  logoBanner: {
+    width: 280,
+    height: 64,
+    marginBottom: 8,
   },
   appTagline: {
-    fontSize: 13,
+    fontSize: 12,
     color: '#64748b',
-    marginTop: 4,
-    fontWeight: '500',
+    fontWeight: '600',
+    letterSpacing: 0.2,
+    textAlign: 'center',
   },
   sessionBanner: {
     flexDirection: 'row',
@@ -383,12 +374,17 @@ const styles = StyleSheet.create({
     padding: 6,
   },
   loginBtn: {
-    backgroundColor: '#059669',
-    height: 48,
+    backgroundColor: '#0066FF',
+    height: 50,
     borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: 8,
+    shadowColor: '#0066FF',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 4,
   },
   loginBtnText: {
     color: '#ffffff',
@@ -445,7 +441,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   resetSubmitBtn: {
-    backgroundColor: '#059669',
+    backgroundColor: '#0066FF',
     height: 48,
     borderRadius: 14,
     justifyContent: 'center',

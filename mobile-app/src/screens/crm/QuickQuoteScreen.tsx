@@ -281,9 +281,9 @@ export const QuickQuoteScreen: React.FC<{ route?: any }> = ({ route }) => {
       {/* HEADER */}
       <View style={styles.header}>
         <View style={{ flex: 1 }}>
-          <Text style={styles.headerTitle}>Quick Field Estimator</Text>
+          <Text style={styles.headerTitle}>WhereReady Solar Estimator</Text>
           <Text style={styles.headerSubtitle}>
-            On-the-spot solar proposal & subsidy calculator
+            On-the-spot solar proposal & PM Surya Ghar calculator
           </Text>
         </View>
         {syncedQuote ? (

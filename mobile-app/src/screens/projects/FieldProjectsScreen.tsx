@@ -164,9 +164,9 @@ export const FieldProjectsScreen: React.FC<{ navigation?: any }> = ({ navigation
       {/* HEADER */}
       <View style={styles.header}>
         <View>
-          <Text style={styles.headerTitle}>Field Site Operations</Text>
+          <Text style={styles.headerTitle}>WhereReady Field Execution</Text>
           <Text style={styles.headerSubtitle}>
-            Active Installations, Hardware Serialization & DISCOM Compliance
+            Solar OS Installations, Serial Scanning & Net-Metering
           </Text>
         </View>
       </View>
