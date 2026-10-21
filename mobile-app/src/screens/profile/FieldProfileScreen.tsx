@@ -83,7 +83,7 @@ export const FieldProfileScreen: React.FC<{ navigation?: any }> = ({ navigation 
         <View style={styles.profileCard}>
           <View style={styles.profileTop}>
             <Image
-              source={require('../../assets/app-icon.png')}
+              source={require('../../../assets/app-icon.png')}
               style={styles.avatarLogo}
               resizeMode="cover"
             />
@@ -248,7 +248,7 @@ export const FieldProfileScreen: React.FC<{ navigation?: any }> = ({ navigation 
         {/* WHEREREADY BRAND & BUILD FOOTER */}
         <View style={styles.brandFooterCard}>
           <Image
-            source={require('../../assets/logo.png')}
+            source={require('../../../assets/logo.png')}
             style={styles.brandFooterLogo}
             resizeMode="contain"
           />
