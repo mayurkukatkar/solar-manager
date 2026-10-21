@@ -6,10 +6,16 @@ const prisma = require('../db');
 const { JWT_SECRET } = require('../middleware/auth');
 
 router.post('/login', async (req, res) => {
-  const { email, password } = req.body;
+  const email = (req.body.email || '').trim().toLowerCase();
+  const password = req.body.password;
   try {
-    const user = await prisma.user.findUnique({
-      where: { email },
+    const user = await prisma.user.findFirst({
+      where: {
+        email: {
+          equals: email,
+          mode: 'insensitive'
+        }
+      },
       include: {
         tenant: {
           select: { id: true, name: true, status: true }

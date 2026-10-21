@@ -52,7 +52,7 @@ export const LoginScreen: React.FC = () => {
   const [resetLoading, setResetLoading] = useState(false);
 
   const handleSignIn = async () => {
-    const cleanEmail = email.trim();
+    const cleanEmail = email.trim().toLowerCase();
     if (!cleanEmail) {
       Alert.alert('Required Field', 'Please enter your work email address.');
       return;
