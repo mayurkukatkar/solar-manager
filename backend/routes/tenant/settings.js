@@ -33,7 +33,13 @@ router.patch('/api/tenant/settings', requireTenantAuth, async (req, res) => {
       return res.status(403).json({ error: 'Only Tenant Admin can update settings' });
     }
 
-    const { name, legalName, email, phone, address, city, state, country, pincode, gstin, pan, logoUrl, signatureUrl } = req.body;
+    const {
+      name, legalName, email, phone, address, city, state, country, pincode,
+      gstin, pan, website, tagline, msmeNumber, contractorLicense,
+      logoUrl, signatureUrl, companyStampUrl, signatoryName, signatoryTitle,
+      primaryColor, accentColor, bankDetails, commercialDefaults, documentPrefixes
+    } = req.body;
+
     const updateData = {};
     if (name) updateData.name = name;
     if (legalName !== undefined) updateData.legalName = legalName;
@@ -46,8 +52,20 @@ router.patch('/api/tenant/settings', requireTenantAuth, async (req, res) => {
     if (pincode !== undefined) updateData.pincode = pincode;
     if (gstin !== undefined) updateData.gstin = gstin;
     if (pan !== undefined) updateData.pan = pan;
+    if (website !== undefined) updateData.website = website;
+    if (tagline !== undefined) updateData.tagline = tagline;
+    if (msmeNumber !== undefined) updateData.msmeNumber = msmeNumber;
+    if (contractorLicense !== undefined) updateData.contractorLicense = contractorLicense;
     if (logoUrl !== undefined) updateData.logoUrl = logoUrl;
     if (signatureUrl !== undefined) updateData.signatureUrl = signatureUrl;
+    if (companyStampUrl !== undefined) updateData.companyStampUrl = companyStampUrl;
+    if (signatoryName !== undefined) updateData.signatoryName = signatoryName;
+    if (signatoryTitle !== undefined) updateData.signatoryTitle = signatoryTitle;
+    if (primaryColor !== undefined) updateData.primaryColor = primaryColor;
+    if (accentColor !== undefined) updateData.accentColor = accentColor;
+    if (bankDetails !== undefined) updateData.bankDetails = bankDetails;
+    if (commercialDefaults !== undefined) updateData.commercialDefaults = commercialDefaults;
+    if (documentPrefixes !== undefined) updateData.documentPrefixes = documentPrefixes;
 
     const tenant = await prisma.tenant.update({
       where: { id: req.user.tenantId },

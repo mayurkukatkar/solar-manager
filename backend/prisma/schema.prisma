@@ -31,11 +31,23 @@ model Tenant {
   state     String?
   country   String       @default("India")
   pincode   String?
-  gstin        String?
-  pan          String?
-  logoUrl      String?
-  signatureUrl String?
-  status       TenantStatus @default(TRIAL)
+  gstin              String?
+  pan                String?
+  website            String?
+  tagline            String?
+  msmeNumber         String?
+  contractorLicense  String?
+  logoUrl            String?
+  signatureUrl       String?
+  companyStampUrl    String?
+  signatoryName      String?
+  signatoryTitle     String?
+  primaryColor       String?      @default("#059669")
+  accentColor        String?      @default("#0284c7")
+  bankDetails        Json?        // { accountName, bankName, accountNumber, ifsc, branch, upiId, qrCodeUrl }
+  commercialDefaults Json?        // { defaultTariff, defaultDiscom, defaultSubsidy, quoteValidityDays, panelWarrantyYears, inverterWarrantyYears, workmanshipWarrantyYears, defaultMilestones }
+  documentPrefixes   Json?        // { lead, quotation, project, invoice, survey, purchaseOrder }
+  status             TenantStatus @default(TRIAL)
 
   users          User[]
   leads          Lead[]

@@ -330,15 +330,19 @@ router.post('/api/tenant/quotations', requireTenantAuth, async (req, res) => {
       totalPayable = finalSubtotal + finalTax - finalDiscount;
     }
 
+    const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
+    const effectiveTariff = tariffRate || tenant?.commercialDefaults?.defaultTariff || 8.5;
+
     const solarMetrics = calculateSolarMetrics({
       capacity: systemCapacity,
       totalCost: totalPayable,
       connectionType,
-      gridTariff: tariffRate,
+      gridTariff: effectiveTariff,
       monthlyBill
     });
 
-    const qNumber = `QT-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}-${Math.floor(1000 + Math.random() * 9000)}`;
+    const qPrefix = tenant?.documentPrefixes?.quotation || 'QT-';
+    const qNumber = `${qPrefix}${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}-${Math.floor(1000 + Math.random() * 9000)}`;
 
     // Milestone schedule
     const calculatedMilestones = solarCalc.generateMilestones(totalPayable, paymentMilestones);
@@ -456,7 +460,7 @@ router.post('/api/tenant/quotations', requireTenantAuth, async (req, res) => {
         warranties: defaultWarranties,
         termsAndConditions: defaultTerms,
         exclusions: defaultExclusions,
-        bankDetails: bankDetails || null,
+        bankDetails: bankDetails || tenant?.bankDetails || null,
         financingDetails: financingDetails || null,
         commercialAnalysis: commercialAnalysis || null,
 

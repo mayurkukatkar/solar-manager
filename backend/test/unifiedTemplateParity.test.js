@@ -8,16 +8,14 @@ const content = fs.readFileSync(pdfServicePath, 'utf8');
 
 console.log('--- TESTING MOBILE & WEB UNIFIED TEMPLATE PARITY ---');
 
-// 1. Verify all 8 core sections exist in the HTML template generator
+// 1. Verify all 6 core luxury editorial sections exist in the HTML template generator
 const requiredSections = [
-  'PAGE 1: EXECUTIVE COVER PAGE',
-  'PAGE 2: CUSTOMER REQUIREMENTS & AUDIT',
-  'PAGE 3: RECOMMENDED SOLAR SOLUTION ARCHITECTURE',
-  'PAGE 4: SAVINGS ANALYSIS & FINANCIAL ROI',
-  'PAGE 5: ITEMIZED COMMERCIAL QUOTATION & BOQ',
-  'PAGE 6: SCOPE OF WORK & EPC DELIVERABLES',
-  'PAGE 7: WARRANTIES, TERMS & CONDITIONS',
-  'PAGE 8: ACCEPTANCE & SIGNATORY BLOCK'
+  'PAGE 1: CINEMATIC COVER PAGE',
+  'PAGE 2: YOUR ENERGY PROFILE',
+  'PAGE 3: YOUR SOLAR SYSTEM',
+  'PAGE 4: ENERGY & SAVINGS',
+  'PAGE 5: YOUR INVESTMENT',
+  'PAGE 6: INSTALLATION ROADMAP, WARRANTIES & ACCEPTANCE'
 ];
 
 for (const sec of requiredSections) {
@@ -41,12 +39,10 @@ for (const tmpl of supportedTemplates) {
 // 3. Verify key financial & technical elements
 const keyElements = [
   'PM Surya Ghar Muft Bijli Yojana',
-  'Section 32 Accelerated Depreciation',
   'Milestone Payment Schedule',
-  'Amount Payable in Words',
-  'Energy Storage System',
+  'Amount in Words',
   'HOT-DIP GALVANIZED',
-  'Official EPC Bank Account'
+  'bankDetails'
 ];
 
 for (const el of keyElements) {
