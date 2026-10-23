@@ -3,12 +3,7 @@
 import React, { useState } from "react";
 import {
   X,
-  Calendar,
-  Building,
-  User,
   Phone,
-  Mail,
-  MapPin,
   CheckCircle2,
   ArrowRight,
   ShieldCheck,
@@ -74,12 +69,13 @@ export default function DemoModal({ isOpen, onClose }: DemoModalProps) {
   );
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="relative w-full max-w-xl bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl text-white">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
+      <div className="relative w-full max-w-lg bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-2xl text-slate-900">
+        
         {/* Close Button */}
         <button
           onClick={onClose}
-          className="absolute top-5 right-5 p-1.5 rounded-full text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+          className="absolute top-5 right-5 p-1.5 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
           aria-label="Close modal"
         >
           <X className="w-5 h-5" />
@@ -87,22 +83,19 @@ export default function DemoModal({ isOpen, onClose }: DemoModalProps) {
 
         {!submitted ? (
           <div>
-            <div className="flex items-center gap-2 mb-2">
-              <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
-              <span className="text-xs font-bold uppercase tracking-wider text-amber-400">
-                WhereReady Solar OS Walkthrough
-              </span>
-            </div>
+            <span className="text-[11px] font-bold uppercase tracking-wider text-blue-600 block mb-1">
+              WhereReady Solar OS Walkthrough
+            </span>
 
-            <h3 className="text-2xl font-bold text-white">
+            <h3 className="text-2xl font-extrabold text-slate-900">
               Schedule Your Free 1-on-1 Demo
             </h3>
-            <p className="text-xs text-slate-400 mt-1">
-              See the proposal engine, OCR bill scanner, and DISCOM statutory tracking in action.
+            <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+              See the 60-second proposal engine, utility bill OCR, and DISCOM statutory tracking configured for your business.
             </p>
 
             {errorMsg && (
-              <div className="mt-4 p-3 bg-red-950/60 border border-red-800 text-red-300 text-xs rounded-xl">
+              <div className="mt-4 p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl">
                 {errorMsg}
               </div>
             )}
@@ -110,7 +103,7 @@ export default function DemoModal({ isOpen, onClose }: DemoModalProps) {
             <form onSubmit={handleSubmit} className="mt-5 space-y-3.5">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-300 mb-1">
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
                     Your Name *
                   </label>
                   <input
@@ -120,12 +113,12 @@ export default function DemoModal({ isOpen, onClose }: DemoModalProps) {
                     value={formData.name}
                     onChange={handleChange}
                     placeholder="Full Name"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:bg-white"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-300 mb-1">
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
                     Company Name *
                   </label>
                   <input
@@ -134,15 +127,15 @@ export default function DemoModal({ isOpen, onClose }: DemoModalProps) {
                     required
                     value={formData.company}
                     onChange={handleChange}
-                    placeholder="Solar Company Name"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                    placeholder="Solar EPC / Installer"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:bg-white"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-300 mb-1">
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
                     WhatsApp Number *
                   </label>
                   <input
@@ -152,12 +145,12 @@ export default function DemoModal({ isOpen, onClose }: DemoModalProps) {
                     value={formData.phone}
                     onChange={handleChange}
                     placeholder="10-digit mobile"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:bg-white"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-300 mb-1">
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
                     Work Email *
                   </label>
                   <input
@@ -167,14 +160,14 @@ export default function DemoModal({ isOpen, onClose }: DemoModalProps) {
                     value={formData.email}
                     onChange={handleChange}
                     placeholder="email@company.com"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:bg-white"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-300 mb-1">
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
                     City &amp; State *
                   </label>
                   <input
@@ -184,19 +177,19 @@ export default function DemoModal({ isOpen, onClose }: DemoModalProps) {
                     value={formData.cityState}
                     onChange={handleChange}
                     placeholder="e.g. Pune, MH"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:bg-white"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-300 mb-1">
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
                     Monthly Project Volume
                   </label>
                   <select
                     name="monthlyVolume"
                     value={formData.monthlyVolume}
                     onChange={handleChange}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs sm:text-sm text-slate-900 focus:outline-none focus:border-blue-500 focus:bg-white"
                   >
                     <option value="Less than 5 projects/month">&lt; 5 projects / month</option>
                     <option value="5 to 20 projects/month">5 to 20 projects / month</option>
@@ -205,16 +198,16 @@ export default function DemoModal({ isOpen, onClose }: DemoModalProps) {
                 </div>
               </div>
 
-              <div className="pt-3">
+              <div className="pt-2">
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full py-3 px-4 rounded-xl text-sm font-bold text-white bg-blue-600 hover:bg-blue-500 shadow-lg shadow-blue-600/30 flex items-center justify-center gap-2 cursor-pointer transition-all disabled:opacity-50"
+                  className="w-full py-3 px-4 rounded-full text-xs sm:text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 shadow-sm flex items-center justify-center gap-2 cursor-pointer transition-all disabled:opacity-50"
                 >
                   {loading ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>Scheduling Demo...</span>
+                      <span>Scheduling Walkthrough...</span>
                     </>
                   ) : (
                     <>
@@ -223,8 +216,8 @@ export default function DemoModal({ isOpen, onClose }: DemoModalProps) {
                     </>
                   )}
                 </button>
-                <div className="flex items-center justify-center gap-1.5 text-[10px] text-slate-500 mt-2">
-                  <ShieldCheck className="w-3 h-3 text-emerald-400" />
+                <div className="flex items-center justify-center gap-1.5 text-[10px] text-slate-400 mt-2.5">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
                   <span>DPDP 2023 Compliant • No spam guarantee</span>
                 </div>
               </div>
@@ -232,20 +225,21 @@ export default function DemoModal({ isOpen, onClose }: DemoModalProps) {
           </div>
         ) : (
           <div className="py-6 text-center space-y-4">
-            <div className="w-12 h-12 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center mx-auto">
+            <div className="w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200 flex items-center justify-center mx-auto">
               <CheckCircle2 className="w-6 h-6" />
             </div>
 
-            <h4 className="text-xl font-bold text-white">Walkthrough Scheduled!</h4>
-            <p className="text-xs text-slate-300 max-w-sm mx-auto">
-              We have received your demo request, <strong className="text-white">{formData.name}</strong>. Our team will reach out on WhatsApp to confirm the exact time slot.
+            <h4 className="text-xl font-bold text-slate-900">Walkthrough Confirmed</h4>
+            <p className="text-xs text-slate-600 max-w-sm mx-auto leading-relaxed">
+              Thank you, <strong className="text-slate-900">{formData.name}</strong> from{" "}
+              <strong className="text-slate-900">{formData.company}</strong>. Our solar solutions team will reach out on WhatsApp to coordinate your demo timing.
             </p>
 
             <a
               href={`https://wa.me/919890000000?text=${whatsappMessage}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center justify-center gap-2 w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs transition-all"
+              className="inline-flex items-center justify-center gap-2 w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-full text-xs transition-all shadow-xs"
             >
               <Phone className="w-3.5 h-3.5" />
               <span>Connect on WhatsApp Now</span>
@@ -255,13 +249,14 @@ export default function DemoModal({ isOpen, onClose }: DemoModalProps) {
               <button
                 type="button"
                 onClick={onClose}
-                className="text-xs text-slate-400 hover:text-white underline"
+                className="text-xs text-slate-400 hover:text-slate-700 underline cursor-pointer"
               >
                 Close Window
               </button>
             </div>
           </div>
         )}
+
       </div>
     </div>
   );

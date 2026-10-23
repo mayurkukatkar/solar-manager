@@ -12,7 +12,7 @@ export const metadata = {
 
 export default function DemoPage() {
   return (
-    <div className="min-h-screen bg-slate-950 text-white font-['Plus_Jakarta_Sans',sans-serif]">
+    <div className="min-h-screen bg-white text-slate-900 font-['Plus_Jakarta_Sans',sans-serif]">
       <Navbar />
 
       <main className="pt-20">

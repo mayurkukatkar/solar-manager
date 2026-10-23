@@ -2,15 +2,16 @@
 
 import React, { useState } from "react";
 import Navbar from "@/components/marketing/Navbar";
-import HeroSection from "@/components/marketing/HeroSection";
-import ProblemSolutionSection from "@/components/marketing/ProblemSolutionSection";
-import InteractiveProposalDemo from "@/components/marketing/InteractiveProposalDemo";
-import WorkflowSection from "@/components/marketing/WorkflowSection";
-import FeaturesSection from "@/components/marketing/FeaturesSection";
-import PricingSection from "@/components/marketing/PricingSection";
+import HeroScene from "@/components/marketing/HeroScene";
+import ProblemScene from "@/components/marketing/ProblemScene";
+import WorkflowScene from "@/components/marketing/WorkflowScene";
+import QuotationScene from "@/components/marketing/QuotationScene";
+import ProductExperienceScene from "@/components/marketing/ProductExperienceScene";
+import BenefitsScene from "@/components/marketing/BenefitsScene";
+import PricingScene from "@/components/marketing/PricingScene";
 import TrustSecuritySection from "@/components/marketing/TrustSecuritySection";
 import FaqSection from "@/components/marketing/FaqSection";
-import DemoBookingSection from "@/components/marketing/DemoBookingSection";
+import FinalCtaScene from "@/components/marketing/FinalCtaScene";
 import Footer from "@/components/marketing/Footer";
 import DemoModal from "@/components/marketing/DemoModal";
 
@@ -26,41 +27,43 @@ export default function HomePage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white font-['Plus_Jakarta_Sans',sans-serif] selection:bg-blue-500 selection:text-white antialiased">
+    <div className="min-h-screen bg-white text-slate-900 font-['Plus_Jakarta_Sans',sans-serif] selection:bg-blue-600 selection:text-white antialiased">
       {/* Navigation Bar */}
       <Navbar onOpenDemo={handleOpenDemo} />
 
-      {/* Main Marketing Sections */}
       <main>
-        {/* Hero Section */}
-        <HeroSection onOpenDemo={handleOpenDemo} />
+        {/* Scene 1: Opening — A solar business begins */}
+        <HeroScene onOpenDemo={handleOpenDemo} />
 
-        {/* Problem vs Solution Contrast */}
-        <ProblemSolutionSection />
+        {/* Scene 2: The problem — Disconnected work */}
+        <ProblemScene />
 
-        {/* Flagship Interactive Proposal Engine & Simulator */}
-        <InteractiveProposalDemo onOpenDemo={handleOpenDemo} />
+        {/* Scene 3: The transformation — One connected workflow */}
+        <WorkflowScene />
 
-        {/* End-to-End 8-Stage Solar EPC Lifecycle */}
-        <WorkflowSection />
+        {/* Scene 4: The quotation experience */}
+        <QuotationScene onOpenDemo={handleOpenDemo} />
 
-        {/* Core Capabilities & Feature Deep-Dive */}
-        <FeaturesSection />
+        {/* Scene 5: The product experience */}
+        <ProductExperienceScene />
 
-        {/* Transparent EPC Pricing & ROI */}
-        <PricingSection onOpenDemo={handleOpenDemo} />
+        {/* Scene 6: Benefits — Three spacious visual moments */}
+        <BenefitsScene />
 
-        {/* DPDP 2023 Compliance & Tenant Security */}
+        {/* Scene 7: Pricing — A plan that fits your next stage */}
+        <PricingScene onOpenDemo={handleOpenDemo} />
+
+        {/* Trust & DPDP 2023 Security Safeguards */}
         <TrustSecuritySection />
 
-        {/* FAQ Accordion */}
+        {/* Frequently Asked Questions Accordion */}
         <FaqSection />
 
-        {/* High-Converting Lead Capture & Demo Form */}
-        <DemoBookingSection />
+        {/* Scene 8: Final CTA — Sunlit installation & WhatsApp connect */}
+        <FinalCtaScene onOpenDemo={handleOpenDemo} />
       </main>
 
-      {/* Enterprise Footer */}
+      {/* Minimal Footer */}
       <Footer />
 
       {/* Global Demo Booking Modal */}

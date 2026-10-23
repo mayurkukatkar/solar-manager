@@ -106,3 +106,102 @@ aside .custom-scrollbar::-webkit-scrollbar-thumb:hover {
     background: #ffffff !important;
   }
 }
+
+/* 2D Vector Storytelling Keyframe Animations */
+@keyframes sunDrift {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-6px) rotate(4deg);
+  }
+}
+
+@keyframes sunRays {
+  0%, 100% {
+    opacity: 0.7;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+}
+
+@keyframes floatGentle {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes floatTilt {
+  0%, 100% {
+    transform: translateY(0px) rotate(-1.5deg);
+  }
+  50% {
+    transform: translateY(-6px) rotate(1.5deg);
+  }
+}
+
+@keyframes dashFlow {
+  to {
+    stroke-dashoffset: -40;
+  }
+}
+
+@keyframes popIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.9) translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.anim-sun-drift {
+  animation: sunDrift 8s ease-in-out infinite;
+}
+
+.anim-sun-rays {
+  animation: sunRays 4s ease-in-out infinite;
+}
+
+.anim-float {
+  animation: floatGentle 6s ease-in-out infinite;
+}
+
+.anim-float-delayed {
+  animation: floatGentle 7s ease-in-out 1.5s infinite;
+}
+
+.anim-float-tilt {
+  animation: floatTilt 8s ease-in-out infinite;
+}
+
+.anim-dash-flow {
+  animation: dashFlow 20s linear infinite;
+}
+
+.anim-pop {
+  animation: popIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  .anim-sun-drift,
+  .anim-sun-rays,
+  .anim-float,
+  .anim-float-delayed,
+  .anim-float-tilt,
+  .anim-dash-flow,
+  .anim-pop {
+    animation: none !important;
+    transform: none !important;
+  }
+}
+

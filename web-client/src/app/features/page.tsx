@@ -1,9 +1,9 @@
 import React from "react";
 import Navbar from "@/components/marketing/Navbar";
-import FeaturesSection from "@/components/marketing/FeaturesSection";
-import InteractiveProposalDemo from "@/components/marketing/InteractiveProposalDemo";
-import WorkflowSection from "@/components/marketing/WorkflowSection";
-import DemoBookingSection from "@/components/marketing/DemoBookingSection";
+import ProductExperienceScene from "@/components/marketing/ProductExperienceScene";
+import QuotationScene from "@/components/marketing/QuotationScene";
+import WorkflowScene from "@/components/marketing/WorkflowScene";
+import FinalCtaScene from "@/components/marketing/FinalCtaScene";
 import Footer from "@/components/marketing/Footer";
 
 export const metadata = {
@@ -13,14 +13,14 @@ export const metadata = {
 
 export default function FeaturesPage() {
   return (
-    <div className="min-h-screen bg-slate-950 text-white font-['Plus_Jakarta_Sans',sans-serif]">
+    <div className="min-h-screen bg-white text-slate-900 font-['Plus_Jakarta_Sans',sans-serif]">
       <Navbar />
 
       <main className="pt-20">
-        <FeaturesSection />
-        <InteractiveProposalDemo />
-        <WorkflowSection />
-        <DemoBookingSection />
+        <ProductExperienceScene />
+        <QuotationScene />
+        <WorkflowScene />
+        <FinalCtaScene />
       </main>
 
       <Footer />

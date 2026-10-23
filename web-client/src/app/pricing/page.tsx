@@ -1,8 +1,8 @@
 import React from "react";
 import Navbar from "@/components/marketing/Navbar";
-import PricingSection from "@/components/marketing/PricingSection";
+import PricingScene from "@/components/marketing/PricingScene";
 import FaqSection from "@/components/marketing/FaqSection";
-import DemoBookingSection from "@/components/marketing/DemoBookingSection";
+import FinalCtaScene from "@/components/marketing/FinalCtaScene";
 import Footer from "@/components/marketing/Footer";
 
 export const metadata = {
@@ -12,13 +12,13 @@ export const metadata = {
 
 export default function PricingPage() {
   return (
-    <div className="min-h-screen bg-slate-950 text-white font-['Plus_Jakarta_Sans',sans-serif]">
+    <div className="min-h-screen bg-white text-slate-900 font-['Plus_Jakarta_Sans',sans-serif]">
       <Navbar />
 
       <main className="pt-20">
-        <PricingSection />
+        <PricingScene />
         <FaqSection />
-        <DemoBookingSection />
+        <FinalCtaScene />
       </main>
 
       <Footer />
