@@ -5,8 +5,11 @@ import { CheckCircle2 } from "lucide-react";
 
 export default function BenefitsScene() {
   return (
-    <section id="benefits" className="py-24 sm:py-36 bg-white text-slate-900 border-t border-slate-100">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <section id="benefits" className="py-24 sm:py-36 bg-grid-subtle text-slate-900 border-t border-slate-100 relative overflow-hidden">
+      {/* Soft gradient masks to fade the grid toward center */}
+      <div className="absolute inset-0 bg-gradient-to-b from-white/95 via-white/80 to-white/95 pointer-events-none" />
+
+      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
         {/* Section Header */}
         <div className="text-center max-w-3xl mx-auto mb-20 sm:mb-28">

@@ -32,8 +32,11 @@ export default function TrustSecuritySection() {
   ];
 
   return (
-    <section id="security" className="py-24 sm:py-32 bg-white text-slate-900 border-t border-slate-100">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <section id="security" className="py-24 sm:py-32 bg-grid-subtle text-slate-900 border-t border-slate-100 relative overflow-hidden">
+      {/* Soft gradient masks to fade the grid toward center */}
+      <div className="absolute inset-0 bg-gradient-to-b from-white/95 via-white/80 to-white/95 pointer-events-none" />
+
+      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
         {/* Header */}
         <div className="text-center max-w-3xl mx-auto mb-16 sm:mb-20">

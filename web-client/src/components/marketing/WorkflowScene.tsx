@@ -92,28 +92,31 @@ export default function WorkflowScene() {
   const current = stages[activeStage];
 
   return (
-    <section id="workflow" className="py-24 sm:py-32 bg-white text-slate-900 border-t border-slate-100">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <section id="workflow" className="py-24 sm:py-32 bg-grid-subtle text-slate-900 border-t border-slate-100 relative overflow-hidden">
+      {/* Soft gradient masks to fade the grid toward center */}
+      <div className="absolute inset-0 bg-gradient-to-b from-white/95 via-white/80 to-white/95 pointer-events-none" />
+
+      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
         {/* Section Header */}
         <div className="text-center max-w-3xl mx-auto mb-16 sm:mb-20">
-          <span className="text-xs font-semibold tracking-wider text-blue-600 uppercase">
-            End-to-End Solar Business Lifecycle
+          <span className="text-xs font-bold tracking-wider text-blue-600 uppercase">
+            Scene 03 • See the Solution
           </span>
-          <h2 className="mt-3 text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight text-slate-900 leading-[1.15] font-['Plus_Jakarta_Sans',sans-serif]">
-            Bring your entire workflow together.
+          <h2 className="mt-3 text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight text-slate-900 leading-[1.12] font-['Plus_Jakarta_Sans',sans-serif]">
+            One connected workflow. From enquiry to installation.
           </h2>
           <p className="mt-4 text-base sm:text-lg text-slate-500 max-w-xl mx-auto font-normal">
-            Seven essential steps. One continuous, unified platform. Every team member sees what comes next.
+            A continuous automated sequence: an enquiry becomes a lead, the lead becomes a quotation, and the quotation moves seamlessly into project execution and commissioning.
           </p>
         </div>
 
-        {/* Desktop Horizontal Journey with Continuous Animated Line */}
+        {/* Desktop Horizontal Journey with Continuous Animated SVG Line */}
         <div className="hidden lg:block mb-12">
           <div className="relative flex items-center justify-between max-w-5xl mx-auto px-6">
             
-            {/* Animated Continuous Background Connecting Line */}
-            <div className="absolute top-1/2 left-10 right-10 -translate-y-1/2 h-0.5 bg-slate-200 z-0">
+            {/* Animated Continuous Background Connecting Line with SVG Dash Flow */}
+            <div className="absolute top-1/2 left-10 right-10 -translate-y-1/2 h-1 bg-slate-200 z-0 rounded-full overflow-hidden">
               <div 
                 className="h-full bg-blue-600 transition-all duration-500 ease-out"
                 style={{ width: `${(activeStage / (stages.length - 1)) * 100}%` }}

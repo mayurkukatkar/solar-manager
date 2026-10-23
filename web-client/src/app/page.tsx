@@ -32,25 +32,23 @@ export default function HomePage() {
       <Navbar onOpenDemo={handleOpenDemo} />
 
       <main>
-        {/* Scene 1: Opening — A solar business begins */}
+        {/* Scene 1: Understand — "Run your entire solar business. In one place." */}
         <HeroScene onOpenDemo={handleOpenDemo} />
 
-        {/* Scene 2: The problem — Disconnected work */}
+        {/* Scene 2: Recognize the problem — "Leads, quotations and projects shouldn't live in different places." */}
         <ProblemScene />
 
-        {/* Scene 3: The transformation — One connected workflow */}
+        {/* Scene 3: See the solution — "One connected workflow. From enquiry to installation." */}
         <WorkflowScene />
 
-        {/* Scene 4: The quotation experience */}
+        {/* Scene 4: Experience the product — "Create proposals. Track progress. Keep work moving." */}
         <QuotationScene onOpenDemo={handleOpenDemo} />
-
-        {/* Scene 5: The product experience */}
         <ProductExperienceScene />
 
-        {/* Scene 6: Benefits — Three spacious visual moments */}
+        {/* Supporting Trust & Operational Simplicity Moments */}
         <BenefitsScene />
 
-        {/* Scene 7: Pricing — A plan that fits your next stage */}
+        {/* Predictable Commercials & Plans */}
         <PricingScene onOpenDemo={handleOpenDemo} />
 
         {/* Trust & DPDP 2023 Security Safeguards */}
@@ -59,7 +57,7 @@ export default function HomePage() {
         {/* Frequently Asked Questions Accordion */}
         <FaqSection />
 
-        {/* Scene 8: Final CTA — Sunlit installation & WhatsApp connect */}
+        {/* Scene 5: Convert / Take action — "Ready to bring your solar business into sync?" */}
         <FinalCtaScene onOpenDemo={handleOpenDemo} />
       </main>
 

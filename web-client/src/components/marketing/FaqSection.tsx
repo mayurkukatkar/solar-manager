@@ -42,8 +42,11 @@ export default function FaqSection() {
   ];
 
   return (
-    <section id="faq" className="py-24 sm:py-32 bg-slate-50/50 text-slate-900 border-t border-slate-100">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+    <section id="faq" className="py-24 sm:py-32 bg-grid-subtle text-slate-900 border-t border-slate-100 relative overflow-hidden">
+      {/* Soft gradient masks to fade the grid toward center */}
+      <div className="absolute inset-0 bg-gradient-to-b from-white/95 via-white/80 to-white/95 pointer-events-none" />
+
+      <div className="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         
         {/* Header */}
         <div className="text-center mb-16 sm:mb-20">

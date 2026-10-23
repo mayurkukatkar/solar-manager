@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { Sun, Menu, X, ArrowRight, Phone, ChevronRight } from "lucide-react";
+import { Sun, Menu, X, ArrowRight, ArrowUpRight, Phone, ChevronRight } from "lucide-react";
 
 interface NavbarProps {
   onOpenDemo?: () => void;
@@ -86,10 +86,10 @@ export default function Navbar({ onOpenDemo }: NavbarProps) {
               </Link>
               <button
                 onClick={onOpenDemo}
-                className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-full shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                className="inline-flex items-center gap-1.5 px-5 py-2.5 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-full shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
               >
-                <span>Book a Free Demo</span>
-                <ArrowRight className="w-4 h-4" />
+                <span>Book a Demo</span>
+                <ArrowUpRight className="w-4 h-4" />
               </button>
             </div>
 
@@ -97,9 +97,10 @@ export default function Navbar({ onOpenDemo }: NavbarProps) {
             <div className="flex md:hidden items-center gap-2">
               <button
                 onClick={onOpenDemo}
-                className="px-3.5 py-1.5 text-xs font-semibold text-white bg-blue-600 rounded-full"
+                className="inline-flex items-center gap-1 px-3.5 py-1.5 text-xs font-semibold text-white bg-blue-600 rounded-full"
               >
-                Demo
+                <span>Demo</span>
+                <ArrowUpRight className="w-3 h-3" />
               </button>
               <button
                 type="button"

@@ -55,19 +55,22 @@ export default function QuotationScene({ onOpenDemo }: QuotationSceneProps) {
   const moduleCount = Math.ceil((capacity * 1000) / moduleWattage);
 
   return (
-    <section id="proposal-demo" className="py-24 sm:py-32 bg-white text-slate-900 border-t border-slate-100">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <section id="proposal-demo" className="py-24 sm:py-32 bg-grid-subtle text-slate-900 border-t border-slate-100 relative overflow-hidden">
+      {/* Soft gradient masks to fade the grid toward center */}
+      <div className="absolute inset-0 bg-gradient-to-b from-white/95 via-white/80 to-white/95 pointer-events-none" />
+
+      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
-        {/* Section Header */}
+        {/* Section Header (Scene 4: Experience the Product) */}
         <div className="text-center max-w-3xl mx-auto mb-16 sm:mb-20">
-          <span className="text-xs font-semibold tracking-wider text-amber-600 uppercase">
-            Flagship Proposal Engine
+          <span className="text-xs font-bold tracking-wider text-amber-600 uppercase">
+            Scene 04 • Experience the Product
           </span>
-          <h2 className="mt-3 text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight text-slate-900 leading-[1.15] font-['Plus_Jakarta_Sans',sans-serif]">
-            Make every proposal feel professional.
+          <h2 className="mt-3 text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight text-slate-900 leading-[1.12] font-['Plus_Jakarta_Sans',sans-serif]">
+            Create proposals. Track progress. Keep work moving.
           </h2>
           <p className="mt-4 text-base sm:text-lg text-slate-500 max-w-xl mx-auto font-normal">
-            Turn customer electricity bills and site measurements into magazine-grade proposals that build trust and close deals faster. Test the interactive simulator below.
+            Real Solar OS proposal engine and interactive simulator. Generate customer proposals with accurate PM Surya Ghar central subsidies and 25-year payback calculations in seconds.
           </p>
         </div>
 

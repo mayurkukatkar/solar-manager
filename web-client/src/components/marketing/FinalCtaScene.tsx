@@ -9,8 +9,11 @@ interface FinalCtaSceneProps {
 
 export default function FinalCtaScene({ onOpenDemo }: FinalCtaSceneProps) {
   return (
-    <section className="py-24 sm:py-32 bg-white text-slate-900 border-t border-slate-100 relative overflow-hidden">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <section className="py-24 sm:py-32 bg-grid-subtle text-slate-900 border-t border-slate-100 relative overflow-hidden">
+      {/* Soft gradient masks to fade the grid toward center */}
+      <div className="absolute inset-0 bg-gradient-to-b from-white/95 via-white/80 to-white/95 pointer-events-none" />
+
+      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
         {/* Spacious Container with Soft Border & Delicate Ambient Glow */}
         <div className="max-w-5xl mx-auto bg-gradient-to-b from-blue-50/40 via-white to-amber-50/20 border border-slate-200/90 rounded-3xl p-8 sm:p-16 text-center relative overflow-hidden shadow-xs">
@@ -20,7 +23,7 @@ export default function FinalCtaScene({ onOpenDemo }: FinalCtaSceneProps) {
           <div className="absolute -bottom-10 left-1/4 w-80 h-80 bg-blue-200/20 rounded-full blur-3xl pointer-events-none" />
 
           {/* 2D Vector Illustration Accent (Echo of sunlit rooftop array) */}
-          <div className="w-20 h-20 mx-auto mb-6 relative flex items-center justify-center">
+          <div className="w-20 h-20 mx-auto mb-4 relative flex items-center justify-center">
             <svg viewBox="0 0 100 100" className="w-full h-full">
               <g className="anim-sun-drift">
                 <circle cx="50" cy="50" r="28" fill="#FEF3C7" className="anim-sun-rays" />
@@ -34,6 +37,11 @@ export default function FinalCtaScene({ onOpenDemo }: FinalCtaSceneProps) {
               </g>
             </svg>
           </div>
+
+          {/* Scene 5 Pill */}
+          <span className="inline-block text-xs font-bold tracking-wider text-blue-600 uppercase mb-3">
+            Scene 05 • Take Action
+          </span>
 
           {/* Headline */}
           <h2 className="text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight text-slate-900 leading-[1.15] font-['Plus_Jakarta_Sans',sans-serif] max-w-2xl mx-auto">

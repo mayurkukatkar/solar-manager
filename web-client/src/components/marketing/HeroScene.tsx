@@ -8,33 +8,43 @@ interface HeroSceneProps {
 }
 
 export default function HeroScene({ onOpenDemo }: HeroSceneProps) {
+  const workflowPillars = [
+    { name: "Leads", desc: "Enquiry & OCR bills", tag: "Auto-synced" },
+    { name: "Quotations", desc: "60-sec luxury proposals", tag: "PM Surya Ghar" },
+    { name: "Projects", desc: "5-stage net-metering", tag: "DISCOM A-1" },
+    { name: "Installation", desc: "Execution & checklists", tag: "DCR Verified" },
+  ];
+
   return (
-    <section className="relative pt-36 pb-20 md:pt-44 md:pb-32 bg-white text-slate-900 overflow-hidden">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <section className="relative pt-32 pb-20 md:pt-40 md:pb-28 bg-grid-subtle text-slate-900 overflow-hidden">
+      {/* Soft gradient masks to fade the grid toward center and edges (Design Rule 1) */}
+      <div className="absolute inset-0 bg-gradient-to-b from-white/90 via-transparent to-white pointer-events-none" />
+      <div className="absolute inset-0 bg-radial from-transparent via-white/40 to-white/95 pointer-events-none" />
+
+      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center">
           
-          {/* Left Column: Story Copy & CTAs */}
+          {/* Left Column: Instant Product Clarity (Design Rule 2) */}
           <div className="lg:col-span-6 space-y-6 text-left">
-            {/* Category / Scope Pill */}
-            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-50 border border-slate-200 text-xs font-medium text-slate-700 shadow-2xs">
-              <span className="flex h-2 w-2 rounded-full bg-blue-600" />
-              <span className="font-semibold text-slate-900">WhereReady Solar OS</span>
-              <span className="text-slate-300">•</span>
-              <span>Software for Indian Solar EPCs &amp; Installers</span>
+            
+            {/* Category / Scope Pill: Explicit Software Identification */}
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-50/90 border border-blue-200/90 text-xs font-semibold text-blue-800 tracking-wide uppercase shadow-2xs">
+              <span className="flex h-2 w-2 rounded-full bg-blue-600 animate-pulse" />
+              <span>SOLAR BUSINESS MANAGEMENT SOFTWARE</span>
             </div>
 
             {/* Main Headline */}
-            <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold tracking-tight text-slate-900 leading-[1.1] font-['Plus_Jakarta_Sans',sans-serif]">
-              Every solar business starts with a{" "}
-              <span className="text-blue-600">possibility.</span>
+            <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold tracking-tight text-slate-900 leading-[1.08] font-['Plus_Jakarta_Sans',sans-serif]">
+              Run your entire solar business.{" "}
+              <span className="text-blue-600 block sm:inline">In one place.</span>
             </h1>
 
             {/* Supporting Copy */}
-            <p className="text-lg sm:text-xl text-slate-600 leading-relaxed max-w-xl font-normal">
-              Turn that possibility into a business that runs in sync. From first customer bill scan to DISCOM net-metering and commissioning — all in one calm, organized workflow.
+            <p className="text-base sm:text-lg sm:leading-relaxed text-slate-600 max-w-xl font-normal">
+              From customer enquiries and professional quotations to project execution and installation tracking.
             </p>
 
-            {/* CTAs */}
+            {/* Primary & Secondary CTAs */}
             <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center gap-3.5">
               <button
                 onClick={onOpenDemo}
@@ -45,196 +55,178 @@ export default function HeroScene({ onOpenDemo }: HeroSceneProps) {
               </button>
 
               <a
-                href="#proposal-demo"
-                className="inline-flex items-center justify-center gap-2 px-6 py-3.5 text-base font-semibold text-slate-700 hover:text-slate-900 bg-slate-50 hover:bg-slate-100 rounded-full border border-slate-200 transition-all text-center"
+                href="#problem"
+                className="inline-flex items-center justify-center gap-1.5 px-6 py-3.5 text-base font-semibold text-slate-700 hover:text-slate-900 bg-white/90 hover:bg-slate-50 rounded-full border border-slate-200 transition-all text-center shadow-2xs"
               >
-                <span>Explore Solar OS</span>
+                <span>See How It Works</span>
+                <span className="text-slate-400 font-mono text-sm">↓</span>
               </a>
             </div>
 
-            {/* Subtle Software Identification Badge */}
-            <div className="pt-4 flex items-center gap-6 text-xs text-slate-500">
+            {/* Connected Workflow Tags (Leads • Quotations • Projects • Installation) */}
+            <div className="pt-4 border-t border-slate-200/80">
+              <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2.5">
+                Connected Solar Workflow
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {workflowPillars.map((pillar) => (
+                  <div
+                    key={pillar.name}
+                    className="p-2.5 rounded-xl bg-white/95 border border-slate-200/90 shadow-2xs text-left"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-blue-600" />
+                      <span className="text-xs font-bold text-slate-800">{pillar.name}</span>
+                    </div>
+                    <span className="text-[10px] text-slate-500 block mt-0.5">{pillar.tag}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Trust Reassurance note */}
+            <div className="flex items-center gap-5 text-xs text-slate-500 pt-1">
               <span className="flex items-center gap-1.5">
                 <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                Pure SaaS Platform
+                Pure SaaS Solution
               </span>
               <span className="flex items-center gap-1.5">
                 <Zap className="w-4 h-4 text-amber-500" />
                 PM Surya Ghar Ready
               </span>
-              <span className="text-slate-400">Not an installation contractor</span>
+              <span className="text-slate-400 hidden sm:inline">Built for Indian Solar EPCs</span>
             </div>
           </div>
 
-          {/* Right Column: Original 2D Vector Illustration (Scene 1) */}
+          {/* Right Column: Illustrative Product UI & 2D Vector Direction (Scene 1) */}
           <div className="lg:col-span-6 relative flex items-center justify-center">
-            <div className="w-full max-w-lg aspect-[4/3] sm:aspect-square relative flex items-center justify-center">
+            
+            {/* Visual Container with Subtle Grid Fade */}
+            <div className="w-full max-w-xl relative">
               
-              {/* Soft background ambient halo */}
-              <div className="absolute inset-0 bg-gradient-to-tr from-blue-50/50 via-amber-50/30 to-transparent rounded-full blur-2xl pointer-events-none" />
-
-              {/* Master 2D Vector SVG Illustration */}
-              <svg
-                viewBox="0 0 540 460"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-                className="w-full h-full relative z-10"
-              >
-                {/* 1. Moving 2D Stylized Sun */}
-                <g className="anim-sun-drift">
-                  {/* Subtle outer pulsing ray ring */}
-                  <circle
-                    cx="430"
-                    cy="85"
-                    r="52"
-                    fill="#FEF3C7"
-                    fillOpacity="0.45"
-                    className="anim-sun-rays"
-                  />
-                  {/* Middle warm glow */}
-                  <circle
-                    cx="430"
-                    cy="85"
-                    r="38"
-                    fill="#FDE68A"
-                    fillOpacity="0.75"
-                  />
-                  {/* Sun core */}
-                  <circle
-                    cx="430"
-                    cy="85"
-                    r="26"
-                    fill="#F59E0B"
-                  />
-                  
-                  {/* Geometric Sun Ray Accents */}
-                  <line x1="430" y1="42" x2="430" y2="30" stroke="#F59E0B" strokeWidth="2.5" strokeLinecap="round" />
-                  <line x1="430" y1="128" x2="430" y2="140" stroke="#F59E0B" strokeWidth="2.5" strokeLinecap="round" />
-                  <line x1="387" y1="85" x2="375" y2="85" stroke="#F59E0B" strokeWidth="2.5" strokeLinecap="round" />
-                  <line x1="473" y1="85" x2="485" y2="85" stroke="#F59E0B" strokeWidth="2.5" strokeLinecap="round" />
-                  <line x1="400" y1="55" x2="391" y2="46" stroke="#F59E0B" strokeWidth="2.5" strokeLinecap="round" />
-                  <line x1="460" y1="115" x2="469" y2="124" stroke="#F59E0B" strokeWidth="2.5" strokeLinecap="round" />
-                  <line x1="400" y1="115" x2="391" y2="124" stroke="#F59E0B" strokeWidth="2.5" strokeLinecap="round" />
-                  <line x1="460" y1="55" x2="469" y2="46" stroke="#F59E0B" strokeWidth="2.5" strokeLinecap="round" />
-                </g>
-
-                {/* 2. Animated Sunlight Beams traveling toward Rooftop Panels */}
-                <g opacity="0.6">
-                  <path
-                    d="M 405 105 L 260 215"
-                    stroke="#FBBF24"
-                    strokeWidth="1.75"
-                    strokeDasharray="6 6"
-                    className="anim-dash-flow"
-                  />
-                  <path
-                    d="M 415 125 L 305 220"
-                    stroke="#FBBF24"
-                    strokeWidth="1.75"
-                    strokeDasharray="6 6"
-                    className="anim-dash-flow"
-                  />
-                  <path
-                    d="M 390 120 L 220 225"
-                    stroke="#FBBF24"
-                    strokeWidth="1.75"
-                    strokeDasharray="6 6"
-                    className="anim-dash-flow"
-                  />
-                </g>
-
-                {/* 3. Clean Modern Architectural Home (2D Flat Silhouette) */}
-                {/* Ground plane */}
-                <line x1="50" y1="410" x2="490" y2="410" stroke="#CBD5E1" strokeWidth="2" strokeLinecap="round" />
+              {/* Product Dashboard Card (Recognizable Software UI) */}
+              <div className="relative z-10 bg-white/95 backdrop-blur-md rounded-2xl border border-slate-200/90 shadow-xl shadow-slate-200/60 p-4 sm:p-5">
                 
-                {/* Main House Wall */}
-                <rect x="110" y="240" width="280" height="170" rx="4" fill="#F8FAFC" stroke="#334155" strokeWidth="2.5" />
-                
-                {/* Foundation base */}
-                <rect x="100" y="405" width="300" height="6" rx="2" fill="#94A3B8" />
-
-                {/* Angled Roof Structure */}
-                <polygon
-                  points="90,240 250,140 410,240"
-                  fill="#EEF2F6"
-                  stroke="#1E293B"
-                  strokeWidth="2.5"
-                  strokeLinejoin="round"
-                />
-
-                {/* Rooftop Solar PV Arrays (Layered on top of roof) */}
-                <g transform="translate(135, 172) rotate(-8)">
-                  {/* Solar Panel 1 */}
-                  <rect x="0" y="0" width="46" height="64" rx="2" fill="#1E3A8A" stroke="#0F172A" strokeWidth="1.5" />
-                  <line x1="23" y1="0" x2="23" y2="64" stroke="#60A5FA" strokeWidth="0.8" />
-                  <line x1="0" y1="21" x2="46" y2="21" stroke="#60A5FA" strokeWidth="0.8" />
-                  <line x1="0" y1="43" x2="46" y2="43" stroke="#60A5FA" strokeWidth="0.8" />
-
-                  {/* Solar Panel 2 */}
-                  <rect x="52" y="0" width="46" height="64" rx="2" fill="#1E3A8A" stroke="#0F172A" strokeWidth="1.5" />
-                  <line x1="75" y1="0" x2="75" y2="64" stroke="#60A5FA" strokeWidth="0.8" />
-                  <line x1="52" y1="21" x2="98" y2="21" stroke="#60A5FA" strokeWidth="0.8" />
-                  <line x1="52" y1="43" x2="98" y2="43" stroke="#60A5FA" strokeWidth="0.8" />
-
-                  {/* Solar Panel 3 */}
-                  <rect x="104" y="0" width="46" height="64" rx="2" fill="#1E3A8A" stroke="#0F172A" strokeWidth="1.5" />
-                  <line x1="127" y1="0" x2="127" y2="64" stroke="#60A5FA" strokeWidth="0.8" />
-                  <line x1="104" y1="21" x2="150" y2="21" stroke="#60A5FA" strokeWidth="0.8" />
-                  <line x1="104" y1="43" x2="150" y2="43" stroke="#60A5FA" strokeWidth="0.8" />
-
-                  {/* Solar Panel 4 */}
-                  <rect x="156" y="0" width="46" height="64" rx="2" fill="#1E3A8A" stroke="#0F172A" strokeWidth="1.5" />
-                  <line x1="179" y1="0" x2="179" y2="64" stroke="#60A5FA" strokeWidth="0.8" />
-                  <line x1="156" y1="21" x2="202" y2="21" stroke="#60A5FA" strokeWidth="0.8" />
-                  <line x1="156" y1="43" x2="202" y2="43" stroke="#60A5FA" strokeWidth="0.8" />
-                </g>
-
-                {/* House Architectural Details */}
-                {/* Modern Front Door */}
-                <rect x="225" y="300" width="50" height="110" rx="3" fill="#E2E8F0" stroke="#334155" strokeWidth="2" />
-                <circle cx="265" cy="355" r="3" fill="#1E293B" />
-
-                {/* Left Large Window with grid */}
-                <rect x="140" y="275" width="60" height="75" rx="3" fill="#BAE6FD" fillOpacity="0.4" stroke="#475569" strokeWidth="2" />
-                <line x1="170" y1="275" x2="170" y2="350" stroke="#475569" strokeWidth="1.5" />
-                <line x1="140" y1="312" x2="200" y2="312" stroke="#475569" strokeWidth="1.5" />
-
-                {/* Right Large Window */}
-                <rect x="300" y="275" width="60" height="75" rx="3" fill="#BAE6FD" fillOpacity="0.4" stroke="#475569" strokeWidth="2" />
-                <line x1="330" y1="275" x2="330" y2="350" stroke="#475569" strokeWidth="1.5" />
-                <line x1="300" y1="312" x2="360" y2="312" stroke="#475569" strokeWidth="1.5" />
-
-                {/* Inverter & Bi-directional Net Meter on Side Wall */}
-                <rect x="395" y="320" width="22" height="32" rx="2" fill="#FFFFFF" stroke="#0F172A" strokeWidth="1.75" />
-                <rect x="399" y="326" width="14" height="8" rx="1" fill="#10B981" />
-                <line x1="395" y1="340" x2="417" y2="340" stroke="#CBD5E1" strokeWidth="1" />
-                <path d="M 380 230 L 406 230 L 406 320" stroke="#64748B" strokeWidth="1.5" fill="none" />
-              </svg>
-
-              {/* 4. Popping Enquiry Notification Bubble (Scene 1 Customer Lead Event) */}
-              <div className="absolute -top-3 sm:top-2 left-2 sm:left-6 z-20 anim-pop">
-                <div className="bg-white/95 backdrop-blur-md border border-slate-200/90 rounded-2xl p-3 sm:p-4 shadow-xl shadow-slate-200/60 max-w-[260px] sm:max-w-[280px]">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-                    <span className="text-[11px] font-bold text-slate-800 tracking-wide uppercase">
-                      New Solar Enquiry
+                {/* Mockup Window Chrome */}
+                <div className="flex items-center justify-between pb-3.5 mb-3.5 border-b border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-slate-300" />
+                    <span className="w-2.5 h-2.5 rounded-full bg-slate-300" />
+                    <span className="w-2.5 h-2.5 rounded-full bg-slate-300" />
+                    <span className="ml-2 text-xs font-semibold text-slate-700">
+                      WhereReady Solar OS
                     </span>
-                    <span className="text-[10px] text-slate-400 ml-auto">Just now</span>
                   </div>
-                  <p className="text-xs font-semibold text-slate-900 mt-1">
-                    Rajesh K. • Baner, Pune
-                  </p>
-                  <p className="text-[11px] text-slate-500 mt-0.5">
-                    5.4 kW Rooftop • MSEDCL Bill Attached
-                  </p>
-                  <div className="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
-                    <span className="text-blue-600 font-medium">Ready in Solar OS →</span>
-                    <span className="px-1.5 py-0.5 bg-blue-50 text-blue-700 font-semibold rounded text-[10px]">
-                      60s Proposal
+                  <div className="flex items-center gap-2">
+                    <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      Live Business Engine
                     </span>
                   </div>
                 </div>
+
+                {/* Sub-header Stats Row */}
+                <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-4">
+                  <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                    <span className="text-[10px] text-slate-500 font-medium block">Active Leads</span>
+                    <span className="text-sm sm:text-base font-extrabold text-slate-900">24</span>
+                    <span className="text-[9px] text-emerald-600 font-medium block">+6 this week</span>
+                  </div>
+                  <div className="bg-blue-50/60 p-2.5 rounded-xl border border-blue-100">
+                    <span className="text-[10px] text-blue-700 font-medium block">Proposals Sent</span>
+                    <span className="text-sm sm:text-base font-extrabold text-blue-900">18</span>
+                    <span className="text-[9px] text-blue-600 font-medium block">₹42.8L Value</span>
+                  </div>
+                  <div className="bg-amber-50/60 p-2.5 rounded-xl border border-amber-100">
+                    <span className="text-[10px] text-amber-700 font-medium block">DISCOM Sync</span>
+                    <span className="text-sm sm:text-base font-extrabold text-amber-900">9 Active</span>
+                    <span className="text-[9px] text-amber-600 font-medium block">MSEDCL Net-Meter</span>
+                  </div>
+                </div>
+
+                {/* Active Lead & Proposal Card */}
+                <div className="bg-gradient-to-r from-slate-50 to-blue-50/30 p-3.5 rounded-xl border border-slate-200/80 mb-3.5">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-xs font-bold text-slate-900">
+                      Rajesh Kulkarni • Baner, Pune
+                    </span>
+                    <span className="text-[10px] font-semibold text-blue-600 bg-blue-100/70 px-2 py-0.5 rounded-full">
+                      Quotation Generated
+                    </span>
+                  </div>
+                  <div className="text-[11px] text-slate-600 flex flex-wrap gap-x-3 gap-y-1">
+                    <span>5.4 kW Rooftop</span>
+                    <span>•</span>
+                    <span>Tata Power Mono-Perc</span>
+                    <span>•</span>
+                    <span className="font-semibold text-slate-800">PM Surya Ghar Subsidy: ₹78,000</span>
+                  </div>
+                  
+                  {/* Connected Workflow Progress Stepper */}
+                  <div className="mt-3 pt-2.5 border-t border-slate-200/60 flex items-center justify-between text-[10px] font-medium text-slate-500">
+                    <span className="text-blue-700 font-bold flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
+                      1. Enquiry
+                    </span>
+                    <span className="text-blue-700 font-bold flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
+                      2. Survey
+                    </span>
+                    <span className="text-blue-700 font-bold flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
+                      3. Quote
+                    </span>
+                    <span className="text-slate-400 flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-slate-300" />
+                      4. DISCOM A-1
+                    </span>
+                    <span className="text-slate-400 flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-slate-300" />
+                      5. Installation
+                    </span>
+                  </div>
+                </div>
+
+                {/* 2D Vector Architectural Rooftop Asset embedded within product view */}
+                <div className="relative bg-slate-50 rounded-xl p-3 border border-slate-100 flex items-center gap-3">
+                  <div className="w-16 h-14 shrink-0 relative flex items-center justify-center">
+                    <svg viewBox="0 0 80 60" fill="none" className="w-full h-full">
+                      {/* Stylized house silhouette */}
+                      <polygon points="10,32 40,12 70,32" fill="#CBD5E1" />
+                      <rect x="18" y="32" width="44" height="24" fill="#F1F5F9" stroke="#94A3B8" strokeWidth="1" />
+                      {/* Solar PV panels */}
+                      <g transform="translate(24, 20) rotate(-10)">
+                        <rect x="0" y="0" width="16" height="10" rx="1" fill="#1E3A8A" stroke="#3B82F6" strokeWidth="0.5" />
+                        <rect x="18" y="0" width="16" height="10" rx="1" fill="#1E3A8A" stroke="#3B82F6" strokeWidth="0.5" />
+                      </g>
+                    </svg>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-xs font-bold text-slate-800">
+                      Rooftop Feasibility &amp; Generation Modeling
+                    </div>
+                    <div className="text-[11px] text-slate-500">
+                      Annual Yield: 8,100 kWh • Payback: 3.2 Years • Carbon Offset: 6.8 Tons
+                    </div>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-200 block">
+                      Sync Ready
+                    </span>
+                  </div>
+                </div>
+
               </div>
+
+              {/* Popping Badge Accent */}
+              <div className="absolute -top-3 -right-2 sm:-right-4 z-20 anim-pop">
+                <div className="bg-blue-600 text-white rounded-xl px-3 py-1.5 shadow-lg shadow-blue-500/30 flex items-center gap-1.5 text-xs font-semibold">
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>Proposal Created in 60s</span>
+                </div>
+              </div>
+
+              {/* Soft decorative ambient glow */}
+              <div className="absolute -inset-2 bg-gradient-to-tr from-blue-100/40 via-amber-100/20 to-transparent rounded-3xl blur-xl -z-10 pointer-events-none" />
 
             </div>
           </div>
