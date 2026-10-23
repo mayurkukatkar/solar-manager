@@ -1,7 +1,9 @@
 "use client";
 
 import React from "react";
-import { ArrowRight, Phone, Sun } from "lucide-react";
+import { ArrowRight, ShieldCheck } from "lucide-react";
+import GuideCharacter from "./GuideCharacter";
+import WhatsAppCta from "./WhatsAppCta";
 
 interface FinalCtaSceneProps {
   onOpenDemo?: () => void;
@@ -22,20 +24,13 @@ export default function FinalCtaScene({ onOpenDemo }: FinalCtaSceneProps) {
           <div className="absolute top-0 right-1/4 w-96 h-96 bg-amber-200/20 rounded-full blur-3xl pointer-events-none" />
           <div className="absolute -bottom-10 left-1/4 w-80 h-80 bg-blue-200/20 rounded-full blur-3xl pointer-events-none" />
 
-          {/* 2D Vector Illustration Accent (Echo of sunlit rooftop array) */}
-          <div className="w-20 h-20 mx-auto mb-4 relative flex items-center justify-center">
-            <svg viewBox="0 0 100 100" className="w-full h-full">
-              <g className="anim-sun-drift">
-                <circle cx="50" cy="50" r="28" fill="#FEF3C7" className="anim-sun-rays" />
-                <circle cx="50" cy="50" r="18" fill="#F59E0B" />
-              </g>
-              <g transform="translate(25, 45)">
-                <rect x="0" y="10" width="22" height="28" rx="2" fill="#1E3A8A" stroke="#0F172A" strokeWidth="1" />
-                <rect x="26" y="10" width="22" height="28" rx="2" fill="#1E3A8A" stroke="#0F172A" strokeWidth="1" />
-                <line x1="11" y1="10" x2="11" y2="38" stroke="#60A5FA" strokeWidth="0.8" />
-                <line x1="37" y1="10" x2="37" y2="38" stroke="#60A5FA" strokeWidth="0.8" />
-              </g>
-            </svg>
+          {/* Guide Character Celebrating Completed Journey & Inviting to Demo */}
+          <div className="mb-4 relative flex items-center justify-center">
+            <GuideCharacter
+              pose="celebrate"
+              size={78}
+              speechText="Ready to bring your solar team into sync!"
+            />
           </div>
 
           {/* Scene 5 Pill */}
@@ -63,15 +58,12 @@ export default function FinalCtaScene({ onOpenDemo }: FinalCtaSceneProps) {
               <ArrowRight className="w-4 h-4" />
             </button>
 
-            <a
-              href="https://wa.me/919890000000?text=Hello%20WhereReady%20Solar%20OS%20team,%20I%20would%20like%20to%20connect%20regarding%20the%20software."
-              target="_blank"
-              rel="noopener noreferrer"
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-4 text-base font-semibold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 rounded-full border border-emerald-200 transition-all"
-            >
-              <Phone className="w-4 h-4 text-emerald-600" />
-              <span>Chat on WhatsApp</span>
-            </a>
+            {/* Verified Business WhatsApp CTA (Item 1 in brief) */}
+            <WhatsAppCta
+              label="Chat on WhatsApp"
+              variant="button"
+              showCharacterWave={false}
+            />
           </div>
 
           {/* Reassurance */}

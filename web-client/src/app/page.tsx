@@ -14,6 +14,7 @@ import FaqSection from "@/components/marketing/FaqSection";
 import FinalCtaScene from "@/components/marketing/FinalCtaScene";
 import Footer from "@/components/marketing/Footer";
 import DemoModal from "@/components/marketing/DemoModal";
+import WhatsAppCta from "@/components/marketing/WhatsAppCta";
 
 export default function HomePage() {
   const [demoModalOpen, setDemoModalOpen] = useState(false);
@@ -39,7 +40,7 @@ export default function HomePage() {
         <ProblemScene />
 
         {/* Scene 3: See the solution — "One connected workflow. From enquiry to installation." */}
-        <WorkflowScene />
+        <WorkflowScene onOpenDemo={handleOpenDemo} />
 
         {/* Scene 4: Experience the product — "Create proposals. Track progress. Keep work moving." */}
         <QuotationScene onOpenDemo={handleOpenDemo} />
@@ -61,8 +62,11 @@ export default function HomePage() {
         <FinalCtaScene onOpenDemo={handleOpenDemo} />
       </main>
 
-      {/* Minimal Footer */}
+      {/* Minimal Footer with Verified Company Information */}
       <Footer />
+
+      {/* Floating Verified WhatsApp CTA (Item 1 in brief) */}
+      <WhatsAppCta variant="floating" showCharacterWave={true} />
 
       {/* Global Demo Booking Modal */}
       <DemoModal isOpen={demoModalOpen} onClose={handleCloseDemo} />

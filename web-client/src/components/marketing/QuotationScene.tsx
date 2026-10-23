@@ -12,6 +12,7 @@ import {
   ArrowRight,
   Info
 } from "lucide-react";
+import GuideCharacter from "./GuideCharacter";
 
 interface QuotationSceneProps {
   onOpenDemo?: () => void;
@@ -218,7 +219,22 @@ export default function QuotationScene({ onOpenDemo }: QuotationSceneProps) {
           </div>
 
           {/* Right Column: Dynamic Live Proposal Document Preview */}
-          <div className="lg:col-span-7 bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-lg shadow-slate-100 flex flex-col">
+          <div className="lg:col-span-7 flex flex-col">
+            {/* Guide Character dynamically reacting to proposal calculations */}
+            <div className="hidden sm:flex items-center gap-2.5 mb-3 bg-blue-50/80 border border-blue-200/80 rounded-2xl px-3.5 py-2 w-fit">
+              <GuideCharacter
+                pose="inspect"
+                size={34}
+                className="shrink-0"
+              />
+              <span className="text-xs font-semibold text-blue-900">
+                {centralSubsidy > 0
+                  ? `PM Surya Ghar Subsidy calculated: ₹${centralSubsidy.toLocaleString("en-IN")} deduction applied!`
+                  : `C&I Commercial Proposal with accelerated depreciation & GST ITC.`}
+              </span>
+            </div>
+
+            <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-lg shadow-slate-100 flex flex-col">
             
             {/* Document Header Bar */}
             <div className="px-6 py-4 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
@@ -451,6 +467,8 @@ export default function QuotationScene({ onOpenDemo }: QuotationSceneProps) {
         </div>
 
       </div>
-    </section>
-  );
+
+    </div>
+  </section>
+);
 }

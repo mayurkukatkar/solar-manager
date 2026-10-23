@@ -114,30 +114,38 @@ export default function Footer() {
             </ul>
           </div>
 
-          {/* Contact */}
+          {/* Contact (Verified Company Information) */}
           <div className="space-y-3">
             <p className="text-xs font-bold uppercase tracking-wider text-slate-900">Connect</p>
             <ul className="space-y-2 text-xs text-slate-500">
               <li className="flex items-center gap-2">
                 <Mail className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                <a href="mailto:support@whereready.com" className="hover:text-blue-600">
-                  support@whereready.com
+                <a href="mailto:info@whereready.com" className="hover:text-blue-600">
+                  info@whereready.com
                 </a>
               </li>
               <li className="flex items-center gap-2">
                 <Phone className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                 <a
-                  href="https://wa.me/919890000000?text=Hello%20WhereReady%20Solar%20OS%20team"
+                  href="https://wa.me/919270201883?text=Hi%20WhereReady%2C%20I'd%20like%20to%20learn%20more%20about%20WhereReady%20Solar%20OS%20and%20book%20a%20demo."
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="hover:text-blue-600"
+                  className="hover:text-blue-600 font-medium"
                 >
-                  WhatsApp: +91 98900 00000
+                  WhatsApp: +91 9270201883
                 </a>
               </li>
               <li className="flex items-center gap-2">
-                <MapPin className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                <span>Pune / Mumbai, Maharashtra</span>
+                <Phone className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                <a href="tel:+919270201883" className="hover:text-blue-600">
+                  Call: +91 9270201883
+                </a>
+              </li>
+              <li className="flex items-start gap-2 pt-1">
+                <MapPin className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
+                <span className="leading-snug">
+                  1/2, Belekar Layout, Gurukrupa Nagar, Hudkeshwar Road, Nagpur - 440034
+                </span>
               </li>
             </ul>
           </div>

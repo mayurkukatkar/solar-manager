@@ -90,7 +90,7 @@ export default function TermsPage() {
           <section className="space-y-3">
             <h2 className="text-xl font-bold text-slate-900">6. Governing Law &amp; Jurisdiction</h2>
             <p>
-              These Terms shall be governed by and construed in accordance with the laws of India. Any disputes arising under or in connection with these Terms shall be subject to the exclusive jurisdiction of the competent courts in Maharashtra, India.
+              These Terms shall be governed by and construed in accordance with the laws of India. Any legal notices shall be served to: WhereReady, 1/2, Belekar Layout, Gurukrupa Nagar, Hudkeshwar Road, Nagpur - 440034 (Email: info@whereready.com, Phone: +91 9270201883). Disputes shall be subject to the exclusive jurisdiction of the competent courts in Nagpur / Maharashtra, India.
             </p>
           </section>
         </div>

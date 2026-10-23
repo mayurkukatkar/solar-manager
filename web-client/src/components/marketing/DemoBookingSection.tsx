@@ -119,7 +119,7 @@ export default function DemoBookingSection() {
                 <p className="text-slate-500 text-[11px] mt-0.5">Chat directly with our product specialist.</p>
               </div>
               <a
-                href="https://wa.me/919890000000?text=Hello%20WhereReady%20Solar%20OS%20team,%20I%20would%20like%20to%20schedule%20a%20product%20demo."
+                href="https://wa.me/919270201883?text=Hi%20WhereReady%2C%20I'd%20like%20to%20learn%20more%20about%20WhereReady%20Solar%20OS%20and%20book%20a%20demo."
                 target="_blank"
                 rel="noopener noreferrer"
                 className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-full text-xs transition-colors shrink-0 flex items-center gap-1.5 shadow-2xs"
@@ -323,7 +323,7 @@ export default function DemoBookingSection() {
                 <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 text-xs text-slate-700 max-w-md mx-auto space-y-2">
                   <p className="text-slate-500">Want to connect right away?</p>
                   <a
-                    href={`https://wa.me/919890000000?text=${whatsappMessage}`}
+                    href={`https://wa.me/919270201883?text=${whatsappMessage}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center justify-center gap-2 w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-full transition-all shadow-2xs"

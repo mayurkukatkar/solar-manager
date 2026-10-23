@@ -97,12 +97,12 @@ export default function FaqSection() {
         <div className="mt-12 text-center text-xs text-slate-500">
           <span>Still have questions about a specific DISCOM or custom workflow? </span>
           <a
-            href="https://wa.me/919890000000?text=Hello%20WhereReady%20Solar%20OS%20team,%20I%20have%20a%20few%20questions%20before%20booking%20a%20demo."
+            href="https://wa.me/919270201883?text=Hi%20WhereReady%2C%20I'd%20like%20to%20learn%20more%20about%20WhereReady%20Solar%20OS%20and%20book%20a%20demo."
             target="_blank"
             rel="noopener noreferrer"
             className="text-blue-600 hover:text-blue-700 font-semibold underline underline-offset-4"
           >
-            Chat directly with our team on WhatsApp →
+            Chat directly with our team on WhatsApp (+91 9270201883) →
           </a>
         </div>
 

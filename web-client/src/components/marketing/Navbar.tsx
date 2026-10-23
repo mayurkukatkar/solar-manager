@@ -150,13 +150,13 @@ export default function Navbar({ onOpenDemo }: NavbarProps) {
                 <ArrowRight className="w-4 h-4" />
               </button>
               <a
-                href="https://wa.me/919890000000?text=Hello%20WhereReady%20Solar%20OS%20team,%20I%20would%20like%20to%20learn%20more%20about%20the%20software%20for%20my%20solar%20business."
+                href="https://wa.me/919270201883?text=Hi%20WhereReady%2C%20I'd%20like%20to%20learn%20more%20about%20WhereReady%20Solar%20OS%20and%20book%20a%20demo."
                 target="_blank"
                 rel="noopener noreferrer"
                 className="w-full py-2.5 text-sm font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-full text-center flex items-center justify-center gap-2"
               >
                 <Phone className="w-4 h-4" />
-                <span>Chat on WhatsApp</span>
+                <span>Chat on WhatsApp (9270201883)</span>
               </a>
             </div>
           </div>

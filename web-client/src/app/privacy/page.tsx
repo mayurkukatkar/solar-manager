@@ -93,10 +93,12 @@ export default function PrivacyPolicyPage() {
             <p>
               In accordance with the DPDP Act 2023, you have the right to access, rectify, or request deletion of personal information held by WhereReady. For any data protection inquiries or grievance notices, please contact:
             </p>
-            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 text-xs">
+            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 text-xs space-y-1">
               <p className="font-bold text-slate-900">Data Protection Officer / Grievance Officer</p>
-              <p className="text-slate-600 mt-1">WhereReady Privacy Office</p>
-              <p className="text-slate-600">Email: privacy@whereready.com</p>
+              <p className="text-slate-600">WhereReady • WhereReady Solar OS</p>
+              <p className="text-slate-600">Email: info@whereready.com / privacy@whereready.com</p>
+              <p className="text-slate-600">Phone / WhatsApp: +91 9270201883</p>
+              <p className="text-slate-600">Address: 1/2, Belekar Layout, Gurukrupa Nagar, Hudkeshwar Road, Nagpur - 440034</p>
               <p className="text-slate-600">Response timeframe: Within 7 business days</p>
             </div>
           </section>

@@ -236,7 +236,7 @@ export default function DemoModal({ isOpen, onClose }: DemoModalProps) {
             </p>
 
             <a
-              href={`https://wa.me/919890000000?text=${whatsappMessage}`}
+              href={`https://wa.me/919270201883?text=${whatsappMessage}`}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center justify-center gap-2 w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-full text-xs transition-all shadow-xs"

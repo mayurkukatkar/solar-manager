@@ -2,6 +2,7 @@
 
 import React from "react";
 import { ArrowRight, Sparkles, Zap, ShieldCheck, Sun } from "lucide-react";
+import GuideCharacter from "./GuideCharacter";
 
 interface HeroSceneProps {
   onOpenDemo?: () => void;
@@ -104,6 +105,15 @@ export default function HeroScene({ onOpenDemo }: HeroSceneProps) {
             {/* Visual Container with Subtle Grid Fade */}
             <div className="w-full max-w-xl relative">
               
+              {/* Friendly Product Guide Character welcoming visitors */}
+              <div className="absolute -top-14 -left-4 sm:-left-6 z-30 hidden sm:block">
+                <GuideCharacter
+                  pose="wave"
+                  size={64}
+                  speechText="Welcome to Solar OS!"
+                />
+              </div>
+
               {/* Product Dashboard Card (Recognizable Software UI) */}
               <div className="relative z-10 bg-white/95 backdrop-blur-md rounded-2xl border border-slate-200/90 shadow-xl shadow-slate-200/60 p-4 sm:p-5">
                 
