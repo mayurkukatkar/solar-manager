@@ -44,14 +44,14 @@ export default function HomePage() {
             ===================================================================== */}
         <div id="details-section" className="border-t border-slate-200 bg-slate-50/60 pt-16 pb-4">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center mb-8">
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest block">
-              Specifications, Pricing &amp; Simulator
+            <span className="text-[11px] font-bold text-blue-600 uppercase tracking-widest block">
+              For Solar Vendors &amp; EPC Installers
             </span>
             <h3 className="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-1">
-              Explore the Working Software &amp; Commercials
+              Explore the Software Tools, Simulator &amp; Pricing
             </h3>
             <p className="text-xs sm:text-sm text-slate-500 mt-2 max-w-xl mx-auto">
-              Configure proposal economics with accurate PM Surya Ghar subsidies, inspect live SaaS modules, and review transparent subscription plans.
+              Test the solar proposal engine with PM Surya Ghar subsidies, inspect real vendor SaaS modules, and pick a subscription plan for your solar company.
             </p>
           </div>
 

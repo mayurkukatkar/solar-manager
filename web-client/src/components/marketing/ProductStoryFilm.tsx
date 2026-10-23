@@ -14,9 +14,12 @@ import {
   ShieldCheck,
   Phone,
   MessageSquare,
-  ChevronDown
+  ChevronDown,
+  Laptop,
+  Layers,
+  Smartphone
 } from "lucide-react";
-import GuideCharacter, { CharacterPose } from "./GuideCharacter";
+import GuideCharacter from "./GuideCharacter";
 import WhatsAppCta from "./WhatsAppCta";
 
 interface ProductStoryFilmProps {
@@ -71,13 +74,13 @@ export default function ProductStoryFilm({ onOpenDemo }: ProductStoryFilmProps) 
               />
             </div>
             <span className="text-xs font-semibold text-slate-700">
-              {activeScene === 1 && "The World of Solar"}
-              {activeScene === 2 && "A Customer Appears"}
-              {activeScene === 3 && "The Quotation Forms"}
-              {activeScene === 4 && "The Project Moves Forward"}
-              {activeScene === 5 && "Installation Complete"}
-              {activeScene === 6 && "Everything Connects"}
-              {activeScene === 7 && "See It In Action"}
+              {activeScene === 1 && "Software for Solar Vendors"}
+              {activeScene === 2 && "Solar Vendor CRM & Leads"}
+              {activeScene === 3 && "60-Second Quotation Engine"}
+              {activeScene === 4 && "DISCOM Statutory Tracking"}
+              {activeScene === 5 && "Mobile App for Field Crews"}
+              {activeScene === 6 && "Unified Solar ERP"}
+              {activeScene === 7 && "Book a Software Demo"}
             </span>
           </div>
 
@@ -86,66 +89,114 @@ export default function ProductStoryFilm({ onOpenDemo }: ProductStoryFilmProps) 
             onClick={onOpenDemo}
             className="pointer-events-auto text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 px-4 py-1.5 rounded-full shadow-xs transition-all cursor-pointer"
           >
-            Book Free Demo ↗
+            Book Software Demo ↗
           </button>
         </div>
       </div>
 
       {/* =========================================================================
-          SCENE 1: THE WORLD OF SOLAR
-          "Full-width white canvas with a subtle square grid.
-           An original small blue animated character stands beside a beautiful
-           2D illustrated Indian home with rooftop solar panels.
-           Only show: 'Your solar business. In sync.'"
+          SCENE 1: THE SOFTWARE PROVIDER FOR SOLAR VENDORS
+          Crystal-clear distinction: We provide business software to solar vendors & EPCs.
           ========================================================================= */}
       <section
         ref={(el) => { sceneRefs.current[0] = el; }}
-        className="min-h-[85vh] sm:min-h-screen flex flex-col justify-center items-center py-20 px-4 sm:px-6 relative bg-grid-subtle overflow-hidden"
+        className="min-h-[90vh] sm:min-h-screen flex flex-col justify-center items-center py-20 px-4 sm:px-6 relative bg-grid-subtle overflow-hidden"
       >
         <div className="absolute inset-0 bg-radial from-transparent via-white/50 to-white pointer-events-none" />
 
         <div className="relative max-w-5xl mx-auto w-full text-center space-y-6">
           
-          {/* Subtle Brand Tag */}
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-50/90 border border-blue-200/90 text-[11px] font-extrabold text-blue-800 tracking-wider uppercase shadow-2xs">
+          {/* Explicit B2B Software Provider Tag */}
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-blue-50/90 border border-blue-200/90 text-xs font-extrabold text-blue-800 tracking-wide uppercase shadow-2xs">
             <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
-            <span>WhereReady Solar OS</span>
+            <span>B2B SOFTWARE FOR SOLAR VENDORS &amp; EPC INSTALLERS</span>
           </div>
 
-          {/* Strict Scene 1 Headline (Exact user brief: "Your solar business. In sync.") */}
+          {/* Main Headline: Unmistakably Identifies What We Provide */}
           <h1 className="text-4xl sm:text-6xl md:text-7xl font-extrabold tracking-tight text-slate-900 leading-[1.08] font-['Plus_Jakarta_Sans',sans-serif]">
-            Your solar business. <span className="text-blue-600 block sm:inline">In sync.</span>
+            The business software platform for{" "}
+            <span className="text-blue-600 block sm:inline">solar vendors.</span>
           </h1>
 
-          {/* Master Visual: Illustrated Indian Solar Home with Character */}
-          <div className="relative mt-8 max-w-3xl mx-auto rounded-3xl overflow-hidden border border-slate-200/90 shadow-2xl shadow-blue-500/10 group">
+          {/* Explicit Subheading: Eliminates ANY confusion about what we provide */}
+          <p className="text-base sm:text-xl text-slate-600 max-w-2xl mx-auto font-normal leading-relaxed">
+            WhereReady Solar OS is specialized management software that powers solar contractors. Coordinate customer enquiries, 60-second proposals, and DISCOM net-metering in one calm platform.
+          </p>
+
+          {/* High-Impact Clarification Banner */}
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-50 border border-amber-200 text-amber-900 text-xs font-medium">
+            <span className="font-bold text-amber-800">Notice:</span>
+            <span>We build software for solar vendors — we do not sell solar panels or install rooftops directly to consumers.</span>
+          </div>
+
+          {/* Master Visual: Solar OS Software Interface Frame on top of the Solar Home */}
+          <div className="relative mt-6 max-w-3xl mx-auto rounded-3xl overflow-hidden border border-slate-200/90 shadow-2xl shadow-blue-500/10 group">
+            
+            {/* Background Illustration of Solar Home */}
             <img
               src="/images/hero_solar_home.jpg"
-              alt="Illustrated modern Indian home with rooftop solar panels"
-              className="w-full h-72 sm:h-96 md:h-[460px] object-cover object-center transform transition-transform duration-700 group-hover:scale-105"
+              alt="WhereReady Solar OS software managing rooftop installations for solar vendors"
+              className="w-full h-80 sm:h-96 md:h-[480px] object-cover object-center transform transition-transform duration-700 group-hover:scale-105 opacity-90"
               loading="eager"
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent pointer-events-none" />
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/30 to-transparent pointer-events-none" />
 
-            {/* Guide Character standing proudly beside home */}
-            <div className="absolute bottom-6 left-6 z-20 flex items-center gap-3">
+            {/* Guide Character Sol welcoming the solar vendor */}
+            <div className="absolute top-5 right-5 z-20 hidden sm:block">
               <GuideCharacter
                 pose="wave"
                 size={70}
-                speechText="Welcome! Scroll to follow the journey."
+                speechText="Welcome Solar Contractors!"
               />
             </div>
 
-            {/* Live Rooftop Indicator */}
-            <div className="absolute top-5 right-5 z-20 bg-white/95 backdrop-blur-md px-3.5 py-2 rounded-2xl border border-slate-200/90 text-xs font-bold text-slate-800 shadow-md flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span>Sharma Villa • 5.4 kW Rooftop</span>
+            {/* Overlaid Solar OS Software Command Center (Shows this is a SOFTWARE PRODUCT) */}
+            <div className="absolute bottom-4 left-4 right-4 z-20 bg-white/95 backdrop-blur-md rounded-2xl border border-slate-200/90 p-4 shadow-xl text-left">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-2.5 mb-2.5 border-b border-slate-100 gap-1.5">
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold text-xs">
+                    OS
+                  </div>
+                  <div>
+                    <span className="text-xs font-extrabold text-slate-900 block">
+                      Solar Vendor Dashboard • Apex Solar EPC (Tenant)
+                    </span>
+                    <span className="text-[10px] text-slate-500">
+                      Managing 14 Active Customer Sites Across Maharashtra
+                    </span>
+                  </div>
+                </div>
+                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200 self-start sm:self-auto">
+                  Software Active • Live Sync
+                </span>
+              </div>
+
+              {/* Connected Modules in Software */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px]">
+                <div className="p-2 bg-slate-50 rounded-lg border border-slate-100">
+                  <span className="text-slate-400 block text-[9px] uppercase font-bold">Module 1</span>
+                  <span className="font-bold text-slate-800">Lead CRM &amp; OCR</span>
+                </div>
+                <div className="p-2 bg-slate-50 rounded-lg border border-slate-100">
+                  <span className="text-slate-400 block text-[9px] uppercase font-bold">Module 2</span>
+                  <span className="font-bold text-slate-800">60s Quotation Studio</span>
+                </div>
+                <div className="p-2 bg-slate-50 rounded-lg border border-slate-100">
+                  <span className="text-slate-400 block text-[9px] uppercase font-bold">Module 3</span>
+                  <span className="font-bold text-slate-800">DISCOM Form A-1</span>
+                </div>
+                <div className="p-2 bg-slate-50 rounded-lg border border-slate-100">
+                  <span className="text-slate-400 block text-[9px] uppercase font-bold">Module 4</span>
+                  <span className="font-bold text-slate-800">Field Mobile App</span>
+                </div>
+              </div>
             </div>
+
           </div>
 
           {/* Gentle Scroll Hint */}
-          <div className="pt-6 flex flex-col items-center justify-center text-xs font-medium text-slate-400 gap-1.5">
-            <span>Scroll to see how work moves forward</span>
+          <div className="pt-4 flex flex-col items-center justify-center text-xs font-medium text-slate-400 gap-1.5">
+            <span>Scroll to see how your solar team uses Solar OS</span>
             <ChevronDown className="w-4 h-4 animate-bounce text-blue-600" />
           </div>
 
@@ -153,10 +204,8 @@ export default function ProductStoryFilm({ onOpenDemo }: ProductStoryFilmProps) 
       </section>
 
       {/* =========================================================================
-          SCENE 2: A CUSTOMER APPEARS
-          "As the visitor scrolls, a floating customer enquiry enters the scene.
-           The character notices it, catches it and guides it into a clean product interface.
-           No explanatory paragraph. The visual itself demonstrates lead capture."
+          SCENE 2: CUSTOMER ENQUIRY INGESTION IN SOFTWARE
+          "Your sales team captures enquiries without spreadsheets."
           ========================================================================= */}
       <section
         ref={(el) => { sceneRefs.current[1] = el; }}
@@ -166,14 +215,18 @@ export default function ProductStoryFilm({ onOpenDemo }: ProductStoryFilmProps) 
 
         <div className="relative max-w-5xl mx-auto w-full text-center space-y-8">
           
-          {/* Minimal Label */}
-          <span className="inline-block text-xs font-bold tracking-wider text-blue-600 uppercase">
-            Scene 02 • A Customer Appears
+          {/* Explicit Software Module Label */}
+          <span className="inline-block text-xs font-bold tracking-wider text-blue-600 uppercase bg-blue-50 px-3 py-1 rounded-full border border-blue-200">
+            Software Module 01 • Solar Vendor CRM
           </span>
 
           <h2 className="text-3xl sm:text-5xl font-extrabold tracking-tight text-slate-900 font-['Plus_Jakarta_Sans',sans-serif]">
-            Every project begins with a conversation.
+            Your sales reps capture homeowner leads automatically.
           </h2>
+
+          <p className="text-sm sm:text-base text-slate-500 max-w-xl mx-auto font-normal">
+            When a homeowner messages your solar company, Solar OS reads the utility bill with OCR and creates an organized lead dossier in your vendor CRM.
+          </p>
 
           {/* Visual Showcase: Floating Enquiry Caught & Transformed into Clean Lead CRM */}
           <div className="relative max-w-3xl mx-auto bg-slate-50/80 border border-slate-200/90 rounded-3xl p-6 sm:p-10 shadow-lg">
@@ -183,40 +236,40 @@ export default function ProductStoryFilm({ onOpenDemo }: ProductStoryFilmProps) 
               <GuideCharacter
                 pose="point-right"
                 size={76}
-                speechText="New enquiry received on WhatsApp!"
+                speechText="Homeowner enquiry logged in your vendor CRM!"
               />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center text-left">
               
-              {/* Incoming Floating WhatsApp Enquiry */}
+              {/* Homeowner messaging the solar vendor */}
               <div className="bg-white p-5 rounded-2xl border border-emerald-200 shadow-md transition-transform hover:-translate-y-1">
                 <div className="flex items-center gap-2 mb-2.5">
                   <div className="w-7 h-7 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
                     <MessageSquare className="w-4 h-4 text-emerald-600" />
                   </div>
                   <div>
-                    <span className="text-xs font-bold text-slate-800 block">WhatsApp Enquiry</span>
-                    <span className="text-[10px] text-slate-400">Just now • Consumer</span>
+                    <span className="text-xs font-bold text-slate-800 block">Homeowner Inquiry to Your Business</span>
+                    <span className="text-[10px] text-slate-400">Via WhatsApp / Website Form</span>
                   </div>
                 </div>
                 <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 text-xs text-slate-700 leading-relaxed font-medium">
-                  &ldquo;Hi, I received a ₹6,800 electricity bill this month. Want to install rooftop solar at Baner, Pune. Can you share a quote?&rdquo;
+                  &ldquo;Hi, my monthly bill is ₹6,800. Can your solar company provide a quotation for rooftop solar at Baner, Pune?&rdquo;
                 </div>
                 <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200 inline-block mt-3">
                   Rajesh Kulkarni • Baner
                 </span>
               </div>
 
-              {/* Character Guides into Solar OS Clean Lead Interface */}
+              {/* Solar Vendor's Software Ingestion */}
               <div className="bg-white p-5 rounded-2xl border border-blue-200 shadow-md">
                 <div className="flex items-center justify-between mb-2.5">
                   <div className="flex items-center gap-2">
                     <ScanText className="w-4 h-4 text-blue-600" />
-                    <span className="text-xs font-bold text-slate-800">Auto-Created Lead Dossier</span>
+                    <span className="text-xs font-bold text-slate-800">Solar OS Vendor Lead Dossier</span>
                   </div>
                   <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
-                    OCR Parsed
+                    Bill OCR Extracted
                   </span>
                 </div>
                 <div className="space-y-1.5 text-xs text-slate-600">
@@ -235,14 +288,14 @@ export default function ProductStoryFilm({ onOpenDemo }: ProductStoryFilmProps) 
                 </div>
                 <div className="mt-3 flex items-center gap-1.5 text-[11px] text-emerald-600 font-semibold">
                   <CheckCircle2 className="w-3.5 h-3.5" />
-                  <span>Assigned to Site Surveyor</span>
+                  <span>Assigned to Your Sales Engineer</span>
                 </div>
               </div>
 
             </div>
 
             <div className="mt-6 text-center text-xs font-medium text-slate-400">
-              No manual re-typing • Utility bill OCR reads load and tariff automatically
+              No manual data entry • Your sales team moves 3x faster
             </div>
 
           </div>
@@ -251,11 +304,8 @@ export default function ProductStoryFilm({ onOpenDemo }: ProductStoryFilmProps) 
       </section>
 
       {/* =========================================================================
-          SCENE 3: THE QUOTATION FORMS
-          "The enquiry card transforms into customer details.
-           A proposal unfolds from a single sheet into a beautiful solar quotation preview.
-           Animate the actual quotation interface wherever possible.
-           Do not invent figures or use AI-generated illegible UI text."
+          SCENE 3: THE PROPOSAL BUILDER FOR SOLAR VENDORS
+          "Your team creates branded solar quotations in 60 seconds."
           ========================================================================= */}
       <section
         ref={(el) => { sceneRefs.current[2] = el; }}
@@ -265,16 +315,20 @@ export default function ProductStoryFilm({ onOpenDemo }: ProductStoryFilmProps) 
 
         <div className="relative max-w-5xl mx-auto w-full text-center space-y-8">
           
-          {/* Minimal Label */}
-          <span className="inline-block text-xs font-bold tracking-wider text-amber-600 uppercase">
-            Scene 03 • The Quotation Forms
+          {/* Explicit Software Module Label */}
+          <span className="inline-block text-xs font-bold tracking-wider text-amber-600 uppercase bg-amber-50 px-3 py-1 rounded-full border border-amber-200">
+            Software Module 02 • 60-Second Proposal Studio
           </span>
 
           <h2 className="text-3xl sm:text-5xl font-extrabold tracking-tight text-slate-900 font-['Plus_Jakarta_Sans',sans-serif]">
-            A proposal in 60 seconds. Legible and accurate.
+            Your solar company generates luxury proposals in 60 seconds.
           </h2>
 
-          {/* Visual Showcase: Real Proposal Preview Unfolding */}
+          <p className="text-sm sm:text-base text-slate-500 max-w-xl mx-auto font-normal">
+            Generate branded client proposals under your solar company&apos;s name with accurate PM Surya Ghar subsidies, your profit margins, and 25-year financial ROI.
+          </p>
+
+          {/* Visual Showcase: Real Proposal Generated by the Solar Vendor */}
           <div className="relative max-w-3xl mx-auto">
             
             {/* Guide Character Inspecting Calculation */}
@@ -282,23 +336,23 @@ export default function ProductStoryFilm({ onOpenDemo }: ProductStoryFilmProps) 
               <GuideCharacter
                 pose="inspect"
                 size={76}
-                speechText="Central PM Surya Ghar subsidy applied: ₹78,000!"
+                speechText="Central PM Surya Ghar subsidy deducted: ₹78,000!"
               />
             </div>
 
             {/* Actual Legible Proposal Canvas */}
             <div className="bg-white border border-slate-200/90 rounded-3xl p-6 sm:p-8 shadow-xl text-left relative overflow-hidden">
               
-              {/* Proposal Document Header */}
+              {/* Proposal Document Header with Vendor Branding */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 mb-5 border-b border-slate-100 gap-2">
                 <div>
                   <span className="text-[10px] font-bold text-blue-600 uppercase tracking-widest">
-                    SOLAR SYSTEM PROPOSAL #WR-2026-902
+                    PROPOSAL BY APEX SOLAR EPC (SOLAR VENDOR)
                   </span>
                   <h3 className="text-xl font-extrabold text-slate-900">
-                    5.4 kW High-Efficiency Rooftop
+                    5.4 kW High-Efficiency Rooftop Proposal
                   </h3>
-                  <p className="text-xs text-slate-500">Prepared for Rajesh Kulkarni • Baner, Pune</p>
+                  <p className="text-xs text-slate-500">Prepared for Client: Rajesh Kulkarni • Baner, Pune</p>
                 </div>
                 <div className="bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-xl self-start sm:self-auto">
                   <span className="text-xs font-bold text-emerald-800 flex items-center gap-1.5">
@@ -328,7 +382,7 @@ export default function ProductStoryFilm({ onOpenDemo }: ProductStoryFilmProps) 
                 </div>
               </div>
 
-              {/* Bill of Materials Hardware Preview */}
+              {/* Bill of Materials Hardware Configured by the Vendor */}
               <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-2 text-xs">
                 <div className="font-bold text-slate-800 text-[11px] uppercase tracking-wider">
                   Configured Hardware Specifications
@@ -342,8 +396,8 @@ export default function ProductStoryFilm({ onOpenDemo }: ProductStoryFilmProps) 
                   <span className="text-slate-900 font-semibold">98.4% Efficiency</span>
                 </div>
                 <div className="flex justify-between items-center text-slate-600">
-                  <span>HDGI Elev. Structure (Wind load: 150 km/h) + Pure Copper Earthing</span>
-                  <span className="text-slate-900 font-semibold">25-Yr Warranty</span>
+                  <span>HDGI Elevated Structure + Chemical Earthing Kit</span>
+                  <span className="text-slate-900 font-semibold">Configured Margin: 18%</span>
                 </div>
               </div>
 
@@ -355,10 +409,8 @@ export default function ProductStoryFilm({ onOpenDemo }: ProductStoryFilmProps) 
       </section>
 
       {/* =========================================================================
-          SCENE 4: THE PROJECT MOVES FORWARD
-          "The quotation transforms into a project timeline.
-           Tasks, milestones and installation updates connect through an animated blue line.
-           The character guides the viewer's attention through each transformation."
+          SCENE 4: DISCOM STATUTORY WORKFLOW ENGINE FOR VENDORS
+          "Your project engineers track state DISCOM net-metering paperwork."
           ========================================================================= */}
       <section
         ref={(el) => { sceneRefs.current[3] = el; }}
@@ -368,14 +420,18 @@ export default function ProductStoryFilm({ onOpenDemo }: ProductStoryFilmProps) 
 
         <div className="relative max-w-5xl mx-auto w-full text-center space-y-8">
           
-          {/* Minimal Label */}
-          <span className="inline-block text-xs font-bold tracking-wider text-blue-600 uppercase">
-            Scene 04 • The Project Moves Forward
+          {/* Explicit Software Module Label */}
+          <span className="inline-block text-xs font-bold tracking-wider text-blue-600 uppercase bg-blue-50 px-3 py-1 rounded-full border border-blue-200">
+            Software Module 03 • Statutory DISCOM Net-Metering Hub
           </span>
 
           <h2 className="text-3xl sm:text-5xl font-extrabold tracking-tight text-slate-900 font-['Plus_Jakarta_Sans',sans-serif]">
-            Every milestone connected by a single thread.
+            Your project engineers track DISCOM net-metering in software.
           </h2>
+
+          <p className="text-sm sm:text-base text-slate-500 max-w-xl mx-auto font-normal">
+            No lost papers or delays. Solar OS manages MSEDCL Form A-1 submissions, technical feasibility reports, and serial dispatch in one centralized software pipeline.
+          </p>
 
           {/* Visual Showcase: Project Timeline Connected by Animated Blue Line */}
           <div className="relative max-w-3xl mx-auto bg-white border border-slate-200/90 rounded-3xl p-6 sm:p-10 shadow-xl text-left">
@@ -385,7 +441,7 @@ export default function ProductStoryFilm({ onOpenDemo }: ProductStoryFilmProps) 
               <GuideCharacter
                 pose="guide"
                 size={76}
-                speechText="MSEDCL DISCOM Form A-1 sanctioned!"
+                speechText="MSEDCL Form A-1 statutory approval recorded in software!"
               />
             </div>
 
@@ -401,7 +457,7 @@ export default function ProductStoryFilm({ onOpenDemo }: ProductStoryFilmProps) 
                   <div className="flex justify-between items-center text-xs">
                     <strong className="text-slate-900">DISCOM Form A-1 Net-Meter Application</strong>
                     <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded">
-                      Approved
+                      Approved in Software
                     </span>
                   </div>
                   <p className="text-xs text-slate-500 mt-0.5">
@@ -419,11 +475,11 @@ export default function ProductStoryFilm({ onOpenDemo }: ProductStoryFilmProps) 
                   <div className="flex justify-between items-center text-xs">
                     <strong className="text-slate-900">Serialized Material Dispatch</strong>
                     <span className="text-[10px] font-bold text-blue-700 bg-blue-100 px-2 py-0.5 rounded">
-                      Dispatched
+                      Warehouse Scanned
                     </span>
                   </div>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    10x DCR Module Barcodes (TC55-2026-9041 to 9052) assigned from central warehouse
+                    10x DCR Module Barcodes (TC55-2026-9041 to 9052) logged in inventory ledger
                   </p>
                 </div>
               </div>
@@ -435,13 +491,13 @@ export default function ProductStoryFilm({ onOpenDemo }: ProductStoryFilmProps) 
                 </span>
                 <div className="bg-emerald-50/50 p-3.5 rounded-xl border border-emerald-200">
                   <div className="flex justify-between items-center text-xs">
-                    <strong className="text-emerald-900">Rooftop Installation &amp; Chemical Earthing</strong>
+                    <strong className="text-emerald-900">Site Inspection &amp; WCR Submission</strong>
                     <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded">
-                      Site Verified
+                      Verified by Engineer
                     </span>
                   </div>
                   <p className="text-xs text-emerald-800 mt-0.5">
-                    Structural tilt 18° verified • Resistance &lt; 2 Ohms certified
+                    Test certificate attached • Ready for utility net-meter installation
                   </p>
                 </div>
               </div>
@@ -454,9 +510,8 @@ export default function ProductStoryFilm({ onOpenDemo }: ProductStoryFilmProps) 
       </section>
 
       {/* =========================================================================
-          SCENE 5: INSTALLATION
-          "The illustrated project transitions into a rooftop solar installation.
-           Panels appear, milestones complete and the character celebrates subtly."
+          SCENE 5: MOBILE APP FOR SOLAR CREWS & SERIAL VERIFICATION
+          "Your site technicians log module barcodes and commissioning on mobile."
           ========================================================================= */}
       <section
         ref={(el) => { sceneRefs.current[4] = el; }}
@@ -466,48 +521,52 @@ export default function ProductStoryFilm({ onOpenDemo }: ProductStoryFilmProps) 
 
         <div className="relative max-w-5xl mx-auto w-full text-center space-y-8">
           
-          {/* Minimal Label */}
-          <span className="inline-block text-xs font-bold tracking-wider text-emerald-600 uppercase">
-            Scene 05 • Installation
+          {/* Explicit Software Module Label */}
+          <span className="inline-block text-xs font-bold tracking-wider text-emerald-600 uppercase bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">
+            Software Module 04 • Mobile Field App for Crews
           </span>
 
           <h2 className="text-3xl sm:text-5xl font-extrabold tracking-tight text-slate-900 font-['Plus_Jakarta_Sans',sans-serif]">
-            Turned on. Generating clean power.
+            Your rooftop crew verifies barcodes &amp; uploads reports on mobile.
           </h2>
+
+          <p className="text-sm sm:text-base text-slate-500 max-w-xl mx-auto font-normal">
+            Technicians scan DCR solar module serials and upload structural inspection photos straight from the roof into the Solar OS mobile app.
+          </p>
 
           {/* Master Visual: Completed Rooftop Installation Scene */}
           <div className="relative max-w-3xl mx-auto rounded-3xl overflow-hidden border border-slate-200/90 shadow-2xl shadow-blue-500/10 group">
             <img
               src="/images/project_installation_sync.jpg"
-              alt="Completed rooftop solar panel installation and net-meter commissioning"
+              alt="WhereReady Solar OS field app verifying on-site solar installation"
               className="w-full h-72 sm:h-96 md:h-[460px] object-cover object-center transform transition-transform duration-700 group-hover:scale-105"
               loading="lazy"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-slate-950/30 to-transparent pointer-events-none" />
 
-            {/* Guide Character Celebrating Subtly */}
+            {/* Guide Character Celebrating */}
             <div className="absolute top-6 right-6 z-20">
               <GuideCharacter
                 pose="celebrate"
                 size={78}
-                speechText="Site commissioned & verified!"
+                speechText="Site commissioned in your software!"
               />
             </div>
 
             {/* Floating Handover Status Badge */}
             <div className="absolute bottom-6 left-6 right-6 z-20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-white">
-              <div className="bg-slate-900/80 backdrop-blur-md px-4 py-2.5 rounded-2xl border border-white/20">
+              <div className="bg-slate-900/80 backdrop-blur-md px-4 py-2.5 rounded-2xl border border-white/20 text-left">
                 <span className="text-xs font-extrabold flex items-center gap-2">
                   <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
-                  MSEDCL Bi-Directional Net-Meter Active ⚡
+                  Solar OS Mobile Sync: Commissioning Passed ✓
                 </span>
                 <span className="text-[11px] text-slate-300 block mt-0.5">
-                  Work Completion Report (WCR) Submitted • DBT Subsidy Ready
+                  Work Completion Report (WCR) Generated • National Portal DBT Export Ready
                 </span>
               </div>
 
               <div className="bg-emerald-500 text-white px-3.5 py-1.5 rounded-xl text-xs font-bold shadow-md self-end sm:self-auto">
-                Clean Power Online ✓
+                Handover Certified ✓
               </div>
             </div>
 
@@ -517,9 +576,8 @@ export default function ProductStoryFilm({ onOpenDemo }: ProductStoryFilmProps) 
       </section>
 
       {/* =========================================================================
-          SCENE 6: EVERYTHING CONNECTS
-          "Pull back to reveal the complete lead-to-installation journey as one coherent visual composition.
-           Use only small labels if needed: Lead → Quotation → Project → Installation."
+          SCENE 6: EVERYTHING CONNECTS IN ONE SOLAR SOFTWARE
+          "Replace 5 disconnected tools with one software built for solar vendors."
           ========================================================================= */}
       <section
         ref={(el) => { sceneRefs.current[5] = el; }}
@@ -529,16 +587,20 @@ export default function ProductStoryFilm({ onOpenDemo }: ProductStoryFilmProps) 
 
         <div className="relative max-w-5xl mx-auto w-full text-center space-y-8">
           
-          {/* Minimal Label */}
-          <span className="inline-block text-xs font-bold tracking-wider text-blue-600 uppercase">
-            Scene 06 • Everything Connects
+          {/* Explicit Software System Label */}
+          <span className="inline-block text-xs font-bold tracking-wider text-blue-600 uppercase bg-blue-50 px-3 py-1 rounded-full border border-blue-200">
+            Unified Solar ERP • Software Architecture
           </span>
 
           <h2 className="text-3xl sm:text-5xl font-extrabold tracking-tight text-slate-900 font-['Plus_Jakarta_Sans',sans-serif]">
-            One coherent journey. No disconnected tools.
+            Replace 5 disconnected tools with one software built for solar vendors.
           </h2>
 
-          {/* Master Pull-Back Panorama: 4 Pillars in a Connected Circuit */}
+          <p className="text-sm sm:text-base text-slate-500 max-w-xl mx-auto font-normal">
+            No more lost WhatsApp chats, broken Excel formulas, or missing paperwork. Run your entire solar business in one software.
+          </p>
+
+          {/* Master Pull-Back Panorama: 4 Software Modules Connected */}
           <div className="relative max-w-4xl mx-auto bg-white/95 backdrop-blur-md border border-slate-200/90 rounded-3xl p-6 sm:p-10 shadow-xl">
             
             {/* Guide Character in Center */}
@@ -546,57 +608,57 @@ export default function ProductStoryFilm({ onOpenDemo }: ProductStoryFilmProps) 
               <GuideCharacter
                 pose="guide"
                 size={80}
-                speechText="The entire solar lifecycle in one place."
+                speechText="4 core software modules working in sync."
               />
             </div>
 
-            {/* 4 Connected Nodes (Lead → Quotation → Project → Installation) */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 relative">
+            {/* 4 Software Modules for the Solar Vendor */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 relative text-left">
               
               {/* Connecting Horizontal Line (Desktop) */}
               <div className="hidden md:block absolute top-10 left-12 right-12 h-0.5 bg-blue-200 -z-10" />
 
-              {/* Node 1: Lead */}
-              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-center hover:border-blue-400 transition-colors shadow-2xs">
-                <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center mx-auto mb-2 font-bold text-xs shadow-xs">
+              {/* Module 1: Vendor CRM */}
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 hover:border-blue-400 transition-colors shadow-2xs">
+                <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center mb-2 font-bold text-xs shadow-xs">
                   01
                 </div>
-                <h4 className="font-extrabold text-sm text-slate-900">Lead</h4>
-                <p className="text-[11px] text-slate-500 mt-1">WhatsApp &amp; OCR Ingestion</p>
+                <h4 className="font-extrabold text-sm text-slate-900">Solar CRM</h4>
+                <p className="text-[11px] text-slate-500 mt-1">WhatsApp &amp; Utility Bill OCR</p>
               </div>
 
-              {/* Node 2: Quotation */}
-              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-center hover:border-blue-400 transition-colors shadow-2xs">
-                <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center mx-auto mb-2 font-bold text-xs shadow-xs">
+              {/* Module 2: Proposal Studio */}
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 hover:border-blue-400 transition-colors shadow-2xs">
+                <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center mb-2 font-bold text-xs shadow-xs">
                   02
                 </div>
-                <h4 className="font-extrabold text-sm text-slate-900">Quotation</h4>
-                <p className="text-[11px] text-slate-500 mt-1">60-sec Surya Ghar Proposal</p>
+                <h4 className="font-extrabold text-sm text-slate-900">Proposal Studio</h4>
+                <p className="text-[11px] text-slate-500 mt-1">60s PM Surya Ghar Builder</p>
               </div>
 
-              {/* Node 3: Project */}
-              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-center hover:border-blue-400 transition-colors shadow-2xs">
-                <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center mx-auto mb-2 font-bold text-xs shadow-xs">
+              {/* Module 3: DISCOM Engine */}
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 hover:border-blue-400 transition-colors shadow-2xs">
+                <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center mb-2 font-bold text-xs shadow-xs">
                   03
                 </div>
-                <h4 className="font-extrabold text-sm text-slate-900">Project</h4>
-                <p className="text-[11px] text-slate-500 mt-1">DISCOM Net-Meter Hub</p>
+                <h4 className="font-extrabold text-sm text-slate-900">DISCOM Engine</h4>
+                <p className="text-[11px] text-slate-500 mt-1">Form A-1 &amp; WCR Dossiers</p>
               </div>
 
-              {/* Node 4: Installation */}
-              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-center hover:border-blue-400 transition-colors shadow-2xs">
-                <div className="w-10 h-10 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto mb-2 font-bold text-xs shadow-xs">
+              {/* Module 4: Mobile Crew App */}
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 hover:border-blue-400 transition-colors shadow-2xs">
+                <div className="w-10 h-10 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center mb-2 font-bold text-xs shadow-xs">
                   04
                 </div>
-                <h4 className="font-extrabold text-sm text-slate-900">Installation</h4>
-                <p className="text-[11px] text-slate-500 mt-1">DCR Sync &amp; Commissioning</p>
+                <h4 className="font-extrabold text-sm text-slate-900">Crew Mobile App</h4>
+                <p className="text-[11px] text-slate-500 mt-1">DCR Serial Barcode Scanner</p>
               </div>
 
             </div>
 
-            {/* Minimal Flow Arrow Label */}
+            {/* Clear Software Architecture Label */}
             <div className="mt-8 pt-4 border-t border-slate-100 text-center text-xs font-bold text-blue-700">
-              Lead → Quotation → Project → Installation
+              One Software License • Unlimited Team Users &bull; Multi-Tenant Isolated
             </div>
 
           </div>
@@ -605,10 +667,8 @@ export default function ProductStoryFilm({ onOpenDemo }: ProductStoryFilmProps) 
       </section>
 
       {/* =========================================================================
-          SCENE 7: THE INVITATION
-          "The character returns beside the completed solar home.
-           Show one prominent CTA: 'See it in action.'
-           Button opens the existing demo-booking flow."
+          SCENE 7: CALL TO ACTION FOR SOLAR VENDORS
+          "Book a demo of the software."
           ========================================================================= */}
       <section
         ref={(el) => { sceneRefs.current[6] = el; }}
@@ -618,11 +678,11 @@ export default function ProductStoryFilm({ onOpenDemo }: ProductStoryFilmProps) 
 
         <div className="relative max-w-4xl mx-auto w-full text-center space-y-8">
           
-          {/* Master Visual: Completed Sunlit Home Finale */}
+          {/* Master Visual: Completed Sunlit Home with Software Success */}
           <div className="relative max-w-3xl mx-auto rounded-3xl overflow-hidden border border-slate-200/90 shadow-2xl shadow-blue-500/10 group">
             <img
               src="/images/final_solar_showcase.jpg"
-              alt="Commissioned rooftop solar system in full sunshine"
+              alt="WhereReady Solar OS powering successful solar vendors across India"
               className="w-full h-72 sm:h-96 md:h-[440px] object-cover object-center transform transition-transform duration-700 group-hover:scale-105"
               loading="lazy"
             />
@@ -633,21 +693,21 @@ export default function ProductStoryFilm({ onOpenDemo }: ProductStoryFilmProps) 
               <GuideCharacter
                 pose="celebrate"
                 size={80}
-                speechText="Ready to bring your solar business into sync?"
+                speechText="Take your solar company to the next level!"
               />
             </div>
 
             <div className="absolute bottom-6 left-6 right-6 z-20 text-white text-left">
               <span className="text-[11px] font-bold text-amber-300 uppercase tracking-wider block">
-                WhereReady Solar OS
+                B2B SOFTWARE FOR SOLAR CONTRACTORS &amp; EPCS
               </span>
               <p className="text-xl sm:text-2xl font-extrabold text-white">
-                Your solar business. In sync.
+                Run your solar company on WhereReady Solar OS.
               </p>
             </div>
           </div>
 
-          {/* Prominent Single Invitation CTA (Requirement 7: "See it in action") */}
+          {/* Prominent Invitation CTA for Solar Vendors */}
           <div className="space-y-4">
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
               <button
@@ -655,23 +715,26 @@ export default function ProductStoryFilm({ onOpenDemo }: ProductStoryFilmProps) 
                 onClick={onOpenDemo}
                 className="w-full sm:w-auto inline-flex items-center justify-center gap-3 px-10 py-5 text-lg font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-full shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all cursor-pointer focus:outline-none focus:ring-4 focus:ring-blue-500/20"
               >
-                <span>See it in action</span>
+                <span>Book a Free Software Demo</span>
                 <ArrowRight className="w-5 h-5" />
               </button>
 
               <WhatsAppCta
-                label="Chat on WhatsApp"
+                label="Chat with Software Specialist"
                 variant="button"
                 showCharacterWave={false}
               />
             </div>
 
+            {/* Explicit Notice Eliminating Any Confusion */}
+            <div className="max-w-xl mx-auto bg-slate-50 border border-slate-200 rounded-2xl p-4 text-xs text-slate-500 text-center leading-relaxed">
+              <strong className="text-slate-800 block mb-0.5">Software Provider Notice:</strong>
+              WhereReady develops and licenses business management software for solar contractors, EPCs, and installation vendors across India. We do not manufacture solar panels or offer direct installation services.
+            </div>
+
             {/* Verified Business Details */}
-            <div className="text-xs text-slate-500 pt-2 space-y-1">
-              <p>Personalized 20-minute walkthrough • No commitments</p>
-              <p className="text-[11px] text-slate-400">
-                Nagpur: 1/2, Belekar Layout, Gurukrupa Nagar, Hudkeshwar Road - 440034 • Phone/WhatsApp: 9270201883
-              </p>
+            <div className="text-xs text-slate-400 pt-1">
+              Nagpur: 1/2, Belekar Layout, Gurukrupa Nagar, Hudkeshwar Road - 440034 • Phone/WhatsApp: 9270201883 • Email: info@whereready.com
             </div>
           </div>
 
