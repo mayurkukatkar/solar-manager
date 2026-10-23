@@ -2,19 +2,16 @@
 
 import React, { useState } from "react";
 import Navbar from "@/components/marketing/Navbar";
-import HeroScene from "@/components/marketing/HeroScene";
-import ProblemScene from "@/components/marketing/ProblemScene";
-import WorkflowScene from "@/components/marketing/WorkflowScene";
+import ProductStoryFilm from "@/components/marketing/ProductStoryFilm";
 import QuotationScene from "@/components/marketing/QuotationScene";
 import ProductExperienceScene from "@/components/marketing/ProductExperienceScene";
-import BenefitsScene from "@/components/marketing/BenefitsScene";
 import PricingScene from "@/components/marketing/PricingScene";
 import TrustSecuritySection from "@/components/marketing/TrustSecuritySection";
 import FaqSection from "@/components/marketing/FaqSection";
-import FinalCtaScene from "@/components/marketing/FinalCtaScene";
 import Footer from "@/components/marketing/Footer";
 import DemoModal from "@/components/marketing/DemoModal";
 import WhatsAppCta from "@/components/marketing/WhatsAppCta";
+import { ChevronDown } from "lucide-react";
 
 export default function HomePage() {
   const [demoModalOpen, setDemoModalOpen] = useState(false);
@@ -33,39 +30,52 @@ export default function HomePage() {
       <Navbar onOpenDemo={handleOpenDemo} />
 
       <main>
-        {/* Scene 1: Understand — "Run your entire solar business. In one place." */}
-        <HeroScene onOpenDemo={handleOpenDemo} />
+        {/* =====================================================================
+            PRIMARY VISUAL NARRATIVE: 7-SCENE ANIMATED PRODUCT FILM
+            (85-90% Visual Storytelling / 10-15% Essential Text / No Card Grids)
+            ===================================================================== */}
+        <ProductStoryFilm onOpenDemo={handleOpenDemo} />
 
-        {/* Scene 2: Recognize the problem — "Leads, quotations and projects shouldn't live in different places." */}
-        <ProblemScene />
+        {/* =====================================================================
+            SECONDARY DEEP-DIVE SECTIONS (BELOW THE PRIMARY VISUAL NARRATIVE)
+            "Keep pricing, detailed features, legal information and FAQs on
+             secondary pages or below the primary visual narrative. Preserve
+             existing working product features, quotation calculations, forms."
+            ===================================================================== */}
+        <div id="details-section" className="border-t border-slate-200 bg-slate-50/60 pt-16 pb-4">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center mb-8">
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest block">
+              Specifications, Pricing &amp; Simulator
+            </span>
+            <h3 className="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-1">
+              Explore the Working Software &amp; Commercials
+            </h3>
+            <p className="text-xs sm:text-sm text-slate-500 mt-2 max-w-xl mx-auto">
+              Configure proposal economics with accurate PM Surya Ghar subsidies, inspect live SaaS modules, and review transparent subscription plans.
+            </p>
+          </div>
 
-        {/* Scene 3: See the solution — "One connected workflow. From enquiry to installation." */}
-        <WorkflowScene onOpenDemo={handleOpenDemo} />
+          {/* Working Interactive Proposal Simulator */}
+          <QuotationScene onOpenDemo={handleOpenDemo} />
 
-        {/* Scene 4: Experience the product — "Create proposals. Track progress. Keep work moving." */}
-        <QuotationScene onOpenDemo={handleOpenDemo} />
-        <ProductExperienceScene />
+          {/* Real SaaS Tenant Platform Views */}
+          <ProductExperienceScene />
 
-        {/* Supporting Trust & Operational Simplicity Moments */}
-        <BenefitsScene />
+          {/* Predictable Commercials & Plans */}
+          <PricingScene onOpenDemo={handleOpenDemo} />
 
-        {/* Predictable Commercials & Plans */}
-        <PricingScene onOpenDemo={handleOpenDemo} />
+          {/* DPDP 2023 & Tenant Isolation Safeguards */}
+          <TrustSecuritySection />
 
-        {/* Trust & DPDP 2023 Security Safeguards */}
-        <TrustSecuritySection />
-
-        {/* Frequently Asked Questions Accordion */}
-        <FaqSection />
-
-        {/* Scene 5: Convert / Take action — "Ready to bring your solar business into sync?" */}
-        <FinalCtaScene onOpenDemo={handleOpenDemo} />
+          {/* Frequently Asked Questions Accordion */}
+          <FaqSection />
+        </div>
       </main>
 
       {/* Minimal Footer with Verified Company Information */}
       <Footer />
 
-      {/* Floating Verified WhatsApp CTA (Item 1 in brief) */}
+      {/* Floating Verified WhatsApp CTA */}
       <WhatsAppCta variant="floating" showCharacterWave={true} />
 
       {/* Global Demo Booking Modal */}

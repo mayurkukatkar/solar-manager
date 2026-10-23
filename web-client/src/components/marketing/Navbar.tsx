@@ -21,10 +21,9 @@ export default function Navbar({ onOpenDemo }: NavbarProps) {
   }, []);
 
   const navLinks = [
-    { label: "Workflow", href: "#workflow" },
-    { label: "Proposal Studio", href: "#proposal-demo" },
-    { label: "Platform View", href: "#product-view" },
-    { label: "Why WhereReady", href: "#benefits" },
+    { label: "Product Film", href: "#story" },
+    { label: "Simulator", href: "#proposal-demo" },
+    { label: "Platform", href: "#product-view" },
     { label: "Pricing", href: "#pricing" },
     { label: "FAQ", href: "#faq" },
   ];
