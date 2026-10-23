@@ -37,7 +37,7 @@ export default function ProductExperienceScene() {
           </p>
 
           {/* Module Selector Pill */}
-          <div className="mt-8 inline-flex items-center gap-1.5 p-1 bg-white rounded-full border border-slate-200 shadow-2xs">
+          <div className="mt-8 flex flex-wrap sm:inline-flex items-center justify-center gap-1.5 p-1 bg-white rounded-2xl sm:rounded-full border border-slate-200 shadow-2xs max-w-full">
             <button
               type="button"
               onClick={() => setActiveTab("pipeline")}

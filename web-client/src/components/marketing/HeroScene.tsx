@@ -137,7 +137,7 @@ export default function HeroScene({ onOpenDemo }: HeroSceneProps) {
                   </div>
 
                   {/* Connected Workflow Stepper */}
-                  <div className="flex items-center justify-between text-[10px] font-medium text-slate-600">
+                  <div className="flex items-center justify-between text-[10px] font-medium text-slate-600 gap-1.5 whitespace-nowrap overflow-x-auto">
                     <span className="text-blue-700 font-bold flex items-center gap-1">
                       <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
                       1. Enquiry

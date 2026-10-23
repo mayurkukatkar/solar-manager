@@ -492,15 +492,45 @@ export default function WorkflowScene({ onOpenDemo }: WorkflowSceneProps) {
                     </p>
 
                     {/* Mobile-Only Inline Character & Visual Snippet */}
-                    <div className="lg:hidden mt-5 pt-4 border-t border-slate-100 flex items-center gap-3">
-                      <GuideCharacter
-                        pose={stage.characterPose}
-                        size={48}
-                        className="shrink-0"
-                      />
-                      <div className="text-xs font-medium text-slate-700 bg-slate-50 p-2.5 rounded-xl border border-slate-100 flex-1">
-                        <span className="font-bold text-blue-600 block">{stage.characterSpeech}</span>
-                        <span className="text-[11px] text-slate-500">Synchronized in Solar OS</span>
+                    <div className="lg:hidden mt-5 pt-4 border-t border-slate-100 space-y-3">
+                      {idx === 2 && (
+                        <div className="relative rounded-xl overflow-hidden border border-slate-200 shadow-xs">
+                          <img
+                            src="/images/lead_to_proposal.jpg"
+                            alt="Utility bill data transforming into a solar quotation proposal"
+                            className="w-full h-36 object-cover"
+                            loading="lazy"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-transparent to-transparent flex items-end p-2.5">
+                            <span className="text-white text-xs font-bold">PM Surya Ghar Proposal Engine</span>
+                          </div>
+                        </div>
+                      )}
+
+                      {idx === 5 && (
+                        <div className="relative rounded-xl overflow-hidden border border-slate-200 shadow-xs">
+                          <img
+                            src="/images/project_installation_sync.jpg"
+                            alt="Solar panels installation and DISCOM bi-directional net-meter sync"
+                            className="w-full h-36 object-cover"
+                            loading="lazy"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-transparent to-transparent flex items-end p-2.5">
+                            <span className="text-white text-xs font-bold">DCR Modules &amp; Net-Meter Commissioned</span>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="flex items-center gap-3">
+                        <GuideCharacter
+                          pose={stage.characterPose}
+                          size={44}
+                          className="shrink-0"
+                        />
+                        <div className="text-xs font-medium text-slate-700 bg-slate-50 p-2.5 rounded-xl border border-slate-100 flex-1">
+                          <span className="font-bold text-blue-600 block">{stage.characterSpeech}</span>
+                          <span className="text-[11px] text-slate-500">Synchronized in Solar OS</span>
+                        </div>
                       </div>
                     </div>
 

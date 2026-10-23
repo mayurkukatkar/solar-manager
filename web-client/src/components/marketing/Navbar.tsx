@@ -41,22 +41,22 @@ export default function Navbar({ onOpenDemo }: NavbarProps) {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between">
             {/* Logo Lockup */}
-            <Link href="/" className="flex items-center gap-3 group focus:outline-none">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-amber-400 p-0.5 shadow-sm group-hover:scale-105 transition-transform">
+            <Link href="/" className="flex items-center gap-2 sm:gap-3 group focus:outline-none shrink-0">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-amber-400 p-0.5 shadow-sm group-hover:scale-105 transition-transform shrink-0">
                 <div className="w-full h-full bg-white rounded-[10px] flex items-center justify-center">
-                  <Sun className="w-5 h-5 text-amber-500 group-hover:rotate-45 transition-transform duration-500" />
+                  <Sun className="w-4 h-4 sm:w-5 sm:h-5 text-amber-500 group-hover:rotate-45 transition-transform duration-500" />
                 </div>
               </div>
               <div className="flex flex-col">
-                <div className="flex items-center gap-1.5">
-                  <span className="font-extrabold text-lg tracking-tight text-slate-900 font-['Plus_Jakarta_Sans',sans-serif]">
+                <div className="flex items-center gap-1 sm:gap-1.5 whitespace-nowrap">
+                  <span className="font-extrabold text-[15px] sm:text-lg tracking-tight text-slate-900 font-['Plus_Jakarta_Sans',sans-serif]">
                     WhereReady
                   </span>
-                  <span className="font-extrabold text-lg text-blue-600">
+                  <span className="font-extrabold text-[15px] sm:text-lg text-blue-600">
                     Solar OS
                   </span>
                 </div>
-                <span className="text-[10px] font-medium tracking-wider text-slate-400 uppercase">
+                <span className="text-[9px] sm:text-[10px] font-medium tracking-wider text-slate-400 uppercase hidden sm:block">
                   Where Growth Gets Ready
                 </span>
               </div>
