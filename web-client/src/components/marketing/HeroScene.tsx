@@ -99,80 +99,45 @@ export default function HeroScene({ onOpenDemo }: HeroSceneProps) {
             </div>
           </div>
 
-          {/* Right Column: Illustrative Product UI & 2D Vector Direction (Scene 1) */}
+          {/* Right Column: Large Cinematic Visual & Real Workspace Preview */}
           <div className="lg:col-span-6 relative flex items-center justify-center">
             
             {/* Visual Container with Subtle Grid Fade */}
             <div className="w-full max-w-xl relative">
               
               {/* Friendly Product Guide Character welcoming visitors */}
-              <div className="absolute -top-14 -left-4 sm:-left-6 z-30 hidden sm:block">
+              <div className="absolute -top-12 -left-4 sm:-left-6 z-30 hidden sm:block">
                 <GuideCharacter
                   pose="wave"
-                  size={64}
+                  size={68}
                   speechText="Welcome to Solar OS!"
                 />
               </div>
 
-              {/* Product Dashboard Card (Recognizable Software UI) */}
-              <div className="relative z-10 bg-white/95 backdrop-blur-md rounded-2xl border border-slate-200/90 shadow-xl shadow-slate-200/60 p-4 sm:p-5">
-                
-                {/* Mockup Window Chrome */}
-                <div className="flex items-center justify-between pb-3.5 mb-3.5 border-b border-slate-100">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-slate-300" />
-                    <span className="w-2.5 h-2.5 rounded-full bg-slate-300" />
-                    <span className="w-2.5 h-2.5 rounded-full bg-slate-300" />
-                    <span className="ml-2 text-xs font-semibold text-slate-700">
-                      WhereReady Solar OS
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                      Live Business Engine
-                    </span>
-                  </div>
-                </div>
+              {/* Master AI-Generated Cinematic Hero Asset */}
+              <div className="relative rounded-3xl overflow-hidden border border-slate-200/90 shadow-2xl shadow-blue-500/10 bg-slate-50 group">
+                <img
+                  src="/images/hero_solar_home.jpg"
+                  alt="Modern solar-powered smart home with rooftop photovoltaic installation"
+                  className="w-full h-auto object-cover transform transition-transform duration-700 group-hover:scale-105"
+                  loading="eager"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-white/95 via-transparent to-transparent pointer-events-none" />
 
-                {/* Sub-header Stats Row */}
-                <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-4">
-                  <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                    <span className="text-[10px] text-slate-500 font-medium block">Active Leads</span>
-                    <span className="text-sm sm:text-base font-extrabold text-slate-900">24</span>
-                    <span className="text-[9px] text-emerald-600 font-medium block">+6 this week</span>
+                {/* Floating Real-Time Solar OS Dashboard Overlay */}
+                <div className="absolute bottom-4 left-4 right-4 z-20 bg-white/92 backdrop-blur-md rounded-2xl border border-slate-200/90 p-4 shadow-lg shadow-slate-200/40">
+                  <div className="flex items-center justify-between pb-2.5 mb-2.5 border-b border-slate-100">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                      <span className="text-xs font-extrabold text-slate-800">Live Workspace • Sharma Villa</span>
+                    </div>
+                    <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200/80">
+                      5.4 kW Rooftop
+                    </span>
                   </div>
-                  <div className="bg-blue-50/60 p-2.5 rounded-xl border border-blue-100">
-                    <span className="text-[10px] text-blue-700 font-medium block">Proposals Sent</span>
-                    <span className="text-sm sm:text-base font-extrabold text-blue-900">18</span>
-                    <span className="text-[9px] text-blue-600 font-medium block">₹42.8L Value</span>
-                  </div>
-                  <div className="bg-amber-50/60 p-2.5 rounded-xl border border-amber-100">
-                    <span className="text-[10px] text-amber-700 font-medium block">DISCOM Sync</span>
-                    <span className="text-sm sm:text-base font-extrabold text-amber-900">9 Active</span>
-                    <span className="text-[9px] text-amber-600 font-medium block">MSEDCL Net-Meter</span>
-                  </div>
-                </div>
 
-                {/* Active Lead & Proposal Card */}
-                <div className="bg-gradient-to-r from-slate-50 to-blue-50/30 p-3.5 rounded-xl border border-slate-200/80 mb-3.5">
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-xs font-bold text-slate-900">
-                      Rajesh Kulkarni • Baner, Pune
-                    </span>
-                    <span className="text-[10px] font-semibold text-blue-600 bg-blue-100/70 px-2 py-0.5 rounded-full">
-                      Quotation Generated
-                    </span>
-                  </div>
-                  <div className="text-[11px] text-slate-600 flex flex-wrap gap-x-3 gap-y-1">
-                    <span>5.4 kW Rooftop</span>
-                    <span>•</span>
-                    <span>Tata Power Mono-Perc</span>
-                    <span>•</span>
-                    <span className="font-semibold text-slate-800">PM Surya Ghar Subsidy: ₹78,000</span>
-                  </div>
-                  
-                  {/* Connected Workflow Progress Stepper */}
-                  <div className="mt-3 pt-2.5 border-t border-slate-200/60 flex items-center justify-between text-[10px] font-medium text-slate-500">
+                  {/* Connected Workflow Stepper */}
+                  <div className="flex items-center justify-between text-[10px] font-medium text-slate-600">
                     <span className="text-blue-700 font-bold flex items-center gap-1">
                       <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
                       1. Enquiry
@@ -195,49 +160,18 @@ export default function HeroScene({ onOpenDemo }: HeroSceneProps) {
                     </span>
                   </div>
                 </div>
-
-                {/* 2D Vector Architectural Rooftop Asset embedded within product view */}
-                <div className="relative bg-slate-50 rounded-xl p-3 border border-slate-100 flex items-center gap-3">
-                  <div className="w-16 h-14 shrink-0 relative flex items-center justify-center">
-                    <svg viewBox="0 0 80 60" fill="none" className="w-full h-full">
-                      {/* Stylized house silhouette */}
-                      <polygon points="10,32 40,12 70,32" fill="#CBD5E1" />
-                      <rect x="18" y="32" width="44" height="24" fill="#F1F5F9" stroke="#94A3B8" strokeWidth="1" />
-                      {/* Solar PV panels */}
-                      <g transform="translate(24, 20) rotate(-10)">
-                        <rect x="0" y="0" width="16" height="10" rx="1" fill="#1E3A8A" stroke="#3B82F6" strokeWidth="0.5" />
-                        <rect x="18" y="0" width="16" height="10" rx="1" fill="#1E3A8A" stroke="#3B82F6" strokeWidth="0.5" />
-                      </g>
-                    </svg>
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="text-xs font-bold text-slate-800">
-                      Rooftop Feasibility &amp; Generation Modeling
-                    </div>
-                    <div className="text-[11px] text-slate-500">
-                      Annual Yield: 8,100 kWh • Payback: 3.2 Years • Carbon Offset: 6.8 Tons
-                    </div>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-200 block">
-                      Sync Ready
-                    </span>
-                  </div>
-                </div>
-
               </div>
 
               {/* Popping Badge Accent */}
               <div className="absolute -top-3 -right-2 sm:-right-4 z-20 anim-pop">
                 <div className="bg-blue-600 text-white rounded-xl px-3 py-1.5 shadow-lg shadow-blue-500/30 flex items-center gap-1.5 text-xs font-semibold">
                   <Sparkles className="w-3.5 h-3.5" />
-                  <span>Proposal Created in 60s</span>
+                  <span>Proposal Generated in 60s</span>
                 </div>
               </div>
 
-              {/* Soft decorative ambient glow */}
-              <div className="absolute -inset-2 bg-gradient-to-tr from-blue-100/40 via-amber-100/20 to-transparent rounded-3xl blur-xl -z-10 pointer-events-none" />
-
+              {/* Ambient Glow */}
+              <div className="absolute -inset-4 bg-gradient-to-tr from-blue-100/40 via-amber-100/20 to-transparent rounded-3xl blur-2xl -z-10 pointer-events-none" />
             </div>
           </div>
 

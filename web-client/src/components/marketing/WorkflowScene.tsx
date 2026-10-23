@@ -285,31 +285,23 @@ export default function WorkflowScene({ onOpenDemo }: WorkflowSceneProps) {
                 {/* STAGE 03: Create the quotation */}
                 {activeStageIndex === 2 && (
                   <div className="w-full space-y-3 animate-in fade-in zoom-in-95 duration-300">
-                    <div className="bg-gradient-to-br from-blue-600 to-blue-800 p-4 rounded-2xl text-white shadow-md">
-                      <div className="flex justify-between items-center text-xs pb-2 border-b border-white/20">
-                        <span className="font-bold">5.4 kW PM Surya Ghar Proposal</span>
-                        <span className="px-2 py-0.5 bg-amber-400 text-amber-950 rounded text-[10px] font-bold">
-                          Luxury Studio
-                        </span>
-                      </div>
-                      <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-                        <div>
-                          <span className="text-blue-200 text-[10px] block">Gross Project Cost</span>
-                          <strong className="text-white text-sm">₹2,80,000</strong>
-                        </div>
-                        <div>
-                          <span className="text-emerald-200 text-[10px] block">PM Surya Ghar Subsidy</span>
-                          <strong className="text-emerald-300 text-sm">-₹78,000</strong>
-                        </div>
-                        <div className="col-span-2 pt-2 border-t border-white/10 flex justify-between items-center">
-                          <span className="text-blue-100 text-xs font-medium">Net Customer Cost:</span>
-                          <span className="text-base font-extrabold text-white">₹2,02,000</span>
+                    <div className="relative rounded-2xl overflow-hidden border border-slate-200/90 shadow-md bg-slate-50">
+                      <img
+                        src="/images/lead_to_proposal.jpg"
+                        alt="Utility bill data transforming into a solar quotation proposal"
+                        className="w-full h-44 object-cover"
+                        loading="lazy"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-transparent to-transparent flex items-end p-3">
+                        <div className="text-white text-xs font-bold flex items-center justify-between w-full">
+                          <span>PM Surya Ghar Proposal Assembled</span>
+                          <span className="text-emerald-300 font-extrabold">Net: ₹2,02,000</span>
                         </div>
                       </div>
                     </div>
                     <div className="p-3 bg-blue-50/70 rounded-xl border border-blue-200 text-xs text-blue-800 flex items-center justify-between">
-                      <span className="font-semibold">Payback: 3.2 Years</span>
-                      <span className="text-slate-500">25-Yr Savings: ₹14.8 Lakhs</span>
+                      <span className="font-semibold">Turn details into a proposal</span>
+                      <span className="text-slate-500 font-mono text-[11px]">Subsidy: ₹78,000</span>
                     </div>
                   </div>
                 )}
@@ -378,37 +370,23 @@ export default function WorkflowScene({ onOpenDemo }: WorkflowSceneProps) {
                 {/* STAGE 06: Track installation */}
                 {activeStageIndex === 5 && (
                   <div className="w-full space-y-3 animate-in fade-in zoom-in-95 duration-300">
-                    <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200">
-                      <div className="flex items-center justify-between text-xs font-bold text-slate-800 mb-2">
-                        <span className="flex items-center gap-1.5">
-                          <Wrench className="w-4 h-4 text-amber-500" />
-                          Site Execution &amp; Serial Log
-                        </span>
-                        <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">
-                          DCR Verified
-                        </span>
-                      </div>
-                      <div className="space-y-1.5 text-xs">
-                        <div className="flex items-center justify-between p-2 bg-white rounded-lg border border-slate-100">
-                          <span className="flex items-center gap-1.5 text-slate-700">
-                            <QrCode className="w-4 h-4 text-slate-400" />
-                            10x DCR Module Barcodes
-                          </span>
-                          <span className="text-emerald-600 font-bold">Logged</span>
-                        </div>
-                        <div className="flex items-center justify-between p-2 bg-white rounded-lg border border-slate-100">
-                          <span className="text-slate-700">5 kW On-Grid Inverter Serial</span>
-                          <span className="text-emerald-600 font-bold">Verified</span>
-                        </div>
-                        <div className="flex items-center justify-between p-2 bg-white rounded-lg border border-slate-100">
-                          <span className="text-slate-700">Chemical Earthing (&lt; 2 Ohms)</span>
-                          <span className="text-emerald-600 font-bold">Passed</span>
+                    <div className="relative rounded-2xl overflow-hidden border border-slate-200/90 shadow-md bg-slate-50">
+                      <img
+                        src="/images/project_installation_sync.jpg"
+                        alt="Solar panels installation and DISCOM bi-directional net-meter sync"
+                        className="w-full h-44 object-cover"
+                        loading="lazy"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-transparent to-transparent flex items-end p-3">
+                        <div className="text-white text-xs font-bold flex items-center justify-between w-full">
+                          <span>DCR Modules Verified &amp; Meter Commissioned</span>
+                          <span className="text-emerald-300 font-extrabold">Passed ✓</span>
                         </div>
                       </div>
                     </div>
-                    <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200 text-xs text-emerald-800 flex items-center gap-2">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                      <span>Ready for DISCOM meter inspector site visit</span>
+                    <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200 text-xs text-emerald-800 flex items-center justify-between">
+                      <span className="font-semibold">See work move forward</span>
+                      <span className="text-slate-500 font-mono text-[11px]">Serial Barcodes Logged</span>
                     </div>
                   </div>
                 )}
