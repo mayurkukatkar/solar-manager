@@ -39,12 +39,14 @@ export default function Navbar({ onOpenDemo }: NavbarProps) {
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between">
-            {/* Logo Lockup */}
-            <Link href="/" className="flex items-center gap-2 sm:gap-3 group focus:outline-none shrink-0">
-              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-amber-400 p-0.5 shadow-sm group-hover:scale-105 transition-transform shrink-0">
-                <div className="w-full h-full bg-white rounded-[10px] flex items-center justify-center">
-                  <Sun className="w-4 h-4 sm:w-5 sm:h-5 text-amber-500 group-hover:rotate-45 transition-transform duration-500" />
-                </div>
+            {/* Official WhereReady Brand Logo Lockup */}
+            <Link href="/" className="flex items-center gap-2.5 sm:gap-3 group focus:outline-none shrink-0">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl overflow-hidden shadow-xs border border-slate-200/80 group-hover:scale-105 transition-transform shrink-0 bg-white">
+                <img
+                  src="/images/whereready_logo.png"
+                  alt="WhereReady Solar OS Logo"
+                  className="w-full h-full object-cover"
+                />
               </div>
               <div className="flex flex-col">
                 <div className="flex items-center gap-1 sm:gap-1.5 whitespace-nowrap">
@@ -55,8 +57,8 @@ export default function Navbar({ onOpenDemo }: NavbarProps) {
                     Solar OS
                   </span>
                 </div>
-                <span className="text-[9px] sm:text-[10px] font-bold tracking-wider text-blue-700 uppercase hidden sm:block">
-                  Software for Solar Vendors
+                <span className="text-[9px] sm:text-[10px] font-medium tracking-wider text-slate-400 uppercase hidden sm:block">
+                  Where Growth Gets Ready
                 </span>
               </div>
             </Link>
@@ -87,7 +89,7 @@ export default function Navbar({ onOpenDemo }: NavbarProps) {
                 onClick={onOpenDemo}
                 className="inline-flex items-center gap-1.5 px-5 py-2.5 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-full shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
               >
-                <span>Book Software Demo</span>
+                <span>Book a Demo</span>
                 <ArrowUpRight className="w-4 h-4" />
               </button>
             </div>

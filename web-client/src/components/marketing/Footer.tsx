@@ -13,10 +13,12 @@ export default function Footer() {
           {/* Brand Column */}
           <div className="lg:col-span-2 space-y-4">
             <Link href="/" className="flex items-center gap-3 group focus:outline-none">
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 to-amber-400 p-0.5 shadow-2xs">
-                <div className="w-full h-full bg-white rounded-[10px] flex items-center justify-center">
-                  <Sun className="w-4 h-4 text-amber-500" />
-                </div>
+              <div className="w-9 h-9 rounded-xl overflow-hidden shadow-2xs border border-slate-200/90 shrink-0 bg-white">
+                <img
+                  src="/images/whereready_logo.png"
+                  alt="WhereReady Solar OS Logo"
+                  className="w-full h-full object-cover"
+                />
               </div>
               <div className="flex flex-col">
                 <div className="flex items-center gap-1.5">

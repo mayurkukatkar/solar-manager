@@ -43,6 +43,11 @@ export const metadata: Metadata = {
     description:
       "All-in-one solar software for Indian EPCs & rooftop installers. Bill OCR, 60-sec proposals, DISCOM net-metering & serialized inventory.",
   },
+  icons: {
+    icon: "/images/whereready_logo.png",
+    shortcut: "/images/whereready_logo.png",
+    apple: "/images/whereready_logo.png",
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
