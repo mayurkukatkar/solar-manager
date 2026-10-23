@@ -1488,3 +1488,25 @@ model DocumentTagRelation {
 
   @@id([documentId, tagId])
 }
+
+// ----------------------------------------------------
+// 13. PLATFORM INBOUND LEADS & DEMO REQUESTS
+// ----------------------------------------------------
+model PlatformLead {
+  id            String   @id @default(uuid())
+  name          String
+  company       String
+  phone         String
+  email         String
+  cityState     String?
+  businessType  String?  @default("Rooftop Solar EPC")
+  monthlyVolume String?  @default("5 to 20 projects/month")
+  preferredTime String?
+  notes         String?
+  status        String   @default("NEW") // NEW, CONTACTED, DEMO_SCHEDULED, TRIAL_PROVISIONED, WON, LOST, ARCHIVED
+  source        String   @default("Marketing Website - Primary Demo Booking Funnel")
+  assignedTo    String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+

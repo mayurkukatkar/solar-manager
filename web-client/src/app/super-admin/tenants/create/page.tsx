@@ -1,7 +1,7 @@
 "use client";
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import axios from 'axios';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Building2, User, CreditCard, Layers, CheckCircle2, AlertCircle } from 'lucide-react';
 
@@ -15,19 +15,46 @@ const Input = ({ label, name, value, onChange, type = 'text', placeholder = '' }
   </div>
 );
 
-export default function CreateTenant() {
+function CreateTenantForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   
   const [formData, setFormData] = useState({
-    name: '', email: '', phone: '', city: '', gst: '',
-    adminName: '', adminEmail: '',
-    planId: '', billingCycle: 'ANNUAL',
+    name: searchParams.get('company') || '', 
+    email: searchParams.get('email') || '', 
+    phone: searchParams.get('phone') || '', 
+    city: searchParams.get('city') || '', 
+    gst: '',
+    adminName: searchParams.get('name') || '', 
+    adminEmail: searchParams.get('email') || '',
+    planId: '', 
+    billingCycle: 'ANNUAL',
     modules: { crm: true, projects: true, inventory: true, finance: false }
   });
   const [plans, setPlans] = useState<any[]>([]);
+
+  useEffect(() => {
+    const company = searchParams.get('company');
+    const name = searchParams.get('name');
+    const email = searchParams.get('email');
+    const phone = searchParams.get('phone');
+    const city = searchParams.get('city');
+
+    if (company || name || email || phone || city) {
+      setFormData(prev => ({
+        ...prev,
+        name: company || prev.name,
+        adminName: name || prev.adminName,
+        adminEmail: email || prev.adminEmail,
+        email: email || prev.email,
+        phone: phone || prev.phone,
+        city: city || prev.city
+      }));
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/super-admin/plans`, { withCredentials: true })
@@ -255,3 +282,12 @@ export default function CreateTenant() {
     </div>
   );
 }
+
+export default function CreateTenant() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center text-slate-400">Loading provisioning form...</div>}>
+      <CreateTenantForm />
+    </Suspense>
+  );
+}
+

@@ -6,14 +6,22 @@ import { useState } from 'react';
 import { 
   LayoutDashboard, Building2, CreditCard, Users, Layers, BarChart3, 
   LifeBuoy, MessageSquare, Webhook, ShieldAlert, Settings, Layout, 
-  LogOut, Search, Bell, HelpCircle, ChevronDown, ChevronRight, Menu 
+  LogOut, Search, Bell, HelpCircle, ChevronDown, ChevronRight, Menu,
+  Flame, Sparkles
 } from 'lucide-react';
 
-const MENU_GROUPS: { title: string; icon?: React.ElementType; items: { name: string; path: string; icon?: React.ElementType }[] }[] = [
+const MENU_GROUPS: { title: string; icon?: React.ElementType; items: { name: string; path: string; icon?: React.ElementType; badge?: string }[] }[] = [
   {
     title: 'MAIN',
     items: [
       { name: 'Dashboard', path: '/super-admin/dashboard', icon: LayoutDashboard }
+    ]
+  },
+  {
+    title: 'GROWTH & LEADS',
+    icon: Flame,
+    items: [
+      { name: 'Demo Leads', path: '/super-admin/leads', icon: Sparkles, badge: 'Inbound' }
     ]
   },
   {
@@ -136,16 +144,27 @@ export default function SuperAdminLayout({ children }: { children: React.ReactNo
                       <Link 
                         key={item.name} 
                         href={item.path}
-                        className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all text-sm border border-transparent ${
+                        className={`flex items-center justify-between px-3 py-2.5 rounded-lg transition-all text-sm border border-transparent ${
                           isActive 
                             ? 'bg-slate-900 text-white font-semibold shadow-md' 
                             : 'text-slate-500 font-medium hover:bg-slate-100 hover:text-slate-900'
                         }`}
                       >
-                        {item.icon && (
-                          <item.icon size={18} className={isActive ? 'text-white' : 'text-slate-400'} />
+                        <div className="flex items-center gap-3 min-w-0">
+                          {item.icon && (
+                            <item.icon size={18} className={isActive ? 'text-white' : 'text-slate-400 shrink-0'} />
+                          )}
+                          <span className="truncate">{item.name}</span>
+                        </div>
+                        {item.badge && (
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider shrink-0 ${
+                            isActive 
+                              ? 'bg-blue-500 text-white' 
+                              : 'bg-blue-50 text-blue-700 border border-blue-200'
+                          }`}>
+                            {item.badge}
+                          </span>
                         )}
-                        {item.name}
                       </Link>
                     )
                   })}
