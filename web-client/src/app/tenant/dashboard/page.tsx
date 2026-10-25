@@ -9,13 +9,18 @@ import {
   CheckCircle2, AlertCircle, Clock, BarChart3,
   PieChart as PieIcon, Activity, Leaf,
   Layers, ArrowUpRight, Truck, AlertTriangle, 
-  Globe, Award, Check, X, Search, Flame
+  Globe, Award, Check, X, Search, Flame,
+  Calendar, CalendarDays, Filter
 } from 'lucide-react';
 
 import {
   ResponsiveContainer,
   AreaChart,
   Area,
+  BarChart,
+  Bar,
+  Line,
+  ComposedChart,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -25,7 +30,8 @@ import {
   Cell
 } from 'recharts';
 
-type TabView = 'all' | 'financial' | 'operations' | 'supply' | 'subsidy';
+type TabView = 'all' | 'analytics' | 'financial' | 'operations' | 'supply' | 'subsidy';
+type HorizonType = 'monthly' | 'quarterly' | 'halfAnnual' | 'annual';
 
 export default function TenantDashboard() {
   const [data, setData] = useState<{
@@ -52,6 +58,10 @@ export default function TenantDashboard() {
   const [timeframe, setTimeframe] = useState<'6M' | 'YTD' | '1Y'>('6M');
   const [activeMetric, setActiveMetric] = useState<'both' | 'capacity' | 'revenue'>('both');
   const [showAlertBanner, setShowAlertBanner] = useState(true);
+
+  // Horizon Analysis State (Monthly, Quarterly, Half-Annual, Annual)
+  const [periodHorizon, setPeriodHorizon] = useState<HorizonType>('quarterly');
+  const [horizonMetricFocus, setHorizonMetricFocus] = useState<'both' | 'clients' | 'revenue'>('both');
 
   useEffect(() => {
     setMounted(true);
@@ -85,6 +95,75 @@ export default function TenantDashboard() {
     { month: 'Mar', capacity: 44.0, revenue: 20.2, projects: 10 },
     { month: 'Apr', capacity: Number((currentMonthProjects * 4.2).toFixed(1)), revenue: currentRevenueLakhs, projects: currentMonthProjects },
   ];
+
+  // ----------------------------------------------------
+  // PERIOD HORIZON DATASETS (MONTHLY / QUARTERLY / HALF-ANNUAL / ANNUAL)
+  // ----------------------------------------------------
+  const horizonDataMap: Record<HorizonType, {
+    label: string;
+    sublabel: string;
+    data: Array<{
+      period: string;
+      clients: number;
+      revenue: number;
+      capacity: number;
+      avgDeal: string;
+      growth: string;
+      status?: string;
+    }>;
+  }> = {
+    monthly: {
+      label: 'Monthly Client & Revenue Trajectory',
+      sublabel: 'Month-over-month performance across energized clients and collected revenue',
+      data: [
+        { period: 'Nov', clients: 4, revenue: 8.4, capacity: 18.5, avgDeal: '₹2.10L', growth: '+14% MoM', status: 'On Target' },
+        { period: 'Dec', clients: 6, revenue: 11.2, capacity: 25.2, avgDeal: '₹1.87L', growth: '+33% MoM', status: 'Expanding' },
+        { period: 'Jan', clients: 8, revenue: 14.8, capacity: 33.8, avgDeal: '₹1.85L', growth: '+32% MoM', status: 'Surge' },
+        { period: 'Feb', clients: 7, revenue: 12.6, capacity: 28.4, avgDeal: '₹1.80L', growth: '-15% MoM', status: 'Stable' },
+        { period: 'Mar', clients: 10, revenue: 20.2, capacity: 44.0, avgDeal: '₹2.02L', growth: '+60% MoM', status: 'Record High' },
+        { period: 'Apr', clients: currentMonthProjects, revenue: currentRevenueLakhs, capacity: Number((currentMonthProjects * 4.2).toFixed(1)), avgDeal: '₹2.14L', growth: '+28% MoM', status: 'Current Peak' },
+      ]
+    },
+    quarterly: {
+      label: 'Quarterly Client & Revenue Velocity (Q1–Q4)',
+      sublabel: 'Fiscal quarters comparing customer rooftop acquisition and financial execution',
+      data: [
+        { period: 'Q1 (Apr–Jun)', clients: 22, revenue: 44.8, capacity: 94.6, avgDeal: '₹2.04L', growth: '+18% YoY', status: 'Stable' },
+        { period: 'Q2 (Jul–Sep)', clients: 18, revenue: 36.2, capacity: 78.2, avgDeal: '₹2.01L', growth: '+22% YoY', status: 'Monsoon Cycle' },
+        { period: 'Q3 (Oct–Dec)', clients: 29, revenue: 59.5, capacity: 126.4, avgDeal: '₹2.05L', growth: '+41% YoY', status: 'Festive Surge' },
+        { period: 'Q4 (Jan–Mar)', clients: 38, revenue: 78.4, capacity: 168.0, avgDeal: '₹2.06L', growth: '+54% YoY', status: 'Year-End High' },
+      ]
+    },
+    halfAnnual: {
+      label: 'Half-Annual Solar Performance Comparison (H1 vs H2)',
+      sublabel: 'Pre-monsoon installation cycle vs post-monsoon PM Surya Ghar rooftop boom',
+      data: [
+        { period: 'H1 FY25 (Apr–Sep)', clients: 32, revenue: 64.0, capacity: 138.0, avgDeal: '₹2.00L', growth: '+28% YoY', status: 'Baseline' },
+        { period: 'H2 FY25 (Oct–Mar)', clients: 51, revenue: 104.2, capacity: 224.5, avgDeal: '₹2.04L', growth: '+62% YoY', status: 'Strong Surge' },
+        { period: 'H1 FY26 (Apr–Sep)', clients: 40, revenue: 81.0, capacity: 172.8, avgDeal: '₹2.03L', growth: '+26% YoY', status: 'Expanded' },
+        { period: 'H2 FY26 (Oct–Mar)', clients: 67, revenue: 137.9, capacity: 294.4, avgDeal: '₹2.06L', growth: '+70% YoY', status: 'All-Time Record' },
+      ]
+    },
+    annual: {
+      label: 'Annual Multi-Year Growth & Client Expansion (YoY)',
+      sublabel: 'Year-over-year enterprise scaling across energized clients, capacity, and revenue',
+      data: [
+        { period: 'FY 2023–24', clients: 48, revenue: 98.5, capacity: 208.0, avgDeal: '₹2.05L', growth: 'Baseline Year', status: 'Early Growth' },
+        { period: 'FY 2024–25', clients: 76, revenue: 154.2, capacity: 332.0, avgDeal: '₹2.03L', growth: '+56.5% YoY', status: 'Scaling' },
+        { period: 'FY 2025–26 (Current)', clients: 107, revenue: 218.9, capacity: 467.2, avgDeal: '₹2.05L', growth: '+42.0% YoY', status: 'Market Leader' },
+        { period: 'FY 2026–27 (Target)', clients: 160, revenue: 340.0, capacity: 720.0, avgDeal: '₹2.12L', growth: '+55.3% Projected', status: 'Target Goal' },
+      ]
+    }
+  };
+
+  const activeHorizonConfig = horizonDataMap[periodHorizon];
+  const activeHorizonData = activeHorizonConfig.data;
+
+  // Aggregate stats for the currently selected horizon
+  const totalHorizonClients = activeHorizonData.reduce((acc, curr) => acc + curr.clients, 0);
+  const totalHorizonRevenue = activeHorizonData.reduce((acc, curr) => acc + curr.revenue, 0).toFixed(1);
+  const totalHorizonCapacity = activeHorizonData.reduce((acc, curr) => acc + curr.capacity, 0).toFixed(1);
+  const avgHorizonDeal = (Number(totalHorizonRevenue) / (totalHorizonClients || 1)).toFixed(2);
 
   // System Segmentation Donut
   const segmentationData = [
@@ -276,6 +355,16 @@ export default function TenantDashboard() {
           ⚡ All Infographics (Full Overview)
         </button>
         <button 
+          onClick={() => setCurrentTab('analytics')}
+          className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
+            currentTab === 'analytics' 
+              ? 'bg-blue-600 text-white shadow-xs' 
+              : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+          }`}
+        >
+          📊 Periodic Horizons (Clients & Revenue)
+        </button>
+        <button 
           onClick={() => setCurrentTab('financial')}
           className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
             currentTab === 'financial' 
@@ -317,7 +406,300 @@ export default function TenantDashboard() {
         </button>
       </div>
 
-      {/* 5. FIVE-STAGE SOLAR BUSINESS LIFECYCLE FUNNEL CARDS */}
+      {/* 5. DEDICATED PERIODIC HORIZON ANALYSIS MODULE (MONTHLY, QUARTERLY, HALF-ANNUAL, ANNUAL) */}
+      {(currentTab === 'all' || currentTab === 'analytics') && (
+        <div className="bg-white/95 backdrop-blur-xs rounded-2xl sm:rounded-3xl p-6 sm:p-8 border border-slate-200/90 shadow-sm hover:shadow-xl transition-all duration-300 relative overflow-hidden group">
+          {/* Top Multi-Color Gradient Accent */}
+          <div className="absolute top-0 inset-x-0 h-1.5 bg-gradient-to-r from-blue-600 via-sky-400 via-emerald-400 to-amber-500" />
+
+          {/* Module Header & Period Horizon Switcher */}
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-6 border-b border-slate-100">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="w-2 h-2 rounded-full bg-blue-600" />
+                <span className="text-[11px] font-extrabold text-blue-900 uppercase tracking-widest">
+                  Performance Horizon Comparative Analysis
+                </span>
+              </div>
+              <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+                {activeHorizonConfig.label}
+              </h2>
+              <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
+                {activeHorizonConfig.sublabel}
+              </p>
+            </div>
+
+            {/* Horizon Selection Buttons (Monthly, Quarterly, Half-Annual, Annual) */}
+            <div className="flex flex-wrap items-center gap-2 self-start lg:self-center">
+              <div className="flex items-center bg-slate-100/90 p-1.5 rounded-2xl border border-slate-200/70 text-xs font-extrabold text-slate-600 shadow-2xs">
+                <button
+                  type="button"
+                  onClick={() => setPeriodHorizon('monthly')}
+                  className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
+                    periodHorizon === 'monthly' ? 'bg-white text-blue-700 shadow-xs font-black' : 'hover:text-slate-900'
+                  }`}
+                >
+                  <Calendar size={13} />
+                  <span>Monthly</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPeriodHorizon('quarterly')}
+                  className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
+                    periodHorizon === 'quarterly' ? 'bg-white text-blue-700 shadow-xs font-black' : 'hover:text-slate-900'
+                  }`}
+                >
+                  <CalendarDays size={13} />
+                  <span>Quarterly (Q1–Q4)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPeriodHorizon('halfAnnual')}
+                  className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
+                    periodHorizon === 'halfAnnual' ? 'bg-white text-blue-700 shadow-xs font-black' : 'hover:text-slate-900'
+                  }`}
+                >
+                  <Layers size={13} />
+                  <span>Half-Annual (H1/H2)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPeriodHorizon('annual')}
+                  className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
+                    periodHorizon === 'annual' ? 'bg-white text-blue-700 shadow-xs font-black' : 'hover:text-slate-900'
+                  }`}
+                >
+                  <TrendingUp size={13} />
+                  <span>Annual (YoY)</span>
+                </button>
+              </div>
+
+              {/* Metric View Filter Toggle */}
+              <div className="flex items-center bg-slate-100/80 p-1 rounded-xl text-xs font-bold text-slate-600">
+                <button
+                  type="button"
+                  onClick={() => setHorizonMetricFocus('both')}
+                  className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${horizonMetricFocus === 'both' ? 'bg-white text-slate-900 shadow-2xs' : 'hover:text-slate-900'}`}
+                >
+                  Both
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setHorizonMetricFocus('clients')}
+                  className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${horizonMetricFocus === 'clients' ? 'bg-blue-600 text-white shadow-2xs' : 'hover:text-slate-900'}`}
+                >
+                  Clients
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setHorizonMetricFocus('revenue')}
+                  className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${horizonMetricFocus === 'revenue' ? 'bg-emerald-600 text-white shadow-2xs' : 'hover:text-slate-900'}`}
+                >
+                  Revenue ₹
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Horizon Period Summary Scorecards */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 my-6">
+            <div className="p-4 rounded-2xl bg-blue-50/70 border border-blue-200/60 flex items-center justify-between">
+              <div>
+                <p className="text-[11px] font-bold text-blue-900/70 uppercase tracking-wider">
+                  Total Successful Clients
+                </p>
+                <p className="text-2xl sm:text-3xl font-black text-blue-950 mt-0.5">
+                  {totalHorizonClients} Clients
+                </p>
+                <span className="text-[10px] font-bold text-blue-700 mt-1 inline-flex items-center gap-1">
+                  <CheckCircle2 size={11} /> Rooftop Sites Energized
+                </span>
+              </div>
+              <div className="w-10 h-10 rounded-2xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-sm shadow-blue-500/20">
+                <Users size={18} />
+              </div>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-emerald-50/70 border border-emerald-200/60 flex items-center justify-between">
+              <div>
+                <p className="text-[11px] font-bold text-emerald-900/70 uppercase tracking-wider">
+                  Realized Period Revenue
+                </p>
+                <p className="text-2xl sm:text-3xl font-black text-emerald-950 mt-0.5">
+                  ₹{totalHorizonRevenue} Lakhs
+                </p>
+                <span className="text-[10px] font-bold text-emerald-700 mt-1 inline-flex items-center gap-1">
+                  <TrendingUp size={11} /> 100% Invoiced & Realized
+                </span>
+              </div>
+              <div className="w-10 h-10 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-sm shadow-emerald-500/20">
+                <Wallet size={18} />
+              </div>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-amber-50/70 border border-amber-200/60 flex items-center justify-between">
+              <div>
+                <p className="text-[11px] font-bold text-amber-900/70 uppercase tracking-wider">
+                  Average Deal Size (Ticket)
+                </p>
+                <p className="text-2xl sm:text-3xl font-black text-amber-950 mt-0.5">
+                  ₹{avgHorizonDeal} Lakhs
+                </p>
+                <span className="text-[10px] font-bold text-amber-800 mt-1 inline-flex items-center gap-1">
+                  <Award size={11} /> Avg per Rooftop Customer
+                </span>
+              </div>
+              <div className="w-10 h-10 rounded-2xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-sm shadow-amber-500/20">
+                <Sun size={18} />
+              </div>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-indigo-50/70 border border-indigo-200/60 flex items-center justify-between">
+              <div>
+                <p className="text-[11px] font-bold text-indigo-900/70 uppercase tracking-wider">
+                  Capacity Energized
+                </p>
+                <p className="text-2xl sm:text-3xl font-black text-indigo-950 mt-0.5">
+                  {totalHorizonCapacity} kWp
+                </p>
+                <span className="text-[10px] font-bold text-indigo-700 mt-1 inline-flex items-center gap-1">
+                  <Zap size={11} /> Cumulative kWp Delivered
+                </span>
+              </div>
+              <div className="w-10 h-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-sm shadow-indigo-500/20">
+                <Activity size={18} />
+              </div>
+            </div>
+          </div>
+
+          {/* Primary Visual Chart: Clients (Bars) + Revenue (Curve) */}
+          <div className="bg-slate-50/60 rounded-2xl p-4 sm:p-6 border border-slate-100">
+            <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
+              <div className="flex items-center gap-6 text-xs font-bold">
+                {(horizonMetricFocus === 'both' || horizonMetricFocus === 'clients') && (
+                  <span className="flex items-center gap-2 text-slate-800">
+                    <span className="w-3.5 h-3.5 rounded-md bg-blue-600" />
+                    Successful Clients (Count on Left Y-Axis)
+                  </span>
+                )}
+                {(horizonMetricFocus === 'both' || horizonMetricFocus === 'revenue') && (
+                  <span className="flex items-center gap-2 text-slate-800">
+                    <span className="w-3.5 h-3.5 rounded-md bg-emerald-500" />
+                    Revenue Inflow (₹ Lakhs on Right Y-Axis)
+                  </span>
+                )}
+              </div>
+
+              <span className="text-[11px] text-slate-500 font-medium">
+                Showing {activeHorizonData.length} sequential periods
+              </span>
+            </div>
+
+            <div className="h-[310px] w-full">
+              {mounted ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <ComposedChart data={activeHorizonData} margin={{ top: 15, right: 15, left: -10, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                    <XAxis 
+                      dataKey="period" 
+                      axisLine={false} 
+                      tickLine={false} 
+                      tick={{ fill: '#475569', fontSize: 11, fontWeight: 700 }}
+                    />
+                    <YAxis 
+                      yAxisId="left"
+                      orientation="left"
+                      axisLine={false} 
+                      tickLine={false} 
+                      tick={{ fill: '#0284c7', fontSize: 11, fontWeight: 700 }}
+                    />
+                    <YAxis 
+                      yAxisId="right"
+                      orientation="right"
+                      axisLine={false} 
+                      tickLine={false} 
+                      tick={{ fill: '#10b981', fontSize: 11, fontWeight: 700 }}
+                    />
+                    <Tooltip content={<HorizonChartTooltip />} />
+
+                    {(horizonMetricFocus === 'both' || horizonMetricFocus === 'clients') && (
+                      <Bar 
+                        yAxisId="left"
+                        dataKey="clients" 
+                        name="clients"
+                        fill="#0284c7" 
+                        radius={[6, 6, 0, 0]}
+                        barSize={34}
+                      />
+                    )}
+
+                    {(horizonMetricFocus === 'both' || horizonMetricFocus === 'revenue') && (
+                      <Line 
+                        yAxisId="right"
+                        type="monotone" 
+                        dataKey="revenue" 
+                        name="revenue"
+                        stroke="#10b981" 
+                        strokeWidth={3}
+                        dot={{ r: 5, fill: '#10b981', strokeWidth: 2, stroke: '#ffffff' }}
+                        activeDot={{ r: 7, fill: '#10b981', strokeWidth: 2, stroke: '#ffffff' }}
+                      />
+                    )}
+                  </ComposedChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-slate-400 text-xs">
+                  Loading horizon graphics...
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Breakdown Table for the Selected Horizon */}
+          <div className="mt-6 overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-slate-200 text-[11px] font-extrabold text-slate-500 uppercase tracking-wider">
+                  <th className="py-3 px-3">Horizon Period</th>
+                  <th className="py-3 px-3">Successful Clients</th>
+                  <th className="py-3 px-3">Realized Revenue</th>
+                  <th className="py-3 px-3">Capacity (kWp)</th>
+                  <th className="py-3 px-3">Avg Ticket Size</th>
+                  <th className="py-3 px-3">Growth Velocity</th>
+                  <th className="py-3 px-3 text-right">Operational Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 text-xs font-semibold text-slate-800">
+                {activeHorizonData.map((row) => (
+                  <tr key={row.period} className="hover:bg-slate-50/80 transition-colors">
+                    <td className="py-3.5 px-3 font-extrabold text-slate-900">{row.period}</td>
+                    <td className="py-3.5 px-3">
+                      <span className="font-black text-blue-700 bg-blue-50 px-2 py-0.5 rounded-lg border border-blue-200/60">
+                        {row.clients} Clients
+                      </span>
+                    </td>
+                    <td className="py-3.5 px-3 font-black text-emerald-600">₹{row.revenue} Lakhs</td>
+                    <td className="py-3.5 px-3 text-slate-600 font-bold">{row.capacity} kWp</td>
+                    <td className="py-3.5 px-3 text-slate-600">{row.avgDeal}</td>
+                    <td className="py-3.5 px-3">
+                      <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
+                        {row.growth}
+                      </span>
+                    </td>
+                    <td className="py-3.5 px-3 text-right">
+                      <span className="text-[10px] font-bold text-slate-700 bg-slate-100 px-2.5 py-1 rounded-full border border-slate-200">
+                        {row.status || 'Active'}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* 6. FIVE-STAGE SOLAR BUSINESS LIFECYCLE FUNNEL CARDS */}
       <div>
         <div className="flex items-center justify-between mb-3 px-1">
           <div>
@@ -384,7 +766,7 @@ export default function TenantDashboard() {
         </div>
       </div>
 
-      {/* 6. PRIMARY INFOGRAPHICS: INSTALLATION VELOCITY & CASHFLOW WATERFALL */}
+      {/* 7. CASHFLOW WATERFALL & REALIZATION */}
       {(currentTab === 'all' || currentTab === 'financial') && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           
@@ -646,7 +1028,7 @@ export default function TenantDashboard() {
         </div>
       )}
 
-      {/* 7. OPERATIONS & SUPPLY CHAIN INFOGRAPHICS */}
+      {/* 8. OPERATIONS & SUPPLY CHAIN INFOGRAPHICS */}
       {(currentTab === 'all' || currentTab === 'operations' || currentTab === 'supply') && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           
@@ -770,7 +1152,7 @@ export default function TenantDashboard() {
         </div>
       )}
 
-      {/* 8. PM SURYA GHAR NATIONAL PORTAL & SYSTEM SEGMENTATION */}
+      {/* 9. PM SURYA GHAR NATIONAL PORTAL & SYSTEM SEGMENTATION */}
       {(currentTab === 'all' || currentTab === 'subsidy') && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           
@@ -907,7 +1289,7 @@ export default function TenantDashboard() {
         </div>
       )}
 
-      {/* 9. CUSTOMER ACQUISITION CHANNELS & PROPOSAL WIN-RATE */}
+      {/* 10. CUSTOMER ACQUISITION CHANNELS & PROPOSAL WIN-RATE */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
         {/* LEAD ACQUISITION CHANNELS (6 COLS) */}
@@ -1023,7 +1405,7 @@ export default function TenantDashboard() {
 
       </div>
 
-      {/* 10. ENVIRONMENTAL OFFSET & SOLAR FLEET TELEMETRY */}
+      {/* 11. ENVIRONMENTAL OFFSET & SOLAR FLEET TELEMETRY */}
       <div className="rounded-2xl sm:rounded-3xl bg-gradient-to-br from-emerald-950 via-slate-900 to-slate-950 text-white p-7 sm:p-8 relative overflow-hidden shadow-xl shadow-slate-900/10 border border-emerald-900/40">
         
         {/* Glow Accents */}
@@ -1098,7 +1480,7 @@ export default function TenantDashboard() {
         </div>
       </div>
 
-      {/* 11. SYSTEM HEALTH & FAST ACTIONS */}
+      {/* 12. SYSTEM HEALTH & FAST ACTIONS */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
         <HealthMetricCard 
           title="Open Service & AMC Tickets"
@@ -1136,6 +1518,55 @@ export default function TenantDashboard() {
 // ----------------------------------------------------
 // HELPER COMPONENTS & TOOLTIPS
 // ----------------------------------------------------
+
+function HorizonChartTooltip({ active, payload, label }: any) {
+  if (active && payload && payload.length) {
+    const clientsEntry = payload.find((p: any) => p.dataKey === 'clients');
+    const revenueEntry = payload.find((p: any) => p.dataKey === 'revenue');
+    const pData = payload[0]?.payload;
+    return (
+      <div className="bg-slate-950/95 backdrop-blur-md text-white p-3.5 rounded-2xl border border-slate-800 shadow-xl text-xs space-y-2 min-w-[200px]">
+        <div className="flex items-center justify-between border-b border-slate-800 pb-1.5">
+          <span className="font-extrabold text-slate-300 text-[11px] uppercase tracking-wider">{label}</span>
+          {pData?.status && (
+            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-blue-500/20 text-blue-300 border border-blue-500/30">
+              {pData.status}
+            </span>
+          )}
+        </div>
+        {clientsEntry && (
+          <div className="flex items-center justify-between gap-3">
+            <span className="flex items-center gap-1.5 text-sky-400">
+              <span className="w-2 h-2 rounded-full bg-sky-400" /> Successful Clients:
+            </span>
+            <span className="font-black text-white">{clientsEntry.value} Clients</span>
+          </div>
+        )}
+        {revenueEntry && (
+          <div className="flex items-center justify-between gap-3">
+            <span className="flex items-center gap-1.5 text-emerald-400">
+              <span className="w-2 h-2 rounded-full bg-emerald-400" /> Revenue Realized:
+            </span>
+            <span className="font-black text-white">₹{revenueEntry.value} Lakhs</span>
+          </div>
+        )}
+        {pData?.capacity && (
+          <div className="flex items-center justify-between gap-3 pt-1 border-t border-slate-800/80 text-[11px]">
+            <span className="text-slate-400">Capacity Energized:</span>
+            <span className="font-bold text-amber-300">{pData.capacity} kWp</span>
+          </div>
+        )}
+        {pData?.avgDeal && (
+          <div className="flex items-center justify-between gap-3 text-[11px]">
+            <span className="text-slate-400">Avg Deal Size:</span>
+            <span className="font-bold text-slate-200">{pData.avgDeal}</span>
+          </div>
+        )}
+      </div>
+    );
+  }
+  return null;
+}
 
 function ExecutiveTickerCard({
   label,
