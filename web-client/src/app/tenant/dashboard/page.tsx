@@ -7,18 +7,15 @@ import {
   ChevronRight, ArrowRight, Sparkles, Sun, Zap, 
   TrendingUp, Plus, ShieldCheck, Wallet, Package, 
   CheckCircle2, AlertCircle, Clock, BarChart3,
-  PieChart as PieIcon, Activity, Leaf, BatteryCharging,
-  Layers, ArrowUpRight, DollarSign, Truck, Check,
-  AlertTriangle, Eye, RefreshCw, Smartphone, Award,
-  Flame, Gauge, Globe
+  PieChart as PieIcon, Activity, Leaf,
+  Layers, ArrowUpRight, Truck, AlertTriangle, 
+  Globe, Award, Check, X, Search, Flame
 } from 'lucide-react';
 
 import {
   ResponsiveContainer,
   AreaChart,
   Area,
-  BarChart,
-  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -54,6 +51,7 @@ export default function TenantDashboard() {
   const [currentTab, setCurrentTab] = useState<TabView>('all');
   const [timeframe, setTimeframe] = useState<'6M' | 'YTD' | '1Y'>('6M');
   const [activeMetric, setActiveMetric] = useState<'both' | 'capacity' | 'revenue'>('both');
+  const [showAlertBanner, setShowAlertBanner] = useState(true);
 
   useEffect(() => {
     setMounted(true);
@@ -96,79 +94,125 @@ export default function TenantDashboard() {
     { name: 'Off-Grid / Storage', value: 8, color: '#10b981', count: '8%' },
   ];
 
-  // Pipeline Stage Funnel Analytics
-  const pipelineAnalytics = [
-    { stage: 'Inbound Enquiries', count: data.totalLeads || 42, pct: 100, color: 'bg-blue-600', vel: '< 15 mins' },
-    { stage: 'Roof Surveys Done', count: data.totalCustomers || 31, pct: 74, color: 'bg-amber-500', vel: '2.1 days' },
-    { stage: 'Proposals Shared', count: Math.max(1, Math.round((data.totalLeads || 30) * 0.65)), pct: 58, color: 'bg-sky-500', vel: '1.4 days' },
-    { stage: 'Sites in Execution', count: data.totalProjects || 14, pct: 41, color: 'bg-indigo-600', vel: '11.8 days' },
-    { stage: 'Net-Meter Disbursed', count: Math.max(1, Math.round((data.totalProjects || 10) * 0.7)), pct: 32, color: 'bg-emerald-600', vel: '14.2 days' },
-  ];
-
   // Lead Acquisition Channels Data
   const leadSourceData = [
     { source: 'WhatsApp Inbound', share: 42, volume: '38 Leads', winRate: '64%', color: 'bg-emerald-500' },
     { source: 'Website & Quotation Tool', share: 28, volume: '25 Leads', winRate: '48%', color: 'bg-blue-500' },
     { source: 'Customer Referrals', share: 18, volume: '16 Leads', winRate: '72%', color: 'bg-amber-500' },
-    { source: 'DISCOM Camp & Field Promoters', share: 12, volume: '11 Leads', winRate: '38%', color: 'bg-indigo-500' },
+    { source: 'DISCOM Camp & Promoters', share: 12, volume: '11 Leads', winRate: '38%', color: 'bg-indigo-500' },
   ];
 
   // Hardware Supply Chain Stock Runway
   const inventoryRunway = [
     { item: '550W Mono PERC Solar Panels (DCR)', stock: '184 Panels (~101 kWp)', runway: 19, status: 'Healthy', unit: 'Days', badge: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-    { item: 'On-Grid Inverters (3kW, 5kW, 10kW)', stock: '14 Units In Warehouse', runway: 11, status: 'Reorder Soon', unit: 'Days', badge: 'bg-amber-50 text-amber-700 border-amber-200' },
+    { item: 'On-Grid Inverters (3kW, 5kW, 10kW)', stock: '14 Units In Stock', runway: 11, status: 'Reorder Soon', unit: 'Days', badge: 'bg-amber-50 text-amber-700 border-amber-200' },
     { item: 'Elevated HDGI & Aluminium Rails', stock: '480 Running Meters', runway: 24, status: 'Healthy', unit: 'Days', badge: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-    { item: 'Solar DC 4mm² UV Cables & ACDB/DCDB', stock: '1,200 Meters + 16 Boxes', runway: 28, status: 'Adequate', unit: 'Days', badge: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+    { item: 'Solar DC 4mm² UV Cables & ACDB', stock: '1,200 Meters + 16 Boxes', runway: 28, status: 'Adequate', unit: 'Days', badge: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
   ];
 
   // PM Surya Ghar Direct Benefit Transfer (DBT) Milestones
   const subsidyFunnel = [
-    { step: '01', title: 'DISCOM Technical Feasibility', count: 24, amount: '₹18.7 Lakhs', status: 'Approved' },
-    { step: '02', title: 'Vendor Work Order & Installation', count: 18, amount: '₹14.0 Lakhs', status: 'In Progress' },
-    { step: '03', title: 'Joint Inspection Report (JIR) Upload', count: 12, amount: '₹9.3 Lakhs', status: 'Inspection Done' },
-    { step: '04', title: 'DBT Subsidy Credited to Consumer', count: 9, amount: '₹7.02 Lakhs', status: 'Disbursed' },
+    { step: '01', title: 'DISCOM Feasibility Approved', count: 24, amount: '₹18.7 Lakhs', status: 'Feasibility Sanctioned' },
+    { step: '02', title: 'Vendor Work Order & Install', count: 18, amount: '₹14.0 Lakhs', status: 'Work Order Active' },
+    { step: '03', title: 'Joint Inspection Report (JIR)', count: 12, amount: '₹9.3 Lakhs', status: 'Uploaded to Portal' },
+    { step: '04', title: 'Direct Subsidy Credited (DBT)', count: 9, amount: '₹7.02 Lakhs', status: 'Credited to Customer' },
   ];
 
   const totalCapacityKWp = (monthlyTrends.reduce((acc, m) => acc + m.capacity, 0)).toFixed(0);
 
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-3 duration-500 pb-20">
+    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-3 duration-500 pb-24">
       
-      {/* 1. EXECUTIVE COMMAND HEADER & TICKER */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-100 pb-6">
+      {/* 1. TOP COMMAND HEADER & FAST ACTION LAUNCHPAD */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5 border-b border-slate-100 pb-6">
         <div>
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 border border-blue-200/60 mb-2">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50/80 border border-blue-200/60 mb-2.5">
             <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
             <span className="text-[11px] font-bold text-blue-900 tracking-wide uppercase">
               WhereReady Solar OS • Executive Command Center
             </span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-            Solar Enterprise Command Center
+          <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+            Solar Operations Command Center
           </h1>
           <p className="text-slate-500 text-sm mt-0.5 font-normal">
-            Complete visual telemetry across lead demand, project execution, cashflow, and PM Surya Ghar subsidies.
+            Effortless oversight of leads, rooftop site audits, hardware inventory, and PM Surya Ghar subsidies.
           </p>
         </div>
 
+        {/* 1-CLICK INSTANT ACTION LAUNCHPAD */}
         <div className="flex flex-wrap items-center gap-2.5 shrink-0">
           <Link 
-            href="/tenant/crm" 
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-300 transition-all shadow-2xs"
+            href="/tenant/quotations" 
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-sm shadow-blue-500/25 hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer"
           >
-            <Users size={15} className="text-slate-500" /> CRM Pipeline
+            <Zap size={15} className="text-amber-300" />
+            <span>New 60s Quotation</span>
           </Link>
           <Link 
-            href="/tenant/quotations" 
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 transition-all shadow-sm shadow-blue-500/20"
+            href="/tenant/crm" 
+            className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-bold text-slate-700 bg-white border border-slate-200/90 hover:bg-slate-50 hover:border-slate-300 shadow-2xs hover:shadow-sm hover:-translate-y-0.5 transition-all cursor-pointer"
           >
-            <Plus size={15} /> 60s Quotation
+            <Plus size={15} className="text-blue-600" />
+            <span>Add Lead</span>
+          </Link>
+          <Link 
+            href="/tenant/surveys" 
+            className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-bold text-slate-700 bg-white border border-slate-200/90 hover:bg-slate-50 hover:border-slate-300 shadow-2xs hover:shadow-sm hover:-translate-y-0.5 transition-all cursor-pointer"
+          >
+            <MapPin size={15} className="text-amber-600" />
+            <span>Book Survey</span>
+          </Link>
+          <Link 
+            href="/tenant/subsidy" 
+            className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-bold text-slate-700 bg-white border border-slate-200/90 hover:bg-slate-50 hover:border-slate-300 shadow-2xs hover:shadow-sm hover:-translate-y-0.5 transition-all cursor-pointer"
+          >
+            <Landmark size={15} className="text-emerald-600" />
+            <span>PM Surya Ghar</span>
           </Link>
         </div>
       </div>
 
-      {/* 2. EXECUTIVE KEY PERFORMANCE TICKER STRIP */}
-      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+      {/* 2. TODAY'S PRIORITY DISPATCH ALERT BANNER (CONVENIENCE FEATURE) */}
+      {showAlertBanner && (
+        <div className="bg-gradient-to-r from-blue-50/90 via-sky-50/70 to-blue-50/90 border border-blue-200/80 rounded-2xl sm:rounded-3xl p-4 sm:p-5 shadow-xs relative overflow-hidden flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-start gap-3.5">
+            <div className="w-10 h-10 rounded-2xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-sm shadow-blue-500/20">
+              <Sparkles size={18} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-black uppercase tracking-wider text-blue-800 bg-blue-100/80 px-2 py-0.5 rounded-full">
+                  Today&apos;s Operational Action Items
+                </span>
+                <span className="text-xs text-slate-500 font-medium hidden sm:inline">• Automated Priority Queue</span>
+              </div>
+              <p className="text-xs sm:text-sm text-slate-800 mt-1 font-semibold leading-relaxed">
+                <strong>3 rooftop proposals</strong> awaiting WhatsApp follow-up, <strong>2 DISCOM Joint Inspection Reports</strong> ready for PM Surya Ghar portal upload, and <strong>₹5.4L milestone payments</strong> maturing this week.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 self-end md:self-center shrink-0">
+            <Link 
+              href="/tenant/crm" 
+              className="px-3.5 py-2 rounded-xl bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 shadow-xs transition-colors"
+            >
+              Action Now
+            </Link>
+            <button 
+              onClick={() => setShowAlertBanner(false)}
+              className="p-2 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-white/60 transition-colors cursor-pointer"
+              title="Dismiss for today"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 3. EXECUTIVE KEY PERFORMANCE TICKER CARDS */}
+      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
         <ExecutiveTickerCard 
           label="Committed Order Book"
           value="₹84.6 Lakhs"
@@ -176,45 +220,50 @@ export default function TenantDashboard() {
           isPositive={true}
           icon={Wallet}
           accent="blue"
+          href="/tenant/finance"
         />
         <ExecutiveTickerCard 
           label="Energized Fleet Size"
           value={`${totalCapacityKWp} kWp`}
-          change={`${data.totalProjects || 14} Sites Live`}
+          change={`${data.totalProjects || 14} Sites Commissioned`}
           isPositive={true}
           icon={Sun}
           accent="amber"
+          href="/tenant/projects"
         />
         <ExecutiveTickerCard 
-          label="DBT Subsidy Claimed"
+          label="DBT Subsidy Disbursed"
           value="₹24.8 Lakhs"
-          change="PM Surya Ghar"
+          change="PM Surya Ghar Scheme"
           isPositive={true}
           icon={Landmark}
           accent="emerald"
+          href="/tenant/subsidy"
         />
         <ExecutiveTickerCard 
-          label="Execution Velocity"
+          label="Site Turnaround Time"
           value="14.8 Days"
-          change="Avg Site Turnaround"
+          change="Inquiry to Commissioning"
           isPositive={true}
           icon={Clock}
           accent="indigo"
+          href="/tenant/installation"
         />
         <ExecutiveTickerCard 
           label="Quotation Win-Rate"
           value="41.2%"
-          change="Proposal to Order"
+          change="60s Proposal Conversion"
           isPositive={true}
           icon={Award}
           accent="sky"
+          href="/tenant/quotations"
         />
       </div>
 
-      {/* 3. EXECUTIVE PERSPECTIVE TAB SWITCHER */}
+      {/* 4. CONVENIENT VIEW SWITCHER TABS */}
       <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none border-b border-slate-100">
-        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider shrink-0 mr-1">
-          Infographic View:
+        <span className="text-xs font-extrabold text-slate-400 uppercase tracking-wider shrink-0 mr-1.5">
+          Focus Lens:
         </span>
         <button 
           onClick={() => setCurrentTab('all')}
@@ -224,7 +273,7 @@ export default function TenantDashboard() {
               : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
           }`}
         >
-          All Infographics (Full Overview)
+          ⚡ All Infographics (Full Overview)
         </button>
         <button 
           onClick={() => setCurrentTab('financial')}
@@ -234,7 +283,7 @@ export default function TenantDashboard() {
               : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
           }`}
         >
-          Revenue & Cashflow Waterfall
+          💰 Revenue & Cashflow Waterfall
         </button>
         <button 
           onClick={() => setCurrentTab('operations')}
@@ -244,7 +293,7 @@ export default function TenantDashboard() {
               : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
           }`}
         >
-          Field Operations & Execution
+          🏗️ Field Execution Phases
         </button>
         <button 
           onClick={() => setCurrentTab('supply')}
@@ -254,7 +303,7 @@ export default function TenantDashboard() {
               : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
           }`}
         >
-          Hardware & Supply Runway
+          📦 Hardware Stock Runway
         </button>
         <button 
           onClick={() => setCurrentTab('subsidy')}
@@ -264,25 +313,25 @@ export default function TenantDashboard() {
               : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
           }`}
         >
-          PM Surya Ghar Portal
+          🏛️ PM Surya Ghar Portal
         </button>
       </div>
 
-      {/* 4. THE FIVE-STAGE SOLAR BUSINESS LIFECYCLE FUNNEL */}
+      {/* 5. FIVE-STAGE SOLAR BUSINESS LIFECYCLE FUNNEL CARDS */}
       <div>
         <div className="flex items-center justify-between mb-3 px-1">
           <div>
             <h2 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider">
               Solar Operations Funnel
             </h2>
-            <p className="text-[11px] text-slate-500">Live stage volume from customer inquiry to subsidy disbursal</p>
+            <p className="text-[11px] text-slate-500">Live project stage volume from customer inquiry to subsidy disbursal</p>
           </div>
-          <Link href="/tenant/projects" className="text-xs font-semibold text-blue-600 hover:underline">
+          <Link href="/tenant/projects" className="text-xs font-bold text-blue-600 hover:underline">
             View All Projects →
           </Link>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
           <FunnelStageCard 
             step="01"
             title="Inbound Leads" 
@@ -335,19 +384,22 @@ export default function TenantDashboard() {
         </div>
       </div>
 
-      {/* 5. PRIMARY STATISTICAL GRAPHICS: CAPACITY & REVENUE TRAJECTORY + CASHFLOW WATERFALL */}
+      {/* 6. PRIMARY INFOGRAPHICS: INSTALLATION VELOCITY & CASHFLOW WATERFALL */}
       {(currentTab === 'all' || currentTab === 'financial') && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           
           {/* CHART 1: MONTHLY CAPACITY (kWp) & REVENUE (₹ Lakhs) - 7 COLS */}
-          <div className="lg:col-span-7 bg-white rounded-3xl p-6 sm:p-7 border border-slate-200/80 shadow-2xs flex flex-col justify-between">
+          <div className="lg:col-span-7 bg-white/95 backdrop-blur-xs rounded-2xl sm:rounded-3xl p-6 sm:p-7 border border-slate-200/80 shadow-xs hover:shadow-lg transition-all duration-300 flex flex-col justify-between relative overflow-hidden group">
+            {/* Top Accent Stripe */}
+            <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-blue-500 via-sky-400 to-amber-400" />
+            
             <div>
               {/* Chart Header & Controls */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6 pb-4 border-b border-slate-100">
                 <div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
-                      <Activity size={17} />
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shadow-2xs">
+                      <Activity size={18} />
                     </div>
                     <div>
                       <h3 className="text-sm font-extrabold text-slate-900 tracking-tight">
@@ -412,10 +464,10 @@ export default function TenantDashboard() {
                   )}
                 </div>
 
-                <div className="flex items-center gap-3 text-xs">
+                <div className="flex items-center gap-2 text-xs">
                   <span className="text-slate-500">Total Portfolio:</span>
-                  <span className="font-extrabold text-slate-900 bg-slate-100 px-2.5 py-0.5 rounded-full">
-                    {totalCapacityKWp} kWp Installed
+                  <span className="font-extrabold text-blue-700 bg-blue-50 border border-blue-200/60 px-2.5 py-0.5 rounded-full">
+                    {totalCapacityKWp} kWp Commissioned
                   </span>
                 </div>
               </div>
@@ -503,12 +555,15 @@ export default function TenantDashboard() {
           </div>
 
           {/* CASHFLOW WATERFALL & WORKING CAPITAL INFOGRAPHIC - 5 COLS */}
-          <div className="lg:col-span-5 bg-white rounded-3xl p-6 sm:p-7 border border-slate-200/80 shadow-2xs flex flex-col justify-between">
+          <div className="lg:col-span-5 bg-white/95 backdrop-blur-xs rounded-2xl sm:rounded-3xl p-6 sm:p-7 border border-slate-200/80 shadow-xs hover:shadow-lg transition-all duration-300 flex flex-col justify-between relative overflow-hidden group">
+            {/* Top Accent Stripe */}
+            <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-emerald-500 via-teal-400 to-blue-500" />
+
             <div>
               <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                    <Wallet size={17} />
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shadow-2xs">
+                    <Wallet size={18} />
                   </div>
                   <div>
                     <h3 className="text-sm font-extrabold text-slate-900 tracking-tight">
@@ -517,40 +572,40 @@ export default function TenantDashboard() {
                     <p className="text-xs text-slate-500">Milestone realization & aging receivables</p>
                   </div>
                 </div>
-                <span className="text-[10px] font-extrabold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-full">
+                <span className="text-[10px] font-extrabold text-slate-800 bg-slate-100 px-2.5 py-1 rounded-full border border-slate-200">
                   Order Book: ₹84.6L
                 </span>
               </div>
 
               {/* Working Capital Stack Progress Bar */}
-              <div className="space-y-3.5 my-2">
-                <div>
-                  <div className="flex items-center justify-between text-xs mb-1">
+              <div className="space-y-4 my-2">
+                <div className="p-3 rounded-2xl bg-slate-50/70 border border-slate-100">
+                  <div className="flex items-center justify-between text-xs mb-1.5">
                     <span className="font-bold text-slate-700">Customer Advances Received</span>
                     <span className="font-black text-emerald-600">₹51.2 Lakhs (60.5%)</span>
                   </div>
-                  <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
-                    <div className="bg-emerald-500 h-2.5 rounded-full w-[60.5%]" />
+                  <div className="w-full bg-slate-200/70 rounded-full h-2 overflow-hidden">
+                    <div className="bg-emerald-500 h-2 rounded-full w-[60.5%]" />
                   </div>
                 </div>
 
-                <div>
-                  <div className="flex items-center justify-between text-xs mb-1">
+                <div className="p-3 rounded-2xl bg-slate-50/70 border border-slate-100">
+                  <div className="flex items-center justify-between text-xs mb-1.5">
                     <span className="font-bold text-slate-700">Installation Milestones In Flight</span>
                     <span className="font-black text-amber-600">₹18.6 Lakhs (22.0%)</span>
                   </div>
-                  <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
-                    <div className="bg-amber-500 h-2.5 rounded-full w-[22%]" />
+                  <div className="w-full bg-slate-200/70 rounded-full h-2 overflow-hidden">
+                    <div className="bg-amber-500 h-2 rounded-full w-[22%]" />
                   </div>
                 </div>
 
-                <div>
-                  <div className="flex items-center justify-between text-xs mb-1">
+                <div className="p-3 rounded-2xl bg-slate-50/70 border border-slate-100">
+                  <div className="flex items-center justify-between text-xs mb-1.5">
                     <span className="font-bold text-slate-700">National DBT Subsidy Clearing</span>
                     <span className="font-black text-blue-600">₹14.8 Lakhs (17.5%)</span>
                   </div>
-                  <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
-                    <div className="bg-blue-500 h-2.5 rounded-full w-[17.5%]" />
+                  <div className="w-full bg-slate-200/70 rounded-full h-2 overflow-hidden">
+                    <div className="bg-blue-500 h-2 rounded-full w-[17.5%]" />
                   </div>
                 </div>
               </div>
@@ -591,17 +646,20 @@ export default function TenantDashboard() {
         </div>
       )}
 
-      {/* 6. OPERATIONS & SUPPLY CHAIN INFOGRAPHICS */}
+      {/* 7. OPERATIONS & SUPPLY CHAIN INFOGRAPHICS */}
       {(currentTab === 'all' || currentTab === 'operations' || currentTab === 'supply') && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           
           {/* FIELD INSTALLATION GANTT & PHASES (6 COLS) */}
-          <div className="lg:col-span-6 bg-white rounded-3xl p-6 sm:p-7 border border-slate-200/80 shadow-2xs flex flex-col justify-between">
+          <div className="lg:col-span-6 bg-white/95 backdrop-blur-xs rounded-2xl sm:rounded-3xl p-6 sm:p-7 border border-slate-200/80 shadow-xs hover:shadow-lg transition-all duration-300 flex flex-col justify-between relative overflow-hidden group">
+            {/* Top Accent Stripe */}
+            <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-amber-400 via-orange-400 to-amber-500" />
+
             <div>
               <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
-                    <HardHat size={17} />
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shadow-2xs">
+                    <HardHat size={18} />
                   </div>
                   <div>
                     <h3 className="text-sm font-extrabold text-slate-900 tracking-tight">
@@ -610,12 +668,12 @@ export default function TenantDashboard() {
                     <p className="text-xs text-slate-500">Technician progress across active customer installations</p>
                   </div>
                 </div>
-                <span className="text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full">
+                <span className="text-[10px] font-bold text-amber-800 bg-amber-50 border border-amber-200/80 px-2.5 py-0.5 rounded-full">
                   {data.totalProjects || 14} Sites Live
                 </span>
               </div>
 
-              <div className="space-y-3.5 my-2">
+              <div className="space-y-3 my-2">
                 <ExecutionPhaseItem 
                   phase="Phase 1"
                   title="Roof Structure & Rail Ballast Mounting"
@@ -634,7 +692,7 @@ export default function TenantDashboard() {
                 />
                 <ExecutionPhaseItem 
                   phase="Phase 3"
-                  title="Inverter Grid Sync & Lightning Arrestor"
+                  title="Inverter Grid Sync & Safety Earthing"
                   sitesCount={3}
                   avgTime="1.6 Days"
                   completion={40}
@@ -660,12 +718,15 @@ export default function TenantDashboard() {
           </div>
 
           {/* HARDWARE SUPPLY CHAIN & RUNWAY (6 COLS) */}
-          <div className="lg:col-span-6 bg-white rounded-3xl p-6 sm:p-7 border border-slate-200/80 shadow-2xs flex flex-col justify-between">
+          <div className="lg:col-span-6 bg-white/95 backdrop-blur-xs rounded-2xl sm:rounded-3xl p-6 sm:p-7 border border-slate-200/80 shadow-xs hover:shadow-lg transition-all duration-300 flex flex-col justify-between relative overflow-hidden group">
+            {/* Top Accent Stripe */}
+            <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-indigo-500 via-purple-400 to-indigo-600" />
+
             <div>
               <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
-                    <Truck size={17} />
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shadow-2xs">
+                    <Truck size={18} />
                   </div>
                   <div>
                     <h3 className="text-sm font-extrabold text-slate-900 tracking-tight">
@@ -709,17 +770,20 @@ export default function TenantDashboard() {
         </div>
       )}
 
-      {/* 7. PM SURYA GHAR NATIONAL PORTAL & SYSTEM SEGMENTATION */}
+      {/* 8. PM SURYA GHAR NATIONAL PORTAL & SYSTEM SEGMENTATION */}
       {(currentTab === 'all' || currentTab === 'subsidy') && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           
           {/* DONUT: SYSTEM SEGMENTATION & PORTFOLIO MIX (5 COLS) */}
-          <div className="lg:col-span-5 bg-white rounded-3xl p-6 sm:p-7 border border-slate-200/80 shadow-2xs flex flex-col justify-between">
+          <div className="lg:col-span-5 bg-white/95 backdrop-blur-xs rounded-2xl sm:rounded-3xl p-6 sm:p-7 border border-slate-200/80 shadow-xs hover:shadow-lg transition-all duration-300 flex flex-col justify-between relative overflow-hidden group">
+            {/* Top Accent Stripe */}
+            <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-sky-400 via-blue-500 to-indigo-500" />
+
             <div>
               <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center">
-                    <PieIcon size={17} />
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center shadow-2xs">
+                    <PieIcon size={18} />
                   </div>
                   <div>
                     <h3 className="text-sm font-extrabold text-slate-900 tracking-tight">System Segmentation</h3>
@@ -788,12 +852,15 @@ export default function TenantDashboard() {
           </div>
 
           {/* PM SURYA GHAR NATIONAL PORTAL SUBSIDY FUNNEL (7 COLS) */}
-          <div className="lg:col-span-7 bg-white rounded-3xl p-6 sm:p-7 border border-slate-200/80 shadow-2xs flex flex-col justify-between">
+          <div className="lg:col-span-7 bg-white/95 backdrop-blur-xs rounded-2xl sm:rounded-3xl p-6 sm:p-7 border border-slate-200/80 shadow-xs hover:shadow-lg transition-all duration-300 flex flex-col justify-between relative overflow-hidden group">
+            {/* Top Accent Stripe */}
+            <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-emerald-400 via-teal-500 to-emerald-600" />
+
             <div>
               <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                    <Landmark size={17} />
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shadow-2xs">
+                    <Landmark size={18} />
                   </div>
                   <div>
                     <h3 className="text-sm font-extrabold text-slate-900 tracking-tight">
@@ -809,10 +876,10 @@ export default function TenantDashboard() {
 
               {/* 4-Step Subsidy Pipeline Visual */}
               <div className="space-y-3 my-2">
-                {subsidyFunnel.map((item, idx) => (
-                  <div key={item.step} className="p-3 rounded-2xl bg-slate-50 border border-slate-200/80 flex items-center justify-between gap-3">
+                {subsidyFunnel.map((item) => (
+                  <div key={item.step} className="p-3 rounded-2xl bg-slate-50/80 border border-slate-200/70 hover:bg-slate-50 transition-colors flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
-                      <span className="w-7 h-7 rounded-xl bg-emerald-600 text-white font-extrabold text-xs flex items-center justify-center shrink-0">
+                      <span className="w-7 h-7 rounded-xl bg-emerald-600 text-white font-extrabold text-xs flex items-center justify-center shrink-0 shadow-2xs">
                         {item.step}
                       </span>
                       <div>
@@ -840,16 +907,19 @@ export default function TenantDashboard() {
         </div>
       )}
 
-      {/* 8. CUSTOMER ACQUISITION CHANNELS & PROPOSAL WIN-RATE */}
+      {/* 9. CUSTOMER ACQUISITION CHANNELS & PROPOSAL WIN-RATE */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
         {/* LEAD ACQUISITION CHANNELS (6 COLS) */}
-        <div className="lg:col-span-6 bg-white rounded-3xl p-6 sm:p-7 border border-slate-200/80 shadow-2xs flex flex-col justify-between">
+        <div className="lg:col-span-6 bg-white/95 backdrop-blur-xs rounded-2xl sm:rounded-3xl p-6 sm:p-7 border border-slate-200/80 shadow-xs hover:shadow-lg transition-all duration-300 flex flex-col justify-between relative overflow-hidden group">
+          {/* Top Accent Stripe */}
+          <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-blue-500 to-indigo-500" />
+
           <div>
             <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
-                  <BarChart3 size={17} />
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shadow-2xs">
+                  <BarChart3 size={18} />
                 </div>
                 <div>
                   <h3 className="text-sm font-extrabold text-slate-900 tracking-tight">
@@ -865,15 +935,15 @@ export default function TenantDashboard() {
 
             <div className="space-y-3.5 my-2">
               {leadSourceData.map((src) => (
-                <div key={src.source} className="space-y-1.5">
+                <div key={src.source} className="p-3 rounded-2xl bg-slate-50/70 border border-slate-100 space-y-1.5">
                   <div className="flex items-center justify-between text-xs">
-                    <span className="font-bold text-slate-700">{src.source}</span>
+                    <span className="font-bold text-slate-800">{src.source}</span>
                     <div className="flex items-center gap-3">
                       <span className="text-[11px] text-slate-500">{src.volume}</span>
-                      <span className="font-extrabold text-slate-900 w-10 text-right">{src.share}%</span>
+                      <span className="font-black text-slate-900 w-10 text-right">{src.share}%</span>
                     </div>
                   </div>
-                  <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                  <div className="w-full bg-slate-200/70 rounded-full h-2 overflow-hidden">
                     <div className={`h-2 rounded-full ${src.color}`} style={{ width: `${src.share}%` }} />
                   </div>
                 </div>
@@ -893,7 +963,7 @@ export default function TenantDashboard() {
         <div className="lg:col-span-6 flex flex-col justify-between gap-4">
           
           {/* SOL MASCOT TIP CARD */}
-          <div className="rounded-3xl p-6 bg-blue-50/70 border border-blue-200/70 relative overflow-hidden flex-1 flex flex-col justify-between">
+          <div className="rounded-2xl sm:rounded-3xl p-6 bg-gradient-to-br from-blue-50/90 via-sky-50/60 to-white border border-blue-200/70 relative overflow-hidden flex-1 flex flex-col justify-between shadow-xs">
             <div className="flex items-start gap-3.5">
               <div className="w-10 h-10 rounded-2xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-sm shadow-blue-500/20">
                 <Sparkles size={20} />
@@ -934,7 +1004,7 @@ export default function TenantDashboard() {
           </div>
 
           {/* QUICK TELEMETRY CARD */}
-          <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-2xs flex items-center justify-between">
+          <div className="bg-white/95 backdrop-blur-xs rounded-2xl p-5 border border-slate-200/80 shadow-2xs flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
                 <ShieldCheck size={18} />
@@ -953,8 +1023,8 @@ export default function TenantDashboard() {
 
       </div>
 
-      {/* 9. ENVIRONMENTAL OFFSET & SOLAR FLEET TELEMETRY */}
-      <div className="rounded-3xl bg-gradient-to-br from-emerald-950 via-slate-900 to-slate-950 text-white p-7 sm:p-8 relative overflow-hidden shadow-xl shadow-slate-900/10 border border-emerald-900/40">
+      {/* 10. ENVIRONMENTAL OFFSET & SOLAR FLEET TELEMETRY */}
+      <div className="rounded-2xl sm:rounded-3xl bg-gradient-to-br from-emerald-950 via-slate-900 to-slate-950 text-white p-7 sm:p-8 relative overflow-hidden shadow-xl shadow-slate-900/10 border border-emerald-900/40">
         
         {/* Glow Accents */}
         <div className="pointer-events-none absolute -right-16 -top-16 w-64 h-64 bg-emerald-500/15 rounded-full blur-3xl" />
@@ -1028,7 +1098,7 @@ export default function TenantDashboard() {
         </div>
       </div>
 
-      {/* 10. SYSTEM HEALTH & FAST ACTIONS */}
+      {/* 11. SYSTEM HEALTH & FAST ACTIONS */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
         <HealthMetricCard 
           title="Open Service & AMC Tickets"
@@ -1074,6 +1144,7 @@ function ExecutiveTickerCard({
   isPositive,
   icon: Icon,
   accent,
+  href,
 }: {
   label: string;
   value: string;
@@ -1081,30 +1152,58 @@ function ExecutiveTickerCard({
   isPositive: boolean;
   icon: any;
   accent: 'blue' | 'amber' | 'emerald' | 'indigo' | 'sky';
+  href: string;
 }) {
   const accents = {
-    blue: 'bg-blue-50 text-blue-600',
-    amber: 'bg-amber-50 text-amber-600',
-    emerald: 'bg-emerald-50 text-emerald-600',
-    indigo: 'bg-indigo-50 text-indigo-600',
-    sky: 'bg-sky-50 text-sky-600',
+    blue: {
+      box: 'bg-blue-50 text-blue-600',
+      border: 'hover:border-blue-400/40',
+      badge: 'text-blue-700 bg-blue-50/80',
+    },
+    amber: {
+      box: 'bg-amber-50 text-amber-600',
+      border: 'hover:border-amber-400/40',
+      badge: 'text-amber-700 bg-amber-50/80',
+    },
+    emerald: {
+      box: 'bg-emerald-50 text-emerald-600',
+      border: 'hover:border-emerald-400/40',
+      badge: 'text-emerald-700 bg-emerald-50/80',
+    },
+    indigo: {
+      box: 'bg-indigo-50 text-indigo-600',
+      border: 'hover:border-indigo-400/40',
+      badge: 'text-indigo-700 bg-indigo-50/80',
+    },
+    sky: {
+      box: 'bg-sky-50 text-sky-600',
+      border: 'hover:border-sky-400/40',
+      badge: 'text-sky-700 bg-sky-50/80',
+    },
   }[accent];
 
   return (
-    <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-2xs flex flex-col justify-between">
+    <Link 
+      href={href}
+      className={`bg-white/95 backdrop-blur-xs rounded-2xl p-4 sm:p-5 border border-slate-200/80 shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 flex flex-col justify-between group ${accents.border}`}
+    >
       <div className="flex items-center justify-between mb-2">
-        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider truncate">
+        <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider truncate">
           {label}
         </span>
-        <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${accents}`}>
-          <Icon size={14} strokeWidth={2.2} />
+        <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform ${accents.box}`}>
+          <Icon size={15} strokeWidth={2.2} />
         </div>
       </div>
       <div>
-        <p className="text-xl font-black text-slate-900 tracking-tight">{value}</p>
-        <p className="text-[10px] font-semibold text-emerald-600 mt-0.5">{change}</p>
+        <p className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight group-hover:text-blue-600 transition-colors">
+          {value}
+        </p>
+        <p className="text-[10px] font-bold text-emerald-600 mt-0.5 flex items-center gap-1">
+          <span>{change}</span>
+        </p>
       </div>
-    </div>
+    </Link>
   );
 }
 
@@ -1131,13 +1230,17 @@ function ExecutionPhaseItem({
   }[tone];
 
   return (
-    <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200/80">
-      <div className="flex items-center justify-between text-xs mb-1">
+    <div className="p-3.5 rounded-2xl bg-slate-50/70 border border-slate-200/60 hover:bg-slate-50 transition-colors">
+      <div className="flex items-center justify-between text-xs mb-1.5">
         <span className="font-extrabold text-slate-900 flex items-center gap-1.5">
-          <span className="text-[10px] font-black text-slate-400">{phase}</span>
+          <span className="text-[10px] font-black text-slate-400 bg-white px-1.5 py-0.5 rounded-md border border-slate-200">
+            {phase}
+          </span>
           {title}
         </span>
-        <span className="font-black text-slate-900">{sitesCount} Sites</span>
+        <span className="font-black text-slate-900 bg-white px-2 py-0.5 rounded-lg border border-slate-200 text-[11px]">
+          {sitesCount} Sites
+        </span>
       </div>
       <div className="flex items-center justify-between text-[11px] text-slate-500 mb-1.5">
         <span>Turnaround: {avgTime}</span>
@@ -1217,27 +1320,27 @@ function FunnelStageCard({
 }) {
   const tones = {
     blue: {
-      border: 'hover:border-blue-300',
+      border: 'hover:border-blue-400/50',
       badge: 'text-blue-700 bg-blue-50',
       iconBox: 'bg-blue-50 text-blue-600',
     },
     amber: {
-      border: 'hover:border-amber-300',
+      border: 'hover:border-amber-400/50',
       badge: 'text-amber-700 bg-amber-50',
       iconBox: 'bg-amber-50 text-amber-600',
     },
     sky: {
-      border: 'hover:border-sky-300',
+      border: 'hover:border-sky-400/50',
       badge: 'text-sky-700 bg-sky-50',
       iconBox: 'bg-sky-50 text-sky-600',
     },
     indigo: {
-      border: 'hover:border-indigo-300',
+      border: 'hover:border-indigo-400/50',
       badge: 'text-indigo-700 bg-indigo-50',
       iconBox: 'bg-indigo-50 text-indigo-600',
     },
     emerald: {
-      border: 'hover:border-emerald-300',
+      border: 'hover:border-emerald-400/50',
       badge: 'text-emerald-700 bg-emerald-50',
       iconBox: 'bg-emerald-50 text-emerald-600',
     },
@@ -1246,14 +1349,14 @@ function FunnelStageCard({
   return (
     <Link 
       href={link} 
-      className={`bg-white rounded-2xl p-4 border border-slate-200/80 shadow-2xs transition-all hover:shadow-md hover:-translate-y-0.5 group flex flex-col justify-between ${tones.border}`}
+      className={`bg-white/95 backdrop-blur-xs rounded-2xl p-4 sm:p-5 border border-slate-200/80 shadow-xs transition-all duration-300 hover:shadow-md hover:-translate-y-0.5 group flex flex-col justify-between ${tones.border}`}
     >
       <div>
         <div className="flex items-center justify-between mb-3">
           <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full ${tones.badge}`}>
             STAGE {step}
           </span>
-          <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${tones.iconBox}`}>
+          <div className={`w-8 h-8 rounded-xl flex items-center justify-center shadow-2xs group-hover:scale-105 transition-transform ${tones.iconBox}`}>
             <Icon size={16} strokeWidth={2.2} />
           </div>
         </div>
@@ -1295,7 +1398,7 @@ function HealthMetricCard({
   cta: string;
 }) {
   return (
-    <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-2xs flex flex-col justify-between">
+    <div className="bg-white/95 backdrop-blur-xs rounded-2xl p-5 border border-slate-200/80 shadow-xs hover:shadow-md transition-all flex flex-col justify-between">
       <div>
         <div className="flex items-center justify-between mb-3">
           <span className="text-xs font-extrabold text-slate-900 uppercase tracking-wider">
