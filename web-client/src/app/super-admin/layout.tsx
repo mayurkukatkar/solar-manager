@@ -1,5 +1,6 @@
 "use client";
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import axios from 'axios';
 import { useState } from 'react';
@@ -91,19 +92,26 @@ export default function SuperAdminLayout({ children }: { children: React.ReactNo
   };
 
   return (
-    <div className="flex h-screen bg-slate-50 font-sans overflow-hidden">
+    <div className="flex h-screen bg-slate-50 font-sans overflow-hidden selection:bg-blue-100 selection:text-blue-900">
       
       {/* SIDEBAR - CLEAN WHITE PREMIUM UI WITH UPGRADED TYPOGRAPHY */}
       <aside className="w-72 bg-white text-slate-800 flex flex-col z-20 flex-shrink-0 border-r border-slate-200 shadow-sm relative overflow-hidden">
         
         {/* LOGO HEADER */}
         <div className="h-16 flex items-center px-6 border-b border-slate-100 relative z-10">
-          <div className="w-8 h-8 rounded-lg bg-slate-900 flex items-center justify-center mr-3 shadow-md">
-            <LayoutDashboard size={16} className="text-white" />
+          <div className="w-9 h-9 rounded-xl bg-white border border-slate-200 p-1 flex items-center justify-center mr-3 shadow-2xs">
+            <Image 
+              src="/images/whereready_logo.png" 
+              alt="WhereReady Logo" 
+              width={28} 
+              height={28} 
+              className="object-contain" 
+              priority
+            />
           </div>
           <div>
-            <h2 className="text-base font-extrabold tracking-tight text-slate-900">Solar ERP</h2>
-            <div className="text-[10px] text-slate-500 font-bold tracking-widest uppercase mt-0.5">Super Admin</div>
+            <h2 className="text-base font-extrabold tracking-tight text-slate-900 leading-none">WhereReady</h2>
+            <div className="text-[10px] text-blue-600 font-bold tracking-wider uppercase mt-1">SOLAR OS • Super Admin</div>
           </div>
         </div>
 
@@ -115,7 +123,7 @@ export default function SuperAdminLayout({ children }: { children: React.ReactNo
               {group.icon ? (
                 <button 
                   onClick={() => toggleGroup(group.title)}
-                  className="w-full flex items-center justify-between px-2 py-1.5 mb-1 group hover:text-slate-900 transition-colors focus:outline-none"
+                  className="w-full flex items-center justify-between px-2 py-1.5 mb-1 group hover:text-slate-900 transition-colors focus:outline-none cursor-pointer"
                 >
                   <div className="flex items-center gap-2.5 text-[11px] font-bold text-slate-400 uppercase tracking-wider group-hover:text-slate-600 transition-colors">
                     <group.icon size={14} className="opacity-70" />
@@ -249,8 +257,19 @@ export default function SuperAdminLayout({ children }: { children: React.ReactNo
         </header>
         
         {/* MAIN CANVAS */}
-        <main className="flex-1 overflow-y-auto bg-[#F8FAFC] p-8 custom-scrollbar">
-          <div className="max-w-7xl mx-auto">
+        <main className="flex-1 overflow-y-auto bg-white p-8 custom-scrollbar relative">
+          {/* Engineering 32px Square Grid Background */}
+          <div 
+            className="pointer-events-none absolute inset-0 z-0 opacity-70"
+            style={{
+              backgroundImage: `
+                linear-gradient(to right, rgba(15, 23, 42, 0.035) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(15, 23, 42, 0.035) 1px, transparent 1px)
+              `,
+              backgroundSize: '32px 32px',
+            }}
+          />
+          <div className="relative z-10 max-w-7xl mx-auto">
             {children}
           </div>
         </main>

@@ -383,7 +383,7 @@ export default function CRMHub() {
               {filteredCustomers.map((c) => {
                 const primaryProject = c.projects && c.projects.length > 0 ? c.projects[0] : null;
                 const cleanPhone = c.mobile?.replace(/[^0-9]/g, '') || '';
-                const waText = encodeURIComponent(`Hello ${c.name}, greeting from Solar ERP! We are checking in regarding your solar rooftop system. Everything operating smoothly?`);
+                const waText = encodeURIComponent(`Hello ${c.name}, greeting from WhereReady Solar OS! We are checking in regarding your solar rooftop system. Everything operating smoothly?`);
 
                 return (
                   <div 
@@ -525,7 +525,7 @@ export default function CRMHub() {
                     {filteredCustomers.map((c) => {
                       const primaryProject = c.projects && c.projects.length > 0 ? c.projects[0] : null;
                       const cleanPhone = c.mobile?.replace(/[^0-9]/g, '') || '';
-                      const waText = encodeURIComponent(`Hello ${c.name}, greeting from Solar ERP! We are checking in regarding your solar rooftop system.`);
+                      const waText = encodeURIComponent(`Hello ${c.name}, greeting from WhereReady Solar OS! We are checking in regarding your solar rooftop system.`);
 
                       return (
                         <tr key={c.id} className="hover:bg-slate-50/80 transition-colors group">

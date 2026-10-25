@@ -1238,7 +1238,7 @@ IFSC Code: SBIN0001234`;
                   <span>Zero Double-Entry Hub</span>
                 </div>
                 <h3 className="text-xl font-black">Register or Import PM Surya Ghar Application</h3>
-                <p className="text-xs text-indigo-300">Import directly from pmsuryaghar.gov.in or auto-fill from Solar ERP — never type twice</p>
+                <p className="text-xs text-indigo-300">Import directly from pmsuryaghar.gov.in or auto-fill from WhereReady Solar OS — never type twice</p>
               </div>
               <button onClick={() => setShowAddModal(false)} className="text-slate-400 hover:text-white">
                 <X size={20} />
@@ -1414,7 +1414,7 @@ IFSC Code: SBIN0001234`;
                   <div className="p-3.5 bg-indigo-50 rounded-2xl border border-indigo-200 text-xs text-indigo-950 flex items-start gap-2.5">
                     <Building2 size={16} className="text-indigo-600 shrink-0 mt-0.5" />
                     <div>
-                      <h4 className="font-bold text-indigo-900">Auto-Pull from Solar ERP</h4>
+                      <h4 className="font-bold text-indigo-900">Auto-Pull from WhereReady Solar OS</h4>
                       <p className="text-[11px] text-indigo-800 mt-0.5">
                         Selecting an active project pulls the consumer profile, inverter model, panel specs, and system capacity automatically.
                       </p>
@@ -1422,7 +1422,7 @@ IFSC Code: SBIN0001234`;
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-700">Select Solar ERP Project *</label>
+                    <label className="text-xs font-bold text-slate-700">Select WhereReady Project *</label>
                     <select 
                       required 
                       value={formData.projectId}

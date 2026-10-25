@@ -294,7 +294,7 @@ export default function LeadDetails() {
                       <Phone size={14} />
                     </a>
                     <a 
-                      href={`https://wa.me/${lead.mobile.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(`Hello ${lead.name}, regarding your solar inquiry with Solar ERP...`)}`} 
+                      href={`https://wa.me/${lead.mobile.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(`Hello ${lead.name}, regarding your solar rooftop inquiry with WhereReady Solar OS...`)}`} 
                       target="_blank"
                       rel="noopener noreferrer"
                       className="p-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 transition-colors"

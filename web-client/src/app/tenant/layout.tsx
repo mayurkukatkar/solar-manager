@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import axios from 'axios';
 import { 
@@ -10,7 +11,7 @@ import {
   ActivitySquare,
   Users2, MapPin, FileText, HardHat, Package, Truck, Receipt, Banknote, Landmark,
   FileBox, Wrench, ShieldCheck, MessageSquare, UserPlus, Shield, BarChart2, Zap,
-  Globe, ShoppingCart, Bell, History, Menu, X
+  Globe, ShoppingCart, Bell, History, Menu, X, Sparkles
 } from 'lucide-react';
 
 const MENU_GROUPS = [
@@ -185,20 +186,27 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
             <button 
               type="button"
               onClick={isCollapsed ? toggleSidebarCollapse : undefined}
-              title={isCollapsed ? "Click to expand sidebar" : "Solar ERP"}
-              className={`w-9 h-9 lg:w-10 lg:h-10 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-xl flex items-center justify-center text-white shadow-xs shadow-emerald-200 shrink-0 ${
+              title={isCollapsed ? "Click to expand sidebar" : "WhereReady Solar OS"}
+              className={`relative w-9 h-9 lg:w-10 lg:h-10 rounded-xl overflow-hidden border border-slate-200 bg-white shadow-2xs shrink-0 flex items-center justify-center ${
                 isCollapsed ? 'hover:scale-105 transition-transform cursor-pointer' : ''
               }`}
             >
-              <Sun size={20} strokeWidth={2.5} />
+              <Image
+                src="/images/whereready_logo.png"
+                alt="WhereReady Logo"
+                width={36}
+                height={36}
+                className="object-contain p-0.5"
+                priority
+              />
             </button>
             {!isCollapsed && (
               <div>
-                <h1 className="font-bold text-slate-800 text-base lg:text-lg tracking-tight leading-none">
-                  Solar <span className="font-light">ERP</span>
+                <h1 className="font-extrabold text-slate-900 text-sm lg:text-base tracking-tight leading-none">
+                  WhereReady
                 </h1>
-                <p className="text-[10px] font-semibold text-emerald-600 uppercase tracking-widest mt-1">
-                  Tenant Admin
+                <p className="text-[10px] font-bold text-blue-600 uppercase tracking-wider mt-1">
+                  SOLAR OS • Workspace
                 </p>
               </div>
             )}
@@ -287,11 +295,11 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
                         href={item.path}
                         className={`w-10 h-10 mx-auto rounded-xl flex items-center justify-center transition-all duration-200 relative group ${
                           isActive 
-                            ? 'text-emerald-700 bg-emerald-50 shadow-xs ring-1 ring-emerald-300' 
+                            ? 'text-blue-700 bg-blue-50 shadow-xs ring-1 ring-blue-300' 
                             : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'
                         }`}
                       >
-                        <Icon size={18} className={isActive ? 'text-emerald-600' : 'text-slate-400 group-hover:text-slate-700'} strokeWidth={isActive ? 2.5 : 2} />
+                        <Icon size={18} className={isActive ? 'text-blue-600' : 'text-slate-400 group-hover:text-slate-700'} strokeWidth={isActive ? 2.5 : 2} />
                         
                         {/* Interactive Floating Tooltip */}
                         <div className="absolute left-full ml-3 px-2.5 py-1 bg-slate-900 text-white text-[11px] font-bold rounded-lg shadow-xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-150 z-50 whitespace-nowrap">
@@ -334,14 +342,14 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
                           onClick={() => { if (isMobile) setMobileMenuOpen(false); }}
                           className={`flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-200 group relative overflow-hidden ${
                             isActive 
-                              ? 'text-emerald-700 bg-emerald-50 shadow-xs shadow-emerald-100/50' 
+                              ? 'text-blue-700 bg-blue-50/90 shadow-xs shadow-blue-100/50' 
                               : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
                           }`}
                         >
                           {isActive && (
-                            <div className="absolute left-0 top-0 bottom-0 w-1 bg-emerald-500 rounded-r-full" />
+                            <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-600 rounded-r-full" />
                           )}
-                          <Icon size={16} className={isActive ? 'text-emerald-600' : 'text-slate-400 group-hover:text-slate-500 transition-colors'} strokeWidth={isActive ? 2.5 : 2} />
+                          <Icon size={16} className={isActive ? 'text-blue-600' : 'text-slate-400 group-hover:text-slate-500 transition-colors'} strokeWidth={isActive ? 2.5 : 2} />
                           {item.name}
                         </Link>
                       );
@@ -407,20 +415,26 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col lg:flex-row font-sans selection:bg-emerald-100 selection:text-emerald-900 w-full overflow-x-hidden">
+    <div className="min-h-screen bg-slate-50 flex flex-col lg:flex-row font-sans selection:bg-blue-100 selection:text-blue-900 w-full overflow-x-hidden">
       
       {/* MOBILE TOPBAR (< lg) */}
       <header className="lg:hidden sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200/80 px-4 py-3 flex items-center justify-between shadow-xs">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-xl flex items-center justify-center text-white shadow-xs shadow-emerald-200">
-            <Sun size={18} strokeWidth={2.5} />
+          <div className="w-8 h-8 rounded-xl bg-white border border-slate-200 p-1 flex items-center justify-center shadow-2xs">
+            <Image 
+              src="/images/whereready_logo.png" 
+              alt="WhereReady Solar OS" 
+              width={24} 
+              height={24} 
+              className="object-contain" 
+            />
           </div>
           <div>
-            <h1 className="font-bold text-slate-800 text-base tracking-tight leading-none">
-              Solar <span className="font-light">ERP</span>
+            <h1 className="font-extrabold text-slate-900 text-sm tracking-tight leading-none">
+              WhereReady
             </h1>
-            <p className="text-[9px] font-semibold text-emerald-600 uppercase tracking-widest mt-0.5">
-              Tenant Admin
+            <p className="text-[9px] font-bold text-blue-600 uppercase tracking-widest mt-0.5">
+              SOLAR OS • Workspace
             </p>
           </div>
         </div>
@@ -458,8 +472,19 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
       </aside>
 
       {/* MAIN CONTENT AREA */}
-      <main className="flex-1 flex flex-col min-h-screen min-w-0 w-full relative bg-slate-50/50 overflow-x-hidden">
-        <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full min-w-0">
+      <main className="flex-1 flex flex-col min-h-screen min-w-0 w-full relative bg-white overflow-x-hidden">
+        {/* Engineering 32px Square Grid Background */}
+        <div 
+          className="pointer-events-none absolute inset-0 z-0 opacity-70"
+          style={{
+            backgroundImage: `
+              linear-gradient(to right, rgba(15, 23, 42, 0.035) 1px, transparent 1px),
+              linear-gradient(to bottom, rgba(15, 23, 42, 0.035) 1px, transparent 1px)
+            `,
+            backgroundSize: '32px 32px',
+          }}
+        />
+        <div className="relative z-10 p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full min-w-0">
           {children}
         </div>
       </main>

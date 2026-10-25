@@ -71,17 +71,27 @@ export default function Dashboard() {
     <div className="animate-in fade-in duration-500 space-y-6">
       
       {/* HEADER */}
-      <div className="flex justify-between items-end mb-4">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-4">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">SaaS Dashboard</h1>
-          <p className="text-slate-500 mt-1">Platform overview, growth leads, and performance metrics.</p>
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 border border-blue-200/60 mb-2">
+            <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
+            <span className="text-[11px] font-bold text-blue-900 tracking-wide uppercase">
+              WhereReady Solar OS • Platform Admin
+            </span>
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+            Platform Command Center
+          </h1>
+          <p className="text-slate-500 text-sm mt-0.5">
+            Real-time platform overview, inbound vendor demo leads, and multi-tenant health.
+          </p>
         </div>
-        <div className="flex gap-3">
-          <Link href="/super-admin/leads" className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2.5 rounded-lg font-semibold shadow-sm transition-all text-sm flex items-center gap-2">
-            <Sparkles size={16} className="text-blue-600" />
-            <span>View Leads ({leadsData.total})</span>
+        <div className="flex items-center gap-3 shrink-0">
+          <Link href="/super-admin/leads" className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2.5 rounded-xl font-bold shadow-2xs transition-all text-xs flex items-center gap-2">
+            <Sparkles size={15} className="text-blue-600" />
+            <span>Demo Leads ({leadsData.total})</span>
           </Link>
-          <Link href="/super-admin/tenants/create" className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-semibold shadow-sm transition-all text-sm">
+          <Link href="/super-admin/tenants/create" className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl font-bold shadow-sm shadow-blue-500/20 transition-all text-xs">
             + Provision Tenant
           </Link>
         </div>
