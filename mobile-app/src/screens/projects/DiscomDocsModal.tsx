@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import {
   X,
@@ -21,6 +22,7 @@ import {
   Award,
   ChevronRight,
 } from 'lucide-react-native';
+import { ModalHeader } from '../../components/Header';
 import {
   generateDiscomHtml,
   createAndSharePdf,
@@ -110,18 +112,12 @@ export const DiscomDocsModal: React.FC<DiscomDocsModalProps> = ({
   return (
     <Modal visible={visible} animationType="slide" transparent={false} onRequestClose={onClose}>
       <View style={styles.container}>
-        {/* Header */}
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.headerTitle}>DISCOM Statutory Hub</Text>
-            <Text style={styles.headerSubtitle}>
-              Stage 5: Official Net-Metering Document Pack
-            </Text>
-          </View>
-          <TouchableOpacity onPress={onClose} style={styles.closeBtn} activeOpacity={0.7}>
-            <X size={20} color="#64748b" />
-          </TouchableOpacity>
-        </View>
+        {/* STANDARDIZED MODAL HEADER */}
+        <ModalHeader
+          title="DISCOM Statutory Hub"
+          subtitle="Stage 5: Official Net-Metering Document Pack"
+          onClose={onClose}
+        />
 
         <ScrollView style={styles.body} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           {/* PROJECT HEADER CARD */}
@@ -464,6 +460,7 @@ const styles = StyleSheet.create({
     borderTopColor: '#f1f5f9',
     paddingHorizontal: 16,
     paddingVertical: 14,
+    paddingBottom: Platform.OS === 'ios' ? 32 : 14,
     flexDirection: 'row',
     gap: 10,
   },

@@ -11,6 +11,7 @@ import {
   Modal,
   Linking,
   Alert,
+  Platform,
 } from 'react-native';
 import {
   Receipt,
@@ -802,7 +803,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 16,
-    paddingBottom: 40,
+    paddingBottom: Platform.OS === 'ios' ? 120 : 100,
   },
   kpiGrid: {
     flexDirection: 'row',

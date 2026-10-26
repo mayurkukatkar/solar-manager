@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import {
   X,
@@ -20,6 +21,7 @@ import {
   FileCheck,
   Award,
 } from 'lucide-react-native';
+import { ModalHeader } from '../../components/Header';
 import { tenantApi } from '../../api/endpoints';
 
 interface InstallationQAModalProps {
@@ -100,18 +102,12 @@ export const InstallationQAModal: React.FC<InstallationQAModalProps> = ({
   return (
     <Modal visible={visible} animationType="slide" transparent={false} onRequestClose={onClose}>
       <View style={styles.container}>
-        {/* HEADER */}
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.headerTitle}>Installation QA & Testing</Text>
-            <Text style={styles.headerSubtitle}>
-              Statutory Electrical Testing & Quality Sign-Off
-            </Text>
-          </View>
-          <TouchableOpacity onPress={onClose} style={styles.closeBtn} activeOpacity={0.7}>
-            <X size={20} color="#64748b" />
-          </TouchableOpacity>
-        </View>
+        {/* STANDARDIZED MODAL HEADER */}
+        <ModalHeader
+          title="Installation QA & Testing"
+          subtitle="Statutory Electrical Testing & Quality Sign-Off"
+          onClose={onClose}
+        />
 
         <ScrollView style={styles.body} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           {/* PROJECT INFO HERO */}
@@ -497,6 +493,7 @@ const styles = StyleSheet.create({
     borderTopColor: '#f1f5f9',
     paddingHorizontal: 16,
     paddingVertical: 14,
+    paddingBottom: Platform.OS === 'ios' ? 32 : 14,
   },
   submitQaBtn: {
     backgroundColor: '#16a34a',

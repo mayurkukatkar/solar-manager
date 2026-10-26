@@ -10,6 +10,7 @@ import {
   Image,
   Alert,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import {
   X,
@@ -29,6 +30,7 @@ import {
 } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
+import { ModalHeader } from '../../components/Header';
 import { crmApi } from '../../api/endpoints';
 import { offlineSyncService } from '../../services/offlineSyncService';
 
@@ -266,16 +268,12 @@ export const LeadCaptureModal: React.FC<LeadCaptureModalProps> = ({
   return (
     <Modal visible={visible} animationType="slide" transparent={false} onRequestClose={onClose}>
       <View style={styles.container}>
-        {/* Top Header */}
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.headerTitle}>New Solar Lead</Text>
-            <Text style={styles.headerSubtitle}>Direct field entry & prospect registration</Text>
-          </View>
-          <TouchableOpacity onPress={onClose} style={styles.closeBtn} activeOpacity={0.7}>
-            <X size={20} color="#64748b" />
-          </TouchableOpacity>
-        </View>
+        {/* STANDARDIZED MODAL HEADER */}
+        <ModalHeader
+          title="New Solar Lead"
+          subtitle="Direct field entry & prospect registration"
+          onClose={onClose}
+        />
 
         <ScrollView style={styles.body} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           {/* SECTION 1: PROSPECT CONTACT DETAILS */}
@@ -847,6 +845,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     paddingHorizontal: 16,
     paddingVertical: 14,
+    paddingBottom: Platform.OS === 'ios' ? 32 : 14,
     borderTopWidth: 1,
     borderTopColor: '#f1f5f9',
     gap: 12,

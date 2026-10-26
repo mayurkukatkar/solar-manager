@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import {
   Calculator,
@@ -22,12 +23,13 @@ import {
   CheckCircle2,
   Send,
 } from 'lucide-react-native';
+import { Header } from '../../components/Header';
 import { generateQuotationHtml, sharePdfFile, printDirectly, QuotationPdfProps } from '../../services/pdfService';
 import { openWhatsAppWithPitch } from '../../services/whatsappService';
 import { quotationsApi } from '../../api/endpoints';
 import { ProposalPreviewModal } from '../../components/ProposalPreviewModal';
 
-export const QuickQuoteScreen: React.FC<{ route?: any }> = ({ route }) => {
+export const QuickQuoteScreen: React.FC<{ navigation?: any; route?: any }> = ({ navigation, route }) => {
   const initialParams = route?.params || {};
   const [prospectName, setProspectName] = useState(initialParams.prospectName || initialParams.lead?.name || '');
   const [prospectPhone, setProspectPhone] = useState(initialParams.prospectPhone || initialParams.lead?.mobile || '');
@@ -278,26 +280,26 @@ export const QuickQuoteScreen: React.FC<{ route?: any }> = ({ route }) => {
 
   return (
     <View style={styles.container}>
-      {/* HEADER */}
-      <View style={styles.header}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.headerTitle}>WhereReady Solar Estimator</Text>
-          <Text style={styles.headerSubtitle}>
-            On-the-spot solar proposal & PM Surya Ghar calculator
-          </Text>
-        </View>
-        {syncedQuote ? (
-          <View style={styles.badgeSynced}>
-            <CheckCircle2 size={12} color="#15803d" />
-            <Text style={styles.badgeSyncedText}>Web: {syncedQuote.qNumber}</Text>
-          </View>
-        ) : syncing ? (
-          <View style={styles.badgeSyncing}>
-            <ActivityIndicator size="small" color="#2563eb" />
-            <Text style={styles.badgeSyncingText}>Syncing...</Text>
-          </View>
-        ) : null}
-      </View>
+      {/* STANDARDIZED HEADER */}
+      <Header
+        variant={navigation?.canGoBack?.() ? 'detail' : 'main'}
+        title="60s Solar Estimator"
+        subtitle="On-the-spot proposal & PM Surya Ghar calculator"
+        onBack={navigation?.canGoBack?.() ? () => navigation.goBack() : undefined}
+        rightAction={
+          syncedQuote ? (
+            <View style={styles.badgeSynced}>
+              <CheckCircle2 size={12} color="#15803d" />
+              <Text style={styles.badgeSyncedText}>Web: {syncedQuote.qNumber}</Text>
+            </View>
+          ) : syncing ? (
+            <View style={styles.badgeSyncing}>
+              <ActivityIndicator size="small" color="#2563eb" />
+              <Text style={styles.badgeSyncingText}>Syncing...</Text>
+            </View>
+          ) : undefined
+        }
+      />
 
       <ScrollView style={styles.body} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {/* INPUTS CARD */}
@@ -494,7 +496,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 16,
-    paddingBottom: 30,
+    paddingBottom: Platform.OS === 'ios' ? 120 : 100,
   },
   card: {
     backgroundColor: '#ffffff',

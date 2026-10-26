@@ -9,6 +9,7 @@ import {
   TextInput,
   ActivityIndicator,
   Alert,
+  Platform,
 } from 'react-native';
 import {
   X,
@@ -22,6 +23,7 @@ import {
   Receipt,
   Sparkles,
 } from 'lucide-react-native';
+import { ModalHeader } from './Header';
 import { financeApi } from '../api/endpoints';
 import { colors } from '../theme/colors';
 
@@ -174,18 +176,12 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.modalOverlay}>
         <View style={styles.modalContainer}>
-          {/* HEADER */}
-          <View style={styles.modalHeader}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.modalTitle}>Create Commercial Invoice</Text>
-              <Text style={styles.modalSub}>
-                GST Tax Invoices, Bank Proformas & Advance Vouchers
-              </Text>
-            </View>
-            <TouchableOpacity onPress={onClose} style={styles.closeBtn} activeOpacity={0.7}>
-              <X size={20} color="#64748b" />
-            </TouchableOpacity>
-          </View>
+          {/* STANDARDIZED MODAL HEADER */}
+          <ModalHeader
+            title="Create Commercial Invoice"
+            subtitle="GST Tax Invoices, Bank Proformas & Advance Vouchers"
+            onClose={onClose}
+          />
 
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.formContent}>
             {/* INVOICE CATEGORY SELECTOR */}
@@ -380,7 +376,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 24,
     maxHeight: '90%',
     padding: 20,
-    paddingBottom: 32,
+    paddingBottom: Platform.OS === 'ios' ? 44 : 24,
   },
   modalHeader: {
     flexDirection: 'row',

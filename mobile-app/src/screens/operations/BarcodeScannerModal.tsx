@@ -9,6 +9,7 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import {
   X,
@@ -22,6 +23,7 @@ import {
   Zap,
 } from 'lucide-react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import { ModalHeader } from '../../components/Header';
 
 interface BarcodeScannerModalProps {
   visible: boolean;
@@ -121,18 +123,12 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
   return (
     <Modal visible={visible} animationType="slide" transparent={false} onRequestClose={onClose}>
       <View style={styles.container}>
-        {/* HEADER */}
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.headerTitle}>Hardware Barcode Scanner</Text>
-            <Text style={styles.headerSubtitle}>
-              Capture Waaree/Adani Modules & String Inverter Serials
-            </Text>
-          </View>
-          <TouchableOpacity onPress={onClose} style={styles.closeBtn} activeOpacity={0.7}>
-            <X size={20} color="#64748b" />
-          </TouchableOpacity>
-        </View>
+        {/* STANDARDIZED MODAL HEADER */}
+        <ModalHeader
+          title="Hardware Barcode Scanner"
+          subtitle="Capture Waaree/Adani Modules & String Inverter Serials"
+          onClose={onClose}
+        />
 
         {/* SCANNER MODE TABS */}
         <View style={styles.tabRow}>
@@ -561,6 +557,7 @@ const styles = StyleSheet.create({
     borderTopColor: '#f1f5f9',
     paddingHorizontal: 16,
     paddingVertical: 14,
+    paddingBottom: Platform.OS === 'ios' ? 32 : 14,
   },
   saveSerialsBtn: {
     backgroundColor: '#10b981',

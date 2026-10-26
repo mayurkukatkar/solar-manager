@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
+  Platform,
 } from 'react-native';
 import {
   X,
@@ -23,6 +24,7 @@ import {
   Clock,
   ArrowRight,
 } from 'lucide-react-native';
+import { ModalHeader } from './Header';
 import {
   InvoicePdfProps,
   generateInvoiceHtml,
@@ -151,21 +153,12 @@ export const InvoicePdfModal: React.FC<InvoicePdfModalProps> = ({
   return (
     <Modal visible={visible} animationType="slide" transparent={false} onRequestClose={onClose}>
       <View style={styles.container}>
-        {/* TOP BAR */}
-        <View style={styles.topBar}>
-          <View style={{ flex: 1 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Receipt size={18} color="#059669" />
-              <Text style={styles.topBarTitle}>Tax Invoice Generator</Text>
-            </View>
-            <Text style={styles.topBarSubtitle}>
-              {invoice.invoiceNumber} • {invoicePdfData.customerName}
-            </Text>
-          </View>
-          <TouchableOpacity style={styles.closeBtn} onPress={onClose} activeOpacity={0.7}>
-            <X size={20} color="#0f172a" />
-          </TouchableOpacity>
-        </View>
+        {/* STANDARDIZED MODAL HEADER */}
+        <ModalHeader
+          title="Tax Invoice Generator"
+          subtitle={`${invoice.invoiceNumber} • ${invoicePdfData.customerName}`}
+          onClose={onClose}
+        />
 
         {/* ACTION BUTTONS BAR */}
         <View style={styles.actionButtonsBar}>
@@ -447,7 +440,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 16,
-    paddingBottom: 40,
+    paddingBottom: Platform.OS === 'ios' ? 50 : 30,
   },
   invoiceDocCard: {
     backgroundColor: '#ffffff',

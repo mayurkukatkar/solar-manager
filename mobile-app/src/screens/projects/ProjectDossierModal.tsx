@@ -35,6 +35,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import { documentsApi } from '../../api/endpoints';
 import { apiClient } from '../../api/client';
+import { ModalHeader } from '../../components/Header';
 import { colors } from '../../theme/colors';
 
 interface ProjectDossierModalProps {
@@ -329,27 +330,18 @@ export const ProjectDossierModal: React.FC<ProjectDossierModalProps> = ({
   return (
     <Modal visible={visible} animationType="slide" transparent={false} onRequestClose={onClose}>
       <View style={styles.container}>
-        {/* HEADER */}
-        <View style={styles.header}>
-          <View style={{ flex: 1 }}>
-            <View style={styles.headerBadgeRow}>
-              <Text style={styles.projectNumberBadge}>{project?.projectNumber || 'PRJ'}</Text>
-              <View style={styles.vaultBadge}>
-                <FolderLock size={11} color="#059669" />
-                <Text style={styles.vaultBadgeText}>Supabase Vault</Text>
-              </View>
+        {/* STANDARDIZED MODAL HEADER */}
+        <ModalHeader
+          title={project?.name || 'Project Dossier'}
+          subtitle={`👤 ${project?.customer?.name || 'Client'} • ⚡ ${project?.capacity || 3.3} kWp`}
+          onClose={onClose}
+          rightAction={
+            <View style={styles.vaultBadge}>
+              <FolderLock size={11} color="#059669" />
+              <Text style={styles.vaultBadgeText}>{project?.projectNumber || 'Vault'}</Text>
             </View>
-            <Text style={styles.headerTitle} numberOfLines={1}>
-              {project?.name || 'Project Dossier'}
-            </Text>
-            <Text style={styles.headerSub}>
-              👤 {project?.customer?.name || 'Client'} • ⚡ {project?.capacity || 3.3} kWp
-            </Text>
-          </View>
-          <TouchableOpacity onPress={onClose} style={styles.closeBtn} activeOpacity={0.7}>
-            <X size={20} color="#64748b" />
-          </TouchableOpacity>
-        </View>
+          }
+        />
 
         {/* SUBSIDY & READINESS SCORECARD */}
         <View style={styles.scorecardContainer}>

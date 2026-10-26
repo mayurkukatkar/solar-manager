@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, ActivityIndicator, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, ActivityIndicator, TouchableOpacity, Platform } from 'react-native';
 import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -208,8 +208,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     borderTopWidth: 1,
     borderTopColor: '#f1f5f9',
-    height: 68,
-    paddingBottom: 10,
+    height: Platform.OS === 'ios' ? 84 : 68,
+    paddingBottom: Platform.OS === 'ios' ? 24 : 10,
     paddingTop: 8,
     shadowColor: '#0f172a',
     shadowOffset: { width: 0, height: -4 },

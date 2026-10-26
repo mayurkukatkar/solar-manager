@@ -11,6 +11,7 @@ import {
   TextInput,
   RefreshControl,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import {
   ShieldCheck,
@@ -30,7 +31,7 @@ import { Header } from '../../components/Header';
 import { installationsApi, tenantApi } from '../../api/endpoints';
 import { InstallationJob } from '../../types';
 
-export const OperationsScreen: React.FC = () => {
+export const OperationsScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
   const [jobs, setJobs] = useState<InstallationJob[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -221,8 +222,10 @@ export const OperationsScreen: React.FC = () => {
   return (
     <View style={styles.container}>
       <Header
-        title="Field QA & Operations"
-        subtitle="On-site execution, checklists & PM Surya Ghar inspections"
+        variant={navigation?.canGoBack?.() ? 'detail' : 'main'}
+        title="Field Operations & Commissioning"
+        subtitle="Checklists, barcode scanning & net-metering"
+        onBack={navigation?.canGoBack?.() ? () => navigation.goBack() : undefined}
       />
 
       {/* KPIS ROW */}
@@ -590,8 +593,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    padding: 20,
-    paddingBottom: 40,
+    padding: 16,
+    paddingBottom: Platform.OS === 'ios' ? 120 : 100,
   },
   sectionTitleRow: {
     marginBottom: 12,

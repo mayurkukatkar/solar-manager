@@ -8,7 +8,9 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
+  Platform,
 } from 'react-native';
+import { ModalHeader } from './Header';
 import {
   X,
   FileText,
@@ -152,32 +154,18 @@ export const ProposalPreviewModal: React.FC<ProposalPreviewModalProps> = ({
   return (
     <Modal visible={visible} animationType="slide" transparent={false} onRequestClose={onClose}>
       <View style={styles.container}>
-        {/* TOP MODAL HEADER */}
-        <View style={styles.topHeader}>
-          <View style={{ flex: 1 }}>
-            <View style={styles.headerTitleRow}>
-              <Text style={styles.topHeaderTitle}>Solar Proposal Preview</Text>
-              {isSynced && (
-                <View style={styles.syncedPill}>
-                  <CheckCircle2 size={11} color="#15803d" />
-                  <Text style={styles.syncedPillText}>Web Synced</Text>
-                </View>
-              )}
-            </View>
-            <Text style={styles.topHeaderSubtitle}>
-              {data.quotationNumber} • {data.templateType || 'Standard Proposal'} • {data.customerName}
-            </Text>
-          </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        {/* STANDARDIZED MODAL HEADER */}
+        <ModalHeader
+          title="Solar Proposal Preview"
+          subtitle={`${data.quotationNumber} • ${data.templateType || 'Standard Proposal'} • ${data.customerName}`}
+          onClose={onClose}
+          rightAction={
             <TouchableOpacity onPress={handlePrint} style={styles.previewA4Btn} activeOpacity={0.8}>
-              <Printer size={15} color="#0284c7" />
+              <Printer size={14} color="#0284c7" />
               <Text style={styles.previewA4BtnText}>A4 Preview</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={onClose} style={styles.closeBtn} activeOpacity={0.7}>
-              <X size={20} color="#64748b" />
-            </TouchableOpacity>
-          </View>
-        </View>
+          }
+        />
 
         {/* VISUAL DOCUMENT VIEWER BODY */}
         <ScrollView style={styles.docScroll} contentContainerStyle={styles.docContent} showsVerticalScrollIndicator={false}>
@@ -1430,6 +1418,7 @@ const styles = StyleSheet.create({
     borderTopColor: '#e2e8f0',
     paddingHorizontal: 16,
     paddingVertical: 10,
+    paddingBottom: Platform.OS === 'ios' ? 28 : 10,
     gap: 8,
   },
   actionRowMain: {

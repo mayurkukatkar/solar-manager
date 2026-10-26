@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import {
   X,
@@ -26,6 +27,7 @@ import {
   Eye,
   Send,
 } from 'lucide-react-native';
+import { ModalHeader } from '../../components/Header';
 import {
   generateQuotationHtml,
   previewPdf,
@@ -378,18 +380,12 @@ export const QuotationBuilderModal: React.FC<QuotationBuilderModalProps> = ({
   return (
     <Modal visible={visible} animationType="slide" transparent={false} onRequestClose={onClose}>
       <View style={styles.container}>
-        {/* Top Header */}
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.headerTitle}>Quotation Builder</Text>
-            <Text style={styles.headerSubtitle}>
-              Stage 2: Custom Pricing & WhatsApp PDF Proposal
-            </Text>
-          </View>
-          <TouchableOpacity onPress={onClose} style={styles.closeBtn} activeOpacity={0.7}>
-            <X size={20} color="#64748b" />
-          </TouchableOpacity>
-        </View>
+        {/* STANDARDIZED MODAL HEADER */}
+        <ModalHeader
+          title="Quotation Builder"
+          subtitle="Stage 2: Custom Pricing & WhatsApp PDF Proposal"
+          onClose={onClose}
+        />
 
         <ScrollView style={styles.body} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           {/* CLIENT PILL */}
@@ -1138,6 +1134,7 @@ const styles = StyleSheet.create({
     borderTopColor: '#f1f5f9',
     paddingHorizontal: 16,
     paddingVertical: 12,
+    paddingBottom: Platform.OS === 'ios' ? 32 : 12,
     gap: 8,
   },
   actionHintRow: {

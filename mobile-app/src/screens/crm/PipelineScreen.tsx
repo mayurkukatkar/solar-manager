@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Linking,
   Alert,
+  Platform,
 } from 'react-native';
 import {
   Plus,
@@ -953,7 +954,7 @@ const styles = StyleSheet.create({
   },
   listContent: {
     padding: 16,
-    paddingBottom: 40,
+    paddingBottom: Platform.OS === 'ios' ? 120 : 100,
   },
   centerContainer: {
     paddingTop: 80,

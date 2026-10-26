@@ -10,6 +10,7 @@ import {
   Image,
   Alert,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import {
   X,
@@ -29,6 +30,7 @@ import {
 } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
+import { ModalHeader } from '../../components/Header';
 import { crmApi, documentsApi, tenantApi } from '../../api/endpoints';
 
 interface CustomerOnboardingModalProps {
@@ -361,18 +363,12 @@ export const CustomerOnboardingModal: React.FC<CustomerOnboardingModalProps> = (
   return (
     <Modal visible={visible} animationType="slide" transparent={false} onRequestClose={onClose}>
       <View style={styles.container}>
-        {/* Top Header */}
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.headerTitle}>Customer Onboarding</Text>
-            <Text style={styles.headerSubtitle}>
-              Stage 3: Legal KYC & Project Provisioning
-            </Text>
-          </View>
-          <TouchableOpacity onPress={onClose} style={styles.closeBtn} activeOpacity={0.7}>
-            <X size={20} color="#64748b" />
-          </TouchableOpacity>
-        </View>
+        {/* STANDARDIZED MODAL HEADER */}
+        <ModalHeader
+          title="Customer Onboarding"
+          subtitle="Stage 3: Legal KYC & Project Provisioning"
+          onClose={onClose}
+        />
 
         <ScrollView style={styles.body} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           {/* CLIENT BADGE CARD */}
@@ -988,6 +984,7 @@ const styles = StyleSheet.create({
     borderTopColor: '#f1f5f9',
     paddingHorizontal: 16,
     paddingVertical: 14,
+    paddingBottom: Platform.OS === 'ios' ? 32 : 14,
   },
   submitOnboardingBtn: {
     backgroundColor: '#10b981',

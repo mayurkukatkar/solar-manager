@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Modal,
   Dimensions,
+  Platform,
 } from 'react-native';
 import {
   FileText,
@@ -883,13 +884,14 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 16,
-    paddingBottom: 40,
+    paddingBottom: Platform.OS === 'ios' ? 120 : 100,
   },
 
   // 1. Launchpad
   launchpadScroll: {
     flexDirection: 'row',
     gap: 8,
+    paddingRight: 16,
     marginBottom: 16,
   },
   launchpadBtn: {
@@ -981,6 +983,7 @@ const styles = StyleSheet.create({
   tickerScroll: {
     flexDirection: 'row',
     gap: 12,
+    paddingRight: 16,
     marginBottom: 16,
   },
   tickerCard: {

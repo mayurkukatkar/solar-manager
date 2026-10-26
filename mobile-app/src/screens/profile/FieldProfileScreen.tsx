@@ -8,6 +8,7 @@ import {
   Alert,
   Linking,
   Image,
+  Platform,
 } from 'react-native';
 import {
   User,
@@ -297,7 +298,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 16,
-    paddingBottom: 40,
+    paddingBottom: Platform.OS === 'ios' ? 120 : 100,
   },
   profileCard: {
     backgroundColor: '#0f172a',

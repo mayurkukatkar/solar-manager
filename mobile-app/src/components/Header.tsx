@@ -1,22 +1,117 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Modal, TextInput, Image, Platform, StatusBar } from 'react-native';
-import { Search, X, LogOut, ShieldCheck, ChevronRight, Zap } from 'lucide-react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Modal,
+  TextInput,
+  Image,
+  Platform,
+  StatusBar,
+} from 'react-native';
+import {
+  Search,
+  X,
+  LogOut,
+  ShieldCheck,
+  ChevronLeft,
+  ArrowLeft,
+  CheckCircle2,
+  Building,
+  KeyRound,
+} from 'lucide-react-native';
 import { useAuth } from '../context/AuthContext';
-import { colors } from '../theme/colors';
+import { colors, spacing, radii, typography, touchTarget } from '../theme';
 
-export const Header: React.FC<{
+export interface HeaderProps {
   title?: string;
   subtitle?: string;
+  variant?: 'main' | 'detail';
+  onBack?: () => void;
+  rightAction?: React.ReactNode;
   showSearch?: boolean;
   onSearch?: (q: string) => void;
-}> = ({ title, subtitle, showSearch, onSearch }) => {
+  searchPlaceholder?: string;
+}
+
+export interface ModalHeaderProps {
+  title: string;
+  subtitle?: string;
+  onClose: () => void;
+  rightAction?: React.ReactNode;
+  dragHandle?: boolean;
+}
+
+export const Header: React.FC<HeaderProps> = ({
+  title,
+  subtitle,
+  variant = 'main',
+  onBack,
+  rightAction,
+  showSearch,
+  onSearch,
+  searchPlaceholder = 'Search leads, projects, or contacts...',
+}) => {
   const { user, backendStatus, logout } = useAuth();
   const [profileModalVisible, setProfileModalVisible] = useState(false);
   const [searchText, setSearchText] = useState('');
 
+  // VARIANT: DETAIL (With Back Button, Inline Title, and Right Action)
+  if (variant === 'detail') {
+    return (
+      <View style={styles.detailContainer}>
+        <View style={styles.detailRow}>
+          {onBack ? (
+            <TouchableOpacity
+              onPress={onBack}
+              style={styles.backButton}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel="Go back"
+            >
+              <ArrowLeft size={20} color={colors.slate900} strokeWidth={2.4} />
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.backPlaceholder} />
+          )}
+
+          <View style={styles.detailTitleBox}>
+            {title && (
+              <Text style={styles.detailTitleText} numberOfLines={1}>
+                {title}
+              </Text>
+            )}
+            {subtitle && (
+              <Text style={styles.detailSubtitleText} numberOfLines={1}>
+                {subtitle}
+              </Text>
+            )}
+          </View>
+
+          <View style={styles.detailRightBox}>
+            {rightAction ? (
+              rightAction
+            ) : (
+              <View style={styles.statusPillCompact}>
+                <View
+                  style={[
+                    styles.statusDot,
+                    { backgroundColor: backendStatus.isOnline ? colors.success : colors.warning },
+                  ]}
+                />
+              </View>
+            )}
+          </View>
+        </View>
+      </View>
+    );
+  }
+
+  // VARIANT: MAIN (Root Tab Header with Brand Row, Title, and Search)
   return (
     <View style={styles.container}>
-      {/* TOP ROW */}
+      {/* TOP BRAND ROW */}
       <View style={styles.topRow}>
         <View style={styles.brandContainer}>
           <Image
@@ -24,12 +119,14 @@ export const Header: React.FC<{
             style={styles.brandLogoImage}
             resizeMode="cover"
           />
-          <View>
+          <View style={styles.brandTextContainer}>
             <Text style={styles.companyName} numberOfLines={1}>
               {user?.tenantName || 'WhereReady Solar OS'}
             </Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-              <Text style={styles.userName}>{user?.name || 'Solar Partner'}</Text>
+            <View style={styles.brandSubRow}>
+              <Text style={styles.userName} numberOfLines={1}>
+                {user?.name || 'Solar Partner'}
+              </Text>
               <Text style={styles.brandTag}>• WHERE GROWTH GETS READY.</Text>
             </View>
           </View>
@@ -41,7 +138,7 @@ export const Header: React.FC<{
             <View
               style={[
                 styles.statusDot,
-                { backgroundColor: backendStatus.isOnline ? '#10b981' : '#f59e0b' },
+                { backgroundColor: backendStatus.isOnline ? colors.success : colors.warning },
               ]}
             />
             <Text style={styles.statusText}>
@@ -54,6 +151,8 @@ export const Header: React.FC<{
             style={styles.avatarPill}
             onPress={() => setProfileModalVisible(true)}
             activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel="View profile"
           >
             <View style={styles.avatarCircle}>
               <Text style={styles.avatarLetter}>
@@ -64,27 +163,34 @@ export const Header: React.FC<{
         </View>
       </View>
 
-      {/* TITLE & SUBTITLE */}
+      {/* SCREEN TITLE & SUBTITLE */}
       {title && (
         <View style={styles.titleSection}>
-          <Text style={styles.titleText}>{title}</Text>
-          {subtitle && <Text style={styles.subtitleText}>{subtitle}</Text>}
+          <Text style={styles.titleText} numberOfLines={1}>
+            {title}
+          </Text>
+          {subtitle && (
+            <Text style={styles.subtitleText} numberOfLines={2}>
+              {subtitle}
+            </Text>
+          )}
         </View>
       )}
 
       {/* OPTIONAL SEARCH BAR */}
       {showSearch && (
         <View style={styles.searchBox}>
-          <Search size={16} color="#94a3b8" />
+          <Search size={16} color={colors.slate400} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Search leads, projects, or contacts..."
-            placeholderTextColor="#94a3b8"
+            placeholder={searchPlaceholder}
+            placeholderTextColor={colors.slate400}
             value={searchText}
             onChangeText={(t) => {
               setSearchText(t);
               if (onSearch) onSearch(t);
             }}
+            returnKeyType="search"
           />
           {searchText ? (
             <TouchableOpacity
@@ -94,7 +200,7 @@ export const Header: React.FC<{
               }}
               style={styles.searchClearBtn}
             >
-              <X size={14} color="#94a3b8" />
+              <X size={14} color={colors.slate400} />
             </TouchableOpacity>
           ) : null}
         </View>
@@ -130,17 +236,17 @@ export const Header: React.FC<{
             <View style={styles.sessionInfoBox}>
               <View style={styles.sessionInfoRow}>
                 <Text style={styles.sessionInfoLabel}>Workspace</Text>
-                <Text style={styles.sessionInfoVal}>{user?.tenantName || 'Solar EPC'}</Text>
+                <Text style={styles.sessionInfoVal}>{user?.tenantName || 'WhereReady Solar OS'}</Text>
               </View>
               <View style={styles.sessionInfoRow}>
                 <Text style={styles.sessionInfoLabel}>Network</Text>
-                <Text style={[styles.sessionInfoVal, { color: '#059669' }]}>
+                <Text style={[styles.sessionInfoVal, { color: colors.success }]}>
                   {backendStatus.isOnline ? 'Operational' : 'Reconnecting'}
                 </Text>
               </View>
               <View style={styles.sessionInfoRow}>
                 <Text style={styles.sessionInfoLabel}>Security</Text>
-                <Text style={styles.sessionInfoVal}>TLS 1.3 Verified</Text>
+                <Text style={styles.sessionInfoVal}>TLS 1.3 256-Bit</Text>
               </View>
             </View>
 
@@ -152,8 +258,8 @@ export const Header: React.FC<{
               }}
               activeOpacity={0.85}
             >
-              <LogOut size={16} color="#ef4444" style={{ marginRight: 8 }} />
-              <Text style={styles.logoutBtnText}>Sign Out</Text>
+              <LogOut size={16} color={colors.danger} style={{ marginRight: 8 }} />
+              <Text style={styles.logoutBtnText}>Sign Out of Workspace</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -170,64 +276,122 @@ export const Header: React.FC<{
   );
 };
 
+/**
+ * Standard Modal & Bottom Sheet Header
+ */
+export const ModalHeader: React.FC<ModalHeaderProps> = ({
+  title,
+  subtitle,
+  onClose,
+  rightAction,
+  dragHandle = true,
+}) => {
+  return (
+    <View style={styles.modalHeaderContainer}>
+      {dragHandle && <View style={styles.modalDragHandle} />}
+      <View style={styles.modalHeaderRow}>
+        <View style={styles.modalHeaderTextBox}>
+          <Text style={styles.modalHeaderTitle} numberOfLines={1}>
+            {title}
+          </Text>
+          {subtitle && (
+            <Text style={styles.modalHeaderSubtitle} numberOfLines={1}>
+              {subtitle}
+            </Text>
+          )}
+        </View>
+
+        <View style={styles.modalHeaderActionBox}>
+          {rightAction}
+          <TouchableOpacity
+            onPress={onClose}
+            style={styles.modalCloseBtn}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel="Close modal"
+          >
+            <X size={18} color={colors.slate600} strokeWidth={2.4} />
+          </TouchableOpacity>
+        </View>
+      </View>
+    </View>
+  );
+};
+
+const topSafeArea =
+  Platform.OS === 'android'
+    ? (StatusBar.currentHeight ? StatusBar.currentHeight + 10 : 36)
+    : 50;
+
 const styles = StyleSheet.create({
+  // MAIN VARIANT
   container: {
-    backgroundColor: '#ffffff',
-    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight ? StatusBar.currentHeight + 12 : 40) : 52,
-    paddingHorizontal: 20,
-    paddingBottom: 16,
+    backgroundColor: colors.white,
+    paddingTop: topSafeArea,
+    paddingHorizontal: spacing[4],
+    paddingBottom: spacing[3],
     borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
+    borderBottomColor: colors.slate100,
   },
   topRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    minHeight: touchTarget.min,
   },
   brandContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: spacing[2],
     flex: 1,
+    marginRight: spacing[2],
   },
   brandLogoImage: {
     width: 36,
     height: 36,
-    borderRadius: 9,
+    borderRadius: radii.sm,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: colors.slate200,
+  },
+  brandTextContainer: {
+    flex: 1,
   },
   companyName: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#0f172a',
-    letterSpacing: -0.3,
+    fontSize: typography.size.base,
+    fontWeight: typography.weight.extrabold,
+    color: colors.slate900,
+    letterSpacing: typography.tracking.tight,
+  },
+  brandSubRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
   userName: {
-    fontSize: 11,
-    color: '#64748b',
-    fontWeight: '600',
+    fontSize: typography.size.caption,
+    color: colors.slate500,
+    fontWeight: typography.weight.semibold,
   },
   brandTag: {
     fontSize: 9,
-    color: '#0066FF',
-    fontWeight: '800',
+    color: colors.primary,
+    fontWeight: typography.weight.extrabold,
     letterSpacing: 0.5,
   },
   actionsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: spacing[2],
   },
   statusPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f8fafc',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 20,
+    backgroundColor: colors.slate50,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: radii.full,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: colors.slate200,
   },
   statusDot: {
     width: 6,
@@ -236,9 +400,9 @@ const styles = StyleSheet.create({
     marginRight: 6,
   },
   statusText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#475569',
+    fontSize: typography.size.caption,
+    fontWeight: typography.weight.semibold,
+    color: colors.slate600,
   },
   avatarPill: {
     padding: 2,
@@ -247,122 +411,228 @@ const styles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 17,
-    backgroundColor: '#0066FF',
+    backgroundColor: colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
   },
   avatarLetter: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#ffffff',
+    fontSize: typography.size.base,
+    fontWeight: typography.weight.extrabold,
+    color: colors.white,
   },
   titleSection: {
-    marginTop: 16,
+    marginTop: spacing[3],
   },
   titleText: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: '#0f172a',
-    letterSpacing: -0.5,
+    fontSize: typography.size.h2,
+    fontWeight: typography.weight.extrabold,
+    color: colors.slate900,
+    letterSpacing: typography.tracking.tight,
   },
   subtitleText: {
-    fontSize: 13,
-    color: '#64748b',
-    marginTop: 4,
+    fontSize: typography.size.body,
+    color: colors.slate500,
+    marginTop: 2,
     lineHeight: 18,
   },
   searchBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f8fafc',
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    height: 44,
-    marginTop: 14,
+    backgroundColor: colors.slate50,
+    borderRadius: radii.md,
+    paddingHorizontal: spacing[3],
+    height: 42,
+    marginTop: spacing[3],
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: colors.slate200,
   },
   searchInput: {
     flex: 1,
-    marginLeft: 10,
-    fontSize: 13,
-    color: '#0f172a',
-    fontWeight: '500',
+    marginLeft: spacing[2],
+    fontSize: typography.size.body,
+    color: colors.slate900,
+    fontWeight: typography.weight.medium,
   },
   searchClearBtn: {
-    padding: 4,
+    padding: spacing[1],
   },
+
+  // DETAIL VARIANT (Back button, Inline title)
+  detailContainer: {
+    backgroundColor: colors.white,
+    paddingTop: topSafeArea,
+    paddingHorizontal: spacing[4],
+    paddingBottom: spacing[3],
+    borderBottomWidth: 1,
+    borderBottomColor: colors.slate100,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    minHeight: touchTarget.min,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: radii.sm,
+    backgroundColor: colors.slate50,
+    borderWidth: 1,
+    borderColor: colors.slate200,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  backPlaceholder: {
+    width: 40,
+  },
+  detailTitleBox: {
+    flex: 1,
+    paddingHorizontal: spacing[3],
+  },
+  detailTitleText: {
+    fontSize: typography.size.title,
+    fontWeight: typography.weight.extrabold,
+    color: colors.slate900,
+    letterSpacing: typography.tracking.snug,
+  },
+  detailSubtitleText: {
+    fontSize: typography.size.caption,
+    color: colors.slate500,
+    marginTop: 1,
+  },
+  detailRightBox: {
+    alignItems: 'flex-end',
+    minWidth: 40,
+  },
+  statusPillCompact: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: colors.slate50,
+    borderWidth: 1,
+    borderColor: colors.slate200,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // MODAL HEADER
+  modalHeaderContainer: {
+    backgroundColor: colors.white,
+    paddingHorizontal: spacing[4],
+    paddingTop: spacing[3],
+    paddingBottom: spacing[3],
+    borderBottomWidth: 1,
+    borderBottomColor: colors.slate100,
+  },
+  modalDragHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.slate300,
+    alignSelf: 'center',
+    marginBottom: spacing[2],
+  },
+  modalHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    minHeight: touchTarget.min,
+  },
+  modalHeaderTextBox: {
+    flex: 1,
+    paddingRight: spacing[2],
+  },
+  modalHeaderTitle: {
+    fontSize: typography.size.title,
+    fontWeight: typography.weight.extrabold,
+    color: colors.slate900,
+    letterSpacing: typography.tracking.snug,
+  },
+  modalHeaderSubtitle: {
+    fontSize: typography.size.caption,
+    color: colors.slate500,
+    marginTop: 2,
+  },
+  modalHeaderActionBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[2],
+  },
+  modalCloseBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: radii.sm,
+    backgroundColor: colors.slate100,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // PROFILE MODAL INSIDE HEADER
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.4)',
+    backgroundColor: 'rgba(15, 23, 42, 0.45)',
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: '#ffffff',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: 24,
-    paddingBottom: 40,
-  },
-  modalDragHandle: {
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: '#e2e8f0',
-    alignSelf: 'center',
-    marginBottom: 20,
+    backgroundColor: colors.white,
+    borderTopLeftRadius: radii.xxl,
+    borderTopRightRadius: radii.xxl,
+    paddingHorizontal: spacing[5],
+    paddingTop: spacing[3],
+    paddingBottom: Platform.OS === 'ios' ? spacing[8] : spacing[6],
   },
   accountProfileCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
-    paddingBottom: 20,
+    gap: spacing[3],
+    paddingVertical: spacing[3],
     borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
+    borderBottomColor: colors.slate100,
   },
   accountAvatar: {
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#0066FF',
-    justifyContent: 'center',
+    backgroundColor: colors.primary,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   accountAvatarText: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: '#ffffff',
+    fontSize: typography.size.h3,
+    fontWeight: typography.weight.extrabold,
+    color: colors.white,
   },
   accountNameText: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: '#0f172a',
+    fontSize: typography.size.title,
+    fontWeight: typography.weight.extrabold,
+    color: colors.slate900,
   },
   accountEmailText: {
-    fontSize: 12,
-    color: '#64748b',
-    marginTop: 2,
+    fontSize: typography.size.sub,
+    color: colors.slate500,
+    marginTop: 1,
   },
   accountRoleBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#eff6ff',
+    backgroundColor: colors.primaryMuted,
     paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-    marginTop: 6,
+    paddingVertical: 2,
+    borderRadius: radii.xs,
+    alignSelf: 'flex-start',
+    marginTop: 4,
   },
   accountRoleBadgeText: {
     fontSize: 9,
-    fontWeight: '800',
-    color: '#0066FF',
-    letterSpacing: 0.5,
+    fontWeight: typography.weight.bold,
+    color: colors.primary,
   },
   sessionInfoBox: {
-    marginVertical: 18,
-    backgroundColor: '#f8fafc',
-    borderRadius: 14,
-    padding: 14,
-    gap: 10,
+    backgroundColor: colors.slate50,
+    borderRadius: radii.md,
+    padding: spacing[3],
+    marginVertical: spacing[4],
+    gap: spacing[2],
+    borderWidth: 1,
+    borderColor: colors.slate100,
   },
   sessionInfoRow: {
     flexDirection: 'row',
@@ -370,36 +640,39 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   sessionInfoLabel: {
-    fontSize: 12,
-    color: '#64748b',
-    fontWeight: '500',
+    fontSize: typography.size.sub,
+    color: colors.slate500,
+    fontWeight: typography.weight.medium,
   },
   sessionInfoVal: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#0f172a',
+    fontSize: typography.size.sub,
+    fontWeight: typography.weight.bold,
+    color: colors.slate900,
   },
   logoutBtn: {
     flexDirection: 'row',
-    justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#fef2f2',
-    paddingVertical: 14,
-    borderRadius: 12,
-    marginBottom: 10,
+    justifyContent: 'center',
+    backgroundColor: '#fee2e2',
+    borderWidth: 1,
+    borderColor: '#fca5a5',
+    borderRadius: radii.md,
+    minHeight: touchTarget.min,
+    marginBottom: spacing[2],
   },
   logoutBtnText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#ef4444',
+    fontSize: typography.size.body,
+    fontWeight: typography.weight.bold,
+    color: colors.danger,
   },
   closeBtn: {
-    paddingVertical: 12,
     alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: touchTarget.min,
   },
   closeBtnText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#64748b',
+    fontSize: typography.size.body,
+    fontWeight: typography.weight.bold,
+    color: colors.slate600,
   },
 });
