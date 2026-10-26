@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Modal, TextInput, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Modal, TextInput, Image, Platform, StatusBar } from 'react-native';
 import { Search, X, LogOut, ShieldCheck, ChevronRight, Zap } from 'lucide-react-native';
 import { useAuth } from '../context/AuthContext';
 import { colors } from '../theme/colors';
@@ -173,7 +173,7 @@ export const Header: React.FC<{
 const styles = StyleSheet.create({
   container: {
     backgroundColor: '#ffffff',
-    paddingTop: 50,
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight ? StatusBar.currentHeight + 12 : 40) : 52,
     paddingHorizontal: 20,
     paddingBottom: 16,
     borderBottomWidth: 1,
