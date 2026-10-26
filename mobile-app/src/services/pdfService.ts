@@ -1986,7 +1986,7 @@ export function generateInvoiceHtml(data: InvoicePdfProps): string {
         <div class="company-sub">Authorized Solar EPC Partner & Turnkey Contractor</div>
         <div class="company-meta">
           ${data.companyAddress || 'Corporate Office, Solar Park, Maharashtra'}<br>
-          📞 ${data.companyPhone || '+91 98765 43210'} | ✉️ ${data.companyEmail || 'contact@solarmanager.in'}<br>
+          📞 ${data.companyPhone || '+91 98220 12345'} | ✉️ ${data.companyEmail || 'proposals@wherereadysolar.com'}<br>
           ${data.companyGstin ? `<strong>GSTIN:</strong> ${data.companyGstin}` : '<strong>GSTIN:</strong> 27AABCS1429B1Z5'} | 
           ${data.companyPan ? `<strong>PAN:</strong> ${data.companyPan}` : '<strong>PAN:</strong> AABCS1429B'}
         </div>
@@ -2156,7 +2156,7 @@ export function generateInvoiceHtml(data: InvoicePdfProps): string {
           <strong>Bank Name:</strong> ${data.bankDetails?.bankName || 'HDFC Bank Ltd'}<br>
           <strong>Account Number:</strong> ${data.bankDetails?.accountNumber || '50200088992211'}<br>
           <strong>IFSC Code:</strong> ${data.bankDetails?.ifsc || 'HDFC0001234'}<br>
-          <strong>UPI ID:</strong> ${data.bankDetails?.upiId || 'solarmanager@hdfcbank'}
+          <strong>UPI ID:</strong> ${data.bankDetails?.upiId || 'solar@hdfcbank'}
         </div>
       </td>
       <td>

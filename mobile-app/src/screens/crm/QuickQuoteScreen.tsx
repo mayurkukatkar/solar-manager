@@ -245,7 +245,7 @@ export const QuickQuoteScreen: React.FC<{ route?: any }> = ({ route }) => {
         netPayable: net,
         monthlySavings,
         lifetimeSavings,
-        companyName: 'SolarManager Solutions',
+        companyName: 'WhereReady Solar OS',
         repName: 'Solar Field Executive',
         language: 'EN',
       });

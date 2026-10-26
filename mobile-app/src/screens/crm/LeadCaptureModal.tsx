@@ -24,6 +24,8 @@ import {
   Trash2,
   Building2,
   Check,
+  Camera,
+  AlertTriangle,
 } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
@@ -140,6 +142,26 @@ export const LeadCaptureModal: React.FC<LeadCaptureModalProps> = ({
       }
     } catch (err: any) {
       Alert.alert('Attachment Error', err.message || 'Could not pick document');
+    }
+  };
+
+  const handleSnapCamera = async () => {
+    try {
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Camera Permission Required', 'Camera access is needed to snap a photo of the electricity bill.');
+        return;
+      }
+      const res = await ImagePicker.launchCameraAsync({
+        quality: 0.85,
+      });
+      if (!res.canceled && res.assets && res.assets.length > 0) {
+        const asset = res.assets[0];
+        setBillAttachmentUri(asset.uri);
+        setBillAttachmentName(`Bill_Camera_${Date.now().toString().slice(-4)}.jpg`);
+      }
+    } catch (err: any) {
+      Alert.alert('Camera Error', err.message || 'Could not take photo');
     }
   };
 
@@ -450,12 +472,20 @@ export const LeadCaptureModal: React.FC<LeadCaptureModalProps> = ({
               ) : (
                 <View style={styles.attachBtnRow}>
                   <TouchableOpacity
+                    style={[styles.attachBtn, { backgroundColor: '#eff6ff', borderColor: '#bfdbfe' }]}
+                    onPress={handleSnapCamera}
+                    activeOpacity={0.75}
+                  >
+                    <Camera size={16} color="#0066FF" />
+                    <Text style={[styles.attachBtnText, { color: '#0066FF', fontWeight: '800' }]}>Snap Bill</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
                     style={styles.attachBtn}
                     onPress={handlePickPhoto}
                     activeOpacity={0.75}
                   >
                     <UploadCloud size={16} color="#475569" />
-                    <Text style={styles.attachBtnText}>Attach Bill Photo</Text>
+                    <Text style={styles.attachBtnText}>Gallery</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={styles.attachBtn}
@@ -463,7 +493,7 @@ export const LeadCaptureModal: React.FC<LeadCaptureModalProps> = ({
                     activeOpacity={0.75}
                   >
                     <FileText size={16} color="#475569" />
-                    <Text style={styles.attachBtnText}>Upload PDF</Text>
+                    <Text style={styles.attachBtnText}>PDF Doc</Text>
                   </TouchableOpacity>
                 </View>
               )}

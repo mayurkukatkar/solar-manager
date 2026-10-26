@@ -122,7 +122,7 @@ export const LoginScreen: React.FC = () => {
             style={styles.logoBanner}
             resizeMode="contain"
           />
-          <Text style={styles.appTagline}>Enterprise Solar EPC & Asset Operating System</Text>
+          <Text style={styles.appTagline}>Where Growth Gets Ready. • Solar OS Gateway</Text>
         </View>
 
         {/* SESSION TIMEOUT BANNER */}

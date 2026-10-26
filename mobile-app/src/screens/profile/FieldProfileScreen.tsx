@@ -31,6 +31,7 @@ import {
 } from 'lucide-react-native';
 import { useAuth } from '../../context/AuthContext';
 import { offlineSyncService } from '../../services/offlineSyncService';
+import { Header } from '../../components/Header';
 
 export const FieldProfileScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
   const { user, logout } = useAuth();
@@ -72,11 +73,11 @@ export const FieldProfileScreen: React.FC<{ navigation?: any }> = ({ navigation 
 
   return (
     <View style={styles.container}>
-      {/* HEADER */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>WhereReady Command Center</Text>
-        <Text style={styles.headerSubtitle}>Solar OS Enterprise Pulse, Cash Flow & Offline Sync</Text>
-      </View>
+      {/* GLOBAL HEADER */}
+      <Header
+        title="Account & Enterprise Hub"
+        subtitle="WhereReady Solar OS • Where Growth Gets Ready."
+      />
 
       <ScrollView style={styles.body} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {/* VENDOR PROFILE CARD */}

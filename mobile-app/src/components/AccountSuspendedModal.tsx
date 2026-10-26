@@ -36,7 +36,7 @@ export const AccountSuspendedModal: React.FC<AccountSuspendedModalProps> = ({
   };
 
   const handleContactSupport = () => {
-    Linking.openURL('mailto:support@solarmanager.com?subject=Organization%20Account%20Suspension%20Inquiry');
+    Linking.openURL('mailto:support@wherereadysolar.com?subject=Organization%20Account%20Suspension%20Inquiry');
   };
 
   return (

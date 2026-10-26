@@ -29,8 +29,8 @@ export const Header: React.FC<{
               {user?.tenantName || 'WhereReady Solar OS'}
             </Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-              <Text style={styles.userName}>{user?.name || 'Administrator'}</Text>
-              <Text style={styles.brandTag}>• SOLAR OS</Text>
+              <Text style={styles.userName}>{user?.name || 'Solar Partner'}</Text>
+              <Text style={styles.brandTag}>• WHERE GROWTH GETS READY.</Text>
             </View>
           </View>
         </View>

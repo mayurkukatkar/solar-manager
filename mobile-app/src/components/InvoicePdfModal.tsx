@@ -71,7 +71,7 @@ export const InvoicePdfModal: React.FC<InvoicePdfModalProps> = ({
     companyName: tenant?.name || user?.tenantName || 'Solar Solutions Pvt Ltd',
     companyAddress: tenant?.address || 'Corporate Office, Solar EPC Center, Maharashtra',
     companyPhone: tenant?.phone || '+91 98812 55560',
-    companyEmail: tenant?.email || 'billing@solarmanager.in',
+    companyEmail: tenant?.email || 'billing@wherereadysolar.com',
     companyGstin: tenant?.gstin || '27AABCS1429B1Z5',
     companyPan: tenant?.pan || 'AABCS1429B',
 
@@ -103,7 +103,7 @@ export const InvoicePdfModal: React.FC<InvoicePdfModalProps> = ({
       bankName: 'HDFC Bank Ltd',
       accountNumber: '50200088992211',
       ifsc: 'HDFC0001234',
-      upiId: 'solarmanager@hdfcbank',
+      upiId: 'solar@hdfcbank',
       branch: 'Shivajinagar, Pune',
     },
     terms: invoice.terms,
@@ -339,7 +339,7 @@ export const InvoicePdfModal: React.FC<InvoicePdfModalProps> = ({
                 <Text style={styles.infoVal}>HDFC Bank: 50200088992211</Text>
                 <Text style={styles.infoVal}>IFSC: HDFC0001234</Text>
                 <Text style={[styles.infoVal, { color: '#059669', fontWeight: '700' }]}>
-                  UPI: solarmanager@hdfcbank
+                  UPI: solar@hdfcbank
                 </Text>
               </View>
             </View>

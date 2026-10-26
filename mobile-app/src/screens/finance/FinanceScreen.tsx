@@ -245,7 +245,7 @@ export const FinanceScreen: React.FC<{ navigation?: any; route?: any }> = ({ nav
           inv.amount || 0
         ).toLocaleString('en-IN')}\n• Balance Due: *₹${balance.toLocaleString(
           'en-IN'
-        )}*\n\nPlease complete the payment via UPI or Bank Transfer to proceed with installation stages.\n\nThank you!\n*SolarManager Solutions*`;
+        )}*\n\nPlease complete the payment via UPI or Bank Transfer to proceed with installation stages.\n\nThank you!\n*WhereReady Solar OS*`;
         const url = `whatsapp://send?phone=${phone.startsWith('91') ? phone : '91' + phone}&text=${encodeURIComponent(
           msg
         )}`;

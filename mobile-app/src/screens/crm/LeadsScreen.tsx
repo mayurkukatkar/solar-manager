@@ -356,8 +356,12 @@ Let's schedule your 3D site survey today!`;
 
             return (
               <View key={lead.id} style={styles.leadCard}>
-                {/* CARD HEADER */}
-                <View style={styles.cardHeaderRow}>
+                {/* CARD HEADER (TAPPABLE FOR DETAIL DOSSIER) */}
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={() => setSelectedLead(lead)}
+                  style={styles.cardHeaderRow}
+                >
                   <View style={{ flex: 1 }}>
                     <Text style={styles.leadName}>{lead.name}</Text>
                     <View style={styles.locationRow}>
@@ -372,7 +376,7 @@ Let's schedule your 3D site survey today!`;
                       {lead.stage || 'NEW'}
                     </Text>
                   </View>
-                </View>
+                </TouchableOpacity>
 
                 {/* CAPACITY & NET INVESTMENT HIGHLIGHT */}
                 <View style={styles.specsRow}>

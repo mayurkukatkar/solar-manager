@@ -75,7 +75,7 @@ export const DiscomDocsModal: React.FC<DiscomDocsModalProps> = ({
         consumerNumber,
         systemCapacityKw: capacityKw,
         address,
-        companyName: 'SolarManager Solutions Pvt Ltd',
+        companyName: 'WhereReady Solar Technologies Pvt Ltd',
       });
       const docName =
         selectedDocType === 'FORM_A1'
@@ -99,7 +99,7 @@ export const DiscomDocsModal: React.FC<DiscomDocsModalProps> = ({
         consumerNumber,
         systemCapacityKw: capacityKw,
         address,
-        companyName: 'SolarManager Solutions Pvt Ltd',
+        companyName: 'WhereReady Solar Technologies Pvt Ltd',
       });
       await printDirectly(html);
     } catch (err: any) {
