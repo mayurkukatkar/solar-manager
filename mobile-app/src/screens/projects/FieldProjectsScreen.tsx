@@ -340,34 +340,38 @@ export const FieldProjectsScreen: React.FC<{ navigation?: any }> = ({ navigation
             </TouchableOpacity>
           </View>
         ) : (
-          filteredProjects.map((p) => {
-            const cap = Number(p.capacity || p.systemCapacity || 3.3);
-            const custName = p.customer?.name || p.lead?.name || p.name?.replace(/Project.*/i, '').trim() || 'Client';
-            const phone = p.customer?.mobile || p.customer?.phone || p.lead?.mobile;
-            const consumerNo =
-              p.consumerNumber || p.customer?.consumerNumber || p.lead?.electricityConnection || '410022120526';
-            const docsCount = (p.Document || []).length;
-            const stagePill = getStagePill(p.currentStage, p.status);
+          <View style={styles.projectsWorkspace}>
+            {filteredProjects.map((p, idx) => {
+              const cap = Number(p.capacity || p.systemCapacity || 3.3);
+              const custName = p.customer?.name || p.lead?.name || p.name?.replace(/Project.*/i, '').trim() || 'Client';
+              const phone = p.customer?.mobile || p.customer?.phone || p.lead?.mobile;
+              const consumerNo =
+                p.consumerNumber || p.customer?.consumerNumber || p.lead?.electricityConnection || '410022120526';
+              const docsCount = (p.Document || []).length;
+              const stagePill = getStagePill(p.currentStage, p.status);
 
-            const progressPct =
-              p.currentStage === 'Completed' || p.status === 'COMPLETED'
-                ? '100%'
-                : p.currentStage === 'Installation' || p.status === 'INSTALLATION'
-                ? '75%'
-                : p.currentStage === 'Design' || p.status === 'DISCOM'
-                ? '45%'
-                : '25%';
+              const progressPct =
+                p.currentStage === 'Completed' || p.status === 'COMPLETED'
+                  ? '100%'
+                  : p.currentStage === 'Installation' || p.status === 'INSTALLATION'
+                  ? '75%'
+                  : p.currentStage === 'Design' || p.status === 'DISCOM'
+                  ? '45%'
+                  : '25%';
 
-            return (
-              <View key={p.id} style={styles.projectCard}>
-                {/* TAPPABLE CARD HEADER */}
+              return (
                 <TouchableOpacity
-                  activeOpacity={0.8}
+                  key={p.id}
+                  style={[
+                    styles.projectRowItem,
+                    idx === filteredProjects.length - 1 && { borderBottomWidth: 0 },
+                  ]}
+                  activeOpacity={0.85}
                   onPress={() => handleOpenDocsModal(p)}
-                  style={styles.cardHeaderTouchable}
                 >
-                  <View style={styles.cardTopRow}>
-                    <View style={styles.badgeRow}>
+                  {/* Top Status & Capacity Row */}
+                  <View style={styles.projectRowTop}>
+                    <View style={styles.projectNumberGroup}>
                       <Text style={styles.projectNumberBadge}>{p.projectNumber || 'PRJ-NEW'}</Text>
                       <View style={[styles.stageBadge, { backgroundColor: stagePill.bg }]}>
                         <Text style={[styles.stageBadgeText, { color: stagePill.text }]}>
@@ -375,134 +379,99 @@ export const FieldProjectsScreen: React.FC<{ navigation?: any }> = ({ navigation
                         </Text>
                       </View>
                     </View>
-                    <View style={styles.capBadge}>
-                      <Zap size={12} color="#0284c7" />
-                      <Text style={styles.capBadgeText}>{cap} kWp</Text>
+
+                    <View style={styles.projectRightPills}>
+                      <View style={styles.progressMiniPill}>
+                        <Text style={styles.progressMiniText}>{progressPct}</Text>
+                      </View>
+                      <View style={styles.capBadge}>
+                        <Zap size={11} color="#0284c7" />
+                        <Text style={styles.capBadgeText}>{cap} kWp</Text>
+                      </View>
                     </View>
                   </View>
 
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <View style={{ flex: 1, paddingRight: 8 }}>
-                      <Text style={styles.projectName} numberOfLines={1}>
-                        {p.name}
-                      </Text>
-                      <Text style={styles.clientDetail}>
-                        👤 {custName} {phone ? `• 📞 ${phone}` : ''}
-                      </Text>
-                    </View>
-                    <ChevronRight size={18} color="#94a3b8" />
-                  </View>
-                </TouchableOpacity>
+                  {/* Project Title & Client Details */}
+                  <Text style={styles.projectName} numberOfLines={1}>
+                    {p.name}
+                  </Text>
 
-                {/* METADATA STRIP */}
-                <View style={styles.metaRow}>
-                  <View style={styles.metaCol}>
-                    <Text style={styles.metaLabel}>Consumer Number</Text>
-                    <Text style={styles.metaHighlight}>{consumerNo}</Text>
-                  </View>
-                  <View style={styles.metaColRight}>
-                    <Text style={styles.metaLabel}>DISCOM Division</Text>
-                    <Text style={styles.metaHighlight}>MSEDCL • Urban</Text>
-                  </View>
-                </View>
-
-                {/* MILESTONE PROGRESS TRACKER */}
-                <View style={styles.milestoneBox}>
-                  <View style={styles.milestoneHeader}>
-                    <Text style={styles.milestoneTitle}>Execution Progress</Text>
-                    <Text style={[styles.milestoneStatus, { color: stagePill.text }]}>
-                      {stagePill.label} ({progressPct})
+                  <View style={styles.projectSubRow}>
+                    <Text style={styles.clientDetail} numberOfLines={1}>
+                      👤 {custName} • ⚡ {consumerNo}
                     </Text>
                   </View>
-                  <View style={styles.progressBarTrack}>
-                    <View
-                      style={[
-                        styles.progressBarFill,
-                        {
-                          width: progressPct,
-                          backgroundColor:
-                            progressPct === '100%'
-                              ? '#059669'
-                              : progressPct === '75%'
-                              ? '#2563eb'
-                              : '#d97706',
-                        },
-                      ]}
-                    />
+
+                  {/* Field Operations Action Strip (Direct Micro-Actions) */}
+                  <View style={styles.microActionsRow}>
+                    <View style={styles.leftActionPills}>
+                      <TouchableOpacity
+                        style={styles.pillActionBtn}
+                        onPress={() => handleOpenDocsModal(p)}
+                        activeOpacity={0.8}
+                      >
+                        <FileText size={12} color="#7c3aed" style={{ marginRight: 3 }} />
+                        <Text style={styles.pillActionText}>Vault ({docsCount})</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={styles.pillActionBtn}
+                        onPress={() =>
+                          handleOpenBarcodeModal({ ...p, consumerNumber: consumerNo, capacity: cap })
+                        }
+                        activeOpacity={0.8}
+                      >
+                        <QrCode size={12} color="#2563eb" style={{ marginRight: 3 }} />
+                        <Text style={styles.pillActionText}>Serials</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={styles.pillActionBtn}
+                        onPress={() =>
+                          handleOpenQaModal({ ...p, consumerNumber: consumerNo, capacity: cap })
+                        }
+                        activeOpacity={0.8}
+                      >
+                        <ShieldCheck size={12} color="#059669" style={{ marginRight: 3 }} />
+                        <Text style={styles.pillActionText}>QA</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={[styles.pillActionBtn, { backgroundColor: '#f0fdf4', borderColor: '#bbf7d0' }]}
+                        onPress={() =>
+                          handleOpenDiscomModal({ ...p, consumerNumber: consumerNo, capacity: cap })
+                        }
+                        activeOpacity={0.8}
+                      >
+                        <Building size={12} color="#15803d" style={{ marginRight: 3 }} />
+                        <Text style={[styles.pillActionText, { color: '#15803d' }]}>DISCOM</Text>
+                      </TouchableOpacity>
+                    </View>
+
+                    <View style={styles.rightContactBtns}>
+                      <TouchableOpacity
+                        style={styles.circleCallBtn}
+                        onPress={() => handleCall(phone)}
+                        activeOpacity={0.7}
+                        accessibilityLabel="Call"
+                      >
+                        <Phone size={13} color="#0284c7" />
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={styles.circleWhatsAppBtn}
+                        onPress={() => handleWhatsApp(phone, custName, p.projectNumber, cap)}
+                        activeOpacity={0.7}
+                        accessibilityLabel="WhatsApp"
+                      >
+                        <MessageCircle size={13} color="#15803d" />
+                      </TouchableOpacity>
+                    </View>
                   </View>
-                </View>
-
-                {/* FIELD OPERATIONS ACTION TOOLBAR */}
-                <View style={styles.cardActionsCol}>
-                  <View style={styles.actionRowTop}>
-                    {/* Call CTA */}
-                    <TouchableOpacity
-                      style={styles.callBtn}
-                      onPress={() => handleCall(phone)}
-                      activeOpacity={0.7}
-                    >
-                      <Phone size={15} color="#0284c7" strokeWidth={2.3} />
-                    </TouchableOpacity>
-
-                    {/* WhatsApp Direct CTA */}
-                    <TouchableOpacity
-                      style={styles.whatsAppBtn}
-                      onPress={() => handleWhatsApp(phone, custName, p.projectNumber, cap)}
-                      activeOpacity={0.7}
-                    >
-                      <MessageCircle size={15} color="#059669" strokeWidth={2.3} />
-                    </TouchableOpacity>
-
-                    {/* Dossier & Compliance Vault CTA */}
-                    <TouchableOpacity
-                      style={styles.docsBtn}
-                      onPress={() => handleOpenDocsModal(p)}
-                      activeOpacity={0.8}
-                    >
-                      <FileText size={14} color="#7c3aed" strokeWidth={2.3} />
-                      <Text style={styles.docsBtnText}>Vault ({docsCount})</Text>
-                    </TouchableOpacity>
-
-                    {/* QR / Barcode Scan CTA */}
-                    <TouchableOpacity
-                      style={styles.barcodeBtn}
-                      onPress={() =>
-                        handleOpenBarcodeModal({ ...p, consumerNumber: consumerNo, capacity: cap })
-                      }
-                      activeOpacity={0.8}
-                    >
-                      <QrCode size={14} color="#2563eb" strokeWidth={2.3} />
-                      <Text style={styles.barcodeBtnText}>Serials</Text>
-                    </TouchableOpacity>
-
-                    {/* QA Checklist CTA */}
-                    <TouchableOpacity
-                      style={styles.qaBtn}
-                      onPress={() =>
-                        handleOpenQaModal({ ...p, consumerNumber: consumerNo, capacity: cap })
-                      }
-                      activeOpacity={0.8}
-                    >
-                      <ShieldCheck size={14} color="#059669" strokeWidth={2.3} />
-                      <Text style={styles.qaBtnText}>QA Test</Text>
-                    </TouchableOpacity>
-                  </View>
-
-                  {/* DISCOM Net Metering Statutory Form CTA */}
-                  <TouchableOpacity
-                    style={styles.discomCta}
-                    onPress={() =>
-                      handleOpenDiscomModal({ ...p, consumerNumber: consumerNo, capacity: cap })
-                    }
-                    activeOpacity={0.85}
-                  >
-                    <Building size={14} color="#ffffff" strokeWidth={2.2} />
-                    <Text style={styles.discomCtaText}>Generate Official DISCOM Docs (Form A-1, WCR)</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            );
-          })
+                </TouchableOpacity>
+              );
+            })}
+          </View>
         )}
       </ScrollView>
 
@@ -698,29 +667,30 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#ffffff',
   },
-  projectCard: {
+  projectsWorkspace: {
     backgroundColor: '#ffffff',
-    borderRadius: 18,
-    padding: 16,
-    marginBottom: 14,
     borderWidth: 1,
     borderColor: '#e2e8f0',
+    borderRadius: 20,
+    paddingHorizontal: 14,
     shadowColor: '#0f172a',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 6,
     elevation: 2,
   },
-  cardHeaderTouchable: {
-    marginBottom: 10,
+  projectRowItem: {
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
   },
-  cardTopRow: {
+  projectRowTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 6,
   },
-  badgeRow: {
+  projectNumberGroup: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
@@ -731,196 +701,118 @@ const styles = StyleSheet.create({
     backgroundColor: '#eff6ff',
     color: '#1d4ed8',
     paddingHorizontal: 7,
-    paddingVertical: 3,
+    paddingVertical: 2,
     borderRadius: 6,
     borderWidth: 1,
     borderColor: '#bfdbfe',
   },
   stageBadge: {
     paddingHorizontal: 7,
-    paddingVertical: 3,
+    paddingVertical: 2,
     borderRadius: 6,
   },
   stageBadgeText: {
     fontSize: 10,
     fontWeight: '800',
   },
+  projectRightPills: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  progressMiniPill: {
+    backgroundColor: '#f1f5f9',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  progressMiniText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#475569',
+  },
   capBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 3,
     backgroundColor: '#f0f9ff',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
     borderRadius: 6,
     borderWidth: 1,
     borderColor: '#bae6fd',
   },
   capBadgeText: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '800',
     color: '#0284c7',
   },
   projectName: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '800',
     color: '#0f172a',
     letterSpacing: -0.2,
+    marginBottom: 3,
+  },
+  projectSubRow: {
+    marginBottom: 10,
   },
   clientDetail: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#64748b',
-    marginTop: 3,
     fontWeight: '500',
   },
-  metaRow: {
+  microActionsRow: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#f8fafc',
-    borderRadius: 10,
-    padding: 10,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#f1f5f9',
+    gap: 6,
   },
-  metaCol: {
+  leftActionPills: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 5,
     flex: 1,
   },
-  metaColRight: {
-    alignItems: 'flex-end',
-  },
-  metaLabel: {
-    fontSize: 10,
-    color: '#94a3b8',
-    fontWeight: '700',
-    textTransform: 'uppercase',
-  },
-  metaHighlight: {
-    fontSize: 12,
-    color: '#0f172a',
-    fontWeight: '800',
-    marginTop: 2,
-  },
-  milestoneBox: {
-    marginBottom: 12,
-  },
-  milestoneHeader: {
+  pillActionBtn: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 6,
-  },
-  milestoneTitle: {
-    fontSize: 10,
-    color: '#64748b',
-    fontWeight: '700',
-    textTransform: 'uppercase',
-  },
-  milestoneStatus: {
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  progressBarTrack: {
-    height: 6,
-    backgroundColor: '#e2e8f0',
-    borderRadius: 3,
-    overflow: 'hidden',
-  },
-  progressBarFill: {
-    height: '100%',
-    borderRadius: 3,
-  },
-  cardActionsCol: {
-    gap: 8,
-  },
-  actionRowTop: {
-    flexDirection: 'row',
-    gap: 6,
-    alignItems: 'center',
-  },
-  callBtn: {
-    width: 38,
-    height: 38,
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
     borderRadius: 8,
+  },
+  pillActionText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#475569',
+  },
+  rightContactBtns: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  circleCallBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 9,
     backgroundColor: '#f0f9ff',
     borderWidth: 1,
     borderColor: '#bae6fd',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  whatsAppBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 8,
-    backgroundColor: '#ecfdf5',
-    borderWidth: 1,
-    borderColor: '#a7f3d0',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  docsBtn: {
-    flex: 1,
-    height: 38,
-    backgroundColor: '#faf5ff',
-    borderWidth: 1,
-    borderColor: '#e9d5ff',
-    borderRadius: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-  },
-  docsBtnText: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#7c3aed',
-  },
-  barcodeBtn: {
-    flex: 1,
-    height: 38,
-    backgroundColor: '#eff6ff',
-    borderWidth: 1,
-    borderColor: '#bfdbfe',
-    borderRadius: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-  },
-  barcodeBtnText: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#2563eb',
-  },
-  qaBtn: {
-    flex: 1,
-    height: 38,
-    backgroundColor: '#f0fdf4',
+  circleWhatsAppBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 9,
+    backgroundColor: '#dcfce7',
     borderWidth: 1,
     borderColor: '#bbf7d0',
-    borderRadius: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
-  },
-  qaBtnText: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#059669',
-  },
-  discomCta: {
-    backgroundColor: '#0f172a',
-    borderRadius: 10,
-    paddingVertical: 10,
-    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 7,
-  },
-  discomCtaText: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#ffffff',
   },
 });

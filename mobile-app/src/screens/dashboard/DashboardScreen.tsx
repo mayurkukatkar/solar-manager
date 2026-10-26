@@ -6,44 +6,27 @@ import {
   ScrollView,
   TouchableOpacity,
   RefreshControl,
-  ActivityIndicator,
-  Modal,
   Dimensions,
   Platform,
   Linking,
 } from 'react-native';
 import {
   FileText,
-  UserPlus,
   MapPin,
   Landmark,
   Briefcase,
   Users,
-  CreditCard,
   ChevronRight,
-  TrendingUp,
-  Info,
-  X,
   Zap,
   Package,
   ShieldCheck,
   Sun,
-  Wallet,
-  Activity,
-  Layers,
   Award,
-  Clock,
   Sparkles,
   ArrowRight,
   Leaf,
   Globe,
-  CheckCircle2,
-  AlertCircle,
-  Truck,
   Plus,
-  Calendar,
-  CalendarDays,
-  Flame,
   Phone,
   MessageCircle,
   Receipt,
@@ -53,7 +36,6 @@ import { tenantApi, crmApi } from '../../api/endpoints';
 import { openWhatsAppWithPitch } from '../../services/whatsappService';
 import { useAuth } from '../../context/AuthContext';
 import { DashboardData, HorizonItem, Project } from '../../types';
-import { colors } from '../../theme/colors';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -92,15 +74,10 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
   const [recentLeads, setRecentLeads] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [showAlertBanner, setShowAlertBanner] = useState(true);
-  const [guideVisible, setGuideVisible] = useState(false);
 
   // Horizon Analysis State
   const [periodHorizon, setPeriodHorizon] = useState<HorizonType>('quarterly');
   const [horizonMetricFocus, setHorizonMetricFocus] = useState<FocusMetric>('both');
-
-  const hour = new Date().getHours();
-  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
 
   useEffect(() => {
     loadDashboard();
@@ -241,10 +218,10 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
 
   // Fallback / Active datasets
   const fallbackInventoryRunway = [
-    { item: '550W Mono PERC Solar Panels (DCR)', stock: '184 Panels (~101 kWp)', runway: 19, status: 'Healthy', unit: 'Days', badge: 'emerald' },
-    { item: 'On-Grid Inverters (3kW, 5kW, 10kW)', stock: '14 Units In Stock', runway: 11, status: 'Reorder Soon', unit: 'Days', badge: 'amber' },
-    { item: 'Elevated HDGI & Aluminium Rails', stock: '480 Running Meters', runway: 24, status: 'Healthy', unit: 'Days', badge: 'emerald' },
-    { item: 'Solar DC 4mm² UV Cables & ACDB', stock: '1,200 Meters + 16 Boxes', runway: 28, status: 'Adequate', unit: 'Days', badge: 'emerald' },
+    { item: '550W Mono PERC Panels (DCR)', stock: '184 Panels (~101 kWp)', runway: 19, status: 'Healthy' },
+    { item: 'On-Grid Inverters (3kW/5kW)', stock: '14 Units In Stock', runway: 11, status: 'Reorder Soon' },
+    { item: 'Elevated HDGI & Al Rails', stock: '480 Running Meters', runway: 24, status: 'Healthy' },
+    { item: 'Solar DC 4mm² UV Cables', stock: '1,200m + 16 ACDB Boxes', runway: 28, status: 'Adequate' },
   ];
   const inventoryRunway =
     data.inventoryRunway && data.inventoryRunway.length > 0
@@ -252,10 +229,10 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
       : fallbackInventoryRunway;
 
   const fallbackSubsidyFunnel = [
-    { step: '01', title: 'DISCOM Feasibility Approved', count: 24, amount: '₹18.7 Lakhs', status: 'Feasibility Sanctioned' },
-    { step: '02', title: 'Vendor Work Order & Install', count: 18, amount: '₹14.0 Lakhs', status: 'Work Order Active' },
-    { step: '03', title: 'Joint Inspection Report (JIR)', count: 12, amount: '₹9.3 Lakhs', status: 'Uploaded to Portal' },
-    { step: '04', title: 'Direct Subsidy Credited (DBT)', count: 9, amount: '₹7.02 Lakhs', status: 'Credited to Customer' },
+    { step: '01', title: 'DISCOM Feasibility Approved', count: 24, amount: '₹18.7L', status: 'Feasibility Sanctioned' },
+    { step: '02', title: 'Vendor Work Order & Install', count: 18, amount: '₹14.0L', status: 'Work Order Active' },
+    { step: '03', title: 'Joint Inspection Report (JIR)', count: 12, amount: '₹9.3L', status: 'Uploaded to Portal' },
+    { step: '04', title: 'Direct Subsidy Credited (DBT)', count: 9, amount: '₹7.02L', status: 'Credited to Customer' },
   ];
   const subsidyFunnel =
     data.subsidyFunnel && data.subsidyFunnel.length > 0
@@ -280,7 +257,7 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
 
   const collectedPct = totalRevenueLakhs > 0
     ? Math.min(100, Math.round((totalCollectedLakhs / totalRevenueLakhs) * 100))
-    : 60;
+    : 65;
   const outstandingPct = Math.max(0, 100 - collectedPct);
 
   // Environmental Metrics
@@ -333,7 +310,7 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
       city: 'Nashik',
       capacity: 3.3,
       value: 191000,
-      stage: 'Installation Active',
+      stage: 'Erection Active',
       stageBg: '#ecfdf5',
       stageColor: '#059669',
       avatarBg: '#a7f3d0',
@@ -367,12 +344,12 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
         })
       : fallbackRecentLeads;
 
+  const urgentProspect = activeStreamItems[0] || fallbackRecentLeads[0];
+
   return (
     <View style={styles.container}>
-      <Header
-        title={`${greeting}, ${user?.name ? user.name.split(' ')[0] : 'Solar Partner'}`}
-        subtitle={`${user?.tenantName || 'WhereReady Solar OS'} • Field Operations Hub`}
-      />
+      {/* Flush, Ultra-Compact Brand & Live Telemetry Header */}
+      <Header variant="home" />
 
       <ScrollView
         style={styles.scroll}
@@ -380,684 +357,694 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         showsVerticalScrollIndicator={false}
       >
-        {/* 1. UBER-INSPIRED: TODAY'S OPERATIONAL DISPATCH HERO */}
-        <View style={styles.dispatchHeroCard}>
-          <View style={styles.dispatchHeroTop}>
-            <View style={styles.dispatchPill}>
-              <View style={styles.pulseDot} />
-              <Text style={styles.dispatchPillText}>TODAY'S MISSION & DISPATCH</Text>
-            </View>
-            <Text style={styles.dispatchDateText}>
-              {new Date().toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })}
-            </Text>
-          </View>
-
-          <Text style={styles.dispatchHeadline}>
-            {data.totalLeads || 3} Proposals Pending Follow-Up
-          </Text>
-          <Text style={styles.dispatchSubline}>
-            {projects.length || data.totalProjects || 2} active installations on-site • ₹{outstandingLakhs}L maturing DBT claims
-          </Text>
-
-          {/* Action-First Recommended Step */}
-          <View style={styles.priorityBox}>
-            <View style={styles.priorityBoxLeft}>
-              <View style={styles.priorityTagRow}>
-                <Sparkles size={11} color="#f59e0b" />
-                <Text style={styles.priorityLabel}>NEXT RECOMMENDED ACTION</Text>
+        {/* =====================================================================
+            ZONE 1: OPERATIONAL RADAR CANOPY (Deep Slate #091326 Edge-to-Edge)
+            Answers: What requires attention right now? Which customer to contact?
+            Dominant visual anchor + zero generic dashboard template card nesting.
+        ===================================================================== */}
+        <View style={styles.operationalCanopy}>
+          {/* 1A. Dominant Typographic Anchor Row */}
+          <View style={styles.radarHeroRow}>
+            <View style={{ flex: 1 }}>
+              <View style={styles.radarBadgeRow}>
+                <View style={styles.pulseDot} />
+                <Text style={styles.radarBadgeText}>LIVE OPERATIONS RADAR</Text>
               </View>
-              <Text style={styles.priorityTitle} numberOfLines={1}>
-                {recentLeads[0]
-                  ? `Follow up with ${recentLeads[0].name} (${recentLeads[0].estimatedCap || 3.3} kWp)`
-                  : 'Dispatch 60s proposal to new inquiry'}
+              <Text style={styles.radarHugeFigure}>₹{totalRevenueLakhs}L</Text>
+              <Text style={styles.radarSubline}>
+                {totalCapacityKWp} kWp Fleet Active • ₹{outstandingLakhs}L In-Flight Claims
               </Text>
             </View>
-            <TouchableOpacity
-              style={styles.actionBtnPrimary}
-              onPress={() => navigation.navigate(recentLeads[0] ? 'Pipeline' : 'QuickQuote')}
-              activeOpacity={0.85}
-            >
-              <Zap size={14} color="#ffffff" style={{ marginRight: 4 }} />
-              <Text style={styles.actionBtnPrimaryText}>Action</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
 
-        {/* 2. BLINKIT-INSPIRED: FAST DISCOVERABILITY & ACTION TOOLKIT */}
-        <View style={styles.speedSection}>
-          <Text style={styles.sectionHeaderTitle}>QUICK ACTION TOOLKIT</Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.speedScroll}
-          >
             <TouchableOpacity
-              style={[styles.speedPill, styles.speedPillPrimary]}
+              style={styles.radarQuickQuoteBtn}
               onPress={() => navigation.navigate('QuickQuote')}
               activeOpacity={0.85}
             >
-              <Zap size={15} color="#fbbf24" style={{ marginRight: 6 }} />
-              <Text style={styles.speedPillTextPrimary}>60s Proposal</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.speedPill}
-              onPress={() => navigation.navigate('Pipeline')}
-              activeOpacity={0.85}
-            >
-              <Plus size={15} color="#0066FF" style={{ marginRight: 6 }} />
-              <Text style={styles.speedPillText}>+ New Lead</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.speedPill}
-              onPress={() => navigation.navigate('Modules', { screen: 'SURVEYS' })}
-              activeOpacity={0.85}
-            >
-              <MapPin size={15} color="#d97706" style={{ marginRight: 6 }} />
-              <Text style={styles.speedPillText}>Book Survey</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.speedPill}
-              onPress={() => navigation.navigate('Finance')}
-              activeOpacity={0.85}
-            >
-              <Receipt size={15} color="#059669" style={{ marginRight: 6 }} />
-              <Text style={styles.speedPillText}>Tax Invoice</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.speedPill}
-              onPress={() => navigation.navigate('Modules', { screen: 'SUBSIDY' })}
-              activeOpacity={0.85}
-            >
-              <Landmark size={15} color="#7c3aed" style={{ marginRight: 6 }} />
-              <Text style={styles.speedPillText}>PM Surya Ghar</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.speedPill}
-              onPress={() => navigation.navigate('Modules', { screen: 'INVENTORY' })}
-              activeOpacity={0.85}
-            >
-              <Package size={15} color="#0284c7" style={{ marginRight: 6 }} />
-              <Text style={styles.speedPillText}>Stock Ledger</Text>
-            </TouchableOpacity>
-          </ScrollView>
-        </View>
-
-        {/* 3. INSTAGRAM-INSPIRED: LIVE CUSTOMER OUTREACH & ACTIVITY STREAM */}
-        <View style={styles.streamSection}>
-          <View style={styles.sectionTitleRow}>
-            <View>
-              <Text style={styles.sectionHeaderTitle}>LIVE PIPELINE & FIELD STREAM</Text>
-              <Text style={styles.sectionHeaderSub}>Recent customer activity & direct outreach</Text>
-            </View>
-            <TouchableOpacity onPress={() => navigation.navigate('Pipeline')} activeOpacity={0.7}>
-              <Text style={styles.sectionLinkText}>Full CRM →</Text>
+              <Zap size={14} color="#fbbf24" style={{ marginRight: 5 }} />
+              <Text style={styles.radarQuickQuoteText}>60s Quote</Text>
             </TouchableOpacity>
           </View>
 
-          <View style={styles.streamCard}>
-            {activeStreamItems.map((item, idx) => (
-              <View
-                key={item.id || idx}
-                style={[
-                  styles.streamRow,
-                  idx === activeStreamItems.length - 1 && { borderBottomWidth: 0 },
-                ]}
+          {/* 1B. Immediate Attention Hero Anchor (Action-First Customer Focus) */}
+          <View style={styles.urgentActionTile}>
+            <View style={styles.urgentHeaderRow}>
+              <View style={styles.urgentTag}>
+                <Sparkles size={11} color="#f59e0b" />
+                <Text style={styles.urgentTagText}>IMMEDIATE ACTION REQUIRED</Text>
+              </View>
+              <Text style={styles.urgentTimeAgo}>{urgentProspect.time || 'Active'}</Text>
+            </View>
+
+            <View style={styles.urgentCustomerInfo}>
+              <Text style={styles.urgentCustomerName} numberOfLines={1}>
+                {urgentProspect.name} ({urgentProspect.capacity} kWp Rooftop)
+              </Text>
+              <Text style={styles.urgentCustomerMeta} numberOfLines={1}>
+                📍 {urgentProspect.city} • Est. ₹{(urgentProspect.value || 185000).toLocaleString('en-IN')}
+              </Text>
+              <Text style={styles.urgentCustomerSubsidy} numberOfLines={1}>
+                🏛️ PM Surya Ghar: Eligible for ₹78,000 Direct DBT Subsidy
+              </Text>
+            </View>
+
+            {/* Direct 1-Tap Execution Actions */}
+            <View style={styles.urgentActionButtonsRow}>
+              <TouchableOpacity
+                style={styles.urgentCallBtn}
+                onPress={() => handlePhoneCall(urgentProspect.mobile)}
+                activeOpacity={0.85}
               >
-                <View style={[styles.streamAvatar, { backgroundColor: item.avatarBg || '#eff6ff' }]}>
-                  <Text style={[styles.streamAvatarText, { color: item.avatarColor || '#0066FF' }]}>
-                    {item.name ? item.name.charAt(0).toUpperCase() : 'S'}
-                  </Text>
-                </View>
+                <Phone size={13} color="#ffffff" style={{ marginRight: 6 }} />
+                <Text style={styles.urgentCallBtnText}>Call Customer</Text>
+              </TouchableOpacity>
 
-                <View style={styles.streamMeta}>
-                  <View style={styles.streamNameRow}>
-                    <Text style={styles.streamName} numberOfLines={1}>
-                      {item.name}
-                    </Text>
-                    <View style={[styles.streamStageBadge, { backgroundColor: item.stageBg || '#eff6ff' }]}>
-                      <Text style={[styles.streamStageText, { color: item.stageColor || '#0066FF' }]}>
-                        {item.stage || 'NEW'}
-                      </Text>
-                    </View>
-                  </View>
-                  <Text style={styles.streamSub} numberOfLines={1}>
-                    ⚡ {item.capacity || 3.3} kWp • 📍 {item.city || 'Site Location'} • ₹{(item.value || 185000).toLocaleString('en-IN')}
-                  </Text>
-                </View>
+              <TouchableOpacity
+                style={styles.urgentPitchBtn}
+                onPress={() => handleWhatsAppDirect(urgentProspect)}
+                activeOpacity={0.85}
+              >
+                <MessageCircle size={13} color="#15803d" style={{ marginRight: 6 }} />
+                <Text style={styles.urgentPitchBtnText}>WhatsApp Pitch</Text>
+              </TouchableOpacity>
 
-                {/* 1-Tap Micro Actions */}
-                <View style={styles.streamActions}>
-                  <TouchableOpacity
-                    style={styles.microActionBtn}
-                    onPress={() => handlePhoneCall(item.mobile)}
-                    activeOpacity={0.7}
-                  >
-                    <Phone size={13} color="#0f172a" />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.microActionBtn, { backgroundColor: '#dcfce7' }]}
-                    onPress={() => handleWhatsAppDirect(item)}
-                    activeOpacity={0.7}
-                  >
-                    <MessageCircle size={13} color="#15803d" />
-                  </TouchableOpacity>
-                </View>
-              </View>
-            ))}
+              <TouchableOpacity
+                style={styles.urgentDetailBtn}
+                onPress={() => navigation.navigate('Pipeline')}
+                activeOpacity={0.85}
+              >
+                <ArrowRight size={14} color="#cbd5e1" />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* 1C. Asymmetric Hairline Pulse Strip */}
+          <View style={styles.pulseStrip}>
+            <View style={styles.pulseItem}>
+              <Text style={styles.pulseNum}>{data.totalLeads || 3}</Text>
+              <Text style={styles.pulseLabel}>Pending Quotes</Text>
+            </View>
+            <View style={styles.pulseHairline} />
+            <View style={styles.pulseItem}>
+              <Text style={styles.pulseNum}>{projects.length || data.totalProjects || 2}</Text>
+              <Text style={styles.pulseLabel}>Active Erection</Text>
+            </View>
+            <View style={styles.pulseHairline} />
+            <View style={styles.pulseItem}>
+              <Text style={[styles.pulseNum, { color: '#34d399' }]}>₹78k</Text>
+              <Text style={styles.pulseLabel}>Max Site Subsidy</Text>
+            </View>
+            <View style={styles.pulseHairline} />
+            <View style={styles.pulseItem}>
+              <Text style={[styles.pulseNum, { color: '#38bdf8' }]}>14.8d</Text>
+              <Text style={styles.pulseLabel}>Avg Turnaround</Text>
+            </View>
           </View>
         </View>
 
-        {/* 4. UNIFIED EXECUTIVE PERFORMANCE STRIP */}
-        <View style={styles.kpiStripCard}>
-          <View style={styles.kpiStripCol}>
-            <Text style={styles.kpiStripLabel}>ORDER BOOK</Text>
-            <Text style={styles.kpiStripVal}>₹{totalRevenueLakhs}L</Text>
-            <Text style={styles.kpiStripHint}>Committed</Text>
-          </View>
-          <View style={styles.kpiStripDivider} />
-          <View style={styles.kpiStripCol}>
-            <Text style={styles.kpiStripLabel}>FLEET</Text>
-            <Text style={styles.kpiStripVal}>{totalCapacityKWp} kW</Text>
-            <Text style={styles.kpiStripHint}>Energized</Text>
-          </View>
-          <View style={styles.kpiStripDivider} />
-          <View style={styles.kpiStripCol}>
-            <Text style={styles.kpiStripLabel}>DBT SUBSIDY</Text>
-            <Text style={[styles.kpiStripVal, { color: '#059669' }]}>₹78k</Text>
-            <Text style={styles.kpiStripHint}>Max / Site</Text>
-          </View>
-          <View style={styles.kpiStripDivider} />
-          <View style={styles.kpiStripCol}>
-            <Text style={styles.kpiStripLabel}>TURNAROUND</Text>
-            <Text style={[styles.kpiStripVal, { color: '#7c3aed' }]}>14.8d</Text>
-            <Text style={styles.kpiStripHint}>Avg Cycle</Text>
-          </View>
-        </View>
+        {/* =====================================================================
+            ZONE 2: EXECUTION FLOOR (Crisp Polar White #f8fafc)
+            Open Editorial Layout: No repeated card-within-card rectangles.
+        ===================================================================== */}
+        <View style={styles.executionFloor}>
 
-        {/* 4. PERIODIC HORIZON COMPARATIVE ANALYSIS MODULE */}
-        <View style={styles.horizonSectionCard}>
-          <View style={styles.horizonHeader}>
-            <View style={styles.horizonHeaderLeft}>
-              <View style={styles.horizonPill}>
-                <View style={styles.horizonPillDot} />
-                <Text style={styles.horizonPillText}>PERIOD COMPARATIVE ANALYSIS</Text>
+          {/* 2A. Field Dispatch & Workday Thread (Horizontal Chronological Workflow) */}
+          <View style={styles.workdaySection}>
+            <View style={styles.sectionTitleRow}>
+              <View>
+                <Text style={styles.openSectionLabel}>FIELD DISPATCH & WORKDAY THREAD</Text>
+                <Text style={styles.openSectionSub}>Scheduled surveys, liaison & commissioning</Text>
               </View>
-              <Text style={styles.horizonTitle}>{activeHorizonConfig.label}</Text>
-              <Text style={styles.horizonSub}>{activeHorizonConfig.sublabel}</Text>
-            </View>
-          </View>
-
-          {/* HORIZON SELECTOR TABS */}
-          <View style={styles.horizonTabsContainer}>
-            {(['monthly', 'quarterly', 'halfAnnual', 'annual'] as HorizonType[]).map((h) => {
-              const active = periodHorizon === h;
-              const labels: Record<HorizonType, string> = {
-                monthly: 'Monthly',
-                quarterly: 'Quarterly',
-                halfAnnual: 'Half-Annual',
-                annual: 'Annual',
-              };
-              return (
-                <TouchableOpacity
-                  key={h}
-                  style={[styles.horizonTabBtn, active && styles.horizonTabBtnActive]}
-                  onPress={() => setPeriodHorizon(h)}
-                  activeOpacity={0.8}
-                >
-                  <Text style={[styles.horizonTabBtnText, active && styles.horizonTabBtnTextActive]}>
-                    {labels[h]}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-
-          {/* METRIC FILTER BUTTONS (BOTH / CLIENTS / REVENUE) */}
-          <View style={styles.metricFilterRow}>
-            {(['both', 'clients', 'revenue'] as FocusMetric[]).map((f) => {
-              const active = horizonMetricFocus === f;
-              const labels: Record<FocusMetric, string> = {
-                both: 'Both Metrics',
-                clients: 'Clients',
-                revenue: 'Revenue ₹',
-              };
-              return (
-                <TouchableOpacity
-                  key={f}
-                  style={[styles.metricFilterBtn, active && styles.metricFilterBtnActive]}
-                  onPress={() => setHorizonMetricFocus(f)}
-                  activeOpacity={0.8}
-                >
-                  <Text style={[styles.metricFilterBtnText, active && styles.metricFilterBtnTextActive]}>
-                    {labels[f]}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-
-          {/* HORIZON SCORECARDS GRID */}
-          <View style={styles.scorecardsGrid}>
-            <View style={[styles.scorecardItem, { backgroundColor: '#eff6ff', borderColor: '#dbeafe' }]}>
-              <Text style={styles.scorecardLabel}>SUCCESSFUL CLIENTS</Text>
-              <Text style={[styles.scorecardVal, { color: '#1e40af' }]}>{totalHorizonClients} Sites</Text>
-              <Text style={styles.scorecardSub}>Commissioned</Text>
+              <TouchableOpacity
+                onPress={() => navigation.navigate('Modules', { screen: 'SURVEYS' })}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.sectionActionText}>Schedule →</Text>
+              </TouchableOpacity>
             </View>
 
-            <View style={[styles.scorecardItem, { backgroundColor: '#ecfdf5', borderColor: '#d1fae5' }]}>
-              <Text style={styles.scorecardLabel}>REALIZED REVENUE</Text>
-              <Text style={[styles.scorecardVal, { color: '#065f46' }]}>₹{totalHorizonRevenue}L</Text>
-              <Text style={styles.scorecardSub}>100% Invoiced</Text>
-            </View>
-
-            <View style={[styles.scorecardItem, { backgroundColor: '#fffbeb', borderColor: '#fef3c7' }]}>
-              <Text style={styles.scorecardLabel}>AVG DEAL SIZE</Text>
-              <Text style={[styles.scorecardVal, { color: '#92400e' }]}>₹{avgHorizonDeal}L</Text>
-              <Text style={styles.scorecardSub}>Per Rooftop</Text>
-            </View>
-
-            <View style={[styles.scorecardItem, { backgroundColor: '#f5f3ff', borderColor: '#ede9fe' }]}>
-              <Text style={styles.scorecardLabel}>CAPACITY (kWp)</Text>
-              <Text style={[styles.scorecardVal, { color: '#5b21b6' }]}>{totalHorizonCapacity} kWp</Text>
-              <Text style={styles.scorecardSub}>Delivered</Text>
-            </View>
-          </View>
-
-          {/* NATIVE VISUAL BAR TRAJECTORY CHART */}
-          <View style={styles.chartContainer}>
-            <View style={styles.chartLegendRow}>
-              {(horizonMetricFocus === 'both' || horizonMetricFocus === 'clients') && (
-                <View style={styles.chartLegendItem}>
-                  <View style={[styles.chartLegendDot, { backgroundColor: '#0284c7' }]} />
-                  <Text style={styles.chartLegendText}>Clients</Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.timelineScroll}
+            >
+              <View style={[styles.timelineNode, styles.timelineNodeDone]}>
+                <View style={styles.timelineNodeTop}>
+                  <View style={[styles.timelineDot, { backgroundColor: '#10b981' }]} />
+                  <Text style={styles.timelineTime}>09:30 AM</Text>
                 </View>
-              )}
-              {(horizonMetricFocus === 'both' || horizonMetricFocus === 'revenue') && (
-                <View style={styles.chartLegendItem}>
-                  <View style={[styles.chartLegendDot, { backgroundColor: '#10b981' }]} />
-                  <Text style={styles.chartLegendText}>Revenue (₹L)</Text>
+                <Text style={styles.timelineTitle}>Site Survey @ Nagpur</Text>
+                <Text style={styles.timelineMeta}>3.3 kWp Mono PERC • Rooftop Clear</Text>
+                <View style={styles.timelineStatusPillDone}>
+                  <Text style={styles.timelineStatusTextDone}>Completed ✓</Text>
                 </View>
-              )}
-            </View>
+              </View>
 
-            {/* BAR COLUMNS */}
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chartColumnsScroll}>
-              {activeHorizonData.map((item, idx) => {
-                const clientHeightPct = Math.max(12, Math.round((item.clients / maxClientsVal) * 110));
-                const revenueHeightPct = Math.max(12, Math.round((item.revenue / maxRevenueVal) * 110));
+              <View style={[styles.timelineNode, styles.timelineNodeActive]}>
+                <View style={styles.timelineNodeTop}>
+                  <View style={[styles.timelineDot, { backgroundColor: '#0066FF' }]} />
+                  <Text style={[styles.timelineTime, { color: '#0066FF' }]}>01:45 PM</Text>
+                </View>
+                <Text style={styles.timelineTitle}>DISCOM Liaison</Text>
+                <Text style={styles.timelineMeta}>MSEDCL Feasibility Sanction</Text>
+                <View style={styles.timelineStatusPillActive}>
+                  <Text style={styles.timelineStatusTextActive}>In Progress ⚡</Text>
+                </View>
+              </View>
 
-                return (
-                  <View key={item.period || idx} style={styles.chartColumnGroup}>
-                    <View style={styles.chartBarsPair}>
-                      {(horizonMetricFocus === 'both' || horizonMetricFocus === 'clients') && (
-                        <View style={styles.singleBarWrapper}>
-                          <Text style={styles.barTopLabel}>{item.clients}</Text>
-                          <View
-                            style={[
-                              styles.chartBar,
-                              { height: clientHeightPct, backgroundColor: '#0284c7' },
-                            ]}
-                          />
-                        </View>
-                      )}
-
-                      {(horizonMetricFocus === 'both' || horizonMetricFocus === 'revenue') && (
-                        <View style={styles.singleBarWrapper}>
-                          <Text style={styles.barTopLabel}>₹{item.revenue}</Text>
-                          <View
-                            style={[
-                              styles.chartBar,
-                              { height: revenueHeightPct, backgroundColor: '#10b981' },
-                            ]}
-                          />
-                        </View>
-                      )}
-                    </View>
-                    <Text style={styles.chartColumnXLabel} numberOfLines={1}>{item.period}</Text>
-                  </View>
-                );
-              })}
+              <View style={styles.timelineNode}>
+                <View style={styles.timelineNodeTop}>
+                  <View style={[styles.timelineDot, { backgroundColor: '#94a3b8' }]} />
+                  <Text style={styles.timelineTime}>04:30 PM</Text>
+                </View>
+                <Text style={styles.timelineTitle}>Joint Inspection (JIR)</Text>
+                <Text style={styles.timelineMeta}>Bi-directional Net Meter Test</Text>
+                <View style={styles.timelineStatusPillNext}>
+                  <Text style={styles.timelineStatusTextNext}>Up Next ➔</Text>
+                </View>
+              </View>
             </ScrollView>
           </View>
 
-          {/* DETAILED PERIOD BREAKDOWN LIST */}
-          <View style={styles.breakdownList}>
-            <Text style={styles.breakdownHeaderTitle}>PERIOD PERFORMANCE BREAKDOWN</Text>
-            {activeHorizonData.map((row, i) => (
-              <View key={row.period || i} style={styles.breakdownRow}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.breakdownPeriodTitle}>{row.period}</Text>
-                  <View style={styles.breakdownSubRow}>
-                    <Text style={styles.breakdownSubMeta}>
-                      {row.capacity} kWp • Avg {row.avgDeal}
-                    </Text>
-                  </View>
-                </View>
-                <View style={styles.breakdownRight}>
-                  <Text style={styles.breakdownClientsVal}>{row.clients} Clients</Text>
-                  <Text style={styles.breakdownRevenueVal}>₹{row.revenue} Lakhs</Text>
-                  <View style={styles.breakdownStatusPill}>
-                    <Text style={styles.breakdownStatusText}>{row.growth || row.status || 'Active'}</Text>
-                  </View>
-                </View>
+          {/* 2B. Live Customer Pipeline & Outbound Outreach (Open Editorial Rows) */}
+          <View style={styles.editorialStreamSection}>
+            <View style={styles.sectionTitleRow}>
+              <View>
+                <Text style={styles.openSectionLabel}>LIVE CUSTOMER PIPELINE & OUTREACH</Text>
+                <Text style={styles.openSectionSub}>High-priority prospects awaiting follow-up or pitch</Text>
               </View>
-            ))}
-          </View>
-        </View>
-
-        {/* 5. SOLAR OPERATIONS LIFECYCLE FUNNEL (5 STAGES) */}
-        <View style={styles.sectionCard}>
-          <View style={styles.sectionTitleRow}>
-            <View>
-              <Text style={styles.sectionHeaderTitle}>SOLAR OPERATIONS FUNNEL</Text>
-              <Text style={styles.sectionHeaderSub}>Live project volume across EPC milestones</Text>
-            </View>
-            <TouchableOpacity onPress={() => navigation.navigate('Projects')}>
-              <Text style={styles.sectionLinkText}>All Projects →</Text>
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.funnelGrid}>
-            <TouchableOpacity
-              style={[styles.funnelItem, { backgroundColor: '#f0f9ff', borderColor: '#bae6fd' }]}
-              onPress={() => navigation.navigate('Pipeline')}
-              activeOpacity={0.85}
-            >
-              <View style={styles.funnelItemTop}>
-                <Text style={[styles.funnelStepNum, { color: '#0284c7' }]}>01</Text>
-                <Users size={16} color="#0284c7" />
-              </View>
-              <Text style={styles.funnelItemVal}>{data.totalLeads}</Text>
-              <Text style={styles.funnelItemLabel}>Inbound Leads</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.funnelItem, { backgroundColor: '#fffbeb', borderColor: '#fde68a' }]}
-              onPress={() => navigation.navigate('Modules', { screen: 'SURVEYS' })}
-              activeOpacity={0.85}
-            >
-              <View style={styles.funnelItemTop}>
-                <Text style={[styles.funnelStepNum, { color: '#d97706' }]}>02</Text>
-                <MapPin size={16} color="#d97706" />
-              </View>
-              <Text style={styles.funnelItemVal}>{data.totalCustomers}</Text>
-              <Text style={styles.funnelItemLabel}>Site Surveys</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.funnelItem, { backgroundColor: '#f5f3ff', borderColor: '#ddd6fe' }]}
-              onPress={() => navigation.navigate('QuickQuote')}
-              activeOpacity={0.85}
-            >
-              <View style={styles.funnelItemTop}>
-                <Text style={[styles.funnelStepNum, { color: '#7c3aed' }]}>03</Text>
-                <FileText size={16} color="#7c3aed" />
-              </View>
-              <Text style={styles.funnelItemVal}>{data.totalLeads > 0 ? Math.round(data.totalLeads * 0.7) : 0}</Text>
-              <Text style={styles.funnelItemLabel}>Proposals Sent</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.funnelItem, { backgroundColor: '#eff6ff', borderColor: '#bfdbfe' }]}
-              onPress={() => navigation.navigate('Projects')}
-              activeOpacity={0.85}
-            >
-              <View style={styles.funnelItemTop}>
-                <Text style={[styles.funnelStepNum, { color: '#2563eb' }]}>04</Text>
-                <Briefcase size={16} color="#2563eb" />
-              </View>
-              <Text style={styles.funnelItemVal}>{data.totalProjects}</Text>
-              <Text style={styles.funnelItemLabel}>Installations</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.funnelItem, { backgroundColor: '#ecfdf5', borderColor: '#a7f3d0' }]}
-              onPress={() => navigation.navigate('Modules', { screen: 'SUBSIDY' })}
-              activeOpacity={0.85}
-            >
-              <View style={styles.funnelItemTop}>
-                <Text style={[styles.funnelStepNum, { color: '#059669' }]}>05</Text>
-                <Landmark size={16} color="#059669" />
-              </View>
-              <Text style={styles.funnelItemVal}>{data.pendingInvoices}</Text>
-              <Text style={styles.funnelItemLabel}>DBT Subsidies</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* 6. CASHFLOW & WORKING CAPITAL WATERFALL */}
-        <View style={styles.sectionCard}>
-          <View style={styles.sectionTitleRow}>
-            <View>
-              <Text style={styles.sectionHeaderTitle}>CASHFLOW & CAPITAL REALIZATION</Text>
-              <Text style={styles.sectionHeaderSub}>Milestone collections & receivables aging</Text>
-            </View>
-            <View style={styles.orderBookPill}>
-              <Text style={styles.orderBookPillText}>Order Book: ₹{totalRevenueLakhs}L</Text>
-            </View>
-          </View>
-
-          {/* PROGRESS BARS */}
-          <View style={styles.waterfallStack}>
-            <View style={styles.waterfallBarItem}>
-              <View style={styles.waterfallBarRow}>
-                <Text style={styles.waterfallBarLabel}>Customer Advances Collected</Text>
-                <Text style={[styles.waterfallBarVal, { color: '#059669' }]}>
-                  ₹{totalCollectedLakhs}L ({collectedPct}%)
-                </Text>
-              </View>
-              <View style={styles.progressTrack}>
-                <View style={[styles.progressFill, { width: `${collectedPct}%`, backgroundColor: '#10b981' }]} />
-              </View>
+              <TouchableOpacity onPress={() => navigation.navigate('Pipeline')} activeOpacity={0.7}>
+                <Text style={styles.sectionActionText}>All Leads →</Text>
+              </TouchableOpacity>
             </View>
 
-            <View style={styles.waterfallBarItem}>
-              <View style={styles.waterfallBarRow}>
-                <Text style={styles.waterfallBarLabel}>Installation Milestones In Flight</Text>
-                <Text style={[styles.waterfallBarVal, { color: '#d97706' }]}>
-                  ₹{outstandingLakhs}L ({outstandingPct}%)
-                </Text>
-              </View>
-              <View style={styles.progressTrack}>
-                <View style={[styles.progressFill, { width: `${outstandingPct}%`, backgroundColor: '#f59e0b' }]} />
-              </View>
-            </View>
-
-            <View style={styles.waterfallBarItem}>
-              <View style={styles.waterfallBarRow}>
-                <Text style={styles.waterfallBarLabel}>National DBT Subsidy Clearing</Text>
-                <Text style={[styles.waterfallBarVal, { color: '#0066FF' }]}>
-                  {subsidyFunnel[3]?.amount || '₹7.02 Lakhs'}
-                </Text>
-              </View>
-              <View style={styles.progressTrack}>
-                <View style={[styles.progressFill, { width: '45%', backgroundColor: '#0066FF' }]} />
-              </View>
-            </View>
-          </View>
-
-          {/* AGING BREAKDOWN 3-COLUMN */}
-          <Text style={styles.agingSectionTitle}>RECEIVABLES AGING BREAKDOWN</Text>
-          <View style={styles.agingGrid}>
-            <View style={[styles.agingCard, { backgroundColor: '#f8fafc', borderColor: '#e2e8f0' }]}>
-              <Text style={styles.agingLabel}>&lt; 15 DAYS</Text>
-              <Text style={styles.agingVal}>
-                ₹{data.aging ? (data.aging.under15 / 100000).toFixed(1) : '11.2'}L
-              </Text>
-              <Text style={[styles.agingBadge, { color: '#059669' }]}>On Track</Text>
-            </View>
-
-            <View style={[styles.agingCard, { backgroundColor: '#fffbeb', borderColor: '#fde68a' }]}>
-              <Text style={[styles.agingLabel, { color: '#b45309' }]}>15–30 DAYS</Text>
-              <Text style={[styles.agingVal, { color: '#92400e' }]}>
-                ₹{data.aging ? (data.aging.under30 / 100000).toFixed(1) : '5.4'}L
-              </Text>
-              <Text style={[styles.agingBadge, { color: '#b45309' }]}>Follow-up</Text>
-            </View>
-
-            <View style={[styles.agingCard, { backgroundColor: '#fff1f2', borderColor: '#fecdd3' }]}>
-              <Text style={[styles.agingLabel, { color: '#be123c' }]}>&gt; 30 DAYS</Text>
-              <Text style={[styles.agingVal, { color: '#9f1239' }]}>
-                ₹{data.aging ? (data.aging.over30 / 100000).toFixed(1) : '2.0'}L
-              </Text>
-              <Text style={[styles.agingBadge, { color: '#be123c' }]}>Action Due</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* 7. HARDWARE SUPPLY CHAIN & RUNWAY */}
-        <View style={styles.sectionCard}>
-          <View style={styles.sectionTitleRow}>
-            <View>
-              <Text style={styles.sectionHeaderTitle}>HARDWARE STOCK RUNWAY</Text>
-              <Text style={styles.sectionHeaderSub}>Estimated buffer days based on velocity</Text>
-            </View>
-            <TouchableOpacity onPress={() => navigation.navigate('Modules', { screen: 'INVENTORY' })}>
-              <Text style={styles.sectionLinkText}>Stock Ledger →</Text>
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.inventoryList}>
-            {inventoryRunway.map((item, idx) => (
-              <View key={item.item || idx} style={styles.inventoryRow}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.inventoryItemTitle} numberOfLines={1}>{item.item}</Text>
-                  <Text style={styles.inventoryStockText}>{item.stock}</Text>
-                </View>
+            <View style={styles.editorialList}>
+              {activeStreamItems.map((item, idx) => (
                 <View
+                  key={item.id || idx}
                   style={[
-                    styles.runwayBadge,
-                    {
-                      backgroundColor: item.status === 'Reorder Soon' ? '#fef3c7' : '#ecfdf5',
-                      borderColor: item.status === 'Reorder Soon' ? '#fde68a' : '#a7f3d0',
-                    },
+                    styles.editorialRow,
+                    idx === activeStreamItems.length - 1 && { borderBottomWidth: 0 },
                   ]}
                 >
-                  <Text
-                    style={[
-                      styles.runwayBadgeText,
-                      { color: item.status === 'Reorder Soon' ? '#b45309' : '#047857' },
-                    ]}
-                  >
-                    {item.runway} Days
+                  <View style={[styles.editorialAvatar, { backgroundColor: item.avatarBg || '#eff6ff' }]}>
+                    <Text style={[styles.editorialAvatarText, { color: item.avatarColor || '#0066FF' }]}>
+                      {item.name ? item.name.charAt(0).toUpperCase() : 'S'}
+                    </Text>
+                  </View>
+
+                  <View style={styles.editorialRowMeta}>
+                    <View style={styles.editorialNameRow}>
+                      <Text style={styles.editorialRowName} numberOfLines={1}>{item.name}</Text>
+                      <View style={[styles.stageBadgePill, { backgroundColor: item.stageBg || '#eff6ff' }]}>
+                        <Text style={[styles.stageBadgeText, { color: item.stageColor || '#0066FF' }]}>
+                          {item.stage}
+                        </Text>
+                      </View>
+                    </View>
+                    <Text style={styles.editorialRowSub} numberOfLines={1}>
+                      ⚡ {item.capacity} kWp • 📍 {item.city} • ₹{(item.value || 185000).toLocaleString('en-IN')}
+                    </Text>
+                  </View>
+
+                  <View style={styles.editorialActionsGroup}>
+                    <TouchableOpacity
+                      style={styles.editorialActionBtn}
+                      onPress={() => handlePhoneCall(item.mobile)}
+                      activeOpacity={0.7}
+                      accessibilityLabel="Call"
+                    >
+                      <Phone size={13} color="#0f172a" />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.editorialActionBtn, { backgroundColor: '#dcfce7' }]}
+                      onPress={() => handleWhatsAppDirect(item)}
+                      activeOpacity={0.7}
+                      accessibilityLabel="WhatsApp"
+                    >
+                      <MessageCircle size={13} color="#15803d" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ))}
+            </View>
+          </View>
+
+          {/* 2C. Solar EPC Execution Pipeline (Connected Workflow Ribbon) */}
+          <View style={styles.epcRibbonSection}>
+            <View style={styles.sectionTitleRow}>
+              <View>
+                <Text style={styles.openSectionLabel}>SOLAR EPC EXECUTION PIPELINE</Text>
+                <Text style={styles.openSectionSub}>End-to-end milestone throughput</Text>
+              </View>
+              <TouchableOpacity onPress={() => navigation.navigate('Projects')} activeOpacity={0.7}>
+                <Text style={styles.sectionActionText}>All Projects →</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.epcRibbonScroll}
+            >
+              <TouchableOpacity
+                style={styles.epcStepNode}
+                onPress={() => navigation.navigate('Pipeline')}
+                activeOpacity={0.8}
+              >
+                <View style={styles.epcStepTop}>
+                  <Text style={styles.epcStepNum}>01</Text>
+                  <Users size={14} color="#0284c7" />
+                </View>
+                <Text style={styles.epcStepValue}>{data.totalLeads}</Text>
+                <Text style={styles.epcStepTitle}>Leads</Text>
+                <Text style={styles.epcStepSub}>Inbound</Text>
+              </TouchableOpacity>
+
+              <View style={styles.epcStepArrow}>
+                <ChevronRight size={14} color="#cbd5e1" />
+              </View>
+
+              <TouchableOpacity
+                style={styles.epcStepNode}
+                onPress={() => navigation.navigate('Modules', { screen: 'SURVEYS' })}
+                activeOpacity={0.8}
+              >
+                <View style={styles.epcStepTop}>
+                  <Text style={styles.epcStepNum}>02</Text>
+                  <MapPin size={14} color="#d97706" />
+                </View>
+                <Text style={styles.epcStepValue}>{data.totalCustomers}</Text>
+                <Text style={styles.epcStepTitle}>Surveys</Text>
+                <Text style={styles.epcStepSub}>Verified</Text>
+              </TouchableOpacity>
+
+              <View style={styles.epcStepArrow}>
+                <ChevronRight size={14} color="#cbd5e1" />
+              </View>
+
+              <TouchableOpacity
+                style={styles.epcStepNode}
+                onPress={() => navigation.navigate('QuickQuote')}
+                activeOpacity={0.8}
+              >
+                <View style={styles.epcStepTop}>
+                  <Text style={styles.epcStepNum}>03</Text>
+                  <Zap size={14} color="#7c3aed" />
+                </View>
+                <Text style={styles.epcStepValue}>
+                  {data.totalLeads > 0 ? Math.round(data.totalLeads * 0.7) : 0}
+                </Text>
+                <Text style={styles.epcStepTitle}>Proposals</Text>
+                <Text style={styles.epcStepSub}>Dispatched</Text>
+              </TouchableOpacity>
+
+              <View style={styles.epcStepArrow}>
+                <ChevronRight size={14} color="#cbd5e1" />
+              </View>
+
+              <TouchableOpacity
+                style={styles.epcStepNode}
+                onPress={() => navigation.navigate('Projects')}
+                activeOpacity={0.8}
+              >
+                <View style={styles.epcStepTop}>
+                  <Text style={styles.epcStepNum}>04</Text>
+                  <Briefcase size={14} color="#2563eb" />
+                </View>
+                <Text style={styles.epcStepValue}>{data.totalProjects}</Text>
+                <Text style={styles.epcStepTitle}>Erection</Text>
+                <Text style={styles.epcStepSub}>On-site</Text>
+              </TouchableOpacity>
+
+              <View style={styles.epcStepArrow}>
+                <ChevronRight size={14} color="#cbd5e1" />
+              </View>
+
+              <TouchableOpacity
+                style={styles.epcStepNode}
+                onPress={() => navigation.navigate('Modules', { screen: 'SUBSIDY' })}
+                activeOpacity={0.8}
+              >
+                <View style={styles.epcStepTop}>
+                  <Text style={styles.epcStepNum}>05</Text>
+                  <Landmark size={14} color="#059669" />
+                </View>
+                <Text style={styles.epcStepValue}>{data.pendingInvoices}</Text>
+                <Text style={styles.epcStepTitle}>DBT Subsidies</Text>
+                <Text style={styles.epcStepSub}>Clearing</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+
+          {/* 2D. Cashflow & Capital Realization Waterfall (Open Clean Composition) */}
+          <View style={styles.cashflowSection}>
+            <View style={styles.sectionTitleRow}>
+              <View>
+                <Text style={styles.openSectionLabel}>CASHFLOW & CAPITAL REALIZATION</Text>
+                <Text style={styles.openSectionSub}>Order book collections & receivables aging</Text>
+              </View>
+              <View style={styles.orderBookPill}>
+                <Text style={styles.orderBookPillText}>Order Book: ₹{totalRevenueLakhs}L</Text>
+              </View>
+            </View>
+
+            <View style={styles.waterfallStack}>
+              <View style={styles.waterfallBarItem}>
+                <View style={styles.waterfallBarRow}>
+                  <Text style={styles.waterfallBarLabel}>Advances Collected</Text>
+                  <Text style={[styles.waterfallBarVal, { color: '#059669' }]}>
+                    ₹{totalCollectedLakhs}L ({collectedPct}%)
                   </Text>
                 </View>
-              </View>
-            ))}
-          </View>
-        </View>
-
-        {/* 8. PM SURYA GHAR NATIONAL PORTAL SUBSIDY TRACKER */}
-        <View style={styles.sectionCard}>
-          <View style={styles.sectionTitleRow}>
-            <View>
-              <Text style={styles.sectionHeaderTitle}>PM SURYA GHAR: MUFT BIJLI YOJANA</Text>
-              <Text style={styles.sectionHeaderSub}>Direct Benefit Transfer (DBT) progress</Text>
-            </View>
-            <View style={styles.subsidyMaxPill}>
-              <Text style={styles.subsidyMaxPillText}>₹78,000 / Site</Text>
-            </View>
-          </View>
-
-          <View style={styles.subsidyStepsList}>
-            {subsidyFunnel.map((step) => (
-              <View key={step.step} style={styles.subsidyStepRow}>
-                <View style={styles.subsidyStepNumBadge}>
-                  <Text style={styles.subsidyStepNumText}>{step.step}</Text>
-                </View>
-                <View style={{ flex: 1, marginLeft: 10 }}>
-                  <Text style={styles.subsidyStepTitle}>{step.title}</Text>
-                  <Text style={styles.subsidyStepSub}>{step.status}</Text>
-                </View>
-                <View style={{ alignItems: 'flex-end' }}>
-                  <Text style={styles.subsidyStepCount}>{step.count} Consumers</Text>
-                  <Text style={styles.subsidyStepAmt}>{step.amount}</Text>
+                <View style={styles.progressTrack}>
+                  <View style={[styles.progressFill, { width: `${collectedPct}%`, backgroundColor: '#10b981' }]} />
                 </View>
               </View>
-            ))}
-          </View>
-        </View>
 
-        {/* 9. SOLAR FLEET ENVIRONMENTAL & CARBON OFFSET TELEMETRY */}
-        <View style={styles.environmentalCard}>
-          <View style={styles.envHeader}>
-            <View style={styles.envIconBadge}>
-              <Leaf size={16} color="#34d399" />
-            </View>
-            <View style={{ flex: 1, marginLeft: 10 }}>
-              <Text style={styles.envTitle}>Solar Fleet Environmental Telemetry</Text>
-              <Text style={styles.envSub}>Clean energy generated & fossil emissions displaced</Text>
-            </View>
-          </View>
-
-          <View style={styles.envGrid}>
-            <View style={styles.envGridItem}>
-              <View style={styles.envItemTop}>
-                <Sun size={14} color="#f59e0b" />
-                <Text style={styles.envItemLabel}>CLEAN ENERGY</Text>
+              <View style={styles.waterfallBarItem}>
+                <View style={styles.waterfallBarRow}>
+                  <Text style={styles.waterfallBarLabel}>Milestone Receivables</Text>
+                  <Text style={[styles.waterfallBarVal, { color: '#d97706' }]}>
+                    ₹{outstandingLakhs}L ({outstandingPct}%)
+                  </Text>
+                </View>
+                <View style={styles.progressTrack}>
+                  <View style={[styles.progressFill, { width: `${outstandingPct}%`, backgroundColor: '#f59e0b' }]} />
+                </View>
               </View>
-              <Text style={styles.envItemVal}>{cleanEnergyMWh} MWh</Text>
-              <Text style={styles.envItemSub}>This Month (+18.4%)</Text>
+
+              <View style={styles.waterfallBarItem}>
+                <View style={styles.waterfallBarRow}>
+                  <Text style={styles.waterfallBarLabel}>National DBT Subsidy Claims</Text>
+                  <Text style={[styles.waterfallBarVal, { color: '#0066FF' }]}>
+                    {subsidyFunnel[3]?.amount || '₹7.02 Lakhs'}
+                  </Text>
+                </View>
+                <View style={styles.progressTrack}>
+                  <View style={[styles.progressFill, { width: '45%', backgroundColor: '#0066FF' }]} />
+                </View>
+              </View>
             </View>
 
-            <View style={styles.envGridItem}>
-              <View style={styles.envItemTop}>
-                <Leaf size={14} color="#10b981" />
+            {/* Dense 3-Segment Aging Strip */}
+            <View style={styles.agingSegmentedRow}>
+              <View style={[styles.agingPillItem, { backgroundColor: '#f8fafc', borderColor: '#e2e8f0' }]}>
+                <Text style={styles.agingPillLabel}>&lt; 15 DAYS</Text>
+                <Text style={styles.agingPillVal}>
+                  ₹{data.aging ? (data.aging.under15 / 100000).toFixed(1) : '11.2'}L
+                </Text>
+                <Text style={[styles.agingPillStatus, { color: '#059669' }]}>On Track</Text>
+              </View>
+              <View style={[styles.agingPillItem, { backgroundColor: '#fffbeb', borderColor: '#fde68a' }]}>
+                <Text style={[styles.agingPillLabel, { color: '#b45309' }]}>15–30 DAYS</Text>
+                <Text style={[styles.agingPillVal, { color: '#92400e' }]}>
+                  ₹{data.aging ? (data.aging.under30 / 100000).toFixed(1) : '5.4'}L
+                </Text>
+                <Text style={[styles.agingPillStatus, { color: '#b45309' }]}>Follow-up</Text>
+              </View>
+              <View style={[styles.agingPillItem, { backgroundColor: '#fff1f2', borderColor: '#fecdd3' }]}>
+                <Text style={[styles.agingPillLabel, { color: '#be123c' }]}>&gt; 30 DAYS</Text>
+                <Text style={[styles.agingPillVal, { color: '#9f1239' }]}>
+                  ₹{data.aging ? (data.aging.over30 / 100000).toFixed(1) : '2.0'}L
+                </Text>
+                <Text style={[styles.agingPillStatus, { color: '#be123c' }]}>Action Due</Text>
+              </View>
+            </View>
+          </View>
+
+          {/* 2E. Period Horizon Comparative Velocity Engine */}
+          <View style={styles.horizonSection}>
+            <View style={styles.sectionTitleRow}>
+              <View>
+                <Text style={styles.openSectionLabel}>PERIOD COMPARATIVE VELOCITY</Text>
+                <Text style={styles.openSectionSub}>{activeHorizonConfig.label}</Text>
+              </View>
+            </View>
+
+            {/* Horizon Horizon Tabs */}
+            <View style={styles.horizonTabsRow}>
+              {(['monthly', 'quarterly', 'halfAnnual', 'annual'] as HorizonType[]).map((h) => {
+                const active = periodHorizon === h;
+                const labels: Record<HorizonType, string> = {
+                  monthly: 'Monthly',
+                  quarterly: 'Quarterly',
+                  halfAnnual: 'Half-Annual',
+                  annual: 'Annual',
+                };
+                return (
+                  <TouchableOpacity
+                    key={h}
+                    style={[styles.horizonTabBtn, active && styles.horizonTabBtnActive]}
+                    onPress={() => setPeriodHorizon(h)}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[styles.horizonTabBtnText, active && styles.horizonTabBtnTextActive]}>
+                      {labels[h]}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {/* Metric Filter Buttons */}
+            <View style={styles.metricFilterRow}>
+              {(['both', 'clients', 'revenue'] as FocusMetric[]).map((f) => {
+                const active = horizonMetricFocus === f;
+                const labels: Record<FocusMetric, string> = {
+                  both: 'Both Metrics',
+                  clients: 'Clients',
+                  revenue: 'Revenue ₹',
+                };
+                return (
+                  <TouchableOpacity
+                    key={f}
+                    style={[styles.metricFilterBtn, active && styles.metricFilterBtnActive]}
+                    onPress={() => setHorizonMetricFocus(f)}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[styles.metricFilterBtnText, active && styles.metricFilterBtnTextActive]}>
+                      {labels[f]}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {/* Horizon Summary Strip */}
+            <View style={styles.horizonStatsGrid}>
+              <View style={styles.horizonStatItem}>
+                <Text style={styles.horizonStatLabel}>CLIENTS</Text>
+                <Text style={styles.horizonStatVal}>{totalHorizonClients}</Text>
+                <Text style={styles.horizonStatHint}>Commissioned</Text>
+              </View>
+              <View style={styles.horizonStatDivider} />
+              <View style={styles.horizonStatItem}>
+                <Text style={styles.horizonStatLabel}>REVENUE</Text>
+                <Text style={[styles.horizonStatVal, { color: '#059669' }]}>₹{totalHorizonRevenue}L</Text>
+                <Text style={styles.horizonStatHint}>Realized</Text>
+              </View>
+              <View style={styles.horizonStatDivider} />
+              <View style={styles.horizonStatItem}>
+                <Text style={styles.horizonStatLabel}>AVG DEAL</Text>
+                <Text style={[styles.horizonStatVal, { color: '#0066FF' }]}>₹{avgHorizonDeal}L</Text>
+                <Text style={styles.horizonStatHint}>Per Site</Text>
+              </View>
+              <View style={styles.horizonStatDivider} />
+              <View style={styles.horizonStatItem}>
+                <Text style={styles.horizonStatLabel}>CAPACITY</Text>
+                <Text style={[styles.horizonStatVal, { color: '#7c3aed' }]}>{totalHorizonCapacity}k</Text>
+                <Text style={styles.horizonStatHint}>kWp Total</Text>
+              </View>
+            </View>
+
+            {/* Native Bar Trajectory Chart */}
+            <View style={styles.chartArea}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chartColumnsScroll}>
+                {activeHorizonData.map((item, idx) => {
+                  const clientHeightPct = Math.max(12, Math.round((item.clients / maxClientsVal) * 100));
+                  const revenueHeightPct = Math.max(12, Math.round((item.revenue / maxRevenueVal) * 100));
+
+                  return (
+                    <View key={item.period || idx} style={styles.chartColumnGroup}>
+                      <View style={styles.chartBarsPair}>
+                        {(horizonMetricFocus === 'both' || horizonMetricFocus === 'clients') && (
+                          <View style={styles.singleBarWrapper}>
+                            <Text style={styles.barTopLabel}>{item.clients}</Text>
+                            <View
+                              style={[
+                                styles.chartBar,
+                                { height: clientHeightPct, backgroundColor: '#0284c7' },
+                              ]}
+                            />
+                          </View>
+                        )}
+
+                        {(horizonMetricFocus === 'both' || horizonMetricFocus === 'revenue') && (
+                          <View style={styles.singleBarWrapper}>
+                            <Text style={styles.barTopLabel}>₹{item.revenue}</Text>
+                            <View
+                              style={[
+                                styles.chartBar,
+                                { height: revenueHeightPct, backgroundColor: '#10b981' },
+                              ]}
+                            />
+                          </View>
+                        )}
+                      </View>
+                      <Text style={styles.chartColumnXLabel} numberOfLines={1}>{item.period}</Text>
+                    </View>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          </View>
+
+          {/* 2F. Dual Section: National Portal Subsidy & Hardware Runway */}
+          <View style={styles.dualSection}>
+            {/* Left: National Portal Subsidy Progress */}
+            <View style={styles.dualSectionHalf}>
+              <View style={styles.sectionTitleRow}>
+                <Text style={styles.openSectionLabel}>PM SURYA GHAR DBT</Text>
+                <View style={styles.subsidyMaxPill}>
+                  <Text style={styles.subsidyMaxPillText}>₹78k/Site</Text>
+                </View>
+              </View>
+
+              <View style={styles.subsidyStepsList}>
+                {subsidyFunnel.map((step) => (
+                  <View key={step.step} style={styles.subsidyStepRow}>
+                    <View style={styles.subsidyStepNumBadge}>
+                      <Text style={styles.subsidyStepNumText}>{step.step}</Text>
+                    </View>
+                    <View style={{ flex: 1, marginLeft: 8 }}>
+                      <Text style={styles.subsidyStepTitle} numberOfLines={1}>{step.title}</Text>
+                      <Text style={styles.subsidyStepSub}>{step.count} Sites • {step.amount}</Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            </View>
+
+            {/* Right: Hardware Stock Runway */}
+            <View style={styles.dualSectionHalf}>
+              <View style={styles.sectionTitleRow}>
+                <Text style={styles.openSectionLabel}>HARDWARE RUNWAY</Text>
+                <TouchableOpacity onPress={() => navigation.navigate('Modules', { screen: 'INVENTORY' })}>
+                  <Text style={styles.sectionActionText}>Ledger →</Text>
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.inventoryList}>
+                {inventoryRunway.map((item, idx) => (
+                  <View key={item.item || idx} style={styles.inventoryRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.inventoryItemTitle} numberOfLines={1}>{item.item}</Text>
+                      <Text style={styles.inventoryStockText} numberOfLines={1}>{item.stock}</Text>
+                    </View>
+                    <View
+                      style={[
+                        styles.runwayBadge,
+                        {
+                          backgroundColor: item.status === 'Reorder Soon' ? '#fef3c7' : '#ecfdf5',
+                          borderColor: item.status === 'Reorder Soon' ? '#fde68a' : '#a7f3d0',
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.runwayBadgeText,
+                          { color: item.status === 'Reorder Soon' ? '#b45309' : '#047857' },
+                        ]}
+                      >
+                        {item.runway}d
+                      </Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            </View>
+          </View>
+
+          {/* 2G. Solar Fleet Environmental & Carbon Offset Telemetry */}
+          <View style={styles.environmentalZone}>
+            <View style={styles.envHeader}>
+              <View style={styles.envIconBadge}>
+                <Leaf size={16} color="#34d399" />
+              </View>
+              <View style={{ flex: 1, marginLeft: 10 }}>
+                <Text style={styles.envTitle}>Solar Fleet Environmental Offset</Text>
+                <Text style={styles.envSub}>Clean green kilowatt-hours & emissions displaced</Text>
+              </View>
+            </View>
+
+            <View style={styles.envGrid}>
+              <View style={styles.envGridItem}>
+                <Text style={styles.envItemLabel}>CLEAN POWER</Text>
+                <Text style={styles.envItemVal}>{cleanEnergyMWh} MWh</Text>
+                <Text style={styles.envItemSub}>This Month (+18%)</Text>
+              </View>
+              <View style={styles.envGridItem}>
                 <Text style={styles.envItemLabel}>CO₂ MITIGATED</Text>
+                <Text style={styles.envItemVal}>{co2Tons} T</Text>
+                <Text style={styles.envItemSub}>Fossil Offset</Text>
               </View>
-              <Text style={styles.envItemVal}>{co2Tons} Tons</Text>
-              <Text style={styles.envItemSub}>Emissions Saved</Text>
-            </View>
-
-            <View style={styles.envGridItem}>
-              <View style={styles.envItemTop}>
-                <Globe size={14} color="#38bdf8" />
+              <View style={styles.envGridItem}>
                 <Text style={styles.envItemLabel}>COAL SAVED</Text>
+                <Text style={styles.envItemVal}>{coalTons} T</Text>
+                <Text style={styles.envItemSub}>Avoided Burn</Text>
               </View>
-              <Text style={styles.envItemVal}>{coalTons} Tons</Text>
-              <Text style={styles.envItemSub}>Fossil Burning</Text>
-            </View>
-
-            <View style={styles.envGridItem}>
-              <View style={styles.envItemTop}>
-                <Award size={14} color="#a7f3d0" />
+              <View style={styles.envGridItem}>
                 <Text style={styles.envItemLabel}>TREES OFFSET</Text>
+                <Text style={styles.envItemVal}>{treesCount}</Text>
+                <Text style={styles.envItemSub}>Forest Impact</Text>
               </View>
-              <Text style={styles.envItemVal}>{treesCount}</Text>
-              <Text style={styles.envItemSub}>Forest Equivalent</Text>
             </View>
           </View>
+
         </View>
-
-        {/* 10. SYSTEM HEALTH METRIC CARDS */}
-        <View style={styles.systemHealthRow}>
-          <TouchableOpacity
-            style={styles.systemHealthCard}
-            onPress={() => navigation.navigate('Modules', { screen: 'SERVICE' })}
-            activeOpacity={0.8}
-          >
-            <ShieldCheck size={20} color="#059669" />
-            <Text style={styles.systemHealthNumber}>{data.openTickets} Open</Text>
-            <Text style={styles.systemHealthLabel}>AMC & Service Tickets</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.systemHealthCard}
-            onPress={() => navigation.navigate('Modules', { screen: 'INVENTORY' })}
-            activeOpacity={0.8}
-          >
-            <Package size={20} color="#0066FF" />
-            <Text style={styles.systemHealthNumber}>Healthy</Text>
-            <Text style={styles.systemHealthLabel}>Warehouse Stock</Text>
-          </TouchableOpacity>
-        </View>
-
       </ScrollView>
+
+      {/* =====================================================================
+          FLOATING OPERATIONAL ACTION CONTROLS (Always Accessible)
+      ===================================================================== */}
+      <View style={styles.floatingCommandBar}>
+        <TouchableOpacity
+          style={styles.floatingActionPrimary}
+          onPress={() => navigation.navigate('QuickQuote')}
+          activeOpacity={0.85}
+        >
+          <Zap size={14} color="#fbbf24" style={{ marginRight: 5 }} />
+          <Text style={styles.floatingActionPrimaryText}>60s Quote</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.floatingActionSecondary}
+          onPress={() => navigation.navigate('Pipeline')}
+          activeOpacity={0.85}
+        >
+          <Plus size={14} color="#0066FF" style={{ marginRight: 5 }} />
+          <Text style={styles.floatingActionSecondaryText}>New Lead</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.floatingActionSecondary}
+          onPress={() => navigation.navigate('Modules', { screen: 'SURVEYS' })}
+          activeOpacity={0.85}
+        >
+          <MapPin size={14} color="#d97706" style={{ marginRight: 5 }} />
+          <Text style={styles.floatingActionSecondaryText}>Survey</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.floatingActionSecondary}
+          onPress={() => navigation.navigate('Finance')}
+          activeOpacity={0.85}
+        >
+          <Receipt size={14} color="#059669" style={{ marginRight: 5 }} />
+          <Text style={styles.floatingActionSecondaryText}>Invoice</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 };
@@ -1065,43 +1052,36 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#091326', // Deep slate ground matching the canopy
   },
   scroll: {
     flex: 1,
   },
   scrollContent: {
-    padding: 16,
     paddingBottom: Platform.OS === 'ios' ? 120 : 100,
   },
 
-  // 1. WhereReady Field Experience - Today's Operational Dispatch Hero (Uber-inspired)
-  dispatchHeroCard: {
-    backgroundColor: '#0f172a',
-    borderRadius: 24,
-    padding: 20,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#1e293b',
-    shadowColor: '#0f172a',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 12,
-    elevation: 4,
+  // ---------------------------------------------------------------------------
+  // ZONE 1: OPERATIONAL RADAR CANOPY (Deep Slate #091326 Edge-to-Edge)
+  // ---------------------------------------------------------------------------
+  operationalCanopy: {
+    backgroundColor: '#091326',
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 22,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
   },
-  dispatchHeroTop: {
+  radarHeroRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
+    alignItems: 'flex-start',
+    marginBottom: 16,
   },
-  dispatchPill: {
+  radarBadgeRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    paddingHorizontal: 9,
-    paddingVertical: 4,
-    borderRadius: 12,
+    marginBottom: 6,
   },
   pulseDot: {
     width: 6,
@@ -1110,129 +1090,174 @@ const styles = StyleSheet.create({
     backgroundColor: '#34d399',
     marginRight: 6,
   },
-  dispatchPillText: {
+  radarBadgeText: {
     fontSize: 9,
     fontWeight: '800',
     color: '#94a3b8',
     letterSpacing: 0.8,
   },
-  dispatchDateText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#64748b',
-  },
-  dispatchHeadline: {
-    fontSize: 20,
+  radarHugeFigure: {
+    fontSize: 34,
     fontWeight: '900',
     color: '#ffffff',
-    letterSpacing: -0.3,
-    marginBottom: 4,
+    letterSpacing: -0.6,
+    lineHeight: 38,
   },
-  dispatchSubline: {
+  radarSubline: {
     fontSize: 12,
     fontWeight: '500',
     color: '#94a3b8',
-    marginBottom: 16,
+    marginTop: 4,
   },
-  priorityBox: {
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+  radarQuickQuoteBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.09)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.16)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 14,
+    marginTop: 4,
+  },
+  radarQuickQuoteText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#ffffff',
+  },
+
+  // 1B. Immediate Attention Hero Tile
+  urgentActionTile: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.12)',
-    borderRadius: 16,
-    padding: 12,
+    borderRadius: 18,
+    padding: 14,
+    marginBottom: 16,
+  },
+  urgentHeaderRow: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    gap: 10,
+    alignItems: 'center',
+    marginBottom: 8,
   },
-  priorityBoxLeft: {
-    flex: 1,
-  },
-  priorityTagRow: {
+  urgentTag: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    marginBottom: 2,
+    gap: 5,
   },
-  priorityLabel: {
+  urgentTagText: {
     fontSize: 9,
     fontWeight: '800',
     color: '#fbbf24',
-    letterSpacing: 0.5,
+    letterSpacing: 0.6,
   },
-  priorityTitle: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#f8fafc',
+  urgentTimeAgo: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#64748b',
   },
-  actionBtnPrimary: {
+  urgentCustomerInfo: {
+    marginBottom: 12,
+  },
+  urgentCustomerName: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#ffffff',
+    marginBottom: 3,
+  },
+  urgentCustomerMeta: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: '#94a3b8',
+    marginBottom: 4,
+  },
+  urgentCustomerSubsidy: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#34d399',
+  },
+  urgentActionButtonsRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 8,
+  },
+  urgentCallBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: '#0066FF',
-    paddingHorizontal: 14,
     paddingVertical: 9,
     borderRadius: 12,
-    shadowColor: '#0066FF',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.4,
-    shadowRadius: 4,
-    elevation: 3,
   },
-  actionBtnPrimaryText: {
+  urgentCallBtnText: {
     fontSize: 12,
     fontWeight: '800',
     color: '#ffffff',
   },
-
-  // 2. Fast Discoverability Toolkit (Blinkit-inspired)
-  speedSection: {
-    marginBottom: 16,
-  },
-  sectionHeaderTitle: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#64748b',
-    letterSpacing: 0.8,
-    marginBottom: 10,
-  },
-  speedScroll: {
-    flexDirection: 'row',
-    gap: 8,
-    paddingRight: 16,
-  },
-  speedPill: {
+  urgentPitchBtn: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    paddingHorizontal: 14,
+    justifyContent: 'center',
+    backgroundColor: '#dcfce7',
     paddingVertical: 9,
-    borderRadius: 14,
-    shadowColor: '#0f172a',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 3,
-    elevation: 1,
+    borderRadius: 12,
   },
-  speedPillPrimary: {
-    backgroundColor: '#091326',
-    borderColor: '#1e293b',
-  },
-  speedPillText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#334155',
-  },
-  speedPillTextPrimary: {
+  urgentPitchBtnText: {
     fontSize: 12,
     fontWeight: '800',
-    color: '#ffffff',
+    color: '#15803d',
+  },
+  urgentDetailBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 
-  // 3. Live Customer Outreach & Activity Stream (Instagram-inspired)
-  streamSection: {
-    marginBottom: 16,
+  // 1C. Asymmetric Hairline Pulse Strip
+  pulseStrip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(0, 0, 0, 0.25)',
+    borderRadius: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+  },
+  pulseItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  pulseNum: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#ffffff',
+  },
+  pulseLabel: {
+    fontSize: 8,
+    fontWeight: '700',
+    color: '#94a3b8',
+    marginTop: 2,
+  },
+  pulseHairline: {
+    width: 1,
+    height: 22,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+
+  // ---------------------------------------------------------------------------
+  // ZONE 2: EXECUTION FLOOR (Crisp Polar White #f8fafc)
+  // ---------------------------------------------------------------------------
+  executionFloor: {
+    backgroundColor: '#f8fafc',
+    paddingHorizontal: 16,
+    paddingTop: 18,
+    gap: 20,
   },
   sectionTitleRow: {
     flexDirection: 'row',
@@ -1240,512 +1265,235 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     marginBottom: 10,
   },
-  sectionHeaderSub: {
-    fontSize: 11,
+  openSectionLabel: {
+    fontSize: 10,
+    fontWeight: '800',
     color: '#64748b',
+    letterSpacing: 0.8,
+  },
+  openSectionSub: {
+    fontSize: 11,
+    color: '#94a3b8',
     marginTop: 2,
   },
-  sectionLinkText: {
+  sectionActionText: {
     fontSize: 11,
     fontWeight: '800',
     color: '#0066FF',
   },
-  streamCard: {
+  sectionActionTextBtn: {},
+
+  // 2A. Field Dispatch & Workday Thread
+  workdaySection: {},
+  timelineScroll: {
+    flexDirection: 'row',
+    gap: 10,
+    paddingRight: 16,
+  },
+  timelineNode: {
+    width: 175,
     backgroundColor: '#ffffff',
     borderWidth: 1,
     borderColor: '#e2e8f0',
-    borderRadius: 20,
-    paddingHorizontal: 14,
-    shadowColor: '#0f172a',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.03,
-    shadowRadius: 6,
-    elevation: 1,
+    borderRadius: 16,
+    padding: 12,
   },
-  streamRow: {
+  timelineNodeDone: {
+    borderColor: '#a7f3d0',
+    backgroundColor: '#f0fdf4',
+  },
+  timelineNodeActive: {
+    borderColor: '#bfdbfe',
+    backgroundColor: '#eff6ff',
+  },
+  timelineNodeTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 6,
+  },
+  timelineDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  timelineTime: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#64748b',
+  },
+  timelineTitle: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#0f172a',
+    marginBottom: 2,
+  },
+  timelineMeta: {
+    fontSize: 10,
+    color: '#64748b',
+    marginBottom: 8,
+  },
+  timelineStatusPillDone: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#dcfce7',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  timelineStatusTextDone: {
+    fontSize: 8,
+    fontWeight: '800',
+    color: '#15803d',
+  },
+  timelineStatusPillActive: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#dbeafe',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  timelineStatusTextActive: {
+    fontSize: 8,
+    fontWeight: '800',
+    color: '#1d4ed8',
+  },
+  timelineStatusPillNext: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#f1f5f9',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  timelineStatusTextNext: {
+    fontSize: 8,
+    fontWeight: '800',
+    color: '#64748b',
+  },
+
+  // 2B. Live Customer Pipeline (Open Editorial Rows)
+  editorialStreamSection: {},
+  editorialList: {
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 18,
+    paddingHorizontal: 12,
+  },
+  editorialRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#f1f5f9',
-    gap: 12,
+    gap: 10,
   },
-  streamAvatar: {
-    width: 38,
-    height: 38,
+  editorialAvatar: {
+    width: 36,
+    height: 36,
     borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  streamAvatarText: {
-    fontSize: 14,
+  editorialAvatarText: {
+    fontSize: 13,
     fontWeight: '900',
   },
-  streamMeta: {
+  editorialRowMeta: {
     flex: 1,
   },
-  streamNameRow: {
+  editorialNameRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    marginBottom: 3,
+    marginBottom: 2,
   },
-  streamName: {
+  editorialRowName: {
     fontSize: 13,
     fontWeight: '800',
     color: '#0f172a',
     flexShrink: 1,
   },
-  streamStageBadge: {
+  stageBadgePill: {
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 6,
   },
-  streamStageText: {
+  stageBadgeText: {
     fontSize: 8,
     fontWeight: '800',
-    letterSpacing: 0.3,
   },
-  streamSub: {
+  editorialRowSub: {
     fontSize: 11,
-    fontWeight: '500',
     color: '#64748b',
   },
-  streamActions: {
+  editorialActionsGroup: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
   },
-  microActionBtn: {
+  editorialActionBtn: {
     width: 30,
     height: 30,
-    borderRadius: 9,
+    borderRadius: 10,
     backgroundColor: '#f1f5f9',
     justifyContent: 'center',
     alignItems: 'center',
   },
 
-  // 4. Unified Performance Strip
-  kpiStripCard: {
-    backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    borderRadius: 20,
-    paddingVertical: 14,
-    paddingHorizontal: 12,
+  // 2C. Solar EPC Execution Pipeline (Connected Workflow Ribbon)
+  epcRibbonSection: {},
+  epcRibbonScroll: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-    shadowColor: '#0f172a',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    elevation: 1,
-  },
-  kpiStripCol: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  kpiStripLabel: {
-    fontSize: 8,
-    fontWeight: '800',
-    color: '#64748b',
-    letterSpacing: 0.6,
-    marginBottom: 2,
-  },
-  kpiStripVal: {
-    fontSize: 14,
-    fontWeight: '900',
-    color: '#0f172a',
-  },
-  kpiStripHint: {
-    fontSize: 8,
-    fontWeight: '600',
-    color: '#94a3b8',
-    marginTop: 1,
-  },
-  kpiStripDivider: {
-    width: 1,
-    height: 28,
-    backgroundColor: '#f1f5f9',
-  },
-
-  // 3. Ticker Cards
-  tickerScroll: {
-    flexDirection: 'row',
-    gap: 12,
+    gap: 8,
     paddingRight: 16,
-    marginBottom: 16,
   },
-  tickerCard: {
-    width: 200,
+  epcStepNode: {
     backgroundColor: '#ffffff',
     borderWidth: 1,
     borderColor: '#e2e8f0',
-    borderRadius: 20,
-    padding: 16,
-    shadowColor: '#0f172a',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  tickerTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  tickerLabel: {
-    fontSize: 9,
-    fontWeight: '800',
-    color: '#64748b',
-    letterSpacing: 0.6,
-  },
-  tickerIconBox: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  tickerValue: {
-    fontSize: 20,
-    fontWeight: '900',
-    color: '#0f172a',
-    letterSpacing: -0.3,
-    marginVertical: 2,
-  },
-  tickerChangePositive: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#059669',
-  },
-
-  // 4. Horizon Section Card
-  horizonSectionCard: {
-    backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    borderRadius: 24,
-    padding: 18,
-    marginBottom: 16,
-    shadowColor: '#0f172a',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  horizonHeader: {
-    marginBottom: 12,
-  },
-  horizonHeaderLeft: {},
-  horizonPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#eff6ff',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
-    alignSelf: 'flex-start',
-    marginBottom: 6,
-  },
-  horizonPillDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 3,
-    backgroundColor: '#0066FF',
-    marginRight: 5,
-  },
-  horizonPillText: {
-    fontSize: 9,
-    fontWeight: '800',
-    color: '#0066FF',
-    letterSpacing: 0.5,
-  },
-  horizonTitle: {
-    fontSize: 16,
-    fontWeight: '900',
-    color: '#0f172a',
-    letterSpacing: -0.3,
-  },
-  horizonSub: {
-    fontSize: 11,
-    color: '#64748b',
-    marginTop: 2,
-  },
-
-  horizonTabsContainer: {
-    flexDirection: 'row',
-    backgroundColor: '#f1f5f9',
-    borderRadius: 14,
-    padding: 3,
-    marginBottom: 10,
-  },
-  horizonTabBtn: {
-    flex: 1,
-    paddingVertical: 8,
-    alignItems: 'center',
-    borderRadius: 11,
-  },
-  horizonTabBtnActive: {
-    backgroundColor: '#ffffff',
-    shadowColor: '#0f172a',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 3,
-    elevation: 1,
-  },
-  horizonTabBtnText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#64748b',
-  },
-  horizonTabBtnTextActive: {
-    color: '#0066FF',
-    fontWeight: '800',
-  },
-
-  metricFilterRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 8,
-    marginBottom: 14,
-  },
-  metricFilterBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
-    backgroundColor: '#f8fafc',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  metricFilterBtnActive: {
-    backgroundColor: '#0066FF',
-    borderColor: '#0066FF',
-  },
-  metricFilterBtnText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#64748b',
-  },
-  metricFilterBtnTextActive: {
-    color: '#ffffff',
-  },
-
-  // Scorecards
-  scorecardsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 16,
-  },
-  scorecardItem: {
-    width: (SCREEN_WIDTH - 32 - 36 - 8) / 2,
-    borderWidth: 1,
     borderRadius: 14,
     padding: 10,
+    width: 90,
   },
-  scorecardLabel: {
-    fontSize: 8,
-    fontWeight: '800',
-    color: '#64748b',
-    letterSpacing: 0.5,
-  },
-  scorecardVal: {
-    fontSize: 17,
-    fontWeight: '900',
-    marginVertical: 2,
-  },
-  scorecardSub: {
-    fontSize: 9,
-    fontWeight: '600',
-    color: '#64748b',
-  },
-
-  // Chart Container
-  chartContainer: {
-    backgroundColor: '#f8fafc',
-    borderRadius: 16,
-    padding: 12,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#f1f5f9',
-  },
-  chartLegendRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 12,
-    marginBottom: 8,
-  },
-  chartLegendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  chartLegendDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 2,
-  },
-  chartLegendText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#475569',
-  },
-  chartColumnsScroll: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: 16,
-    paddingVertical: 8,
-    paddingHorizontal: 4,
-  },
-  chartColumnGroup: {
-    alignItems: 'center',
-    width: 60,
-  },
-  chartBarsPair: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: 4,
-    height: 120,
-  },
-  singleBarWrapper: {
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-  },
-  barTopLabel: {
-    fontSize: 8,
-    fontWeight: '800',
-    color: '#475569',
-    marginBottom: 2,
-  },
-  chartBar: {
-    width: 14,
-    borderTopLeftRadius: 4,
-    borderTopRightRadius: 4,
-  },
-  chartColumnXLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#64748b',
-    marginTop: 6,
-    textAlign: 'center',
-  },
-
-  // Breakdown List
-  breakdownList: {
-    borderTopWidth: 1,
-    borderTopColor: '#f1f5f9',
-    paddingTop: 12,
-  },
-  breakdownHeaderTitle: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#64748b',
-    letterSpacing: 0.6,
-    marginBottom: 8,
-  },
-  breakdownRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 9,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f8fafc',
-  },
-  breakdownPeriodTitle: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#0f172a',
-  },
-  breakdownSubRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 2,
-  },
-  breakdownSubMeta: {
-    fontSize: 10,
-    color: '#64748b',
-  },
-  breakdownRight: {
-    alignItems: 'flex-end',
-  },
-  breakdownClientsVal: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#0284c7',
-  },
-  breakdownRevenueVal: {
-    fontSize: 11,
-    fontWeight: '900',
-    color: '#059669',
-    marginTop: 1,
-  },
-  breakdownStatusPill: {
-    backgroundColor: '#ecfdf5',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-    marginTop: 2,
-  },
-  breakdownStatusText: {
-    fontSize: 8,
-    fontWeight: '800',
-    color: '#059669',
-  },
-
-  // General Section Card
-  sectionCard: {
-    backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    borderRadius: 24,
-    padding: 18,
-    marginBottom: 16,
-    shadowColor: '#0f172a',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    elevation: 2,
-  },
-
-  // 5. Funnel Grid
-  funnelGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  funnelItem: {
-    width: (SCREEN_WIDTH - 32 - 36 - 8) / 2,
-    borderWidth: 1,
-    borderRadius: 14,
-    padding: 12,
-  },
-  funnelItemTop: {
+  epcStepTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 4,
   },
-  funnelStepNum: {
-    fontSize: 11,
+  epcStepNum: {
+    fontSize: 9,
     fontWeight: '900',
+    color: '#94a3b8',
   },
-  funnelItemVal: {
-    fontSize: 20,
+  epcStepValue: {
+    fontSize: 16,
     fontWeight: '900',
     color: '#0f172a',
-    marginVertical: 2,
+    marginVertical: 1,
   },
-  funnelItemLabel: {
+  epcStepTitle: {
     fontSize: 10,
-    fontWeight: '700',
-    color: '#475569',
+    fontWeight: '800',
+    color: '#334155',
+  },
+  epcStepSub: {
+    fontSize: 8,
+    color: '#94a3b8',
+  },
+  epcStepArrow: {
+    paddingHorizontal: 2,
   },
 
-  // 6. Waterfall
+  // 2D. Cashflow Waterfall & Capital Realization
+  cashflowSection: {
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 18,
+    padding: 16,
+  },
   orderBookPill: {
     backgroundColor: '#f1f5f9',
     paddingHorizontal: 8,
@@ -1758,15 +1506,15 @@ const styles = StyleSheet.create({
     color: '#334155',
   },
   waterfallStack: {
-    gap: 12,
-    marginBottom: 16,
+    gap: 10,
+    marginBottom: 14,
   },
   waterfallBarItem: {},
   waterfallBarRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: 3,
   },
   waterfallBarLabel: {
     fontSize: 11,
@@ -1778,97 +1526,211 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   progressTrack: {
-    height: 7,
+    height: 6,
     backgroundColor: '#f1f5f9',
-    borderRadius: 4,
+    borderRadius: 3,
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
-    borderRadius: 4,
+    borderRadius: 3,
   },
-  agingSectionTitle: {
-    fontSize: 9,
-    fontWeight: '800',
-    color: '#64748b',
-    letterSpacing: 0.6,
-    marginBottom: 8,
-    marginTop: 4,
-  },
-  agingGrid: {
+  agingSegmentedRow: {
     flexDirection: 'row',
     gap: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#f1f5f9',
+    paddingTop: 12,
   },
-  agingCard: {
+  agingPillItem: {
     flex: 1,
     borderWidth: 1,
     borderRadius: 12,
-    padding: 10,
+    padding: 8,
     alignItems: 'center',
   },
-  agingLabel: {
+  agingPillLabel: {
     fontSize: 8,
     fontWeight: '800',
     color: '#64748b',
-    letterSpacing: 0.5,
   },
-  agingVal: {
+  agingPillVal: {
+    fontSize: 12,
+    fontWeight: '900',
+    color: '#0f172a',
+    marginVertical: 1,
+  },
+  agingPillStatus: {
+    fontSize: 8,
+    fontWeight: '800',
+  },
+
+  // 2E. Period Horizon Comparative Velocity Engine
+  horizonSection: {
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 18,
+    padding: 16,
+  },
+  horizonTabsRow: {
+    flexDirection: 'row',
+    backgroundColor: '#f1f5f9',
+    borderRadius: 12,
+    padding: 3,
+    marginBottom: 10,
+  },
+  horizonTabBtn: {
+    flex: 1,
+    paddingVertical: 7,
+    alignItems: 'center',
+    borderRadius: 9,
+  },
+  horizonTabBtnActive: {
+    backgroundColor: '#ffffff',
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  horizonTabBtnText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#64748b',
+  },
+  horizonTabBtnTextActive: {
+    color: '#0066FF',
+    fontWeight: '800',
+  },
+  metricFilterRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 6,
+    marginBottom: 12,
+  },
+  metricFilterBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 10,
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  metricFilterBtnActive: {
+    backgroundColor: '#0066FF',
+    borderColor: '#0066FF',
+  },
+  metricFilterBtnText: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#64748b',
+  },
+  metricFilterBtnTextActive: {
+    color: '#ffffff',
+  },
+  horizonStatsGrid: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#f8fafc',
+    borderRadius: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    marginBottom: 12,
+  },
+  horizonStatItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  horizonStatLabel: {
+    fontSize: 8,
+    fontWeight: '800',
+    color: '#64748b',
+  },
+  horizonStatVal: {
     fontSize: 13,
     fontWeight: '900',
     color: '#0f172a',
-    marginVertical: 2,
+    marginTop: 1,
   },
-  agingBadge: {
+  horizonStatHint: {
+    fontSize: 8,
+    color: '#94a3b8',
+  },
+  horizonStatDivider: {
+    width: 1,
+    height: 20,
+    backgroundColor: '#e2e8f0',
+  },
+  chartArea: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 14,
+    padding: 10,
+  },
+  chartColumnsScroll: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 16,
+    paddingVertical: 4,
+    paddingHorizontal: 4,
+  },
+  chartColumnGroup: {
+    alignItems: 'center',
+    width: 58,
+  },
+  chartBarsPair: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 4,
+    height: 100,
+  },
+  singleBarWrapper: {
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+  },
+  barTopLabel: {
     fontSize: 8,
     fontWeight: '800',
+    color: '#475569',
+    marginBottom: 2,
+  },
+  chartBar: {
+    width: 12,
+    borderTopLeftRadius: 3,
+    borderTopRightRadius: 3,
+  },
+  chartColumnXLabel: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#64748b',
+    marginTop: 6,
+    textAlign: 'center',
   },
 
-  // 7. Inventory List
-  inventoryList: {
-    gap: 8,
-  },
-  inventoryRow: {
+  // 2F. Dual Section: National Portal Subsidy & Hardware Runway
+  dualSection: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#f8fafc',
+    gap: 12,
+  },
+  dualSectionHalf: {
+    flex: 1,
+    backgroundColor: '#ffffff',
     borderWidth: 1,
-    borderColor: '#f1f5f9',
-    borderRadius: 14,
+    borderColor: '#e2e8f0',
+    borderRadius: 18,
     padding: 12,
   },
-  inventoryItemTitle: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#0f172a',
-  },
-  inventoryStockText: {
-    fontSize: 10,
-    color: '#64748b',
-    marginTop: 2,
-  },
-  runwayBadge: {
-    borderWidth: 1,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
-  },
-  runwayBadgeText: {
-    fontSize: 10,
-    fontWeight: '800',
-  },
-
-  // 8. Subsidy Tracker
   subsidyMaxPill: {
     backgroundColor: '#ecfdf5',
     borderWidth: 1,
     borderColor: '#a7f3d0',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
   },
   subsidyMaxPillText: {
-    fontSize: 9,
+    fontSize: 8,
     fontWeight: '800',
     color: '#059669',
   },
@@ -1879,75 +1741,86 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#f8fafc',
-    borderWidth: 1,
-    borderColor: '#f1f5f9',
-    borderRadius: 14,
-    padding: 12,
+    borderRadius: 10,
+    padding: 8,
   },
   subsidyStepNumBadge: {
-    width: 24,
-    height: 24,
-    borderRadius: 8,
+    width: 20,
+    height: 20,
+    borderRadius: 6,
     backgroundColor: '#059669',
     justifyContent: 'center',
     alignItems: 'center',
   },
   subsidyStepNumText: {
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: '900',
     color: '#ffffff',
   },
   subsidyStepTitle: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '800',
     color: '#0f172a',
   },
   subsidyStepSub: {
-    fontSize: 9,
+    fontSize: 8,
+    color: '#64748b',
+  },
+  inventoryList: {
+    gap: 6,
+  },
+  inventoryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#f8fafc',
+    borderRadius: 10,
+    padding: 8,
+  },
+  inventoryItemTitle: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#0f172a',
+  },
+  inventoryStockText: {
+    fontSize: 8,
     color: '#64748b',
     marginTop: 1,
   },
-  subsidyStepCount: {
-    fontSize: 10,
-    fontWeight: '900',
-    color: '#0f172a',
+  runwayBadge: {
+    borderWidth: 1,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
   },
-  subsidyStepAmt: {
-    fontSize: 10,
+  runwayBadgeText: {
+    fontSize: 9,
     fontWeight: '800',
-    color: '#059669',
-    marginTop: 1,
   },
 
-  // 9. Environmental Card
-  environmentalCard: {
+  // 2G. Environmental Offset Zone (Deep Emerald)
+  environmentalZone: {
     backgroundColor: '#022c22',
     borderWidth: 1,
     borderColor: '#064e3b',
-    borderRadius: 24,
-    padding: 18,
-    marginBottom: 16,
-    shadowColor: '#064e3b',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 3,
+    borderRadius: 20,
+    padding: 16,
   },
   envHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 14,
+    marginBottom: 12,
   },
   envIconBadge: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
+    width: 30,
+    height: 30,
+    borderRadius: 9,
     backgroundColor: 'rgba(52, 211, 153, 0.15)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   envTitle: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '900',
     color: '#ffffff',
   },
@@ -1958,72 +1831,84 @@ const styles = StyleSheet.create({
   },
   envGrid: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     gap: 8,
   },
   envGridItem: {
-    width: (SCREEN_WIDTH - 32 - 36 - 8) / 2,
+    flex: 1,
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.08)',
-    borderRadius: 14,
-    padding: 10,
-  },
-  envItemTop: {
-    flexDirection: 'row',
+    borderRadius: 12,
+    padding: 8,
     alignItems: 'center',
-    gap: 5,
-    marginBottom: 3,
   },
   envItemLabel: {
-    fontSize: 8,
+    fontSize: 7,
     fontWeight: '800',
     color: '#94a3b8',
     letterSpacing: 0.5,
   },
   envItemVal: {
-    fontSize: 16,
+    fontSize: 12,
     fontWeight: '900',
     color: '#ffffff',
     marginVertical: 2,
   },
   envItemSub: {
-    fontSize: 8,
+    fontSize: 7,
     fontWeight: '600',
     color: '#34d399',
   },
 
-  // 10. System Health Row
-  systemHealthRow: {
+  // ---------------------------------------------------------------------------
+  // FLOATING OPERATIONAL ACTION CONTROLS
+  // ---------------------------------------------------------------------------
+  floatingCommandBar: {
+    position: 'absolute',
+    bottom: Platform.OS === 'ios' ? 70 : 60,
+    left: 16,
+    right: 16,
     flexDirection: 'row',
-    gap: 10,
-    marginBottom: 20,
-  },
-  systemHealthCard: {
-    flex: 1,
     backgroundColor: '#ffffff',
+    borderRadius: 20,
+    padding: 6,
+    gap: 6,
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.16,
+    shadowRadius: 16,
+    elevation: 8,
     borderWidth: 1,
     borderColor: '#e2e8f0',
-    borderRadius: 18,
-    padding: 14,
+  },
+  floatingActionPrimary: {
+    flex: 1.2,
+    flexDirection: 'row',
     alignItems: 'center',
-    shadowColor: '#0f172a',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    elevation: 1,
+    justifyContent: 'center',
+    backgroundColor: '#091326',
+    borderRadius: 14,
+    paddingVertical: 9,
   },
-  systemHealthNumber: {
-    fontSize: 14,
-    fontWeight: '900',
-    color: '#0f172a',
-    marginTop: 6,
-    marginBottom: 2,
+  floatingActionPrimaryText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#ffffff',
   },
-  systemHealthLabel: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: '#64748b',
-    textAlign: 'center',
+  floatingActionSecondary: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 14,
+    paddingVertical: 9,
+  },
+  floatingActionSecondaryText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#334155',
   },
 });

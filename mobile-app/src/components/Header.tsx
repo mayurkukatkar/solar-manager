@@ -27,7 +27,7 @@ import { colors, spacing, radii, typography, touchTarget } from '../theme';
 export interface HeaderProps {
   title?: string;
   subtitle?: string;
-  variant?: 'main' | 'detail';
+  variant?: 'main' | 'detail' | 'home';
   onBack?: () => void;
   rightAction?: React.ReactNode;
   showSearch?: boolean;
@@ -56,6 +56,125 @@ export const Header: React.FC<HeaderProps> = ({
   const { user, backendStatus, logout } = useAuth();
   const [profileModalVisible, setProfileModalVisible] = useState(false);
   const [searchText, setSearchText] = useState('');
+
+  // VARIANT: HOME (Ultra-Compact Flush Spatial Header for Operational Radar)
+  if (variant === 'home') {
+    return (
+      <View style={styles.homeContainer}>
+        <View style={styles.homeRow}>
+          <View style={styles.homeBrandGroup}>
+            <Image
+              source={require('../../assets/app-icon.png')}
+              style={styles.homeBrandLogo}
+              resizeMode="cover"
+            />
+            <View>
+              <View style={styles.homeBrandTitleRow}>
+                <Text style={styles.homeBrandTitle}>WhereReady</Text>
+                <View style={styles.homeOsBadge}>
+                  <Text style={styles.homeOsBadgeText}>SOLAR OS</Text>
+                </View>
+              </View>
+              <Text style={styles.homeTagline}>Where Growth Gets Ready.</Text>
+            </View>
+          </View>
+
+          <View style={styles.homeRightGroup}>
+            <View style={styles.homeStatusPill}>
+              <View
+                style={[
+                  styles.statusDot,
+                  { backgroundColor: backendStatus.isOnline ? '#34d399' : '#f59e0b' },
+                ]}
+              />
+              <Text style={styles.homeStatusText}>
+                {backendStatus.isOnline ? 'MSEDCL Live' : 'Offline'}
+              </Text>
+            </View>
+
+            <TouchableOpacity
+              style={styles.homeAvatarBtn}
+              onPress={() => setProfileModalVisible(true)}
+              activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel="View profile"
+            >
+              <Text style={styles.homeAvatarText}>
+                {user?.name ? user.name.charAt(0).toUpperCase() : 'W'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* USER ACCOUNT PROFILE MODAL */}
+        <Modal visible={profileModalVisible} transparent animationType="fade">
+          <TouchableOpacity
+            style={styles.modalOverlay}
+            activeOpacity={1}
+            onPress={() => setProfileModalVisible(false)}
+          >
+            <View style={styles.modalContent}>
+              <View style={styles.modalDragHandle} />
+
+              <View style={styles.accountProfileCard}>
+                <View style={styles.accountAvatar}>
+                  <Text style={styles.accountAvatarText}>
+                    {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}
+                  </Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.accountNameText}>{user?.name || 'Administrator'}</Text>
+                  <Text style={styles.accountEmailText}>{user?.email}</Text>
+                  <View style={styles.accountRoleBadge}>
+                    <Text style={styles.accountRoleBadgeText}>
+                      {user?.role === 'SUPER_ADMIN' ? 'PLATFORM SUPER ADMIN' : 'TENANT ADMINISTRATOR'}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+
+              <View style={styles.sessionInfoBox}>
+                <View style={styles.sessionInfoRow}>
+                  <Building size={14} color="#64748b" />
+                  <Text style={styles.sessionInfoLabel}>Vendor Enterprise:</Text>
+                  <Text style={styles.sessionInfoVal} numberOfLines={1}>
+                    {user?.tenantName || 'WhereReady Solar OS'}
+                  </Text>
+                </View>
+                <View style={styles.sessionInfoRow}>
+                  <ShieldCheck size={14} color="#059669" />
+                  <Text style={styles.sessionInfoLabel}>Sync Status:</Text>
+                  <Text style={[styles.sessionInfoVal, { color: '#059669' }]}>
+                    {backendStatus.isOnline ? 'Active & Synchronized' : 'Offline Mode'}
+                  </Text>
+                </View>
+              </View>
+
+              <TouchableOpacity
+                style={styles.logoutBtn}
+                onPress={() => {
+                  setProfileModalVisible(false);
+                  logout();
+                }}
+                activeOpacity={0.8}
+              >
+                <LogOut size={16} color="#ef4444" />
+                <Text style={styles.logoutBtnText}>Sign Out of Mobile OS</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.closeBtn}
+                onPress={() => setProfileModalVisible(false)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.closeBtnText}>Done</Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </Modal>
+      </View>
+    );
+  }
 
   // VARIANT: DETAIL (With Back Button, Inline Title, and Right Action)
   if (variant === 'detail') {
@@ -324,6 +443,94 @@ const topSafeArea =
     : 50;
 
 const styles = StyleSheet.create({
+  // HOME VARIANT (Flush Spatial Sky Header)
+  homeContainer: {
+    backgroundColor: '#091326',
+    paddingTop: topSafeArea,
+    paddingHorizontal: spacing[4],
+    paddingBottom: spacing[2],
+    borderBottomWidth: 1,
+    borderBottomColor: '#172554',
+  },
+  homeRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    minHeight: 44,
+  },
+  homeBrandGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  homeBrandLogo: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+  },
+  homeBrandTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  homeBrandTitle: {
+    fontSize: 16,
+    fontWeight: '900',
+    color: '#ffffff',
+    letterSpacing: -0.3,
+  },
+  homeOsBadge: {
+    backgroundColor: '#0066FF',
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 5,
+  },
+  homeOsBadgeText: {
+    fontSize: 8,
+    fontWeight: '900',
+    color: '#ffffff',
+    letterSpacing: 0.5,
+  },
+  homeTagline: {
+    fontSize: 9,
+    color: '#94a3b8',
+    fontWeight: '500',
+  },
+  homeRightGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  homeStatusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  homeStatusText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#94a3b8',
+  },
+  homeAvatarBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: '#1e293b',
+    borderWidth: 1,
+    borderColor: '#334155',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  homeAvatarText: {
+    fontSize: 13,
+    fontWeight: '900',
+    color: '#38bdf8',
+  },
+
   // MAIN VARIANT
   container: {
     backgroundColor: colors.white,
