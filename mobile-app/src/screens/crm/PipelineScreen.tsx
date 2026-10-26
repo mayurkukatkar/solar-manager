@@ -31,6 +31,8 @@ import {
   Receipt,
   CreditCard,
 } from 'lucide-react-native';
+import { Header } from '../../components/Header';
+import { openWhatsAppWithPitch } from '../../services/whatsappService';
 import { crmApi, financeApi } from '../../api/endpoints';
 import { offlineSyncService } from '../../services/offlineSyncService';
 import { LeadCaptureModal } from './LeadCaptureModal';
@@ -132,6 +134,32 @@ export const PipelineScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
     if (!phone) return;
     const clean = phone.replace(/[^0-9]/g, '');
     Linking.openURL(`tel:${clean}`);
+  };
+
+  const handleWhatsAppPitch = (lead: any) => {
+    const phone = lead.mobile || lead.phone;
+    if (!phone) {
+      Alert.alert('Phone Missing', 'Customer mobile number is not available.');
+      return;
+    }
+    const cap = lead.estimatedCap || 3.3;
+    const gross = lead.estimatedValue || Math.round(cap * 56000);
+    const subsidy = cap >= 3 ? 78000 : cap >= 2 ? 60000 : 30000;
+    const net = Math.max(0, gross - subsidy);
+    const monthlySavings = Math.round(cap * 120 * 8.5);
+    const lifetimeSavings = Math.round(cap * 1460 * 25 * 8.5 * 0.92);
+
+    openWhatsAppWithPitch({
+      customerName: lead.name,
+      customerPhone: phone,
+      systemCapacityKw: cap,
+      grossAmount: gross,
+      subsidyAmount: subsidy,
+      netPayable: net,
+      monthlySavings,
+      lifetimeSavings,
+      companyName: 'WhereReady Solar OS',
+    });
   };
 
   const handleOpenLeadCapture = () => {
@@ -282,33 +310,31 @@ export const PipelineScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
 
   return (
     <View style={styles.container}>
-      {/* VENDOR BRANDED HEADER */}
-      <View style={styles.header}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.headerTitle}>WhereReady Sales Pipeline</Text>
-          <Text style={styles.headerSubtitle}>
-            Solar OS Turnkey EPC Pipeline & Sizing
-          </Text>
-        </View>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <TouchableOpacity
-            style={styles.financeHeaderBtn}
-            onPress={() => navigation?.navigate('Finance')}
-            activeOpacity={0.85}
-          >
-            <Receipt size={15} color="#059669" strokeWidth={2.5} />
-            <Text style={styles.financeHeaderBtnText}>Finance</Text>
-          </TouchableOpacity>
+      {/* GLOBAL HEADER */}
+      <Header
+        title="Sales CRM & Pipeline"
+        subtitle="Turnkey solar pipeline, quote builder & lead intake"
+      />
 
-          <TouchableOpacity
-            style={styles.addLeadHeaderBtn}
-            onPress={handleOpenLeadCapture}
-            activeOpacity={0.85}
-          >
-            <Plus size={16} color="#ffffff" strokeWidth={2.8} />
-            <Text style={styles.addLeadHeaderBtnText}>New Lead</Text>
-          </TouchableOpacity>
-        </View>
+      {/* QUICK ACTION BAR */}
+      <View style={styles.topActionStrip}>
+        <TouchableOpacity
+          style={styles.financeHeaderBtn}
+          onPress={() => navigation?.navigate('Finance')}
+          activeOpacity={0.85}
+        >
+          <Receipt size={14} color="#059669" strokeWidth={2.5} />
+          <Text style={styles.financeHeaderBtnText}>Finance Ledger</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.addLeadHeaderBtn}
+          onPress={handleOpenLeadCapture}
+          activeOpacity={0.85}
+        >
+          <Plus size={15} color="#ffffff" strokeWidth={2.8} />
+          <Text style={styles.addLeadHeaderBtnText}>+ New Lead</Text>
+        </TouchableOpacity>
       </View>
 
       {/* EXECUTIVE PULSE METRICS BAR */}
@@ -608,7 +634,15 @@ export const PipelineScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
                     onPress={() => handlePhoneCall(item.mobile || item.phone)}
                     activeOpacity={0.7}
                   >
-                    <Phone size={16} color="#0284c7" />
+                    <Phone size={15} color="#0284c7" strokeWidth={2.3} />
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.iconActionBtn, { backgroundColor: '#ecfdf5', borderColor: '#a7f3d0' }]}
+                    onPress={() => handleWhatsAppPitch(item)}
+                    activeOpacity={0.7}
+                  >
+                    <MessageCircle size={15} color="#059669" strokeWidth={2.3} />
                   </TouchableOpacity>
 
                   {isWon ? (
@@ -717,6 +751,15 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f8fafc',
+  },
+  topActionStrip: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 2,
   },
   header: {
     backgroundColor: '#ffffff',

@@ -16,7 +16,9 @@ import { useAuth } from '../context/AuthContext';
 import { LoginScreen } from '../screens/auth/LoginScreen';
 import { DashboardScreen } from '../screens/dashboard/DashboardScreen';
 import { PipelineScreen } from '../screens/crm/PipelineScreen';
+import { LeadsScreen } from '../screens/crm/LeadsScreen';
 import { FieldProjectsScreen } from '../screens/projects/FieldProjectsScreen';
+import { OperationsScreen } from '../screens/operations/OperationsScreen';
 import { QuickQuoteScreen } from '../screens/crm/QuickQuoteScreen';
 import { FinanceScreen } from '../screens/finance/FinanceScreen';
 import { ModulesScreen } from '../screens/modules/ModulesScreen';
@@ -29,7 +31,13 @@ export const navigationRef = createNavigationContainerRef<any>();
 
 export function navigateToTab(screenName: string, params?: any) {
   if (navigationRef.isReady()) {
-    if (screenName === 'QuickQuote' || screenName === 'Modules' || screenName === 'Profile') {
+    if (
+      screenName === 'QuickQuote' ||
+      screenName === 'Modules' ||
+      screenName === 'Profile' ||
+      screenName === 'Operations' ||
+      screenName === 'Leads'
+    ) {
       navigationRef.navigate(screenName, params);
     } else {
       navigationRef.navigate('MainTabs', { screen: screenName, params });
@@ -169,6 +177,8 @@ export const RootNavigator: React.FC = () => {
               <Stack.Screen name="Modules" component={ModulesScreen} />
               <Stack.Screen name="FinanceDetail" component={FinanceScreen} />
               <Stack.Screen name="Profile" component={FieldProfileScreen} />
+              <Stack.Screen name="Operations" component={OperationsScreen} />
+              <Stack.Screen name="Leads" component={LeadsScreen} />
             </>
           )}
         </Stack.Navigator>
