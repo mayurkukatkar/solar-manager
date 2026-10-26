@@ -10,6 +10,7 @@ import {
   Modal,
   Dimensions,
   Platform,
+  Linking,
 } from 'react-native';
 import {
   FileText,
@@ -43,9 +44,13 @@ import {
   Calendar,
   CalendarDays,
   Flame,
+  Phone,
+  MessageCircle,
+  Receipt,
 } from 'lucide-react-native';
 import { Header } from '../../components/Header';
 import { tenantApi, crmApi } from '../../api/endpoints';
+import { openWhatsAppWithPitch } from '../../services/whatsappService';
 import { useAuth } from '../../context/AuthContext';
 import { DashboardData, HorizonItem, Project } from '../../types';
 import { colors } from '../../theme/colors';
@@ -84,6 +89,7 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
   });
 
   const [projects, setProjects] = useState<Project[]>([]);
+  const [recentLeads, setRecentLeads] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [showAlertBanner, setShowAlertBanner] = useState(true);
@@ -93,15 +99,19 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
   const [periodHorizon, setPeriodHorizon] = useState<HorizonType>('quarterly');
   const [horizonMetricFocus, setHorizonMetricFocus] = useState<FocusMetric>('both');
 
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+
   useEffect(() => {
     loadDashboard();
   }, []);
 
   const loadDashboard = async () => {
     try {
-      const [dashRes, prjRes] = await Promise.all([
+      const [dashRes, prjRes, leadsRes] = await Promise.all([
         tenantApi.getDashboard().catch(() => null),
         tenantApi.getProjects().catch(() => null),
+        crmApi.getLeads({ all: true }).catch(() => null),
       ]);
 
       if (dashRes) {
@@ -111,12 +121,47 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
       if (prjRes && Array.isArray(prjRes.projects)) {
         setProjects(prjRes.projects);
       }
+
+      if (leadsRes && Array.isArray(leadsRes.leads)) {
+        setRecentLeads(leadsRes.leads.slice(0, 5));
+      }
     } catch (err: any) {
       console.warn('Dashboard fetch notice:', err.message);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
+  };
+
+  const handlePhoneCall = (phone?: string) => {
+    if (!phone) return;
+    const clean = phone.replace(/[^0-9]/g, '');
+    Linking.openURL(`tel:${clean}`);
+  };
+
+  const handleWhatsAppDirect = (item: any) => {
+    const phone = item.mobile || item.phone;
+    if (!phone) return;
+    const cap = item.capacity || item.estimatedCap || 3.3;
+    const gross = item.value || item.estimatedValue || Math.round(cap * 56000);
+    const subsidy = cap >= 3 ? 78000 : cap >= 2 ? 60000 : 30000;
+    const net = Math.max(0, gross - subsidy);
+    const monthlySavings = Math.round(cap * 120 * 8.5);
+    const lifetimeSavings = Math.round(cap * 1460 * 25 * 8.5 * 0.92);
+
+    openWhatsAppWithPitch({
+      customerName: item.name,
+      customerPhone: phone,
+      systemCapacityKw: cap,
+      grossAmount: gross,
+      subsidyAmount: subsidy,
+      netPayable: net,
+      monthlySavings,
+      lifetimeSavings,
+      companyName: user?.tenantName || 'WhereReady Solar OS',
+      repName: user?.name || 'Solar Partner',
+      repPhone: (user as any)?.phone || '',
+    });
   };
 
   const onRefresh = () => {
@@ -252,11 +297,81 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
     ? data.environmental.trees.toLocaleString()
     : '1,780';
 
+  const fallbackRecentLeads = [
+    {
+      id: 'lead-1',
+      name: 'Ramesh Patil',
+      mobile: '9822012345',
+      city: 'Nagpur',
+      capacity: 3.3,
+      value: 185000,
+      stage: 'Proposal Sent',
+      stageBg: '#eff6ff',
+      stageColor: '#0066FF',
+      avatarBg: '#dbeafe',
+      avatarColor: '#1d4ed8',
+      time: '1h ago',
+    },
+    {
+      id: 'lead-2',
+      name: 'Suresh Deshmukh',
+      mobile: '9822054321',
+      city: 'Pune',
+      capacity: 5.0,
+      value: 275000,
+      stage: 'Survey Booked',
+      stageBg: '#fef3c7',
+      stageColor: '#d97706',
+      avatarBg: '#fde68a',
+      avatarColor: '#b45309',
+      time: '3h ago',
+    },
+    {
+      id: 'lead-3',
+      name: 'Anand Kulkarni',
+      mobile: '9822088899',
+      city: 'Nashik',
+      capacity: 3.3,
+      value: 191000,
+      stage: 'Installation Active',
+      stageBg: '#ecfdf5',
+      stageColor: '#059669',
+      avatarBg: '#a7f3d0',
+      avatarColor: '#047857',
+      time: 'Today',
+    },
+  ];
+
+  const activeStreamItems =
+    recentLeads && recentLeads.length > 0
+      ? recentLeads.map((l, i) => {
+          const cap = l.estimatedCap || 3.3;
+          const val = l.estimatedValue || Math.round(cap * 56000);
+          const isWon = l.status === 'WON';
+          const isProposal = l.status === 'PROPOSAL_SENT';
+          const isSurvey = l.status === 'SITE_SURVEY';
+          return {
+            id: l.id || `lead-${i}`,
+            name: l.name || 'Prospect',
+            mobile: l.mobile || '',
+            city: l.city || 'Site Location',
+            capacity: cap,
+            value: val,
+            stage: isWon ? 'Won / EPC' : isProposal ? 'Proposal Sent' : isSurvey ? 'Survey Booked' : 'New Lead',
+            stageBg: isWon ? '#ecfdf5' : isProposal ? '#eff6ff' : isSurvey ? '#fef3c7' : '#f1f5f9',
+            stageColor: isWon ? '#059669' : isProposal ? '#0066FF' : isSurvey ? '#d97706' : '#475569',
+            avatarBg: isWon ? '#d1fae5' : isProposal ? '#dbeafe' : '#fef3c7',
+            avatarColor: isWon ? '#065f46' : isProposal ? '#1e40af' : '#92400e',
+            time: 'Active',
+          };
+        })
+      : fallbackRecentLeads;
+
   return (
     <View style={styles.container}>
       <Header
-        title="Command Center"
-        subtitle="Rooftop solar operations, revenue & PM Surya Ghar"
+        title={`${greeting}, ${user?.name ? user.name.split(' ')[0] : 'Solar Partner'}`}
+        subtitle={`${user?.tenantName || 'WhereReady Solar OS'} • Field Operations Hub`}
       />
 
       <ScrollView
@@ -265,131 +380,204 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         showsVerticalScrollIndicator={false}
       >
-        {/* 1. TOP ACTION LAUNCHPAD */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.launchpadScroll}
-        >
-          <TouchableOpacity
-            style={[styles.launchpadBtn, styles.launchpadBtnPrimary]}
-            onPress={() => navigation.navigate('QuickQuote')}
-            activeOpacity={0.85}
-          >
-            <Zap size={15} color="#fbbf24" style={{ marginRight: 6 }} />
-            <Text style={styles.launchpadBtnTextPrimary}>60s Proposal</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.launchpadBtn}
-            onPress={() => navigation.navigate('Pipeline')}
-            activeOpacity={0.85}
-          >
-            <Plus size={15} color="#0066FF" style={{ marginRight: 6 }} />
-            <Text style={styles.launchpadBtnText}>Add Lead</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.launchpadBtn}
-            onPress={() => navigation.navigate('Modules', { screen: 'SURVEYS' })}
-            activeOpacity={0.85}
-          >
-            <MapPin size={15} color="#d97706" style={{ marginRight: 6 }} />
-            <Text style={styles.launchpadBtnText}>Book Survey</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.launchpadBtn}
-            onPress={() => navigation.navigate('Modules', { screen: 'SUBSIDY' })}
-            activeOpacity={0.85}
-          >
-            <Landmark size={15} color="#059669" style={{ marginRight: 6 }} />
-            <Text style={styles.launchpadBtnText}>PM Surya Ghar</Text>
-          </TouchableOpacity>
-        </ScrollView>
-
-        {/* 2. TODAY'S PRIORITY DISPATCH ALERT BANNER */}
-        {showAlertBanner && (
-          <View style={styles.alertBanner}>
-            <View style={styles.alertBannerTop}>
-              <View style={styles.alertBadge}>
-                <Sparkles size={12} color="#1e40af" style={{ marginRight: 4 }} />
-                <Text style={styles.alertBadgeText}>Operational Action Queue</Text>
-              </View>
-              <TouchableOpacity onPress={() => setShowAlertBanner(false)} style={{ padding: 2 }}>
-                <X size={15} color="#64748b" />
-              </TouchableOpacity>
+        {/* 1. UBER-INSPIRED: TODAY'S OPERATIONAL DISPATCH HERO */}
+        <View style={styles.dispatchHeroCard}>
+          <View style={styles.dispatchHeroTop}>
+            <View style={styles.dispatchPill}>
+              <View style={styles.pulseDot} />
+              <Text style={styles.dispatchPillText}>TODAY'S MISSION & DISPATCH</Text>
             </View>
-
-            <Text style={styles.alertBannerMessage}>
-              <Text style={{ fontWeight: '800', color: '#0f172a' }}>{data.totalLeads || 3} rooftop proposals</Text> awaiting follow-up,{' '}
-              <Text style={{ fontWeight: '800', color: '#0f172a' }}>{data.totalProjects || 2} active installations</Text> on schedule, and{' '}
-              <Text style={{ fontWeight: '800', color: '#059669' }}>₹{outstandingLakhs}L receivables</Text> maturing this cycle.
+            <Text style={styles.dispatchDateText}>
+              {new Date().toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })}
             </Text>
+          </View>
 
-            <View style={styles.alertBannerFooter}>
-              <TouchableOpacity
-                style={styles.alertActionBtn}
-                onPress={() => navigation.navigate('Pipeline')}
-                activeOpacity={0.85}
+          <Text style={styles.dispatchHeadline}>
+            {data.totalLeads || 3} Proposals Pending Follow-Up
+          </Text>
+          <Text style={styles.dispatchSubline}>
+            {projects.length || data.totalProjects || 2} active installations on-site • ₹{outstandingLakhs}L maturing DBT claims
+          </Text>
+
+          {/* Action-First Recommended Step */}
+          <View style={styles.priorityBox}>
+            <View style={styles.priorityBoxLeft}>
+              <View style={styles.priorityTagRow}>
+                <Sparkles size={11} color="#f59e0b" />
+                <Text style={styles.priorityLabel}>NEXT RECOMMENDED ACTION</Text>
+              </View>
+              <Text style={styles.priorityTitle} numberOfLines={1}>
+                {recentLeads[0]
+                  ? `Follow up with ${recentLeads[0].name} (${recentLeads[0].estimatedCap || 3.3} kWp)`
+                  : 'Dispatch 60s proposal to new inquiry'}
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={styles.actionBtnPrimary}
+              onPress={() => navigation.navigate(recentLeads[0] ? 'Pipeline' : 'QuickQuote')}
+              activeOpacity={0.85}
+            >
+              <Zap size={14} color="#ffffff" style={{ marginRight: 4 }} />
+              <Text style={styles.actionBtnPrimaryText}>Action</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* 2. BLINKIT-INSPIRED: FAST DISCOVERABILITY & ACTION TOOLKIT */}
+        <View style={styles.speedSection}>
+          <Text style={styles.sectionHeaderTitle}>QUICK ACTION TOOLKIT</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.speedScroll}
+          >
+            <TouchableOpacity
+              style={[styles.speedPill, styles.speedPillPrimary]}
+              onPress={() => navigation.navigate('QuickQuote')}
+              activeOpacity={0.85}
+            >
+              <Zap size={15} color="#fbbf24" style={{ marginRight: 6 }} />
+              <Text style={styles.speedPillTextPrimary}>60s Proposal</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.speedPill}
+              onPress={() => navigation.navigate('Pipeline')}
+              activeOpacity={0.85}
+            >
+              <Plus size={15} color="#0066FF" style={{ marginRight: 6 }} />
+              <Text style={styles.speedPillText}>+ New Lead</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.speedPill}
+              onPress={() => navigation.navigate('Modules', { screen: 'SURVEYS' })}
+              activeOpacity={0.85}
+            >
+              <MapPin size={15} color="#d97706" style={{ marginRight: 6 }} />
+              <Text style={styles.speedPillText}>Book Survey</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.speedPill}
+              onPress={() => navigation.navigate('Finance')}
+              activeOpacity={0.85}
+            >
+              <Receipt size={15} color="#059669" style={{ marginRight: 6 }} />
+              <Text style={styles.speedPillText}>Tax Invoice</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.speedPill}
+              onPress={() => navigation.navigate('Modules', { screen: 'SUBSIDY' })}
+              activeOpacity={0.85}
+            >
+              <Landmark size={15} color="#7c3aed" style={{ marginRight: 6 }} />
+              <Text style={styles.speedPillText}>PM Surya Ghar</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.speedPill}
+              onPress={() => navigation.navigate('Modules', { screen: 'INVENTORY' })}
+              activeOpacity={0.85}
+            >
+              <Package size={15} color="#0284c7" style={{ marginRight: 6 }} />
+              <Text style={styles.speedPillText}>Stock Ledger</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </View>
+
+        {/* 3. INSTAGRAM-INSPIRED: LIVE CUSTOMER OUTREACH & ACTIVITY STREAM */}
+        <View style={styles.streamSection}>
+          <View style={styles.sectionTitleRow}>
+            <View>
+              <Text style={styles.sectionHeaderTitle}>LIVE PIPELINE & FIELD STREAM</Text>
+              <Text style={styles.sectionHeaderSub}>Recent customer activity & direct outreach</Text>
+            </View>
+            <TouchableOpacity onPress={() => navigation.navigate('Pipeline')} activeOpacity={0.7}>
+              <Text style={styles.sectionLinkText}>Full CRM →</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.streamCard}>
+            {activeStreamItems.map((item, idx) => (
+              <View
+                key={item.id || idx}
+                style={[
+                  styles.streamRow,
+                  idx === activeStreamItems.length - 1 && { borderBottomWidth: 0 },
+                ]}
               >
-                <Text style={styles.alertActionBtnText}>Action Now</Text>
-                <ArrowRight size={13} color="#ffffff" style={{ marginLeft: 4 }} />
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
+                <View style={[styles.streamAvatar, { backgroundColor: item.avatarBg || '#eff6ff' }]}>
+                  <Text style={[styles.streamAvatarText, { color: item.avatarColor || '#0066FF' }]}>
+                    {item.name ? item.name.charAt(0).toUpperCase() : 'S'}
+                  </Text>
+                </View>
 
-        {/* 3. EXECUTIVE KPI TICKER CARDS (HORIZONTAL SCROLL) */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.tickerScroll}
-        >
-          <View style={styles.tickerCard}>
-            <View style={styles.tickerTop}>
-              <Text style={styles.tickerLabel}>COMMITTED ORDER BOOK</Text>
-              <View style={[styles.tickerIconBox, { backgroundColor: '#eff6ff' }]}>
-                <Wallet size={16} color="#0066FF" />
-              </View>
-            </View>
-            <Text style={styles.tickerValue}>₹{totalRevenueLakhs} Lakhs</Text>
-            <Text style={styles.tickerChangePositive}>+18.4% MoM Velocity</Text>
-          </View>
+                <View style={styles.streamMeta}>
+                  <View style={styles.streamNameRow}>
+                    <Text style={styles.streamName} numberOfLines={1}>
+                      {item.name}
+                    </Text>
+                    <View style={[styles.streamStageBadge, { backgroundColor: item.stageBg || '#eff6ff' }]}>
+                      <Text style={[styles.streamStageText, { color: item.stageColor || '#0066FF' }]}>
+                        {item.stage || 'NEW'}
+                      </Text>
+                    </View>
+                  </View>
+                  <Text style={styles.streamSub} numberOfLines={1}>
+                    ⚡ {item.capacity || 3.3} kWp • 📍 {item.city || 'Site Location'} • ₹{(item.value || 185000).toLocaleString('en-IN')}
+                  </Text>
+                </View>
 
-          <View style={styles.tickerCard}>
-            <View style={styles.tickerTop}>
-              <Text style={styles.tickerLabel}>ENERGIZED FLEET</Text>
-              <View style={[styles.tickerIconBox, { backgroundColor: '#fffbeb' }]}>
-                <Sun size={16} color="#d97706" />
+                {/* 1-Tap Micro Actions */}
+                <View style={styles.streamActions}>
+                  <TouchableOpacity
+                    style={styles.microActionBtn}
+                    onPress={() => handlePhoneCall(item.mobile)}
+                    activeOpacity={0.7}
+                  >
+                    <Phone size={13} color="#0f172a" />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.microActionBtn, { backgroundColor: '#dcfce7' }]}
+                    onPress={() => handleWhatsAppDirect(item)}
+                    activeOpacity={0.7}
+                  >
+                    <MessageCircle size={13} color="#15803d" />
+                  </TouchableOpacity>
+                </View>
               </View>
-            </View>
-            <Text style={styles.tickerValue}>{totalCapacityKWp} kWp</Text>
-            <Text style={styles.tickerChangePositive}>{data.totalProjects || 11} Sites Commissioned</Text>
+            ))}
           </View>
+        </View>
 
-          <View style={styles.tickerCard}>
-            <View style={styles.tickerTop}>
-              <Text style={styles.tickerLabel}>DBT SUBSIDY DISBURSED</Text>
-              <View style={[styles.tickerIconBox, { backgroundColor: '#ecfdf5' }]}>
-                <Landmark size={16} color="#059669" />
-              </View>
-            </View>
-            <Text style={styles.tickerValue}>{subsidyFunnel[3]?.amount || '₹24.8 Lakhs'}</Text>
-            <Text style={styles.tickerChangePositive}>PM Surya Ghar Scheme</Text>
+        {/* 4. UNIFIED EXECUTIVE PERFORMANCE STRIP */}
+        <View style={styles.kpiStripCard}>
+          <View style={styles.kpiStripCol}>
+            <Text style={styles.kpiStripLabel}>ORDER BOOK</Text>
+            <Text style={styles.kpiStripVal}>₹{totalRevenueLakhs}L</Text>
+            <Text style={styles.kpiStripHint}>Committed</Text>
           </View>
-
-          <View style={styles.tickerCard}>
-            <View style={styles.tickerTop}>
-              <Text style={styles.tickerLabel}>SITE TURNAROUND</Text>
-              <View style={[styles.tickerIconBox, { backgroundColor: '#f5f3ff' }]}>
-                <Clock size={16} color="#7c3aed" />
-              </View>
-            </View>
-            <Text style={styles.tickerValue}>14.8 Days</Text>
-            <Text style={styles.tickerChangePositive}>Inquiry to Net-Meter</Text>
+          <View style={styles.kpiStripDivider} />
+          <View style={styles.kpiStripCol}>
+            <Text style={styles.kpiStripLabel}>FLEET</Text>
+            <Text style={styles.kpiStripVal}>{totalCapacityKWp} kW</Text>
+            <Text style={styles.kpiStripHint}>Energized</Text>
           </View>
-        </ScrollView>
+          <View style={styles.kpiStripDivider} />
+          <View style={styles.kpiStripCol}>
+            <Text style={styles.kpiStripLabel}>DBT SUBSIDY</Text>
+            <Text style={[styles.kpiStripVal, { color: '#059669' }]}>₹78k</Text>
+            <Text style={styles.kpiStripHint}>Max / Site</Text>
+          </View>
+          <View style={styles.kpiStripDivider} />
+          <View style={styles.kpiStripCol}>
+            <Text style={styles.kpiStripLabel}>TURNAROUND</Text>
+            <Text style={[styles.kpiStripVal, { color: '#7c3aed' }]}>14.8d</Text>
+            <Text style={styles.kpiStripHint}>Avg Cycle</Text>
+          </View>
+        </View>
 
         {/* 4. PERIODIC HORIZON COMPARATIVE ANALYSIS MODULE */}
         <View style={styles.horizonSectionCard}>
@@ -887,14 +1075,132 @@ const styles = StyleSheet.create({
     paddingBottom: Platform.OS === 'ios' ? 120 : 100,
   },
 
-  // 1. Launchpad
-  launchpadScroll: {
+  // 1. WhereReady Field Experience - Today's Operational Dispatch Hero (Uber-inspired)
+  dispatchHeroCard: {
+    backgroundColor: '#0f172a',
+    borderRadius: 24,
+    padding: 20,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#1e293b',
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  dispatchHeroTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  dispatchPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  pulseDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#34d399',
+    marginRight: 6,
+  },
+  dispatchPillText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#94a3b8',
+    letterSpacing: 0.8,
+  },
+  dispatchDateText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#64748b',
+  },
+  dispatchHeadline: {
+    fontSize: 20,
+    fontWeight: '900',
+    color: '#ffffff',
+    letterSpacing: -0.3,
+    marginBottom: 4,
+  },
+  dispatchSubline: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#94a3b8',
+    marginBottom: 16,
+  },
+  priorityBox: {
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderRadius: 16,
+    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  priorityBoxLeft: {
+    flex: 1,
+  },
+  priorityTagRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: 2,
+  },
+  priorityLabel: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#fbbf24',
+    letterSpacing: 0.5,
+  },
+  priorityTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#f8fafc',
+  },
+  actionBtnPrimary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#0066FF',
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 12,
+    shadowColor: '#0066FF',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.4,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  actionBtnPrimaryText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#ffffff',
+  },
+
+  // 2. Fast Discoverability Toolkit (Blinkit-inspired)
+  speedSection: {
+    marginBottom: 16,
+  },
+  sectionHeaderTitle: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#64748b',
+    letterSpacing: 0.8,
+    marginBottom: 10,
+  },
+  speedScroll: {
     flexDirection: 'row',
     gap: 8,
     paddingRight: 16,
-    marginBottom: 16,
   },
-  launchpadBtn: {
+  speedPill: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#ffffff',
@@ -909,74 +1215,160 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
     elevation: 1,
   },
-  launchpadBtnPrimary: {
-    backgroundColor: '#0066FF',
-    borderColor: '#0066FF',
+  speedPillPrimary: {
+    backgroundColor: '#091326',
+    borderColor: '#1e293b',
   },
-  launchpadBtnText: {
+  speedPillText: {
     fontSize: 12,
     fontWeight: '700',
     color: '#334155',
   },
-  launchpadBtnTextPrimary: {
+  speedPillTextPrimary: {
     fontSize: 12,
     fontWeight: '800',
     color: '#ffffff',
   },
 
-  // 2. Alert Banner
-  alertBanner: {
-    backgroundColor: '#eff6ff',
-    borderWidth: 1,
-    borderColor: '#bfdbfe',
-    borderRadius: 18,
-    padding: 14,
+  // 3. Live Customer Outreach & Activity Stream (Instagram-inspired)
+  streamSection: {
     marginBottom: 16,
   },
-  alertBannerTop: {
+  sectionTitleRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 6,
+    alignItems: 'flex-start',
+    marginBottom: 10,
   },
-  alertBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#dbeafe',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
+  sectionHeaderSub: {
+    fontSize: 11,
+    color: '#64748b',
+    marginTop: 2,
   },
-  alertBadgeText: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#1e40af',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  alertBannerMessage: {
-    fontSize: 12,
-    color: '#334155',
-    lineHeight: 18,
-    marginVertical: 4,
-  },
-  alertBannerFooter: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    marginTop: 8,
-  },
-  alertActionBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#0066FF',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 10,
-  },
-  alertActionBtnText: {
+  sectionLinkText: {
     fontSize: 11,
     fontWeight: '800',
-    color: '#ffffff',
+    color: '#0066FF',
+  },
+  streamCard: {
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 6,
+    elevation: 1,
+  },
+  streamRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+    gap: 12,
+  },
+  streamAvatar: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  streamAvatarText: {
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  streamMeta: {
+    flex: 1,
+  },
+  streamNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 3,
+  },
+  streamName: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#0f172a',
+    flexShrink: 1,
+  },
+  streamStageBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  streamStageText: {
+    fontSize: 8,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+  },
+  streamSub: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: '#64748b',
+  },
+  streamActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  microActionBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 9,
+    backgroundColor: '#f1f5f9',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  // 4. Unified Performance Strip
+  kpiStripCard: {
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 20,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  kpiStripCol: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  kpiStripLabel: {
+    fontSize: 8,
+    fontWeight: '800',
+    color: '#64748b',
+    letterSpacing: 0.6,
+    marginBottom: 2,
+  },
+  kpiStripVal: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#0f172a',
+  },
+  kpiStripHint: {
+    fontSize: 8,
+    fontWeight: '600',
+    color: '#94a3b8',
+    marginTop: 1,
+  },
+  kpiStripDivider: {
+    width: 1,
+    height: 28,
+    backgroundColor: '#f1f5f9',
   },
 
   // 3. Ticker Cards
@@ -1317,28 +1709,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.04,
     shadowRadius: 6,
     elevation: 2,
-  },
-  sectionTitleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 14,
-  },
-  sectionHeaderTitle: {
-    fontSize: 11,
-    fontWeight: '900',
-    color: '#0f172a',
-    letterSpacing: 0.6,
-  },
-  sectionHeaderSub: {
-    fontSize: 10,
-    color: '#64748b',
-    marginTop: 2,
-  },
-  sectionLinkText: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#0066FF',
   },
 
   // 5. Funnel Grid

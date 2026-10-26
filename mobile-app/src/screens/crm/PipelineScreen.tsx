@@ -11,6 +11,7 @@ import {
   Linking,
   Alert,
   Platform,
+  Modal,
 } from 'react-native';
 import {
   Plus,
@@ -31,6 +32,11 @@ import {
   Calendar,
   Receipt,
   CreditCard,
+  X,
+  ChevronRight,
+  Clock,
+  MapPin,
+  User,
 } from 'lucide-react-native';
 import { Header } from '../../components/Header';
 import { openWhatsAppWithPitch } from '../../services/whatsappService';
@@ -75,6 +81,13 @@ export const PipelineScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
   const [selectedLead, setSelectedLead] = useState<any | null>(null);
   const [activeQuotationData, setActiveQuotationData] = useState<any | null>(null);
   const [selectedProject, setSelectedProject] = useState<any | null>(null);
+  const [detailModalVisible, setDetailModalVisible] = useState(false);
+  const [leadForDetail, setLeadForDetail] = useState<any | null>(null);
+
+  const handleOpenLeadDetail = (lead: any) => {
+    setLeadForDetail(lead);
+    setDetailModalVisible(true);
+  };
 
   useEffect(() => {
     fetchLeads();
@@ -488,196 +501,129 @@ export const PipelineScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
               }
             }
 
+            const avatarInitials = item.name
+              ? item.name
+                  .split(' ')
+                  .map((w: string) => w[0])
+                  .join('')
+                  .toUpperCase()
+                  .slice(0, 2)
+              : 'SO';
+
             return (
-              <View key={item.id} style={styles.leadCard}>
-                {/* CARD HEADER */}
-                <View style={styles.cardTopRow}>
-                  <View style={styles.cardCustomerInfo}>
-                    <Text style={styles.cardCustomerName}>{item.name}</Text>
-                    <Text style={styles.cardCustomerSub}>
-                      📍 {item.city || 'Site Location'} {item.consumerNumber ? `| No: ${item.consumerNumber}` : ''}
+              <TouchableOpacity
+                key={item.id}
+                style={styles.leadRowCard}
+                onPress={() => handleOpenLeadDetail(item)}
+                activeOpacity={0.88}
+              >
+                {/* TOP ROW: AVATAR + NAME & LOCATION + STAGE BADGE */}
+                <View style={styles.rowMainTop}>
+                  <View style={[styles.avatarCircle, isWon ? styles.avatarWon : item.isDraft ? styles.avatarDraft : styles.avatarActive]}>
+                    <Text style={[styles.avatarText, isWon ? styles.avatarTextWon : item.isDraft ? styles.avatarTextDraft : styles.avatarTextActive]}>
+                      {avatarInitials}
                     </Text>
                   </View>
-                  <View style={[styles.statusBadge, item.isDraft ? styles.statusBadgeDraft : isWon ? styles.statusBadgeWon : styles.statusBadgeActive]}>
-                    <Text style={[styles.statusBadgeText, item.isDraft ? styles.statusBadgeTextDraft : isWon ? styles.statusBadgeTextWon : styles.statusBadgeTextActive]}>
-                      {item.isDraft ? 'OFFLINE DRAFT' : item.status || 'NEW'}
-                    </Text>
-                  </View>
-                </View>
 
-                {/* SIZING & COMMERCIAL HIGHLIGHTS */}
-                <View style={styles.metricGrid}>
-                  <View style={styles.metricItem}>
-                    <Text style={styles.metricLabel}>Plant Size</Text>
-                    <Text style={styles.metricValueBold}>{cap} kWp</Text>
-                  </View>
-                  <View style={styles.metricItem}>
-                    <Text style={styles.metricLabel}>Total Value</Text>
-                    <Text style={styles.metricValue}>₹{gross.toLocaleString('en-IN')}</Text>
-                  </View>
-                  <View style={styles.metricItem}>
-                    <Text style={styles.metricLabel}>PM Subsidy</Text>
-                    <Text style={styles.metricValueGreen}>-₹{subsidy.toLocaleString('en-IN')}</Text>
-                  </View>
-                  <View style={styles.metricItem}>
-                    <Text style={styles.metricLabel}>Customer Cost</Text>
-                    <Text style={styles.metricValueBlue}>₹{net.toLocaleString('en-IN')}</Text>
-                  </View>
-                </View>
-
-                {/* COMMERCIAL BILLING & REALIZED CASHFLOW HUB */}
-                <View style={styles.commercialBillingBox}>
-                  <View style={styles.commercialHeaderRow}>
-                    <View style={styles.commercialTitleGroup}>
-                      <View style={styles.commercialIconCircle}>
-                        <Receipt size={13} color="#059669" />
-                      </View>
-                      <View>
-                        <Text style={styles.commercialTitle}>COMMERCIAL BILLING & CASHFLOW</Text>
-                        <Text style={styles.commercialSub}>
-                          {hasInvoices
-                            ? `${uniqueInvoices.length} document(s) • ${billedOfDealPct}% of contract invoiced`
-                            : 'No commercial invoice issued yet'}
+                  <View style={styles.leadInfoCol}>
+                    <View style={styles.leadNameRow}>
+                      <Text style={styles.leadNameText} numberOfLines={1}>
+                        {item.name}
+                      </Text>
+                      <View style={[styles.statusBadge, item.isDraft ? styles.statusBadgeDraft : isWon ? styles.statusBadgeWon : styles.statusBadgeActive]}>
+                        <Text style={[styles.statusBadgeText, item.isDraft ? styles.statusBadgeTextDraft : isWon ? styles.statusBadgeTextWon : styles.statusBadgeTextActive]}>
+                          {item.isDraft ? 'DRAFT' : isWon ? 'WON / EPC' : item.status || 'NEW'}
                         </Text>
                       </View>
                     </View>
-                    <View style={[styles.commercialStatusBadge, statusBadgeStyle]}>
-                      <Text style={[styles.commercialStatusText, statusTextStyle]}>{statusLabel}</Text>
-                    </View>
-                  </View>
 
-                  {/* REALIZED CASHFLOW PROGRESS BAR */}
-                  <View style={styles.progressBarWrapper}>
-                    <View style={styles.progressBarTrack}>
-                      <View
-                        style={[
-                          styles.progressBarFill,
-                          {
-                            width: `${hasInvoices ? realizedPct : 0}%`,
-                            backgroundColor: totalDue === 0 && totalPaid > 0 ? '#10b981' : '#0284c7',
-                          },
-                        ]}
-                      />
-                    </View>
-                  </View>
-
-                  {/* 3-COLUMN METRICS GRID */}
-                  <View style={styles.commercialMetricsRow}>
-                    <View style={styles.commercialMetricCol}>
-                      <Text style={styles.commercialMetricLabel}>Invoiced</Text>
-                      <Text style={styles.commercialMetricVal}>₹{totalBilled.toLocaleString('en-IN')}</Text>
-                      <Text style={styles.commercialMetricHint}>
-                        {hasInvoices ? `${billedOfDealPct}% of deal` : 'Ready to Bill'}
-                      </Text>
-                    </View>
-                    <View style={[styles.commercialMetricCol, styles.commercialMetricColBorder]}>
-                      <Text style={styles.commercialMetricLabel}>Received</Text>
-                      <Text style={[styles.commercialMetricVal, { color: '#059669' }]}>
-                        ₹{totalPaid.toLocaleString('en-IN')}
-                      </Text>
-                      <Text style={styles.commercialMetricHint}>
-                        {hasInvoices ? `${realizedPct}% realized` : '₹0 collected'}
-                      </Text>
-                    </View>
-                    <View style={styles.commercialMetricCol}>
-                      <Text style={styles.commercialMetricLabel}>Balance Due</Text>
-                      <Text
-                        style={[
-                          styles.commercialMetricVal,
-                          { color: totalDue > 0 ? '#d97706' : '#64748b' },
-                        ]}
-                      >
-                        ₹{totalDue.toLocaleString('en-IN')}
-                      </Text>
-                      <Text style={styles.commercialMetricHint}>
-                        {totalDue > 0 ? 'Pending' : 'All clear'}
-                      </Text>
-                    </View>
-                  </View>
-
-                  {/* COMMERCIAL ACTIONS: QUICK INVOICE, PDF, LEDGER */}
-                  <View style={styles.commercialActionsRow}>
-                    <TouchableOpacity
-                      style={styles.quickInvoiceBtn}
-                      onPress={() => handleOpenCreateInvoiceForLead(item)}
-                      activeOpacity={0.85}
-                    >
-                      <Plus size={13} color="#ffffff" />
-                      <Text style={styles.quickInvoiceBtnText}>+ Quick Invoice</Text>
-                    </TouchableOpacity>
-
-                    {hasInvoices && (
-                      <TouchableOpacity
-                        style={styles.viewPdfInvoiceBtn}
-                        onPress={() => handleOpenPdfInvoiceForLead(item)}
-                        activeOpacity={0.8}
-                      >
-                        <FileText size={13} color="#2563eb" />
-                        <Text style={styles.viewPdfInvoiceBtnText}>📄 PDF</Text>
-                      </TouchableOpacity>
-                    )}
-
-                    <TouchableOpacity
-                      style={styles.leadFinanceLinkBtn}
-                      onPress={() => handleNavigateToFinanceForLead(item)}
-                      activeOpacity={0.8}
-                    >
-                      <CreditCard size={13} color="#059669" />
-                      <Text style={styles.leadFinanceLinkBtnText}>💳 Ledger</Text>
-                    </TouchableOpacity>
+                    <Text style={styles.leadSubText} numberOfLines={1}>
+                      📍 {item.city || 'Site Location'} {item.mobile ? `• ${item.mobile}` : ''} {item.consumerNumber ? `• No: ${item.consumerNumber}` : ''}
+                    </Text>
                   </View>
                 </View>
 
-                {/* CONTEXTUAL ACTION ROW */}
-                <View style={styles.cardActionsRow}>
+                {/* KEY SPECS & COMMERCIAL STRIP */}
+                <View style={styles.specsPillsRow}>
+                  <View style={styles.specPill}>
+                    <Zap size={11} color="#0284c7" />
+                    <Text style={styles.specPillText}>{cap} kWp</Text>
+                  </View>
+
+                  <View style={styles.specPill}>
+                    <IndianRupee size={11} color="#0f172a" />
+                    <Text style={styles.specPillText}>₹{(gross / 100000).toFixed(2)}L</Text>
+                  </View>
+
+                  <View style={[styles.specPill, { backgroundColor: '#ecfdf5', borderColor: '#a7f3d0' }]}>
+                    <Sparkles size={11} color="#059669" />
+                    <Text style={[styles.specPillText, { color: '#059669' }]}>₹{(subsidy / 1000).toFixed(0)}k DBT</Text>
+                  </View>
+
+                  <View style={[styles.specPill, statusBadgeStyle]}>
+                    <Text style={[styles.specPillText, statusTextStyle]}>{statusLabel}</Text>
+                  </View>
+                </View>
+
+                {/* QUICK 1-TAP ACTION STRIP */}
+                <View style={styles.rowActionsStrip}>
                   <TouchableOpacity
-                    style={styles.iconActionBtn}
+                    style={styles.microCircleBtn}
                     onPress={() => handlePhoneCall(item.mobile || item.phone)}
-                    activeOpacity={0.7}
+                    activeOpacity={0.75}
                   >
-                    <Phone size={15} color="#0284c7" strokeWidth={2.3} />
+                    <Phone size={14} color="#0284c7" />
                   </TouchableOpacity>
 
                   <TouchableOpacity
-                    style={[styles.iconActionBtn, { backgroundColor: '#ecfdf5', borderColor: '#a7f3d0' }]}
+                    style={[styles.microCircleBtn, { backgroundColor: '#ecfdf5', borderColor: '#a7f3d0' }]}
                     onPress={() => handleWhatsAppPitch(item)}
-                    activeOpacity={0.7}
+                    activeOpacity={0.75}
                   >
-                    <MessageCircle size={15} color="#059669" strokeWidth={2.3} />
+                    <MessageCircle size={14} color="#059669" />
                   </TouchableOpacity>
 
                   {isWon ? (
                     <TouchableOpacity
-                      style={styles.discomCtaBtn}
+                      style={styles.actionBtnWon}
                       onPress={() => handleOpenDiscomDocs(item)}
                       activeOpacity={0.8}
                     >
-                      <Building size={15} color="#d97706" />
-                      <Text style={styles.discomCtaText}>Generate Official DISCOM Docs</Text>
+                      <Building size={13} color="#d97706" />
+                      <Text style={styles.actionBtnWonText}>DISCOM Docs</Text>
                     </TouchableOpacity>
                   ) : (
                     <>
                       <TouchableOpacity
-                        style={styles.quoteCtaBtn}
+                        style={styles.actionBtnQuote}
                         onPress={() => handleOpenQuoteBuilder(item)}
                         activeOpacity={0.8}
                       >
-                        <FileText size={15} color="#2563eb" />
-                        <Text style={styles.quoteCtaText}>Custom Quote</Text>
+                        <Zap size={13} color="#2563eb" />
+                        <Text style={styles.actionBtnQuoteText}>Quote</Text>
                       </TouchableOpacity>
 
                       <TouchableOpacity
-                        style={styles.onboardCtaBtn}
+                        style={styles.actionBtnOnboard}
                         onPress={() => handleProceedToOnboarding(item, { capacityKw: cap, grossTotal: gross, subsidy, netCustomerCost: net })}
                         activeOpacity={0.8}
                       >
-                        <ShieldCheck size={15} color="#ffffff" />
-                        <Text style={styles.onboardCtaText}>Onboard</Text>
+                        <ShieldCheck size={13} color="#ffffff" />
+                        <Text style={styles.actionBtnOnboardText}>Onboard</Text>
                       </TouchableOpacity>
                     </>
                   )}
+
+                  <TouchableOpacity
+                    style={styles.openDetailPill}
+                    onPress={() => handleOpenLeadDetail(item)}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.openDetailText}>Profile</Text>
+                    <ChevronRight size={12} color="#64748b" />
+                  </TouchableOpacity>
                 </View>
-              </View>
+              </TouchableOpacity>
             );
           })
         )}
@@ -744,6 +690,274 @@ export const PipelineScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
         }}
         invoice={selectedInvoiceForPdf}
       />
+
+      {/* 6. WHERE READY FIELD EXPERIENCE: ACTION-ORIENTED CUSTOMER PROFILE MODAL */}
+      <Modal
+        visible={detailModalVisible && !!leadForDetail}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setDetailModalVisible(false)}
+      >
+        <View style={styles.detailModalOverlay}>
+          <View style={styles.detailModalSheet}>
+            {/* SHEET HEADER */}
+            <View style={styles.detailModalHeader}>
+              <View>
+                <Text style={styles.detailModalTitle}>Customer Profile & Dispatch</Text>
+                <Text style={styles.detailModalSub}>WhereReady Field Experience • Operational Hub</Text>
+              </View>
+              <TouchableOpacity
+                style={styles.detailModalClose}
+                onPress={() => setDetailModalVisible(false)}
+                activeOpacity={0.7}
+              >
+                <X size={18} color="#64748b" />
+              </TouchableOpacity>
+            </View>
+
+            {leadForDetail && (() => {
+              const dCap = leadForDetail.estimatedCap || 3.3;
+              const dGross = leadForDetail.estimatedValue || Math.round(dCap * 56000);
+              const dSubsidy = dCap >= 3 ? 78000 : dCap >= 2 ? 60000 : 30000;
+              const dNet = Math.max(0, dGross - dSubsidy);
+              const dMonthlyUnits = Math.round(dCap * 120);
+              const dMonthlySavings = Math.round(dMonthlyUnits * 8.5);
+              const isWon = leadForDetail.status === 'WON';
+
+              // Invoices
+              const dInvs: any[] = [];
+              if (leadForDetail.customer?.invoices) dInvs.push(...leadForDetail.customer.invoices);
+              if (leadForDetail.projects) {
+                leadForDetail.projects.forEach((p: any) => {
+                  if (p.invoices) dInvs.push(...p.invoices);
+                });
+              }
+              const dUniqueInvs = Array.from(new Map(dInvs.map((i: any) => [i.id, i])).values());
+              const dBilled = dUniqueInvs.reduce((s: number, i: any) => s + (i.amount || 0), 0);
+              const dPaid = dUniqueInvs.reduce((s: number, i: any) => {
+                const pSum = (i.payments || []).reduce((ps: number, p: any) => ps + (p.amount || 0), 0);
+                return s + (i.totalPaid ?? pSum);
+              }, 0);
+              const dDue = Math.max(0, dBilled - dPaid);
+              const dPct = dBilled > 0 ? Math.min(100, Math.round((dPaid / dBilled) * 100)) : 0;
+
+              return (
+                <ScrollView
+                  style={styles.detailScroll}
+                  contentContainerStyle={styles.detailScrollContent}
+                  showsVerticalScrollIndicator={false}
+                >
+                  {/* HERO CUSTOMER PROFILE CARD */}
+                  <View style={styles.detailHeroCard}>
+                    <View style={styles.detailHeroTop}>
+                      <View style={styles.detailAvatar}>
+                        <Text style={styles.detailAvatarText}>
+                          {leadForDetail.name ? leadForDetail.name.charAt(0).toUpperCase() : 'S'}
+                        </Text>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.detailHeroName}>{leadForDetail.name}</Text>
+                        <Text style={styles.detailHeroSub}>
+                          📍 {leadForDetail.city || 'Site Location'} {leadForDetail.consumerNumber ? `• Cons: ${leadForDetail.consumerNumber}` : ''}
+                        </Text>
+                      </View>
+                      <View style={[styles.statusBadge, isWon ? styles.statusBadgeWon : styles.statusBadgeActive]}>
+                        <Text style={[styles.statusBadgeText, isWon ? styles.statusBadgeTextWon : styles.statusBadgeTextActive]}>
+                          {isWon ? 'WON / EPC' : leadForDetail.status || 'NEW'}
+                        </Text>
+                      </View>
+                    </View>
+
+                    {/* DIRECT COMMUNICATIONS BAR */}
+                    <View style={styles.detailCommsRow}>
+                      <TouchableOpacity
+                        style={styles.detailCommBtn}
+                        onPress={() => handlePhoneCall(leadForDetail.mobile || leadForDetail.phone)}
+                        activeOpacity={0.8}
+                      >
+                        <Phone size={14} color="#0284c7" />
+                        <Text style={styles.detailCommBtnText}>Call Customer</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={[styles.detailCommBtn, { backgroundColor: '#ecfdf5', borderColor: '#a7f3d0' }]}
+                        onPress={() => handleWhatsAppPitch(leadForDetail)}
+                        activeOpacity={0.8}
+                      >
+                        <MessageCircle size={14} color="#059669" />
+                        <Text style={[styles.detailCommBtnText, { color: '#059669' }]}>WhatsApp Pitch</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+
+                  {/* UBER-INSPIRED: NEXT RECOMMENDED ACTION */}
+                  <View style={styles.detailRecommendCard}>
+                    <View style={styles.recommendTagRow}>
+                      <Sparkles size={13} color="#f59e0b" />
+                      <Text style={styles.recommendTag}>RECOMMENDED NEXT ACTION</Text>
+                    </View>
+                    <Text style={styles.recommendHeadline}>
+                      {isWon
+                        ? 'Generate Net-Metering DISCOM Statutory Forms'
+                        : leadForDetail.status === 'PROPOSAL_SENT'
+                        ? 'Execute Customer Agreement & Onboarding'
+                        : 'Send 60-Second PM Surya Ghar Solar Proposal'}
+                    </Text>
+                    <Text style={styles.recommendSub}>
+                      {isWon
+                        ? 'Customer deal is won. Submit formal grid connection and bi-directional meter requisition to DISCOM.'
+                        : leadForDetail.status === 'PROPOSAL_SENT'
+                        ? 'Quotation has been delivered. Collect KYC documents and generate the EPC master contract.'
+                        : `Lock in ₹${(dSubsidy / 1000).toFixed(0)}k DBT subsidy for ${dCap} kWp rooftop plant.`}
+                    </Text>
+
+                    <TouchableOpacity
+                      style={styles.recommendBtn}
+                      onPress={() => {
+                        setDetailModalVisible(false);
+                        if (isWon) {
+                          handleOpenDiscomDocs(leadForDetail);
+                        } else if (leadForDetail.status === 'PROPOSAL_SENT') {
+                          handleProceedToOnboarding(leadForDetail, { capacityKw: dCap, grossTotal: dGross, subsidy: dSubsidy, netCustomerCost: dNet });
+                        } else {
+                          handleOpenQuoteBuilder(leadForDetail);
+                        }
+                      }}
+                      activeOpacity={0.85}
+                    >
+                      <Zap size={14} color="#ffffff" style={{ marginRight: 6 }} />
+                      <Text style={styles.recommendBtnText}>
+                        {isWon ? 'Generate DISCOM Dossier' : leadForDetail.status === 'PROPOSAL_SENT' ? 'Start Client Onboarding' : 'Open Quotation Builder'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* SYSTEM & FINANCIAL ARCHITECTURE */}
+                  <View style={styles.detailSpecsCard}>
+                    <Text style={styles.detailSectionTitle}>SYSTEM SPECIFICATIONS & PM SURYA GHAR</Text>
+                    <View style={styles.detailSpecsGrid}>
+                      <View style={styles.detailSpecItem}>
+                        <Text style={styles.detailSpecLabel}>Capacity</Text>
+                        <Text style={styles.detailSpecVal}>{dCap} kWp</Text>
+                        <Text style={styles.detailSpecHint}>Mono PERC DCR</Text>
+                      </View>
+                      <View style={styles.detailSpecItem}>
+                        <Text style={styles.detailSpecLabel}>Turnkey Cost</Text>
+                        <Text style={styles.detailSpecVal}>₹{dGross.toLocaleString('en-IN')}</Text>
+                        <Text style={styles.detailSpecHint}>All GST Incl.</Text>
+                      </View>
+                      <View style={styles.detailSpecItem}>
+                        <Text style={styles.detailSpecLabel}>PM Subsidy</Text>
+                        <Text style={[styles.detailSpecVal, { color: '#059669' }]}>-₹{dSubsidy.toLocaleString('en-IN')}</Text>
+                        <Text style={styles.detailSpecHint}>Direct DBT</Text>
+                      </View>
+                      <View style={styles.detailSpecItem}>
+                        <Text style={styles.detailSpecLabel}>Net Payable</Text>
+                        <Text style={[styles.detailSpecVal, { color: '#0284c7' }]}>₹{dNet.toLocaleString('en-IN')}</Text>
+                        <Text style={styles.detailSpecHint}>After Subsidy</Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.detailYieldRow}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.detailYieldTitle}>Monthly Generation & Bill Offset</Text>
+                        <Text style={styles.detailYieldSub}>
+                          ~{dMonthlyUnits} units/mo • Saves ₹{dMonthlySavings.toLocaleString('en-IN')}/mo on tariff
+                        </Text>
+                      </View>
+                      <View style={styles.detailYieldBadge}>
+                        <Text style={styles.detailYieldBadgeText}>⚡ 90%+ Offset</Text>
+                      </View>
+                    </View>
+                  </View>
+
+                  {/* COMMERCIAL INVOICING & CASHFLOW HUB */}
+                  <View style={styles.detailFinanceCard}>
+                    <View style={styles.detailFinanceHeader}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Receipt size={15} color="#059669" />
+                        <Text style={styles.detailSectionTitle}>COMMERCIAL CASHFLOW LEDGER</Text>
+                      </View>
+                      <Text style={styles.detailFinanceCount}>{dUniqueInvs.length} Invoices</Text>
+                    </View>
+
+                    {/* Progress Bar */}
+                    <View style={styles.detailProgressWrap}>
+                      <View style={styles.detailProgressTrack}>
+                        <View
+                          style={[
+                            styles.detailProgressFill,
+                            {
+                              width: `${dBilled > 0 ? dPct : 0}%`,
+                              backgroundColor: dDue === 0 && dPaid > 0 ? '#10b981' : '#0284c7',
+                            },
+                          ]}
+                        />
+                      </View>
+                      <Text style={styles.detailProgressText}>{dPct}% Collected</Text>
+                    </View>
+
+                    {/* 3 Metric Columns */}
+                    <View style={styles.detailFinanceCols}>
+                      <View style={styles.detailFinanceCol}>
+                        <Text style={styles.detailFinanceColLabel}>Invoiced</Text>
+                        <Text style={styles.detailFinanceColVal}>₹{dBilled.toLocaleString('en-IN')}</Text>
+                      </View>
+                      <View style={styles.detailFinanceCol}>
+                        <Text style={styles.detailFinanceColLabel}>Received</Text>
+                        <Text style={[styles.detailFinanceColVal, { color: '#059669' }]}>₹{dPaid.toLocaleString('en-IN')}</Text>
+                      </View>
+                      <View style={styles.detailFinanceCol}>
+                        <Text style={styles.detailFinanceColLabel}>Outstanding</Text>
+                        <Text style={[styles.detailFinanceColVal, { color: dDue > 0 ? '#d97706' : '#64748b' }]}>₹{dDue.toLocaleString('en-IN')}</Text>
+                      </View>
+                    </View>
+
+                    {/* Action buttons */}
+                    <View style={styles.detailFinanceActions}>
+                      <TouchableOpacity
+                        style={styles.detailInvoiceActionBtn}
+                        onPress={() => {
+                          setDetailModalVisible(false);
+                          handleOpenCreateInvoiceForLead(leadForDetail);
+                        }}
+                        activeOpacity={0.8}
+                      >
+                        <Plus size={13} color="#ffffff" />
+                        <Text style={styles.detailInvoiceActionBtnText}>+ Quick Invoice</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={styles.detailPdfActionBtn}
+                        onPress={() => {
+                          setDetailModalVisible(false);
+                          handleOpenPdfInvoiceForLead(leadForDetail);
+                        }}
+                        activeOpacity={0.8}
+                      >
+                        <FileText size={13} color="#2563eb" />
+                        <Text style={styles.detailPdfActionBtnText}>📄 PDF Invoice</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={styles.detailLedgerActionBtn}
+                        onPress={() => {
+                          setDetailModalVisible(false);
+                          handleNavigateToFinanceForLead(leadForDetail);
+                        }}
+                        activeOpacity={0.8}
+                      >
+                        <CreditCard size={13} color="#059669" />
+                        <Text style={styles.detailLedgerActionBtnText}>💳 Full Ledger</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </ScrollView>
+              );
+            })()}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -1353,6 +1567,530 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   leadFinanceLinkBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#334155',
+  },
+
+  // ----------------------------------------------------
+  // WHERE READY FIELD EXPERIENCE: SCANNABLE LEAD ROW STYLES
+  // ----------------------------------------------------
+  leadRowCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 18,
+    padding: 14,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  rowMainTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 10,
+  },
+  avatarCircle: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarActive: {
+    backgroundColor: '#eff6ff',
+    borderWidth: 1,
+    borderColor: '#dbeafe',
+  },
+  avatarWon: {
+    backgroundColor: '#ecfdf5',
+    borderWidth: 1,
+    borderColor: '#a7f3d0',
+  },
+  avatarDraft: {
+    backgroundColor: '#fffbeb',
+    borderWidth: 1,
+    borderColor: '#fde68a',
+  },
+  avatarText: {
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  avatarTextActive: {
+    color: '#0066FF',
+  },
+  avatarTextWon: {
+    color: '#059669',
+  },
+  avatarTextDraft: {
+    color: '#d97706',
+  },
+  leadInfoCol: {
+    flex: 1,
+  },
+  leadNameRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 6,
+  },
+  leadNameText: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#0f172a',
+    flexShrink: 1,
+  },
+  leadSubText: {
+    fontSize: 11,
+    color: '#64748b',
+    marginTop: 2,
+    fontWeight: '500',
+  },
+  specsPillsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 12,
+  },
+  specPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  specPillText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#334155',
+  },
+  rowActionsStrip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  microCircleBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    backgroundColor: '#f0f9ff',
+    borderWidth: 1,
+    borderColor: '#e0f2fe',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionBtnWon: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#fef3c7',
+    borderWidth: 1,
+    borderColor: '#fde68a',
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 8,
+  },
+  actionBtnWonText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#d97706',
+  },
+  actionBtnQuote: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#eff6ff',
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 8,
+  },
+  actionBtnQuoteText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#0066FF',
+  },
+  actionBtnOnboard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#10b981',
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 8,
+  },
+  actionBtnOnboardText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#ffffff',
+  },
+  openDetailPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    marginLeft: 'auto',
+    paddingHorizontal: 6,
+    paddingVertical: 6,
+  },
+  openDetailText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#64748b',
+  },
+
+  // ----------------------------------------------------
+  // ACTION-ORIENTED CUSTOMER PROFILE MODAL (Uber & Ola inspired)
+  // ----------------------------------------------------
+  detailModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.7)',
+    justifyContent: 'flex-end',
+  },
+  detailModalSheet: {
+    backgroundColor: '#ffffff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: '92%',
+    paddingBottom: Platform.OS === 'ios' ? 36 : 20,
+  },
+  detailModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+  },
+  detailModalTitle: {
+    fontSize: 16,
+    fontWeight: '900',
+    color: '#0f172a',
+  },
+  detailModalSub: {
+    fontSize: 10,
+    color: '#64748b',
+    marginTop: 2,
+    fontWeight: '500',
+  },
+  detailModalClose: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#f1f5f9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  detailScroll: {
+    maxHeight: '100%',
+  },
+  detailScrollContent: {
+    padding: 16,
+    paddingBottom: 40,
+  },
+  detailHeroCard: {
+    backgroundColor: '#0f172a',
+    borderRadius: 20,
+    padding: 16,
+    marginBottom: 16,
+  },
+  detailHeroTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 14,
+  },
+  detailAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  detailAvatarText: {
+    fontSize: 16,
+    fontWeight: '900',
+    color: '#ffffff',
+  },
+  detailHeroName: {
+    fontSize: 16,
+    fontWeight: '900',
+    color: '#ffffff',
+  },
+  detailHeroSub: {
+    fontSize: 11,
+    color: '#94a3b8',
+    marginTop: 2,
+  },
+  detailCommsRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  detailCommBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    paddingVertical: 10,
+  },
+  detailCommBtnText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#0284c7',
+  },
+  detailRecommendCard: {
+    backgroundColor: '#eff6ff',
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+    borderRadius: 18,
+    padding: 16,
+    marginBottom: 16,
+  },
+  recommendTagRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: 4,
+  },
+  recommendTag: {
+    fontSize: 9,
+    fontWeight: '900',
+    color: '#d97706',
+    letterSpacing: 0.5,
+  },
+  recommendHeadline: {
+    fontSize: 15,
+    fontWeight: '900',
+    color: '#0f172a',
+    marginBottom: 4,
+  },
+  recommendSub: {
+    fontSize: 11,
+    color: '#475569',
+    lineHeight: 16,
+    marginBottom: 12,
+  },
+  recommendBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#0066FF',
+    borderRadius: 12,
+    paddingVertical: 11,
+    shadowColor: '#0066FF',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  recommendBtnText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#ffffff',
+  },
+  detailSpecsCard: {
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 18,
+    padding: 16,
+    marginBottom: 16,
+  },
+  detailSectionTitle: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: '#475569',
+    letterSpacing: 0.6,
+    marginBottom: 12,
+  },
+  detailSpecsGrid: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 12,
+  },
+  detailSpecItem: {
+    flex: 1,
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#f1f5f9',
+    alignItems: 'center',
+  },
+  detailSpecLabel: {
+    fontSize: 8,
+    fontWeight: '700',
+    color: '#64748b',
+    textTransform: 'uppercase',
+  },
+  detailSpecVal: {
+    fontSize: 12,
+    fontWeight: '900',
+    color: '#0f172a',
+    marginVertical: 2,
+  },
+  detailSpecHint: {
+    fontSize: 8,
+    color: '#94a3b8',
+    fontWeight: '600',
+  },
+  detailYieldRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#f1f5f9',
+  },
+  detailYieldTitle: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#0f172a',
+  },
+  detailYieldSub: {
+    fontSize: 10,
+    color: '#64748b',
+    marginTop: 1,
+  },
+  detailYieldBadge: {
+    backgroundColor: '#ecfdf5',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  detailYieldBadgeText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#059669',
+  },
+  detailFinanceCard: {
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 18,
+    padding: 16,
+    marginBottom: 16,
+  },
+  detailFinanceHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  detailFinanceCount: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#64748b',
+  },
+  detailProgressWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+  },
+  detailProgressTrack: {
+    flex: 1,
+    height: 6,
+    backgroundColor: '#f1f5f9',
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  detailProgressFill: {
+    height: '100%',
+    borderRadius: 3,
+  },
+  detailProgressText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#059669',
+  },
+  detailFinanceCols: {
+    flexDirection: 'row',
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#f1f5f9',
+    marginBottom: 12,
+  },
+  detailFinanceCol: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  detailFinanceColLabel: {
+    fontSize: 8,
+    fontWeight: '700',
+    color: '#64748b',
+    textTransform: 'uppercase',
+  },
+  detailFinanceColVal: {
+    fontSize: 12,
+    fontWeight: '900',
+    color: '#0f172a',
+    marginTop: 2,
+  },
+  detailFinanceActions: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  detailInvoiceActionBtn: {
+    flex: 1.2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    backgroundColor: '#059669',
+    borderRadius: 10,
+    paddingVertical: 8,
+  },
+  detailInvoiceActionBtnText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#ffffff',
+  },
+  detailPdfActionBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    backgroundColor: '#eff6ff',
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+    borderRadius: 10,
+    paddingVertical: 8,
+  },
+  detailPdfActionBtnText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#0066FF',
+  },
+  detailLedgerActionBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 10,
+    paddingVertical: 8,
+  },
+  detailLedgerActionBtnText: {
     fontSize: 11,
     fontWeight: '700',
     color: '#334155',

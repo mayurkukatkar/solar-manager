@@ -22,6 +22,12 @@ import {
   Eye,
   CheckCircle2,
   Send,
+  ChevronRight,
+  ChevronLeft,
+  Check,
+  Layers,
+  ShieldCheck,
+  Building,
 } from 'lucide-react-native';
 import { Header } from '../../components/Header';
 import { generateQuotationHtml, sharePdfFile, printDirectly, QuotationPdfProps } from '../../services/pdfService';
@@ -31,6 +37,10 @@ import { ProposalPreviewModal } from '../../components/ProposalPreviewModal';
 
 export const QuickQuoteScreen: React.FC<{ navigation?: any; route?: any }> = ({ navigation, route }) => {
   const initialParams = route?.params || {};
+  const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
+  const [panelBrand, setPanelBrand] = useState('Waaree 540W Mono PERC Bifacial');
+  const [inverterBrand, setInverterBrand] = useState('Solis Dual MPPT On-Grid');
+  const [structureType, setStructureType] = useState('Elevated HDG Structure');
   const [prospectName, setProspectName] = useState(initialParams.prospectName || initialParams.lead?.name || '');
   const [prospectPhone, setProspectPhone] = useState(initialParams.prospectPhone || initialParams.lead?.mobile || '');
   const [monthlyBill, setMonthlyBill] = useState(initialParams.monthlyBill || (initialParams.lead?.monthlyBill ? String(initialParams.lead.monthlyBill) : '3500'));
@@ -126,13 +136,13 @@ export const QuickQuoteScreen: React.FC<{ navigation?: any; route?: any }> = ({ 
       discomName: initialParams.lead?.discomName || 'MSEDCL',
       systemCapacityKw: cap,
       inverterCapacityKw: cap,
-      panelBrand: 'Waaree 540W Mono PERC Bifacial',
-      panelWattage: 540,
-      panelQuantity: Math.ceil((cap * 1000) / 540),
+      panelBrand,
+      panelWattage: panelBrand.includes('545') ? 545 : 540,
+      panelQuantity: Math.ceil((cap * 1000) / (panelBrand.includes('545') ? 545 : 540)),
       panelWarranty: '25 Years Performance',
-      inverterBrand: 'Solis / Growatt On-Grid Inverter',
+      inverterBrand,
       inverterWarranty: '10 Years Replacement',
-      structureType: 'Elevated HDG Structure',
+      structureType,
       structureWarranty: '10 Years Structural',
       grossAmount: gross,
       subtotal,
@@ -177,9 +187,9 @@ export const QuickQuoteScreen: React.FC<{ navigation?: any; route?: any }> = ({ 
         totalSystemCost: gross,
         status: statusOverride,
         templateType: 'quick_quote',
-        panelBrand: 'Waaree 540W Mono PERC Bifacial',
-        inverterBrand: 'Solis 3.3kW On-Grid Inverter',
-        structureBrand: 'Elevated HDG Structure',
+        panelBrand,
+        inverterBrand,
+        structureBrand: structureType,
         consumerNumber: initialParams.lead?.consumerNumber,
         discom: initialParams.lead?.discomName || 'MSEDCL',
         validityDays: 15,
@@ -301,113 +311,368 @@ export const QuickQuoteScreen: React.FC<{ navigation?: any; route?: any }> = ({ 
         }
       />
 
+      {/* 1. PERSISTENT FLOATING FINANCIAL KPI STRIP (WhereReady Field Experience) */}
+      <View style={styles.floatingKpiStrip}>
+        <View style={styles.kpiCol}>
+          <Text style={styles.kpiColLabel}>CAPACITY</Text>
+          <Text style={styles.kpiColVal}>{cap} kWp</Text>
+        </View>
+        <View style={styles.kpiDivider} />
+        <View style={styles.kpiCol}>
+          <Text style={styles.kpiColLabel}>TURNKEY GROSS</Text>
+          <Text style={styles.kpiColVal}>₹{(gross / 1000).toFixed(0)}k</Text>
+        </View>
+        <View style={styles.kpiDivider} />
+        <View style={styles.kpiCol}>
+          <Text style={styles.kpiColLabel}>DBT SUBSIDY</Text>
+          <Text style={[styles.kpiColVal, { color: '#059669' }]}>-₹{(subsidy / 1000).toFixed(0)}k</Text>
+        </View>
+        <View style={styles.kpiDivider} />
+        <View style={styles.kpiCol}>
+          <Text style={styles.kpiColLabel}>NET PAYABLE</Text>
+          <Text style={[styles.kpiColVal, { color: '#0066FF' }]}>₹{(net / 1000).toFixed(0)}k</Text>
+        </View>
+      </View>
+
+      {/* 2. OLA-INSPIRED GUIDED PROGRESS STEPPER TRACK */}
+      <View style={styles.guidedStepperTrack}>
+        <TouchableOpacity
+          style={[styles.stepTab, currentStep === 1 && styles.stepTabActive]}
+          onPress={() => setCurrentStep(1)}
+          activeOpacity={0.8}
+        >
+          <View style={[styles.stepNumCircle, currentStep === 1 ? styles.stepNumActive : currentStep > 1 ? styles.stepNumDone : styles.stepNumInactive]}>
+            {currentStep > 1 ? <Check size={11} color="#ffffff" strokeWidth={3} /> : <Text style={styles.stepNumText}>1</Text>}
+          </View>
+          <Text style={[styles.stepTabText, currentStep === 1 && styles.stepTabTextActive]}>Customer</Text>
+        </TouchableOpacity>
+
+        <View style={[styles.stepConnector, currentStep > 1 && styles.stepConnectorActive]} />
+
+        <TouchableOpacity
+          style={[styles.stepTab, currentStep === 2 && styles.stepTabActive]}
+          onPress={() => setCurrentStep(2)}
+          activeOpacity={0.8}
+        >
+          <View style={[styles.stepNumCircle, currentStep === 2 ? styles.stepNumActive : currentStep > 2 ? styles.stepNumDone : styles.stepNumInactive]}>
+            {currentStep > 2 ? <Check size={11} color="#ffffff" strokeWidth={3} /> : <Text style={styles.stepNumText}>2</Text>}
+          </View>
+          <Text style={[styles.stepTabText, currentStep === 2 && styles.stepTabTextActive]}>Sizing & Gear</Text>
+        </TouchableOpacity>
+
+        <View style={[styles.stepConnector, currentStep > 2 && styles.stepConnectorActive]} />
+
+        <TouchableOpacity
+          style={[styles.stepTab, currentStep === 3 && styles.stepTabActive]}
+          onPress={() => setCurrentStep(3)}
+          activeOpacity={0.8}
+        >
+          <View style={[styles.stepNumCircle, currentStep === 3 ? styles.stepNumActive : styles.stepNumInactive]}>
+            <Text style={styles.stepNumText}>3</Text>
+          </View>
+          <Text style={[styles.stepTabText, currentStep === 3 && styles.stepTabTextActive]}>Proposal</Text>
+        </TouchableOpacity>
+      </View>
+
       <ScrollView style={styles.body} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {/* INPUTS CARD */}
-        <View style={styles.card}>
-          <Text style={styles.label}>Prospect / Client Name *</Text>
-          <TextInput
-            style={styles.input}
-            value={prospectName}
-            onChangeText={setProspectName}
-            placeholder="e.g. Suresh Deshmukh"
-          />
-
-          <View style={styles.formRow}>
-            <View style={styles.formCol}>
-              <Text style={styles.label}>Mobile Number</Text>
-              <TextInput
-                style={styles.input}
-                value={prospectPhone}
-                onChangeText={setProspectPhone}
-                placeholder="10-digit number"
-                keyboardType="phone-pad"
-              />
+        {/* STEP 1: PROSPECT & ELECTRICITY BILL */}
+        {currentStep === 1 && (
+          <View style={styles.stepCard}>
+            <View style={styles.stepCardHeader}>
+              <View style={styles.stepBadge}>
+                <Text style={styles.stepBadgeText}>STEP 1 OF 3</Text>
+              </View>
+              <Text style={styles.stepCardTitle}>Prospect & Consumption Profile</Text>
+              <Text style={styles.stepCardSub}>Input client details to auto-size optimal solar capacity</Text>
             </View>
-            <View style={styles.formCol}>
-              <Text style={styles.label}>Current Monthly Bill (₹)</Text>
-              <TextInput
-                style={styles.inputHighlight}
-                value={monthlyBill}
-                onChangeText={handleBillChange}
-                keyboardType="numeric"
-              />
+
+            <Text style={styles.label}>Prospect / Client Name *</Text>
+            <TextInput
+              style={styles.input}
+              value={prospectName}
+              onChangeText={setProspectName}
+              placeholder="e.g. Suresh Deshmukh"
+              placeholderTextColor="#94a3b8"
+            />
+
+            <Text style={styles.label}>Mobile Number (WhatsApp Enabled)</Text>
+            <TextInput
+              style={styles.input}
+              value={prospectPhone}
+              onChangeText={setProspectPhone}
+              placeholder="10-digit mobile number"
+              placeholderTextColor="#94a3b8"
+              keyboardType="phone-pad"
+            />
+
+            <Text style={styles.label}>Current Monthly Electricity Bill (₹) *</Text>
+            <TextInput
+              style={styles.inputHighlight}
+              value={monthlyBill}
+              onChangeText={handleBillChange}
+              keyboardType="numeric"
+              placeholder="e.g. 3500"
+            />
+
+            {/* Quick Bill Preset Chips */}
+            <View style={styles.chipScrollRow}>
+              {['2500', '3500', '5000', '8000', '15000'].map((preset) => (
+                <TouchableOpacity
+                  key={preset}
+                  style={[styles.presetChip, monthlyBill === preset && styles.presetChipActive]}
+                  onPress={() => handleBillChange(preset)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.presetChipText, monthlyBill === preset && styles.presetChipTextActive]}>
+                    ₹{parseInt(preset).toLocaleString('en-IN')}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* AI Sizing Intelligence Callout */}
+            <View style={styles.aiHintBox}>
+              <View style={styles.aiHintHeader}>
+                <Sparkles size={13} color="#f59e0b" />
+                <Text style={styles.aiHintTitle}>AI SIZING RECOMMENDATION</Text>
+              </View>
+              <Text style={styles.aiHintBody}>
+                A monthly tariff of ₹{monthlyBill || '3,500'} recommends a{' '}
+                <Text style={{ fontWeight: '900', color: '#0f172a' }}>{cap} kWp plant</Text>, generating ~
+                {monthlyUnits} units/mo to offset ~90% of electricity bills and save ₹{monthlySavings.toLocaleString('en-IN')}/mo.
+              </Text>
+            </View>
+
+            <TouchableOpacity
+              style={styles.stepNextBtn}
+              onPress={() => {
+                if (!prospectName.trim()) {
+                  Alert.alert('Customer Name Required', 'Please enter prospect name before proceeding.');
+                  return;
+                }
+                setCurrentStep(2);
+              }}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.stepNextBtnText}>Configure System & Hardware</Text>
+              <ChevronRight size={16} color="#ffffff" />
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* STEP 2: TURNKEY SIZING & HARDWARE SPECIFICATIONS */}
+        {currentStep === 2 && (
+          <View style={styles.stepCard}>
+            <View style={styles.stepCardHeader}>
+              <View style={styles.stepBadge}>
+                <Text style={styles.stepBadgeText}>STEP 2 OF 3</Text>
+              </View>
+              <Text style={styles.stepCardTitle}>Turnkey Sizing & Equipment Specs</Text>
+              <Text style={styles.stepCardSub}>Select Tier-1 DCR solar modules, inverter, and mounting structure</Text>
+            </View>
+
+            <Text style={styles.label}>System Capacity (kWp) *</Text>
+            <TextInput
+              style={styles.inputHighlight}
+              value={capacityKw}
+              onChangeText={handleCapacityChange}
+              keyboardType="decimal-pad"
+            />
+
+            {/* Capacity Presets */}
+            <View style={styles.chipScrollRow}>
+              {['2.0', '3.3', '4.0', '5.0', '10.0'].map((kwPreset) => (
+                <TouchableOpacity
+                  key={kwPreset}
+                  style={[styles.presetChip, capacityKw === kwPreset && styles.presetChipActive]}
+                  onPress={() => handleCapacityChange(kwPreset)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.presetChipText, capacityKw === kwPreset && styles.presetChipTextActive]}>
+                    {kwPreset} kWp
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* Equipment 1: Modules */}
+            <Text style={[styles.label, { marginTop: 12 }]}>Tier-1 DCR Solar Modules</Text>
+            <View style={styles.gearSelectionCol}>
+              <TouchableOpacity
+                style={[styles.gearCard, panelBrand.includes('Waaree') && styles.gearCardActive]}
+                onPress={() => setPanelBrand('Waaree 540W Mono PERC Bifacial')}
+                activeOpacity={0.8}
+              >
+                <View style={styles.gearCardTop}>
+                  <Text style={[styles.gearCardTitle, panelBrand.includes('Waaree') && styles.gearCardTitleActive]}>
+                    Waaree 540W Mono PERC Bifacial
+                  </Text>
+                  {panelBrand.includes('Waaree') && <Check size={14} color="#0066FF" />}
+                </View>
+                <Text style={styles.gearCardSub}>25 Years Warranty • DCR ALMM Approved • High Yield</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.gearCard, panelBrand.includes('Adani') && styles.gearCardActive]}
+                onPress={() => setPanelBrand('Adani 545W TopCon DCR Bifacial')}
+                activeOpacity={0.8}
+              >
+                <View style={styles.gearCardTop}>
+                  <Text style={[styles.gearCardTitle, panelBrand.includes('Adani') && styles.gearCardTitleActive]}>
+                    Adani 545W TopCon DCR Bifacial
+                  </Text>
+                  {panelBrand.includes('Adani') && <Check size={14} color="#0066FF" />}
+                </View>
+                <Text style={styles.gearCardSub}>N-Type TopCon Cells • 30 Years Linear Warranty</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Equipment 2: Inverter */}
+            <Text style={[styles.label, { marginTop: 12 }]}>Grid-Tied Solar Inverter</Text>
+            <View style={styles.gearSelectionCol}>
+              <TouchableOpacity
+                style={[styles.gearCard, inverterBrand.includes('Solis') && styles.gearCardActive]}
+                onPress={() => setInverterBrand('Solis Dual MPPT On-Grid')}
+                activeOpacity={0.8}
+              >
+                <View style={styles.gearCardTop}>
+                  <Text style={[styles.gearCardTitle, inverterBrand.includes('Solis') && styles.gearCardTitleActive]}>
+                    Solis Dual MPPT Smart Inverter
+                  </Text>
+                  {inverterBrand.includes('Solis') && <Check size={14} color="#0066FF" />}
+                </View>
+                <Text style={styles.gearCardSub}>Dual MPPT • 10 Years Warranty • WiFi Telemetry</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.gearCard, inverterBrand.includes('Growatt') && styles.gearCardActive]}
+                onPress={() => setInverterBrand('Growatt 3.3kW Smart Inverter')}
+                activeOpacity={0.8}
+              >
+                <View style={styles.gearCardTop}>
+                  <Text style={[styles.gearCardTitle, inverterBrand.includes('Growatt') && styles.gearCardTitleActive]}>
+                    Growatt Smart On-Grid Inverter
+                  </Text>
+                  {inverterBrand.includes('Growatt') && <Check size={14} color="#0066FF" />}
+                </View>
+                <Text style={styles.gearCardSub}>Integrated DC Switch • 98.4% Efficiency</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Turnkey System Pricing Input */}
+            <View style={styles.systemCostBox}>
+              <View style={styles.costTitleRow}>
+                <Text style={styles.costPrimaryLabel}>Turnkey System Cost (Incl. All GST) *</Text>
+                <View style={styles.gstTag}>
+                  <Text style={styles.gstTagText}>GST Included</Text>
+                </View>
+              </View>
+              <View style={styles.costInputRow}>
+                <Text style={styles.rupeeSymbol}>₹</Text>
+                <TextInput
+                  style={styles.costInput}
+                  value={systemCost}
+                  onChangeText={setSystemCost}
+                  keyboardType="numeric"
+                  placeholder="e.g. 195000"
+                />
+              </View>
+              <Text style={styles.costHelpText}>
+                Turnkey price includes modules, inverter, structure, wiring, and installation.
+              </Text>
+            </View>
+
+            {/* Step 2 Navigation Buttons */}
+            <View style={styles.stepNavRow}>
+              <TouchableOpacity
+                style={styles.stepBackBtn}
+                onPress={() => setCurrentStep(1)}
+                activeOpacity={0.8}
+              >
+                <ChevronLeft size={16} color="#64748b" />
+                <Text style={styles.stepBackBtnText}>Back</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.stepNextBtnFlex}
+                onPress={() => setCurrentStep(3)}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.stepNextBtnText}>Review PM Subsidy & Proposal</Text>
+                <ChevronRight size={16} color="#ffffff" />
+              </TouchableOpacity>
             </View>
           </View>
+        )}
 
-          <View style={styles.formRow}>
-            <View style={styles.formCol}>
-              <Text style={styles.label}>System Capacity (kWp)</Text>
-              <TextInput
-                style={styles.inputHighlight}
-                value={capacityKw}
-                onChangeText={handleCapacityChange}
-                keyboardType="decimal-pad"
-              />
-            </View>
-          </View>
+        {/* STEP 3: PM SURYA GHAR COMMERCIALS & INSTANT PROPOSAL */}
+        {currentStep === 3 && (
+          <View>
+            {/* HERO COMMERCIAL ECONOMICS CARD */}
+            <View style={styles.heroCard}>
+              <View style={styles.heroCardHeader}>
+                <View style={styles.heroCardPill}>
+                  <Text style={styles.heroCardPillText}>CENTRAL DBT FINANCIAL BREAKDOWN</Text>
+                </View>
+              </View>
 
-          {/* SINGLE PRICING INPUT: SOLAR SYSTEM COST (INCL. ALL GST) */}
-          <View style={styles.systemCostBox}>
-            <View style={styles.costTitleRow}>
-              <Text style={styles.costPrimaryLabel}>Solar System Cost (Incl. All GST) *</Text>
-              <View style={styles.gstTag}>
-                <Text style={styles.gstTagText}>GST Included</Text>
+              <View style={styles.heroRow}>
+                <Text style={styles.heroLabel}>Turnkey Plant Cost (All GST Included)</Text>
+                <Text style={styles.heroVal}>₹{gross.toLocaleString('en-IN')}</Text>
+              </View>
+              <View style={styles.heroRow}>
+                <Text style={styles.heroLabelGreen}>PM Surya Ghar Central Subsidy</Text>
+                <Text style={styles.heroValGreen}>-₹{subsidy.toLocaleString('en-IN')}</Text>
+              </View>
+              <View style={styles.heroDivider} />
+              <View style={styles.netRow}>
+                <View>
+                  <Text style={styles.netLabel}>Net Customer Investment</Text>
+                  <Text style={styles.netSub}>Direct government DBT credit to customer account</Text>
+                </View>
+                <Text style={styles.netVal}>₹{net.toLocaleString('en-IN')}</Text>
               </View>
             </View>
-            <View style={styles.costInputRow}>
-              <Text style={styles.rupeeSymbol}>₹</Text>
-              <TextInput
-                style={styles.costInput}
-                value={systemCost}
-                onChangeText={setSystemCost}
-                keyboardType="numeric"
-                placeholder="e.g. 195000"
-              />
-            </View>
-            <Text style={styles.costHelpText}>
-              Turnkey plant price with all taxes. Same total will appear on the final invoice.
-            </Text>
-          </View>
-        </View>
 
-        {/* ECONOMICS HERO CARD */}
-        <View style={styles.heroCard}>
-          <View style={styles.heroRow}>
-            <Text style={styles.heroLabel}>Turnkey Plant Cost (All GST Included)</Text>
-            <Text style={styles.heroVal}>₹{gross.toLocaleString('en-IN')}</Text>
-          </View>
-          <View style={styles.heroRow}>
-            <Text style={styles.heroLabelGreen}>PM Surya Ghar Subsidy</Text>
-            <Text style={styles.heroValGreen}>-₹{subsidy.toLocaleString('en-IN')}</Text>
-          </View>
-          <View style={styles.heroDivider} />
-          <View style={styles.netRow}>
-            <View>
-              <Text style={styles.netLabel}>Net Customer Investment</Text>
-              <Text style={styles.netSub}>After direct bank credit</Text>
+            {/* SAVINGS & PAYBACK ROI MATRIX */}
+            <View style={styles.savingsCard}>
+              <View style={styles.savingsCol}>
+                <Text style={styles.savingsLabel}>Est. Monthly Gen</Text>
+                <Text style={styles.savingsVal}>{monthlyUnits} Units</Text>
+              </View>
+              <View style={styles.savingsDivider} />
+              <View style={styles.savingsCol}>
+                <Text style={styles.savingsLabel}>Monthly Tariff Saved</Text>
+                <Text style={styles.savingsValGreen}>₹{monthlySavings.toLocaleString('en-IN')}</Text>
+              </View>
+              <View style={styles.savingsDivider} />
+              <View style={styles.savingsCol}>
+                <Text style={styles.savingsLabel}>Payback ROI</Text>
+                <Text style={styles.savingsValBlue}>{paybackYears} Yrs</Text>
+              </View>
             </View>
-            <Text style={styles.netVal}>₹{net.toLocaleString('en-IN')}</Text>
-          </View>
-        </View>
 
-        {/* SAVINGS MATRIX */}
-        <View style={styles.savingsCard}>
-          <View style={styles.savingsCol}>
-            <Text style={styles.savingsLabel}>Est. Monthly Gen</Text>
-            <Text style={styles.savingsVal}>{monthlyUnits} Units</Text>
+            {/* HARDWARE AUDIT SUMMARY CARD */}
+            <View style={styles.summaryGearCard}>
+              <Text style={styles.summaryGearTitle}>EQUIPMENT SPECIFICATIONS INCLUDED</Text>
+              <Text style={styles.summaryGearRow}>• Modules: {panelBrand}</Text>
+              <Text style={styles.summaryGearRow}>• Inverter: {inverterBrand}</Text>
+              <Text style={styles.summaryGearRow}>• Structure: {structureType}</Text>
+              <Text style={styles.summaryGearRow}>• Recipient: {prospectName} ({prospectPhone || 'No Phone'})</Text>
+
+              <TouchableOpacity
+                style={styles.modifyGearBtn}
+                onPress={() => setCurrentStep(2)}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.modifyGearBtnText}>Modify Specs / Pricing ↗</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-          <View style={styles.savingsCol}>
-            <Text style={styles.savingsLabel}>Monthly Bill Saved</Text>
-            <Text style={styles.savingsValGreen}>₹{monthlySavings.toLocaleString('en-IN')}</Text>
-          </View>
-          <View style={styles.savingsCol}>
-            <Text style={styles.savingsLabel}>Payback ROI</Text>
-            <Text style={styles.savingsValBlue}>{paybackYears} Yrs</Text>
-          </View>
-        </View>
+        )}
       </ScrollView>
 
-      {/* BOTTOM ACTION */}
+      {/* BOTTOM ACTION BAR */}
       <View style={styles.bottomBar}>
         <View style={styles.actionRowTop}>
           <TouchableOpacity
@@ -823,5 +1088,318 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
     color: '#2563eb',
+  },
+
+  // ----------------------------------------------------
+  // WHERE READY FIELD EXPERIENCE: GUIDED PROPOSAL STYLES
+  // ----------------------------------------------------
+  floatingKpiStrip: {
+    backgroundColor: '#0f172a',
+    flexDirection: 'row',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#1e293b',
+  },
+  kpiCol: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  kpiColLabel: {
+    fontSize: 8,
+    fontWeight: '800',
+    color: '#94a3b8',
+    letterSpacing: 0.5,
+  },
+  kpiColVal: {
+    fontSize: 13,
+    fontWeight: '900',
+    color: '#ffffff',
+    marginTop: 1,
+  },
+  kpiDivider: {
+    width: 1,
+    height: 22,
+    backgroundColor: '#1e293b',
+  },
+  guidedStepperTrack: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+  },
+  stepTab: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  stepTabActive: {},
+  stepNumCircle: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepNumActive: {
+    backgroundColor: '#0066FF',
+  },
+  stepNumDone: {
+    backgroundColor: '#059669',
+  },
+  stepNumInactive: {
+    backgroundColor: '#e2e8f0',
+  },
+  stepNumText: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: '#ffffff',
+  },
+  stepTabText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#64748b',
+  },
+  stepTabTextActive: {
+    color: '#0f172a',
+    fontWeight: '800',
+  },
+  stepConnector: {
+    flex: 1,
+    height: 2,
+    backgroundColor: '#e2e8f0',
+    marginHorizontal: 8,
+  },
+  stepConnectorActive: {
+    backgroundColor: '#059669',
+  },
+  stepCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 18,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
+    marginBottom: 16,
+  },
+  stepCardHeader: {
+    marginBottom: 16,
+  },
+  stepBadge: {
+    backgroundColor: '#eff6ff',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    alignSelf: 'flex-start',
+    marginBottom: 6,
+  },
+  stepBadgeText: {
+    fontSize: 9,
+    fontWeight: '900',
+    color: '#0066FF',
+    letterSpacing: 0.6,
+  },
+  stepCardTitle: {
+    fontSize: 16,
+    fontWeight: '900',
+    color: '#0f172a',
+  },
+  stepCardSub: {
+    fontSize: 11,
+    color: '#64748b',
+    marginTop: 2,
+  },
+  chipScrollRow: {
+    flexDirection: 'row',
+    gap: 6,
+    marginBottom: 14,
+  },
+  presetChip: {
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 10,
+  },
+  presetChipActive: {
+    backgroundColor: '#0f172a',
+    borderColor: '#0f172a',
+  },
+  presetChipText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#334155',
+  },
+  presetChipTextActive: {
+    color: '#ffffff',
+    fontWeight: '800',
+  },
+  aiHintBox: {
+    backgroundColor: '#fffbeb',
+    borderWidth: 1,
+    borderColor: '#fde68a',
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 16,
+  },
+  aiHintHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 4,
+  },
+  aiHintTitle: {
+    fontSize: 9,
+    fontWeight: '900',
+    color: '#d97706',
+    letterSpacing: 0.5,
+  },
+  aiHintBody: {
+    fontSize: 11,
+    color: '#475569',
+    lineHeight: 16,
+  },
+  stepNextBtn: {
+    backgroundColor: '#0066FF',
+    borderRadius: 14,
+    paddingVertical: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    shadowColor: '#0066FF',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  stepNextBtnText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#ffffff',
+  },
+  gearSelectionCol: {
+    gap: 8,
+    marginBottom: 14,
+  },
+  gearCard: {
+    backgroundColor: '#f8fafc',
+    borderWidth: 1.5,
+    borderColor: '#e2e8f0',
+    borderRadius: 12,
+    padding: 12,
+  },
+  gearCardActive: {
+    backgroundColor: '#eff6ff',
+    borderColor: '#0066FF',
+  },
+  gearCardTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 2,
+  },
+  gearCardTitle: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#334155',
+  },
+  gearCardTitleActive: {
+    color: '#0066FF',
+  },
+  gearCardSub: {
+    fontSize: 10,
+    color: '#64748b',
+  },
+  stepNavRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 8,
+  },
+  stepBackBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    backgroundColor: '#f1f5f9',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  stepBackBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#64748b',
+  },
+  stepNextBtnFlex: {
+    flex: 1,
+    backgroundColor: '#0066FF',
+    borderRadius: 12,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  heroCardHeader: {
+    marginBottom: 10,
+  },
+  heroCardPill: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    alignSelf: 'flex-start',
+  },
+  heroCardPillText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#fbbf24',
+    letterSpacing: 0.6,
+  },
+  savingsDivider: {
+    width: 1,
+    height: 28,
+    backgroundColor: '#f1f5f9',
+  },
+  summaryGearCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    padding: 14,
+    marginTop: 14,
+  },
+  summaryGearTitle: {
+    fontSize: 9,
+    fontWeight: '900',
+    color: '#64748b',
+    letterSpacing: 0.6,
+    marginBottom: 6,
+  },
+  summaryGearRow: {
+    fontSize: 11,
+    color: '#334155',
+    fontWeight: '600',
+    marginBottom: 3,
+  },
+  modifyGearBtn: {
+    alignSelf: 'flex-end',
+    marginTop: 6,
+  },
+  modifyGearBtnText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#0066FF',
   },
 });
