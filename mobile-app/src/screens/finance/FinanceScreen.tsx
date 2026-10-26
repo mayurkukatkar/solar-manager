@@ -270,24 +270,54 @@ export const FinanceScreen: React.FC<{ navigation?: any; route?: any }> = ({ nav
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
         showsVerticalScrollIndicator={false}
       >
-        {/* EXECUTIVE KPI SUMMARY CARDS */}
-        <View style={styles.kpiGrid}>
-          <View style={[styles.kpiCard, { backgroundColor: '#059669' }]}>
-            <View style={styles.kpiTopRow}>
-              <Text style={styles.kpiLabel}>COLLECTIONS REALIZED</Text>
-              <TrendingUp size={16} color="#a7f3d0" />
+        {/* EXECUTIVE FINANCIAL OVERVIEW */}
+        <View style={styles.executiveCard}>
+          <View style={styles.kpiRow}>
+            <View style={styles.kpiCol}>
+              <View style={styles.kpiTopRow}>
+                <Text style={styles.kpiLabel}>COLLECTIONS REALIZED</Text>
+                <TrendingUp size={14} color="#059669" />
+              </View>
+              <Text style={styles.kpiVal}>₹{(stats.totalRevenue / 100000).toFixed(2)}L</Text>
+              <Text style={styles.kpiSub}>₹{stats.totalRevenue.toLocaleString('en-IN')} received</Text>
             </View>
-            <Text style={styles.kpiVal}>₹{(stats.totalRevenue / 100000).toFixed(2)}L</Text>
-            <Text style={styles.kpiSub}>₹{stats.totalRevenue.toLocaleString('en-IN')} total received</Text>
+
+            <View style={styles.kpiDivider} />
+
+            <View style={styles.kpiCol}>
+              <View style={styles.kpiTopRow}>
+                <Text style={styles.kpiLabel}>OUTSTANDING RECEIVABLES</Text>
+                <Clock size={14} color="#d97706" />
+              </View>
+              <Text style={styles.kpiVal}>₹{(stats.outstanding / 100000).toFixed(2)}L</Text>
+              <Text style={styles.kpiSub}>Active milestone balances</Text>
+            </View>
           </View>
 
-          <View style={[styles.kpiCard, { backgroundColor: '#d97706' }]}>
-            <View style={styles.kpiTopRow}>
-              <Text style={styles.kpiLabel}>OUTSTANDING RECEIVABLES</Text>
-              <Clock size={16} color="#fde68a" />
+          {/* Capital Realization Progress Bar */}
+          <View style={styles.capitalTrackContainer}>
+            <View style={styles.capitalTrackLabels}>
+              <Text style={styles.capitalTrackLeftText}>
+                Collected: {stats.totalRevenue + stats.outstanding > 0 ? Math.round((stats.totalRevenue / (stats.totalRevenue + stats.outstanding)) * 100) : 65}%
+              </Text>
+              <Text style={styles.capitalTrackRightText}>
+                Total Order Book: ₹{((stats.totalRevenue + stats.outstanding) / 100000).toFixed(1)}L
+              </Text>
             </View>
-            <Text style={styles.kpiVal}>₹{(stats.outstanding / 100000).toFixed(2)}L</Text>
-            <Text style={styles.kpiSub}>Active milestone balances</Text>
+            <View style={styles.capitalProgressBar}>
+              <View
+                style={[
+                  styles.capitalProgressFill,
+                  {
+                    width: `${
+                      stats.totalRevenue + stats.outstanding > 0
+                        ? Math.min(100, Math.round((stats.totalRevenue / (stats.totalRevenue + stats.outstanding)) * 100))
+                        : 65
+                    }%`,
+                  },
+                ]}
+              />
+            </View>
           </View>
         </View>
 
@@ -318,11 +348,13 @@ export const FinanceScreen: React.FC<{ navigation?: any; route?: any }> = ({ nav
         {/* PM SURYA GHAR DBT SUBSIDY TRACKER */}
         <View style={styles.subsidyBanner}>
           <View style={styles.subsidyBannerLeft}>
-            <ShieldCheck size={20} color="#2563eb" />
+            <View style={styles.subsidyIconCircle}>
+              <ShieldCheck size={18} color="#0066FF" />
+            </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.subsidyBannerTitle}>PM Surya Ghar DBT Subsidy Pipeline</Text>
               <Text style={styles.subsidyBannerSub}>
-                Direct Central Financial Assistance to consumer bank accounts
+                Direct Central Financial Assistance to consumer accounts
               </Text>
             </View>
           </View>
@@ -346,7 +378,7 @@ export const FinanceScreen: React.FC<{ navigation?: any; route?: any }> = ({ nav
             onPress={() => setCreateInvoiceModalVisible(true)}
             activeOpacity={0.85}
           >
-            <Plus size={16} color="#ffffff" strokeWidth={2.8} />
+            <Plus size={15} color="#ffffff" strokeWidth={2.8} />
             <Text style={styles.createInvoiceBtnText}>New Invoice</Text>
           </TouchableOpacity>
         </View>
@@ -805,44 +837,84 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingBottom: Platform.OS === 'ios' ? 120 : 100,
   },
-  kpiGrid: {
-    flexDirection: 'row',
-    gap: 12,
+  executiveCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
     marginBottom: 12,
-  },
-  kpiCard: {
-    flex: 1,
-    borderRadius: 16,
-    padding: 14,
-    shadowColor: '#000',
+    shadowColor: '#0f172a',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    elevation: 3,
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  kpiRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+  },
+  kpiCol: {
+    flex: 1,
+  },
+  kpiDivider: {
+    width: 1,
+    height: 36,
+    backgroundColor: '#f1f5f9',
+    marginHorizontal: 12,
   },
   kpiTopRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 6,
+    gap: 6,
+    marginBottom: 4,
   },
   kpiLabel: {
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: '800',
-    color: 'rgba(255, 255, 255, 0.85)',
+    color: '#64748b',
     letterSpacing: 0.5,
   },
   kpiVal: {
     fontSize: 22,
     fontWeight: '900',
-    color: '#ffffff',
+    color: '#0f172a',
     letterSpacing: -0.5,
   },
   kpiSub: {
     fontSize: 10,
-    color: 'rgba(255, 255, 255, 0.75)',
-    marginTop: 4,
+    color: '#94a3b8',
+    marginTop: 2,
     fontWeight: '500',
+  },
+  capitalTrackContainer: {},
+  capitalTrackLabels: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  capitalTrackLeftText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#059669',
+  },
+  capitalTrackRightText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#64748b',
+  },
+  capitalProgressBar: {
+    height: 6,
+    backgroundColor: '#f1f5f9',
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  capitalProgressFill: {
+    height: '100%',
+    backgroundColor: '#059669',
+    borderRadius: 3,
   },
   overdueNoticeCard: {
     backgroundColor: '#fff1f2',
@@ -863,69 +935,29 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   overdueNoticeTitle: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '800',
     color: '#9f1239',
   },
   overdueNoticeSub: {
-    fontSize: 11,
+    fontSize: 10,
     color: '#be123c',
     marginTop: 1,
   },
   overdueActionBtn: {
     backgroundColor: '#e11d48',
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 8,
-  },
-  overdueActionBtnText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#ffffff',
-  },
-  subsidyBanner: {
-    backgroundColor: '#eff6ff',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#bfdbfe',
-    padding: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  subsidyBannerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    flex: 1,
-  },
-  subsidyBannerTitle: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: '#1e40af',
-  },
-  subsidyBannerSub: {
-    fontSize: 11,
-    color: '#3b82f6',
-    marginTop: 1,
-  },
-  subsidyBannerRight: {
-    backgroundColor: '#ffffff',
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#dbeafe',
   },
-  subsidyBannerVal: {
-    fontSize: 13,
-    fontWeight: '900',
-    color: '#1d4ed8',
+  overdueActionBtnText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#ffffff',
   },
-  createInvoiceBar: {
+  subsidyBanner: {
     backgroundColor: '#ffffff',
-    borderRadius: 14,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: '#e2e8f0',
     padding: 14,
@@ -933,19 +965,75 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 12,
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  subsidyBannerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  subsidyIconCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: '#eff6ff',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  subsidyBannerTitle: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#0f172a',
+  },
+  subsidyBannerSub: {
+    fontSize: 10,
+    color: '#64748b',
+    marginTop: 1,
+  },
+  subsidyBannerRight: {
+    backgroundColor: '#eff6ff',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  subsidyBannerVal: {
+    fontSize: 12,
+    fontWeight: '900',
+    color: '#0066FF',
+  },
+  createInvoiceBar: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    padding: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 4,
+    elevation: 1,
   },
   createInvoiceBarTitle: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '800',
     color: '#0f172a',
   },
   createInvoiceBarSub: {
-    fontSize: 11,
+    fontSize: 10,
     color: '#64748b',
-    marginTop: 2,
+    marginTop: 1,
   },
   createInvoiceBtn: {
-    backgroundColor: '#059669',
+    backgroundColor: '#0066FF',
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 8,
@@ -954,7 +1042,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   createInvoiceBtnText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '800',
     color: '#ffffff',
   },

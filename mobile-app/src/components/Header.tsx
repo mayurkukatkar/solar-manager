@@ -240,61 +240,50 @@ export const Header: React.FC<HeaderProps> = ({
           />
           <View style={styles.brandTextContainer}>
             <Text style={styles.companyName} numberOfLines={1}>
-              {user?.tenantName || 'WhereReady Solar OS'}
+              {title || user?.tenantName || 'WhereReady Solar OS'}
             </Text>
-            <View style={styles.brandSubRow}>
-              <Text style={styles.userName} numberOfLines={1}>
-                {user?.name || 'Solar Partner'}
-              </Text>
-              <Text style={styles.brandTag}>• WHERE GROWTH GETS READY.</Text>
-            </View>
+            <Text style={styles.userName} numberOfLines={1}>
+              {subtitle || `${user?.name || 'Solar Partner'} • Where Growth Gets Ready.`}
+            </Text>
           </View>
         </View>
 
         <View style={styles.actionsRow}>
-          {/* Status Indicator */}
-          <View style={styles.statusPill}>
-            <View
-              style={[
-                styles.statusDot,
-                { backgroundColor: backendStatus.isOnline ? colors.success : colors.warning },
-              ]}
-            />
-            <Text style={styles.statusText}>
-              {backendStatus.isOnline ? 'Online' : 'Reconnecting'}
-            </Text>
-          </View>
+          {rightAction ? (
+            rightAction
+          ) : (
+            <>
+              {/* Status Indicator */}
+              <View style={styles.statusPill}>
+                <View
+                  style={[
+                    styles.statusDot,
+                    { backgroundColor: backendStatus.isOnline ? colors.success : colors.warning },
+                  ]}
+                />
+                <Text style={styles.statusText}>
+                  {backendStatus.isOnline ? 'Online' : 'Offline'}
+                </Text>
+              </View>
 
-          {/* User Profile Avatar Pill */}
-          <TouchableOpacity
-            style={styles.avatarPill}
-            onPress={() => setProfileModalVisible(true)}
-            activeOpacity={0.8}
-            accessibilityRole="button"
-            accessibilityLabel="View profile"
-          >
-            <View style={styles.avatarCircle}>
-              <Text style={styles.avatarLetter}>
-                {user?.name ? user.name.charAt(0).toUpperCase() : 'W'}
-              </Text>
-            </View>
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* SCREEN TITLE & SUBTITLE */}
-      {title && (
-        <View style={styles.titleSection}>
-          <Text style={styles.titleText} numberOfLines={1}>
-            {title}
-          </Text>
-          {subtitle && (
-            <Text style={styles.subtitleText} numberOfLines={2}>
-              {subtitle}
-            </Text>
+              {/* User Profile Avatar Pill */}
+              <TouchableOpacity
+                style={styles.avatarPill}
+                onPress={() => setProfileModalVisible(true)}
+                activeOpacity={0.8}
+                accessibilityRole="button"
+                accessibilityLabel="View profile"
+              >
+                <View style={styles.avatarCircle}>
+                  <Text style={styles.avatarLetter}>
+                    {user?.name ? user.name.charAt(0).toUpperCase() : 'W'}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            </>
           )}
         </View>
-      )}
+      </View>
 
       {/* OPTIONAL SEARCH BAR */}
       {showSearch && (
@@ -443,14 +432,14 @@ const topSafeArea =
     : 50;
 
 const styles = StyleSheet.create({
-  // HOME VARIANT (Flush Spatial Sky Header)
+  // HOME VARIANT (Unified Luminous Header)
   homeContainer: {
-    backgroundColor: '#091326',
+    backgroundColor: '#ffffff',
     paddingTop: topSafeArea,
     paddingHorizontal: spacing[4],
     paddingBottom: spacing[2],
     borderBottomWidth: 1,
-    borderBottomColor: '#172554',
+    borderBottomColor: '#f1f5f9',
   },
   homeRow: {
     flexDirection: 'row',
@@ -466,7 +455,9 @@ const styles = StyleSheet.create({
   homeBrandLogo: {
     width: 32,
     height: 32,
-    borderRadius: 8,
+    borderRadius: 9,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
   },
   homeBrandTitleRow: {
     flexDirection: 'row',
@@ -476,7 +467,7 @@ const styles = StyleSheet.create({
   homeBrandTitle: {
     fontSize: 16,
     fontWeight: '900',
-    color: '#ffffff',
+    color: '#0f172a',
     letterSpacing: -0.3,
   },
   homeOsBadge: {
@@ -493,8 +484,8 @@ const styles = StyleSheet.create({
   },
   homeTagline: {
     fontSize: 9,
-    color: '#94a3b8',
-    fontWeight: '500',
+    color: '#64748b',
+    fontWeight: '600',
   },
   homeRightGroup: {
     flexDirection: 'row',
@@ -505,7 +496,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
@@ -513,22 +506,22 @@ const styles = StyleSheet.create({
   homeStatusText: {
     fontSize: 10,
     fontWeight: '700',
-    color: '#94a3b8',
+    color: '#475569',
   },
   homeAvatarBtn: {
     width: 32,
     height: 32,
     borderRadius: 10,
-    backgroundColor: '#1e293b',
+    backgroundColor: '#eff6ff',
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: '#bfdbfe',
     alignItems: 'center',
     justifyContent: 'center',
   },
   homeAvatarText: {
     fontSize: 13,
     fontWeight: '900',
-    color: '#38bdf8',
+    color: '#0066FF',
   },
 
   // MAIN VARIANT

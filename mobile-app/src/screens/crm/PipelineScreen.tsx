@@ -324,34 +324,16 @@ export const PipelineScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
 
   return (
     <View style={styles.container}>
-      {/* GLOBAL HEADER */}
+      {/* GLOBAL HEADER WITH BUILT-IN SEARCH */}
       <Header
         title="Sales CRM & Pipeline"
         subtitle="Turnkey solar pipeline, quote builder & lead intake"
+        showSearch
+        onSearch={setSearchQuery}
+        searchPlaceholder="Search customer, mobile, city, consumer no..."
       />
 
-      {/* QUICK ACTION BAR */}
-      <View style={styles.topActionStrip}>
-        <TouchableOpacity
-          style={styles.financeHeaderBtn}
-          onPress={() => navigation?.navigate('Finance')}
-          activeOpacity={0.85}
-        >
-          <Receipt size={14} color="#059669" strokeWidth={2.5} />
-          <Text style={styles.financeHeaderBtnText}>Finance Ledger</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.addLeadHeaderBtn}
-          onPress={handleOpenLeadCapture}
-          activeOpacity={0.85}
-        >
-          <Plus size={15} color="#ffffff" strokeWidth={2.8} />
-          <Text style={styles.addLeadHeaderBtnText}>+ New Lead</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* EXECUTIVE PULSE METRICS BAR */}
+      {/* EXECUTIVE PULSE METRICS BAR (WhereReady Clean Studio) */}
       <View style={styles.pulseContainer}>
         <View style={styles.pulseItem}>
           <Text style={styles.pulseNum}>{pipelineMetrics.totalKw} <Text style={styles.pulseUnit}>kW</Text></Text>
@@ -359,7 +341,7 @@ export const PipelineScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
         </View>
         <View style={styles.pulseDivider} />
         <View style={styles.pulseItem}>
-          <Text style={styles.pulseNum}>₹{pipelineMetrics.grossLakhs} <Text style={styles.pulseUnit}>L</Text></Text>
+          <Text style={styles.pulseNumBlue}>₹{pipelineMetrics.grossLakhs} <Text style={styles.pulseUnitBlue}>L</Text></Text>
           <Text style={styles.pulseLabel}>Turnkey</Text>
         </View>
         <View style={styles.pulseDivider} />
@@ -374,21 +356,33 @@ export const PipelineScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
         </View>
       </View>
 
-      {/* SEARCH BAR */}
-      <View style={styles.searchContainer}>
-        <Search size={16} color="#64748b" style={styles.searchIcon} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search customer, mobile, consumer no..."
-          placeholderTextColor="#94a3b8"
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-        />
-      </View>
+      {/* QUICK ACTIONS & STAGE FILTER BAR */}
+      <View style={styles.actionsAndFilterRow}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.stageTabsContent}
+        >
+          {/* Quick Action Button for + New Lead */}
+          <TouchableOpacity
+            style={styles.addLeadChipBtn}
+            onPress={handleOpenLeadCapture}
+            activeOpacity={0.85}
+          >
+            <Plus size={13} color="#ffffff" strokeWidth={2.8} />
+            <Text style={styles.addLeadChipText}>New Lead</Text>
+          </TouchableOpacity>
 
-      {/* STAGE CHIPS */}
-      <View style={styles.stageTabsContainer}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.stageTabsContent}>
+          {/* Quick Action for Finance */}
+          <TouchableOpacity
+            style={styles.financeChipBtn}
+            onPress={() => navigation?.navigate('Finance')}
+            activeOpacity={0.85}
+          >
+            <Receipt size={13} color="#059669" strokeWidth={2.4} />
+            <Text style={styles.financeChipText}>Ledger</Text>
+          </TouchableOpacity>
+
           {STAGES.map((s) => {
             const isActive = activeStage === s.id;
             const count =
@@ -1043,13 +1037,21 @@ const styles = StyleSheet.create({
   },
   pulseContainer: {
     flexDirection: 'row',
-    backgroundColor: '#0f172a',
+    backgroundColor: '#ffffff',
     marginHorizontal: 16,
-    marginTop: 12,
-    borderRadius: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
+    marginTop: 10,
+    marginBottom: 6,
+    borderRadius: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
     alignItems: 'center',
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 6,
+    elevation: 2,
   },
   pulseItem: {
     flex: 1,
@@ -1058,62 +1060,89 @@ const styles = StyleSheet.create({
   pulseNum: {
     fontSize: 15,
     fontWeight: '900',
-    color: '#ffffff',
+    color: '#0f172a',
   },
   pulseUnit: {
     fontSize: 10,
     fontWeight: '700',
-    color: '#94a3b8',
+    color: '#64748b',
+  },
+  pulseNumBlue: {
+    fontSize: 15,
+    fontWeight: '900',
+    color: '#0066FF',
+  },
+  pulseUnitBlue: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#0066FF',
   },
   pulseNumGold: {
     fontSize: 15,
     fontWeight: '900',
-    color: '#fbbf24',
+    color: '#d97706',
   },
   pulseUnitGold: {
     fontSize: 10,
     fontWeight: '700',
-    color: '#fbbf24',
+    color: '#d97706',
   },
   pulseNumGreen: {
     fontSize: 15,
     fontWeight: '900',
-    color: '#4ade80',
+    color: '#059669',
   },
   pulseLabel: {
     fontSize: 9,
     fontWeight: '700',
-    color: '#94a3b8',
+    color: '#64748b',
     textTransform: 'uppercase',
     marginTop: 2,
     letterSpacing: 0.3,
   },
   pulseDivider: {
     width: 1,
-    height: 24,
-    backgroundColor: 'rgba(255,255,255,0.12)',
+    height: 22,
+    backgroundColor: '#f1f5f9',
   },
-  searchContainer: {
+  actionsAndFilterRow: {
+    marginTop: 6,
+    marginBottom: 4,
+  },
+  addLeadChipBtn: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#0066FF',
+    paddingHorizontal: 13,
+    paddingVertical: 6,
+    borderRadius: 20,
+    shadowColor: '#0066FF',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  addLeadChipText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#ffffff',
+  },
+  financeChipBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
     backgroundColor: '#ffffff',
-    marginHorizontal: 16,
-    marginTop: 10,
-    marginBottom: 6,
-    borderRadius: 10,
     borderWidth: 1,
     borderColor: '#e2e8f0',
-    paddingHorizontal: 12,
+    paddingHorizontal: 11,
+    paddingVertical: 6,
+    borderRadius: 20,
   },
-  searchIcon: {
-    marginRight: 8,
-  },
-  searchInput: {
-    flex: 1,
-    height: 40,
-    fontSize: 13,
-    color: '#0f172a',
-    fontWeight: '500',
+  financeChipText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#059669',
   },
   stageTabsContainer: {
     marginBottom: 4,
@@ -1122,6 +1151,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     gap: 8,
     paddingVertical: 4,
+    alignItems: 'center',
   },
   stageChip: {
     flexDirection: 'row',
