@@ -113,6 +113,10 @@ export const LoginScreen: React.FC = () => {
       >
         {/* WHERE READY SOLAR OS BRANDING */}
         <View style={styles.brandBox}>
+          <View style={styles.topBadge}>
+            <View style={styles.topBadgeDot} />
+            <Text style={styles.topBadgeText}>WhereReady Solar OS • Enterprise Gateway</Text>
+          </View>
           <Image
             source={require('../../../assets/logo.png')}
             style={styles.logoBanner}
@@ -152,13 +156,15 @@ export const LoginScreen: React.FC = () => {
 
         {/* LOGIN CARD */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Sign In</Text>
-          <Text style={styles.cardSubtitle}>Access your enterprise vendor workspace</Text>
+          <Text style={styles.cardTitle}>Solar Operations Gateway</Text>
+          <Text style={styles.cardSubtitle}>
+            Sign in to access your organization workspace, rooftop surveys, and EPC projects.
+          </Text>
 
           {/* EMAIL INPUT */}
           <Text style={styles.inputLabel}>WORK EMAIL</Text>
           <View style={styles.inputContainer}>
-            <Mail size={16} color="#94a3b8" style={{ marginRight: 10 }} />
+            <Mail size={16} color="#0066FF" style={{ marginRight: 10 }} />
             <TextInput
               style={styles.textInput}
               placeholder="name@solarcompany.com"
@@ -174,7 +180,7 @@ export const LoginScreen: React.FC = () => {
           {/* PASSWORD INPUT WITH SHOW/HIDE */}
           <Text style={styles.inputLabel}>PASSWORD</Text>
           <View style={styles.inputContainer}>
-            <Lock size={16} color="#94a3b8" style={{ marginRight: 10 }} />
+            <Lock size={16} color="#0066FF" style={{ marginRight: 10 }} />
             <TextInput
               style={styles.textInput}
               placeholder="••••••••"
@@ -202,19 +208,22 @@ export const LoginScreen: React.FC = () => {
             style={styles.loginBtn}
             onPress={handleSignIn}
             disabled={loading}
-            activeOpacity={0.85}
+            activeOpacity={0.88}
           >
             {loading ? (
               <ActivityIndicator size="small" color="#fff" />
             ) : (
-              <Text style={styles.loginBtnText}>Continue to Workspace</Text>
+              <View style={styles.loginBtnInner}>
+                <Text style={styles.loginBtnText}>Sign In to Workspace</Text>
+                <ArrowRight size={16} color="#ffffff" style={{ marginLeft: 6 }} />
+              </View>
             )}
           </TouchableOpacity>
 
           <View style={styles.securityFooter}>
-            <ShieldCheck size={14} color="#0066FF" style={{ marginRight: 6 }} />
+            <ShieldCheck size={14} color="#059669" style={{ marginRight: 6 }} />
             <Text style={styles.securityFooterText}>
-              TLS 1.3 Verified • WhereReady Cloud Synced
+              256-Bit TLS Encryption • Enterprise EPC Cloud Synced
             </Text>
           </View>
         </View>
@@ -295,6 +304,31 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 24,
   },
+  topBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#eff6ff',
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 20,
+    marginBottom: 16,
+  },
+  topBadgeDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#2563eb',
+    marginRight: 6,
+  },
+  topBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#1e40af',
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+  },
   logoBanner: {
     width: 280,
     height: 64,
@@ -328,28 +362,30 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     padding: 24,
     borderWidth: 1,
-    borderColor: '#f1f5f9',
+    borderColor: '#e2e8f0',
     shadowColor: '#0f172a',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.03,
-    shadowRadius: 10,
-    elevation: 2,
+    shadowOpacity: 0.05,
+    shadowRadius: 14,
+    elevation: 3,
   },
   cardTitle: {
-    fontSize: 20,
-    fontWeight: '800',
+    fontSize: 21,
+    fontWeight: '900',
     color: '#0f172a',
+    letterSpacing: -0.3,
   },
   cardSubtitle: {
     fontSize: 13,
     color: '#64748b',
+    lineHeight: 18,
     marginTop: 4,
     marginBottom: 20,
   },
   inputLabel: {
     fontSize: 11,
-    fontWeight: '700',
-    color: '#64748b',
+    fontWeight: '800',
+    color: '#475569',
     letterSpacing: 0.5,
     marginBottom: 6,
   },
@@ -361,13 +397,13 @@ const styles = StyleSheet.create({
     borderColor: '#e2e8f0',
     borderRadius: 14,
     paddingHorizontal: 14,
-    height: 48,
+    height: 50,
     marginBottom: 16,
   },
   textInput: {
     flex: 1,
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: '600',
     color: '#0f172a',
   },
   showPasswordBtn: {
@@ -375,21 +411,27 @@ const styles = StyleSheet.create({
   },
   loginBtn: {
     backgroundColor: '#0066FF',
-    height: 50,
+    height: 52,
     borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: 8,
     shadowColor: '#0066FF',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
+    shadowOpacity: 0.28,
+    shadowRadius: 10,
     elevation: 4,
+  },
+  loginBtnInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   loginBtnText: {
     color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '700',
+    fontSize: 15,
+    fontWeight: '800',
+    letterSpacing: 0.2,
   },
   securityFooter: {
     flexDirection: 'row',
@@ -403,7 +445,7 @@ const styles = StyleSheet.create({
   securityFooterText: {
     fontSize: 11,
     color: '#64748b',
-    fontWeight: '500',
+    fontWeight: '600',
   },
   modalOverlay: {
     flex: 1,

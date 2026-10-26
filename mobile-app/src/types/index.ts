@@ -11,6 +11,16 @@ export interface UserProfile {
   backendRole?: string;
 }
 
+export interface HorizonItem {
+  period: string;
+  clients: number;
+  revenue: number;
+  capacity: number;
+  avgDeal: string;
+  growth: string;
+  status?: string;
+}
+
 export interface DashboardData {
   totalLeads: number;
   totalCustomers: number;
@@ -18,7 +28,31 @@ export interface DashboardData {
   pendingInvoices: number;
   openTickets: number;
   totalRevenue: number;
+  totalCollected?: number;
   outstanding: number;
+  orderBook?: number;
+  totalCapacity?: number;
+  aging?: {
+    under15: number;
+    under30: number;
+    over30: number;
+  };
+  horizonAnalytics?: {
+    monthly: HorizonItem[];
+    quarterly: HorizonItem[];
+    halfAnnual: HorizonItem[];
+    annual: HorizonItem[];
+  };
+  segmentationData?: Array<{ name: string; value: number; color: string; count: string }>;
+  leadSources?: Array<{ source: string; share: number; volume: string; winRate: string; color: string }> | null;
+  inventoryRunway?: Array<{ item: string; stock: string; runway: number; status: string; unit: string; badge: string }> | null;
+  subsidyFunnel?: Array<{ step: string; title: string; count: number; amount: string; status: string }>;
+  environmental?: {
+    monthlyEnergyKWh: number;
+    co2Tons: number;
+    coalTons: number;
+    trees: number;
+  };
 }
 
 export interface Customer {

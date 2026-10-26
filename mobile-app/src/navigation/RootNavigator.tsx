@@ -4,6 +4,7 @@ import { NavigationContainer, createNavigationContainerRef } from '@react-naviga
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import {
+  LayoutDashboard,
   Layers,
   Briefcase,
   Zap,
@@ -13,6 +14,7 @@ import {
 } from 'lucide-react-native';
 import { useAuth } from '../context/AuthContext';
 import { LoginScreen } from '../screens/auth/LoginScreen';
+import { DashboardScreen } from '../screens/dashboard/DashboardScreen';
 import { PipelineScreen } from '../screens/crm/PipelineScreen';
 import { FieldProjectsScreen } from '../screens/projects/FieldProjectsScreen';
 import { QuickQuoteScreen } from '../screens/crm/QuickQuoteScreen';
@@ -27,7 +29,7 @@ export const navigationRef = createNavigationContainerRef<any>();
 
 export function navigateToTab(screenName: string, params?: any) {
   if (navigationRef.isReady()) {
-    if (screenName === 'QuickQuote' || screenName === 'Modules') {
+    if (screenName === 'QuickQuote' || screenName === 'Modules' || screenName === 'Profile') {
       navigationRef.navigate(screenName, params);
     } else {
       navigationRef.navigate('MainTabs', { screen: screenName, params });
@@ -55,22 +57,22 @@ const MainTabNavigator: React.FC = () => {
         }}
       >
         <Tab.Screen
+          name="Dashboard"
+          component={DashboardScreen}
+          options={{
+            tabBarLabel: 'Dashboard',
+            tabBarIcon: ({ color }) => (
+              <LayoutDashboard size={21} color={color} strokeWidth={2.2} />
+            ),
+          }}
+        />
+        <Tab.Screen
           name="Pipeline"
           component={PipelineScreen}
           options={{
             tabBarLabel: 'Pipeline',
             tabBarIcon: ({ color }) => (
-              <Layers size={22} color={color} strokeWidth={2.2} />
-            ),
-          }}
-        />
-        <Tab.Screen
-          name="Projects"
-          component={FieldProjectsScreen}
-          options={{
-            tabBarLabel: 'Projects',
-            tabBarIcon: ({ color }) => (
-              <Briefcase size={22} color={color} strokeWidth={2.2} />
+              <Layers size={21} color={color} strokeWidth={2.2} />
             ),
           }}
         />
@@ -93,22 +95,22 @@ const MainTabNavigator: React.FC = () => {
           }}
         />
         <Tab.Screen
+          name="Projects"
+          component={FieldProjectsScreen}
+          options={{
+            tabBarLabel: 'Projects',
+            tabBarIcon: ({ color }) => (
+              <Briefcase size={21} color={color} strokeWidth={2.2} />
+            ),
+          }}
+        />
+        <Tab.Screen
           name="Finance"
           component={FinanceScreen}
           options={{
             tabBarLabel: 'Finance',
             tabBarIcon: ({ color }) => (
-              <Receipt size={22} color={color} strokeWidth={2.2} />
-            ),
-          }}
-        />
-        <Tab.Screen
-          name="Profile"
-          component={FieldProfileScreen}
-          options={{
-            tabBarLabel: 'Profile',
-            tabBarIcon: ({ color }) => (
-              <User size={22} color={color} strokeWidth={2.2} />
+              <Receipt size={21} color={color} strokeWidth={2.2} />
             ),
           }}
         />
@@ -166,6 +168,7 @@ export const RootNavigator: React.FC = () => {
               <Stack.Screen name="QuickQuote" component={QuickQuoteScreen} />
               <Stack.Screen name="Modules" component={ModulesScreen} />
               <Stack.Screen name="FinanceDetail" component={FinanceScreen} />
+              <Stack.Screen name="Profile" component={FieldProfileScreen} />
             </>
           )}
         </Stack.Navigator>
