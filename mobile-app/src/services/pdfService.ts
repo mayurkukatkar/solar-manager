@@ -1439,168 +1439,415 @@ export const createAndSharePdf = sharePdfFile;
 export const sharePdfToWhatsApp = sharePdfFile;
 
 /**
- * DISCOM Net Metering Statutory Documents Generator
+ * Official MSEDCL DISCOM Statutory Documents Generator
+ * Ported directly from web-client (MsedclFormsPDF.tsx) for 100% template parity.
  */
 export function generateDiscomHtml(type: string, data: any): string {
-  const custName = data.customerName || 'SHRI CONSUMER';
-  const consumerNo = data.consumerNumber || '123456789012';
-  const bu = data.bu || '4100';
-  const capacity = data.systemCapacityKw || '3.3';
-  const company = data.companyName || 'Solar Energy Solutions';
+  const beneficiaryName = (data.beneficiaryName || data.customerName || 'SHRI. SURENDRA RAMBHAU THAKRE').toUpperCase();
+  const consumerNo = data.consumerNumber || data.consumerAccountNo || '410022120526';
+  const bu = data.bu || data.billingUnit || '4100';
+  const capacityKw = Number(data.systemCapacityKw || data.appliedCapacity || data.capacity || 3.3).toFixed(1);
+  const installedCapKw = (Number(capacityKw) * 0.97).toFixed(2);
+  const company = data.companyName || 'WhereReady Solar Technologies Pvt Ltd';
+  const vendorName = (data.vendorName || company).toUpperCase();
+  const address = (data.address || data.installationAddress || 'Plot No 87, Navin Nagar, Near Ring Road').toUpperCase();
+  const city = (data.city || data.district || 'Nagpur').toUpperCase();
+  const state = (data.state || 'Maharashtra').toUpperCase();
+  const pincode = data.pincode || '440008';
+  const appRef = data.applicationRefNo || data.nationalPortalAppNo || `NP-MHSED26-${consumerNo.slice(-6)}`;
+  const appDate = data.applicationDate || new Date().toLocaleDateString('en-IN');
+  const commDate = data.commissioningDate || new Date().toLocaleDateString('en-IN');
+  const mobile = data.mobile || data.phone || data.customerMobile || '9822012345';
+  const email = data.email || data.customerEmail || 'customer@gmail.com';
+  const moduleMake = (data.moduleMake || data.panelBrand || 'Waaree Solar 540Wp Mono PERC').toUpperCase();
+  const inverterMake = (data.inverterMake || data.inverterBrand || 'Growatt Dual MPPT Grid-Tied').toUpperCase();
+  const moduleQty = data.moduleQuantity || Math.ceil((Number(capacityKw) * 1000) / 540);
+  const moduleWatt = data.moduleWattage || 540;
 
-  if (type === 'ANNEXURE_2') {
-    return `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <title>Annexure 2 - Agreement</title>
-  <style>
-    @page { size: A4; margin: 15mm; }
-    body { font-family: serif; font-size: 10pt; line-height: 1.5; color: #000; }
-    .stamp-space { height: 160px; border: 1px dashed #999; display: flex; align-items: center; justify-content: center; font-family: sans-serif; font-size: 11pt; color: #666; margin-bottom: 20px; }
-    h2, h3 { text-align: center; margin: 4px 0; }
-    .sign-row { display: flex; justify-content: space-between; margin-top: 50px; }
-  </style>
-</head>
-<body>
-  <div class="stamp-space">[ SPACE FOR ₹100 / ₹500 NON-JUDICIAL STAMP PAPER ]</div>
-  <h2>ANNEXURE - 2</h2>
-  <h3>CONNECTION AGREEMENT FOR ROOFTOP SOLAR PV SYSTEM</h3>
-  <p style="text-align: center; font-style: italic;">(Under MSEDCL Net Metering Regulations)</p>
+  // Dynamic Serial Numbers for DCR Undertaking
+  const serials: string[] = Array.isArray(data.moduleSerialNumbers) && data.moduleSerialNumbers.length > 0
+    ? data.moduleSerialNumbers
+    : Array.from({ length: moduleQty }).map((_, i) => `MS2608211A${4100 + i * 15}`);
 
-  <p>This Agreement is entered on this <strong>${new Date().toLocaleDateString()}</strong> between:</p>
-  <p><strong>Consumer:</strong> ${custName}, Consumer No: <strong>${consumerNo}</strong>, BU: <strong>${bu}</strong>, Address: ${data.address || 'Site Address'}.</p>
-  <p>AND</p>
-  <p><strong>System Installer / Vendor:</strong> ${company}.</p>
+  // Base CSS for MSEDCL Statutory Forms
+  const baseStyles = `
+    @page { size: A4 portrait; margin: 12mm 15mm; }
+    * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    body {
+      font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif;
+      font-size: 11px;
+      line-height: 1.45;
+      color: #000000;
+      background: #ffffff;
+      margin: 0;
+      padding: 0;
+    }
+    .page {
+      width: 210mm;
+      min-height: 297mm;
+      margin: 0 auto;
+      padding: 14mm 16mm;
+      box-sizing: border-box;
+      position: relative;
+      background: #ffffff;
+      page-break-after: always;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .page:last-child { page-break-after: avoid; }
+    .doc-header { text-align: center; margin-bottom: 18px; }
+    .doc-org { font-size: 13.5px; font-weight: bold; text-transform: uppercase; color: #000; letter-spacing: 0.3px; margin: 0 0 4px 0; }
+    .doc-title { font-size: 12.5px; font-weight: bold; text-transform: uppercase; color: #000; margin: 0; }
+    .doc-sub { font-size: 10px; color: #475569; margin-top: 2px; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 12px; font-size: 10.5px; }
+    th, td { border: 1px solid #000000; padding: 6px 8px; vertical-align: middle; }
+    th { background: #f3f4f6; font-weight: bold; text-align: left; }
+    .section-head { background: #e5e7eb; font-weight: bold; font-size: 11px; }
+    .stamp-header {
+      border: 3px double #8b1e42;
+      border-radius: 4px;
+      padding: 8px 12px;
+      background: #fdf2f4;
+      margin-bottom: 16px;
+      text-align: center;
+      font-family: serif;
+    }
+    .stamp-title { font-size: 14px; font-weight: 900; color: #8b1e42; letter-spacing: 2px; }
+    .stamp-meta { display: flex; justify-content: space-between; font-size: 9.5px; font-weight: bold; color: #1e293b; margin-top: 4px; border-top: 1px solid #e2e8f0; padding-top: 3px; font-family: monospace; }
+    .sign-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-top: 32px; text-align: center; font-size: 10px; }
+    .sign-box { border-top: 1px solid #000; padding-top: 4px; font-weight: bold; }
+    .sign-space { height: 48px; display: flex; align-items: center; justify-content: center; }
+  `;
 
-  <h4>1. System Specifications</h4>
-  <p>Proposed Solar PV Plant Capacity: <strong>${capacity} kWp</strong> connected at LT grid voltage.</p>
-  <h4>2. Obligations & Grid Protection</h4>
-  <p>The consumer shall ensure anti-islanding protection is active at all times in the inverter, preventing any back-feeding to the grid during line outages to ensure safety of utility linemen.</p>
+  // 1. WORK COMPLETION REPORT (WCR)
+  const renderWcrHtml = () => `
+    <div class="page">
+      <div>
+        <div class="doc-header">
+          <div class="doc-org">MAHARASHTRA STATE ELECTRICITY DISTRIBUTION CO. LTD. (MSEDCL)</div>
+          <div class="doc-title">WORK COMPLETION REPORT (WCR) FOR GRID-CONNECTED SOLAR PV SYSTEM</div>
+          <div class="doc-sub">Statutory Interconnection Compliance Under PM Surya Ghar: Muft Bijli Yojana</div>
+        </div>
 
-  <div class="sign-row">
-    <div>
-      <br><br>
-      ____________________________<br>
-      <strong>Signature of Consumer</strong><br>
-      Name: ${custName}
+        <table>
+          <thead>
+            <tr class="section-head"><th colspan="2">1. Beneficiary Details</th></tr>
+          </thead>
+          <tbody>
+            <tr><td style="width: 35%; font-weight: bold;">Beneficiary Name</td><td style="font-weight: bold;">${beneficiaryName}</td></tr>
+            <tr><td style="font-weight: bold;">Application Ref. No. & Date</td><td>${appRef} / ${appDate}</td></tr>
+            <tr><td style="font-weight: bold;">Consumer Account No.</td><td style="font-weight: bold;">${consumerNo} (BU: ${bu})</td></tr>
+            <tr><td style="font-weight: bold;">Mobile No. & Email</td><td>${mobile} | ${email}</td></tr>
+            <tr><td style="font-weight: bold;">Tariff Category</td><td>LT-I Residential</td></tr>
+            <tr><td style="font-weight: bold;">Installation Address</td><td>${address}, District: ${city}, State: ${state}, PIN: ${pincode}</td></tr>
+          </tbody>
+        </table>
+
+        <table>
+          <thead>
+            <tr class="section-head"><th colspan="2">2. System Technical Specifications</th></tr>
+          </thead>
+          <tbody>
+            <tr><td style="width: 35%; font-weight: bold;">Sanctioned Load</td><td>${capacityKw} kW</td></tr>
+            <tr><td style="font-weight: bold;">Applied Capacity</td><td style="font-weight: bold;">${capacityKw} kWp (Installed: ${installedCapKw} kWp)</td></tr>
+            <tr><td style="font-weight: bold;">PV Modules Make & Model</td><td>${moduleMake} (${moduleWatt}Wp × ${moduleQty} Nos)</td></tr>
+            <tr><td style="font-weight: bold;">PCU / Inverter Capacity & Make</td><td>${capacityKw} kW Grid-Tied (${inverterMake})</td></tr>
+            <tr><td style="font-weight: bold;">Earthing & Lightning Protection</td><td>Separate AC, DC & LA Earthing provided as per MNRE standards (&lt; 5.0 Ohms)</td></tr>
+            <tr><td style="font-weight: bold;">Empaneled Vendor Name</td><td style="font-weight: bold;">${vendorName}</td></tr>
+          </tbody>
+        </table>
+
+        <table>
+          <thead>
+            <tr class="section-head"><th colspan="4">3. Statutory Electrical Safety & Interconnection Test Certificate</th></tr>
+            <tr style="background: #f9fafb;">
+              <th>Test Parameter</th><th>Standard Norm</th><th>Observed Value</th><th>Compliance</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>Earth Pit 1 (Inverter Body)</td><td>&lt; 5.0 Ohms</td><td style="font-family: monospace;">2.10 Ohms</td><td style="font-weight: bold; color: green;">PASS</td></tr>
+            <tr><td>Earth Pit 2 (PV Module Structure)</td><td>&lt; 5.0 Ohms</td><td style="font-family: monospace;">1.85 Ohms</td><td style="font-weight: bold; color: green;">PASS</td></tr>
+            <tr><td>Earth Pit 3 (Lightning Arrestor)</td><td>&lt; 5.0 Ohms</td><td style="font-family: monospace;">2.40 Ohms</td><td style="font-weight: bold; color: green;">PASS</td></tr>
+            <tr><td>Anti-Islanding Test (Mains Trip)</td><td>Trips &lt; 2.0 sec</td><td style="font-family: monospace;">0.18 sec</td><td style="font-weight: bold; color: green;">PASS</td></tr>
+            <tr><td>DC Insulation Resistance</td><td>&gt; 1000 Mega Ohms</td><td style="font-family: monospace;">&gt; 2000 MΩ</td><td style="font-weight: bold; color: green;">PASS</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="sign-grid">
+        <div>
+          <div class="sign-space"><span>${beneficiaryName.split(' ')[0]}</span></div>
+          <div class="sign-box">(Signature of Consumer)<br><span style="font-size: 9px;">${beneficiaryName}</span></div>
+        </div>
+        <div>
+          <div class="sign-space"><span style="border: 1px solid #1e40af; color: #1e40af; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-size: 8.5px;">${vendorName}</span></div>
+          <div class="sign-box">(Authorized Solar Vendor)<br><span style="font-size: 9px;">License: PWD/EL/2026/0994</span></div>
+        </div>
+        <div>
+          <div class="sign-space"><span style="border: 1px dashed #94a3b8; color: #94a3b8; padding: 4px 8px; font-size: 8px;">Official Seal</span></div>
+          <div class="sign-box">(MSEDCL Section Officer)<br><span style="font-size: 9px;">Seal & Signature</span></div>
+        </div>
+      </div>
     </div>
-    <div style="text-align: right;">
-      <br><br>
-      ____________________________<br>
-      <strong>Authorized Signatory</strong><br>
-      For ${company}
+  `;
+
+  // 2. COMMISSIONING CERTIFICATE (ANNEXURE - I)
+  const renderCommissioningHtml = () => `
+    <div class="page">
+      <div>
+        <div class="doc-header">
+          <div class="doc-org">ANNEXURE - I</div>
+          <div class="doc-title">COMMISSIONING CERTIFICATE FOR GRID CONNECTED SOLAR ROOFTOP PV SYSTEM</div>
+          <div class="doc-sub">Maharashtra State Electricity Distribution Co. Ltd. (MSEDCL)</div>
+        </div>
+
+        <p style="text-align: justify; line-height: 1.6; margin-bottom: 16px;">
+          Certified that the Solar Power Plant of capacity <strong>${capacityKw} kWp</strong> installed at <strong>${address}, District: ${city}, State: ${state}, PIN: ${pincode}</strong> for <strong>${beneficiaryName}</strong> (Consumer No. <strong>${consumerNo}</strong>) is complete in all respects and ready for Grid Interconnection.
+        </p>
+
+        <table>
+          <thead><tr class="section-head"><th colspan="2">System Technical Details</th></tr></thead>
+          <tbody>
+            <tr>
+              <td style="width: 50%; vertical-align: top; padding: 10px;">
+                <p style="font-weight: bold; margin: 0 0 6px 0; border-bottom: 1px solid #000; padding-bottom: 2px;">Solar PV Array Details</p>
+                <p>• <strong>Capacity:</strong> ${capacityKw} kWp (Installed: ${installedCapKw} kWp)</p>
+                <p>• <strong>Make:</strong> ${moduleMake}</p>
+                <p>• <strong>Module Rating:</strong> ${moduleWatt} Wp (${moduleQty} NOS)</p>
+                <p>• <strong>Sanctioned Load:</strong> ${capacityKw} kW</p>
+              </td>
+              <td style="width: 50%; vertical-align: top; padding: 10px;">
+                <p style="font-weight: bold; margin: 0 0 6px 0; border-bottom: 1px solid #000; padding-bottom: 2px;">Power Conditioning Unit (Inverter) Details</p>
+                <p>• <strong>Capacity:</strong> ${capacityKw} kW Grid-Tied</p>
+                <p>• <strong>Make:</strong> ${inverterMake}</p>
+                <p>• <strong>Type:</strong> Single Phase / 3-Phase LT</p>
+                <p>• <strong>Protection:</strong> IP65 / Anti-Islanding Embedded</p>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        <table>
+          <thead><tr class="section-head"><th colspan="2">Metering & Earthing Synchronization</th></tr></thead>
+          <tbody>
+            <tr>
+              <td style="width: 50%; padding: 8px;">• <strong>Metering Type:</strong> Bi-directional Net Meter & Generation Meter (Class 1.0 accuracy)</td>
+              <td style="width: 50%; padding: 8px;">• <strong>Earthing:</strong> 3 Dedicated chemical earth pits (< 5.0 Ohms) for AC, DC, LA</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <p style="font-weight: bold; margin-top: 16px;">Date of Commissioning: ${commDate}</p>
+      </div>
+
+      <div class="sign-grid" style="grid-template-columns: 1fr 1fr;">
+        <div>
+          <div class="sign-space"><span>${beneficiaryName.split(' ')[0]}</span></div>
+          <div class="sign-box">(Consumer Signature)<br><span style="font-size: 9px;">${beneficiaryName}</span></div>
+        </div>
+        <div>
+          <div class="sign-space"><span style="border: 1px solid #1e40af; color: #1e40af; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-size: 8.5px;">${vendorName}</span></div>
+          <div class="sign-box">(Vendor Signature & Stamp)<br><span style="font-size: 9px;">${vendorName}</span></div>
+        </div>
+      </div>
     </div>
-  </div>
-</body>
-</html>
-    `;
+  `;
+
+  // 3. DCR UNDERTAKING (ANNEXURE - A)
+  const renderDcrHtml = () => `
+    <div class="page">
+      <div>
+        <div class="doc-header">
+          <div class="doc-org">ANNEXURE - A</div>
+          <div class="doc-title">(SELF-DECLARATION / UNDERTAKING FOR DOMESTIC CONTENT REQUIREMENT)</div>
+          <div class="doc-sub">PM Surya Ghar: Muft Bijli Yojana • MNRE Phase-II Central CFA Scheme</div>
+        </div>
+
+        <p style="text-align: justify; line-height: 1.5; margin-bottom: 12px;">
+          This is to certify that <strong>${vendorName}</strong> has installed <strong>${capacityKw} kWp</strong> Grid Connected Rooftop Solar (GCRTS) Power Plant for <strong>${beneficiaryName}</strong> at <strong>${address}, District: ${city}, State: ${state}, PIN: ${pincode}</strong>, under MNRE Rooftop Solar Scheme Phase-II, against Application Reference Number: <strong>${appRef}</strong>.
+        </p>
+
+        <table style="margin-bottom: 10px;">
+          <thead><tr class="section-head"><th colspan="2">Details of Domestically Manufactured Solar PV Modules</th></tr></thead>
+          <tbody>
+            <tr><td style="width: 45%;">1. Total No. of Modules Installed</td><td style="font-weight: bold;">${moduleQty} NOS</td></tr>
+            <tr><td>2. Rating of Each Module</td><td style="font-weight: bold;">${moduleWatt} Wp</td></tr>
+            <tr><td>3. Total Capacity Installed</td><td style="font-weight: bold;">${installedCapKw} kWp (Applied: ${capacityKw} kWp)</td></tr>
+            <tr><td>4. PV Module Make</td><td style="font-weight: bold;">${moduleMake}</td></tr>
+            <tr><td>5. Cell Manufacturer Name</td><td>Mundra Solar PV Ltd (Adani) / Waaree Energies Ltd</td></tr>
+            <tr><td>6. Module Manufacturer Name</td><td>Mundra Solar PV Ltd (Adani) / Waaree Energies Ltd</td></tr>
+          </tbody>
+        </table>
+
+        <table>
+          <thead>
+            <tr style="background: #f3f4f6;"><th style="width: 60px; text-align: center;">Sr. No.</th><th>PV Module Serial Number (Tier-1 ALMM Listed)</th><th style="width: 90px; text-align: center;">Rating</th></tr>
+          </thead>
+          <tbody style="font-family: monospace;">
+            ${serials.slice(0, 10).map((s, idx) => `
+              <tr>
+                <td style="text-align: center;">${idx + 1}</td>
+                <td><strong>${s}</strong></td>
+                <td style="text-align: center;">${moduleWatt} Wp</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+
+        <p style="text-align: justify; font-size: 9.5px; color: #334155; line-height: 1.4;">
+          I / We hereby undertake that the above mentioned Solar PV Modules are domestically manufactured using domestic manufactured solar cells and conform to the Domestic Content Requirement (DCR) criteria as per MNRE guidelines. In case any document is found incorrect, MNRE / MSEDCL may take appropriate action against us.
+        </p>
+      </div>
+
+      <div class="sign-grid" style="grid-template-columns: 1fr 1fr;">
+        <div>
+          <div class="sign-space"><span>${beneficiaryName.split(' ')[0]}</span></div>
+          <div class="sign-box">(Signature of Beneficiary)<br><span style="font-size: 9px;">Name: ${beneficiaryName}</span></div>
+        </div>
+        <div>
+          <div class="sign-space"><span style="border: 1px solid #1e40af; color: #1e40af; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-size: 8.5px;">${vendorName}</span></div>
+          <div class="sign-box">(Authorized Signatory)<br><span style="font-size: 9px;">For ${vendorName}</span></div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // 4. NET METERING CONNECTION AGREEMENT (ANNEXURE 2 / 3)
+  const renderAgreementHtml = () => `
+    <div class="page">
+      <div>
+        <!-- STAMP PAPER HEADER -->
+        <div class="stamp-header">
+          <div class="stamp-title">INDIA NON JUDICIAL</div>
+          <div style="font-size: 11px; font-weight: bold; color: #8b1e42; margin-top: 2px;">GOVERNMENT OF MAHARASHTRA</div>
+          <div class="stamp-meta">
+            <span>MAHARASHTRA</span>
+            <span>● 2026 ●</span>
+            <span>${city} TREASURY • 55AB 416416</span>
+          </div>
+        </div>
+
+        <div class="doc-header">
+          <div class="doc-org">ANNEXURE – 3 / ANNEXURE - 2</div>
+          <div class="doc-title">NET METERING CONNECTION AGREEMENT</div>
+          <div class="doc-sub">(Under MERC Grid Interactive Renewable Energy Systems Regulations, 2019)</div>
+        </div>
+
+        <p style="text-align: justify; line-height: 1.6; margin-bottom: 12px;">
+          This Agreement is made and entered into at <strong>${city}</strong> on this <strong>${new Date().getDate()}</strong> day of <strong>${new Date().toLocaleString('en-US', { month: 'short' })} 2026</strong> between the Eligible Consumer (Name: <strong>${beneficiaryName}</strong>, premises: <strong>${address}, ${city}</strong>, Consumer No. <strong>${consumerNo}</strong>) as First Party, AND
+        </p>
+
+        <p style="text-align: justify; line-height: 1.6; margin-bottom: 12px;">
+          <strong>MSEDCL (Distribution Licensee) & Empaneled Vendor (${vendorName})</strong> as Second Party.
+        </p>
+
+        <h4 style="margin: 12px 0 4px 0; font-size: 11px; text-transform: uppercase;">1. Technical Standards & Interconnection</h4>
+        <p style="text-align: justify; font-size: 10px; line-height: 1.45; margin-bottom: 8px;">
+          The Renewable Energy Generating System (${capacityKw} kWp) meets the applicable technical norms and safety standards specified by CEA and MERC. The Eligible Consumer shall maintain the system in safe operational condition.
+        </p>
+
+        <h4 style="margin: 8px 0 4px 0; font-size: 11px; text-transform: uppercase;">2. Islanding & Grid Protection</h4>
+        <p style="text-align: justify; font-size: 10px; line-height: 1.45; margin-bottom: 8px;">
+          The system is equipped with automatic anti-islanding protection (IEC 62109, IEC 61727). In the event of grid power failure, the solar plant shall disconnect within 0.20 seconds to prevent back-feeding into the grid.
+        </p>
+
+        <h4 style="margin: 8px 0 4px 0; font-size: 11px; text-transform: uppercase;">3. Commercial Net Metering & Energy Accounting</h4>
+        <p style="text-align: justify; font-size: 10px; line-height: 1.45; margin-bottom: 12px;">
+          Electricity generated from the solar rooftop plant shall be measured by a bi-directional net meter installed by MSEDCL and accounted in the monthly billing cycle.
+        </p>
+      </div>
+
+      <div class="sign-grid" style="grid-template-columns: 1fr 1fr;">
+        <div>
+          <div class="sign-space"><span>${beneficiaryName.split(' ')[0]}</span></div>
+          <div class="sign-box">First Party (Eligible Consumer)<br><span style="font-size: 9px;">${beneficiaryName}</span></div>
+        </div>
+        <div>
+          <div class="sign-space"><span style="border: 1px solid #1e40af; color: #1e40af; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-size: 8.5px;">${vendorName}</span></div>
+          <div class="sign-box">Second Party (Vendor / Licensee)<br><span style="font-size: 9px;">${vendorName}</span></div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // 5. FORM A-1: NET METERING APPLICATION
+  const renderFormA1Html = () => `
+    <div class="page">
+      <div>
+        <div class="doc-header">
+          <div class="doc-org">MAHARASHTRA STATE ELECTRICITY DISTRIBUTION CO. LTD. (MSEDCL)</div>
+          <div class="doc-title">FORM A-1: APPLICATION FOR NET-METERING ROOFTOP SOLAR PV SYSTEM</div>
+          <div class="doc-sub">To: The Executive Engineer / Sub-Divisional Officer, MSEDCL (${city} Circle)</div>
+        </div>
+
+        <table>
+          <thead><tr class="section-head"><th colspan="2">Official Application Particulars</th></tr></thead>
+          <tbody>
+            <tr><td style="width: 40%; font-weight: bold;">1. Name of the Applicant</td><td style="font-weight: bold;">${beneficiaryName}</td></tr>
+            <tr><td style="font-weight: bold;">2. Consumer Number (12 Digit)</td><td style="font-weight: bold; font-family: monospace;">${consumerNo}</td></tr>
+            <tr><td style="font-weight: bold;">3. Billing Unit (BU)</td><td style="font-family: monospace;">${bu}</td></tr>
+            <tr><td style="font-weight: bold;">4. Service Connection Address</td><td>${address}, District: ${city}, PIN: ${pincode}</td></tr>
+            <tr><td style="font-weight: bold;">5. Mobile & Email</td><td>${mobile} | ${email}</td></tr>
+            <tr><td style="font-weight: bold;">6. Tariff Category</td><td>LT-I Residential</td></tr>
+            <tr><td style="font-weight: bold;">7. Sanctioned Connected Load</td><td>${capacityKw} kW</td></tr>
+            <tr><td style="font-weight: bold;">8. Proposed Solar Capacity</td><td style="font-weight: bold;">${capacityKw} kWp Grid-Tied</td></tr>
+            <tr><td style="font-weight: bold;">9. Inverter Specifications</td><td>${inverterMake} (Compliant with IEC 62109, IEC 61727)</td></tr>
+            <tr><td style="font-weight: bold;">10. Approved Solar EPC Partner</td><td style="font-weight: bold;">${vendorName}</td></tr>
+          </tbody>
+        </table>
+
+        <p style="font-size: 10px; color: #334155; line-height: 1.5; margin-top: 16px;">
+          I/We hereby apply for grid interconnection of our Rooftop Solar PV System under the Net-Metering arrangement. I agree to abide by the terms and conditions stipulated by MERC (Grid Interactive Renewable Energy Systems) Regulations, 2019 and MSEDCL guidelines.
+        </p>
+
+        <div style="margin-top: 24px; display: flex; justify-content: space-between; font-size: 10.5px;">
+          <div>
+            Date: <strong>${appDate}</strong><br>
+            Place: <strong>${city}</strong>
+          </div>
+          <div style="text-align: right;">
+            <div style="height: 40px;"></div>
+            ____________________________<br>
+            <strong>Signature of Applicant</strong><br>
+            ${beneficiaryName}
+          </div>
+        </div>
+      </div>
+
+      <div style="border-top: 1px dashed #cbd5e1; padding-top: 8px; font-size: 9px; color: #64748b; text-align: center;">
+        WhereReady Solar OS Statutory Compliance Engine • Generated for Official State Utility Net-Metering Filing
+      </div>
+    </div>
+  `;
+
+  // Select appropriate document or full statutory pack
+  let content = '';
+  if (type === 'ANNEXURE_2' || type === 'AGREEMENT') {
+    content = renderAgreementHtml();
+  } else if (type === 'WCR') {
+    content = renderWcrHtml();
+  } else if (type === 'COMMISSIONING') {
+    content = renderCommissioningHtml();
+  } else if (type === 'DCR') {
+    content = renderDcrHtml();
+  } else if (type === 'FULL_PACK') {
+    content = renderFormA1Html() + renderAgreementHtml() + renderWcrHtml() + renderCommissioningHtml() + renderDcrHtml();
+  } else {
+    // Default: Form A-1
+    content = renderFormA1Html();
   }
 
-  if (type === 'WCR') {
-    return `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <title>Work Completion Report</title>
-  <style>
-    @page { size: A4; margin: 15mm; }
-    body { font-family: sans-serif; font-size: 10pt; line-height: 1.4; color: #1e293b; }
-    table { width: 100%; border-collapse: collapse; margin: 12px 0; }
-    th, td { border: 1px solid #cbd5e1; padding: 6px 8px; font-size: 9pt; }
-    th { background: #f1f5f9; text-align: left; }
-    h2, h3 { text-align: center; margin: 4px 0; color: #0f172a; }
-  </style>
-</head>
-<body>
-  <h2>WORK COMPLETION REPORT (WCR)</h2>
-  <h3>Rooftop Solar PV Grid Interconnection Testing Report</h3>
-  <p style="text-align: center; color: #64748b;">MSEDCL Net-Metering Statutory Compliance</p>
-
-  <table>
-    <tr><th>Consumer Name</th><td>${custName}</td><th>Consumer No</th><td>${consumerNo}</td></tr>
-    <tr><th>Billing Unit (BU)</th><td>${bu}</td><th>Sanctioned Load</th><td>${data.sanctionedLoadKw || capacity} kW</td></tr>
-    <tr><th>Installed Solar Capacity</th><td>${capacity} kWp</td><th>Grid Interconnection</th><td>LT 230V / 415V</td></tr>
-  </table>
-
-  <h4>Technical Test Certificate</h4>
-  <table>
-    <tr><th>Test Parameter</th><th>Standard Norm</th><th>Observed Value</th><th>Status</th></tr>
-    <tr><td>Earth Pit 1 (Inverter Body)</td><td>&lt; 5.0 Ohms</td><td>2.1 Ohms</td><td>PASS</td></tr>
-    <tr><td>Earth Pit 2 (PV Module Structure)</td><td>&lt; 5.0 Ohms</td><td>1.8 Ohms</td><td>PASS</td></tr>
-    <tr><td>Earth Pit 3 (Lightning Arrestor)</td><td>&lt; 5.0 Ohms</td><td>2.4 Ohms</td><td>PASS</td></tr>
-    <tr><td>Anti-Islanding Test (Mains Trip)</td><td>Trips &lt; 2.0 sec</td><td>0.18 sec</td><td>PASS</td></tr>
-    <tr><td>DC Insulation Resistance</td><td>&gt; 1000 Mega Ohms</td><td>&gt; 2000 M-Ohms</td><td>PASS</td></tr>
-  </table>
-
-  <div style="margin-top: 40px; display: flex; justify-content: space-between;">
-    <div>
-      ____________________________<br>
-      <strong>Certified Electrical Contractor</strong><br>
-      License No: PWD/EL/2026/0994
-    </div>
-    <div style="text-align: right;">
-      ____________________________<br>
-      <strong>Consumer Signature</strong><br>
-      ${custName}
-    </div>
-  </div>
-</body>
-</html>
-    `;
-  }
-
-  // Default: Form A-1
   return `
 <!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
-  <title>MSEDCL Form A-1</title>
-  <style>
-    @page { size: A4; margin: 15mm; }
-    body { font-family: sans-serif; font-size: 10pt; line-height: 1.45; color: #0f172a; }
-    h2, h3 { text-align: center; margin: 4px 0; }
-    table { width: 100%; border-collapse: collapse; margin: 12px 0; }
-    th, td { border: 1px solid #cbd5e1; padding: 7px 10px; font-size: 9pt; }
-    th { background: #f8fafc; text-align: left; width: 35%; }
-  </style>
+  <title>MSEDCL Net-Metering Document - ${consumerNo}</title>
+  <style>${baseStyles}</style>
 </head>
 <body>
-  <h2>MAHARASHTRA STATE ELECTRICITY DISTRIBUTION CO. LTD.</h2>
-  <h3>FORM A-1: APPLICATION FOR NET-METERING ROOFTOP SOLAR PV SYSTEM</h3>
-  <p style="text-align: center; color: #64748b; font-size: 8.5pt;">To: The Executive Engineer / Sub-Divisional Officer, MSEDCL</p>
-
-  <table>
-    <tr><th>1. Name of the Applicant</th><td>${custName}</td></tr>
-    <tr><th>2. Consumer Number</th><td><strong>${consumerNo}</strong></td></tr>
-    <tr><th>3. Billing Unit (BU)</th><td>${bu}</td></tr>
-    <tr><th>4. Service Connection Address</th><td>${data.address || 'Installation Address'}</td></tr>
-    <tr><th>5. Mobile & Email</th><td>${data.phone || '9876543210'} | ${data.email || 'customer@gmail.com'}</td></tr>
-    <tr><th>6. Tariff Category</th><td>LT-I Residential</td></tr>
-    <tr><th>7. Sanctioned Connected Load</th><td>${data.sanctionedLoadKw || capacity} kW</td></tr>
-    <tr><th>8. Proposed Solar Capacity</th><td><strong>${capacity} kWp</strong></td></tr>
-    <tr><th>9. Inverter Make & Type</th><td>Grid-Tied String Inverter (IEC 62109, IEC 61727)</td></tr>
-    <tr><th>10. Approved Solar Vendor</th><td>${company}</td></tr>
-  </table>
-
-  <p style="font-size: 8.5pt; color: #475569; margin-top: 14px;">
-    I/We hereby apply for grid interconnection of our Rooftop Solar PV System under the Net-Metering arrangement. I agree to abide by the terms and conditions stipulated by MERC and MSEDCL.
-  </p>
-
-  <div style="margin-top: 50px; display: flex; justify-content: space-between;">
-    <div>
-      Date: <strong>${new Date().toLocaleDateString()}</strong><br>
-      Place: <strong>${data.city || 'Site'}</strong>
-    </div>
-    <div style="text-align: right;">
-      <br><br>
-      ____________________________<br>
-      <strong>Signature of Applicant</strong>
-    </div>
-  </div>
+  ${content}
 </body>
 </html>
   `;
@@ -1711,29 +1958,29 @@ export function generateInvoiceHtml(data: InvoicePdfProps): string {
   const isPaid = data.status === 'PAID' || data.balanceDue <= 0;
   const isOverdue = data.status === 'OVERDUE';
   const statusColor = isPaid ? '#059669' : isOverdue ? '#e11d48' : '#d97706';
-  const statusBg = isPaid ? '#ecfdf5' : isOverdue ? '#fff1f2' : '#fffbeb';
-  const statusBorder = isPaid ? '#a7f3d0' : isOverdue ? '#fecdd3' : '#fde68a';
 
   const isProforma = data.invoiceType === 'PROFORMA' || (data.invoiceNumber || '').startsWith('PRO');
   const isAdvance = data.invoiceType === 'ADVANCE_RECEIPT' || (data.invoiceNumber || '').startsWith('ADV');
   const docTitle = isProforma ? 'PROFORMA INVOICE' : isAdvance ? 'ADVANCE PAYMENT RECEIPT' : 'TAX INVOICE';
 
+  const taxableBase = data.subtotal || Math.round((data.grossTotal || 0) / 1.138);
+  const effectiveGst = Math.round((data.grossTotal || 0) - taxableBase);
+  const cgst = Math.round(effectiveGst / 2);
+  const sgst = effectiveGst - cgst;
+
   const defaultItems = [
     {
-      description: `${data.milestoneTitle || 'Complete Turnkey Rooftop Solar PV System Kit'} (${data.projectCapacityKw || 3.3} kWp Grid-Tied)`,
-      hsn: '8541',
+      description: `${data.milestoneTitle || 'Solar Power Generation Plant Installation & Supply'} (${data.projectCapacityKw || 3.3} kWp On-Grid)`,
+      hsn: data.milestoneKey === 'MATERIAL_DELIVERY' ? '8541' : '9954',
       qty: 1,
-      unit: 'System',
-      rate: data.subtotal || data.grossTotal,
-      amount: data.subtotal || data.grossTotal,
-      gstRate: data.taxRate || 13.8,
+      unit: 'Set',
+      rate: taxableBase,
+      amount: data.grossTotal,
+      gstRate: 13.8,
     },
   ];
 
   const items = data.items && data.items.length > 0 ? data.items : defaultItems;
-  const halfGstRate = ((data.taxRate || 13.8) / 2).toFixed(1);
-  const halfGstAmount = Math.round((data.taxAmount || (data.grossTotal - data.subtotal)) / 2);
-  const amountInWords = numberToWordsINR(data.grossTotal);
 
   return `
 <!DOCTYPE html>
@@ -1742,9 +1989,10 @@ export function generateInvoiceHtml(data: InvoicePdfProps): string {
   <meta charset="utf-8">
   <title>Tax Invoice - ${data.invoiceNumber}</title>
   <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
     @page {
-      size: A4;
-      margin: 10mm 12mm;
+      size: A4 portrait;
+      margin: 10mm 14mm;
     }
     * {
       box-sizing: border-box;
@@ -1752,437 +2000,404 @@ export function generateInvoiceHtml(data: InvoicePdfProps): string {
       print-color-adjust: exact;
     }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       color: #0f172a;
       background: #ffffff;
       margin: 0;
       padding: 0;
-      font-size: 9.5pt;
-      line-height: 1.4;
+      font-size: 11.5px;
+      line-height: 1.45;
     }
-    .header-table {
+    .invoice-container {
       width: 100%;
-      border-collapse: collapse;
+      max-width: 820px;
+      margin: 0 auto;
+      padding: 10px 0;
+    }
+    /* Header matching web */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      padding-bottom: 24px;
       border-bottom: 2px solid #0f172a;
-      padding-bottom: 12px;
-      margin-bottom: 12px;
     }
     .company-title {
-      font-size: 18pt;
+      font-size: 24px;
       font-weight: 900;
-      color: #0f172a;
-      letter-spacing: -0.5px;
-      margin: 0 0 4px 0;
-    }
-    .company-sub {
-      font-size: 8.5pt;
       color: #059669;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      margin-bottom: 4px;
+      margin: 0 0 4px 0;
+      line-height: 1.2;
     }
     .company-meta {
-      font-size: 8.5pt;
-      color: #475569;
-      line-height: 1.35;
+      font-size: 11px;
+      color: #64748b;
+      font-weight: 500;
+      margin: 2px 0;
+      max-width: 320px;
+      line-height: 1.4;
     }
-    .invoice-title-box {
+    .company-gstin {
+      font-size: 11px;
+      font-weight: 700;
+      color: #334155;
+      margin-top: 4px;
+    }
+    .header-right {
       text-align: right;
     }
-    .invoice-title {
-      font-size: 20pt;
+    .doc-title {
+      font-size: 26px;
       font-weight: 900;
-      color: #059669;
-      letter-spacing: 1px;
-      margin: 0 0 6px 0;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      color: #0f172a;
+      margin: 0 0 8px 0;
+    }
+    .meta-row {
+      font-size: 11px;
+      font-weight: 700;
+      color: #1e293b;
+      margin: 3px 0;
+    }
+    .meta-val {
+      font-weight: 500;
+      color: #475569;
     }
     .status-badge {
-      display: inline-block;
-      padding: 3px 10px;
-      border-radius: 4px;
-      font-size: 8.5pt;
       font-weight: 800;
-      letter-spacing: 0.5px;
-      border: 1px solid ${statusBorder};
-      background: ${statusBg};
-      color: ${statusColor};
-      margin-bottom: 8px;
-    }
-    .meta-table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-bottom: 14px;
-    }
-    .meta-table td {
-      vertical-align: top;
-      width: 50%;
-      padding: 10px;
-      border: 1px solid #e2e8f0;
-      background: #fafafa;
-    }
-    .meta-heading {
-      font-size: 8pt;
-      font-weight: 800;
-      color: #64748b;
       text-transform: uppercase;
       letter-spacing: 0.5px;
+    }
+
+    /* Billed to & Project Grid matching web */
+    .party-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 32px;
+      margin: 24px 0;
+      padding-bottom: 20px;
+      border-bottom: 1px solid #f1f5f9;
+    }
+    .section-kicker {
+      font-size: 10px;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      color: #94a3b8;
       margin-bottom: 6px;
-      border-bottom: 1px solid #e2e8f0;
-      padding-bottom: 4px;
     }
     .party-name {
-      font-size: 11pt;
-      font-weight: 800;
+      font-size: 15px;
+      font-weight: 700;
       color: #0f172a;
       margin-bottom: 4px;
     }
-    .party-meta {
-      font-size: 8.5pt;
-      color: #334155;
+    .project-name {
+      font-size: 15px;
+      font-weight: 700;
+      color: #065f46;
+      margin-bottom: 4px;
+    }
+    .party-text {
+      font-size: 11px;
+      color: #475569;
+      margin: 2px 0;
       line-height: 1.4;
     }
-    .milestone-badge-bar {
-      background: #ecfdf5;
-      border: 1px solid #a7f3d0;
-      border-radius: 6px;
-      padding: 8px 12px;
-      margin-bottom: 14px;
+    .dbt-eligible {
+      font-size: 11px;
+      color: #1d4ed8;
+      font-weight: 600;
+      margin-top: 4px;
     }
-    .milestone-title {
-      font-size: 10pt;
-      font-weight: 800;
-      color: #065f46;
-    }
-    .milestone-sub {
-      font-size: 8.5pt;
-      color: #047857;
-      margin-top: 2px;
-    }
+
+    /* Items Table matching web */
     .items-table {
       width: 100%;
       border-collapse: collapse;
-      margin-bottom: 14px;
-    }
-    .items-table th {
-      background: #0f172a;
-      color: #ffffff;
-      font-size: 8pt;
-      font-weight: 800;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      padding: 8px 10px;
-      border: 1px solid #0f172a;
-    }
-    .items-table td {
-      border: 1px solid #e2e8f0;
-      padding: 8px 10px;
-      font-size: 9pt;
-      color: #1e293b;
-    }
-    .totals-container {
-      width: 100%;
-      display: flex;
-      justify-content: flex-end;
-      margin-bottom: 14px;
-    }
-    .totals-table {
-      width: 45%;
-      border-collapse: collapse;
-    }
-    .totals-table td {
-      padding: 6px 10px;
-      font-size: 9pt;
-      border-bottom: 1px solid #f1f5f9;
-    }
-    .totals-label {
-      color: #64748b;
-      font-weight: 600;
-    }
-    .totals-val {
-      text-align: right;
-      font-weight: 700;
-      color: #0f172a;
-    }
-    .grand-total-row {
-      background: #059669;
-      color: #ffffff;
-    }
-    .grand-total-row td {
-      padding: 10px;
-      font-size: 11pt;
-      font-weight: 900;
-      color: #ffffff;
-      border: none;
-    }
-    .words-box {
-      background: #f8fafc;
-      border: 1px solid #e2e8f0;
-      border-radius: 6px;
-      padding: 8px 12px;
-      margin-bottom: 14px;
-      font-size: 8.5pt;
-      color: #334155;
-    }
-    .payments-box {
-      border: 1px solid #e2e8f0;
-      border-radius: 6px;
-      padding: 10px 12px;
-      margin-bottom: 14px;
-      background: #ffffff;
-    }
-    .payments-title {
-      font-size: 8.5pt;
-      font-weight: 800;
-      color: #059669;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      margin-bottom: 6px;
-    }
-    .payments-table {
-      width: 100%;
-      border-collapse: collapse;
-    }
-    .payments-table th, .payments-table td {
-      padding: 5px 8px;
-      font-size: 8.5pt;
-      border-bottom: 1px solid #f1f5f9;
+      margin-bottom: 24px;
       text-align: left;
     }
-    .bank-and-sign {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 14px;
+    .items-table th {
+      border-bottom: 2px solid #0f172a;
+      font-size: 11px;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #1e293b;
+      padding: 10px 8px;
     }
-    .bank-and-sign td {
+    .items-table td {
+      padding: 12px 8px;
+      border-bottom: 1px solid #e2e8f0;
+      font-size: 11px;
       vertical-align: top;
-      width: 50%;
-      padding: 10px;
-      border: 1px solid #e2e8f0;
     }
-    .sign-box {
-      text-align: right;
-      height: 90px;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
+    .item-title {
+      font-weight: 700;
+      color: #0f172a;
+      margin: 0;
+      font-size: 12px;
     }
-    .terms-text {
-      font-size: 7.5pt;
+    .item-desc {
+      font-size: 10.5px;
       color: #64748b;
-      line-height: 1.35;
-      margin-top: 14px;
+      margin-top: 3px;
+      line-height: 1.4;
+    }
+
+    /* Totals & Bank section matching web */
+    .bottom-grid {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      padding-top: 16px;
       border-top: 1px solid #e2e8f0;
-      padding-top: 8px;
+      margin-bottom: 28px;
+    }
+    .bank-box {
+      max-width: 340px;
+      font-size: 11px;
+      line-height: 1.5;
+    }
+    .bank-title {
+      font-weight: 700;
+      color: #1e293b;
+      margin-bottom: 4px;
+    }
+    .bank-line {
+      color: #475569;
+      margin: 1px 0;
+    }
+    .dbt-callout {
+      padding: 10px 12px;
+      border-radius: 10px;
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      margin-top: 12px;
+    }
+    .dbt-callout-title {
+      font-size: 11px;
+      font-weight: 700;
+      color: #1e3a8a;
+      margin-bottom: 2px;
+    }
+    .dbt-callout-text {
+      font-size: 10px;
+      color: #1e40af;
+      line-height: 1.4;
+    }
+
+    .totals-box {
+      width: 290px;
+      font-size: 11.5px;
+    }
+    .total-line {
+      display: flex;
+      justify-content: space-between;
+      padding: 4px 0;
+      border-bottom: 1px solid #f1f5f9;
+      color: #64748b;
+    }
+    .total-line-val {
+      font-weight: 700;
+      color: #1e293b;
+    }
+    .grand-total-line {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 2px solid #0f172a;
+      font-size: 13px;
+      font-weight: 900;
+      color: #0f172a;
+    }
+    .grand-total-val {
+      font-size: 15px;
+      font-weight: 900;
+      color: #0f172a;
+    }
+    .paid-line {
+      display: flex;
+      justify-content: space-between;
+      padding: 4px 0;
+      color: #047857;
+      font-weight: 700;
+    }
+    .bal-line {
+      display: flex;
+      justify-content: space-between;
+      padding: 4px 0;
+      color: #b45309;
+      font-weight: 900;
+    }
+
+    /* Footer matching web */
+    .footer {
+      padding-top: 24px;
+      border-top: 1px solid #e2e8f0;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+    }
+    .footer-left {
+      font-size: 10.5px;
+      color: #94a3b8;
+      line-height: 1.5;
+    }
+    .signatory-box {
+      text-align: center;
+    }
+    .sign-line {
+      width: 120px;
+      border-bottom: 2px solid #94a3b8;
+      height: 44px;
+      margin: 0 auto 6px auto;
+    }
+    .sign-title {
+      font-size: 10px;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #0f172a;
+      margin: 0;
+    }
+    .sign-comp {
+      font-size: 11px;
+      color: #64748b;
+      margin: 2px 0 0 0;
     }
   </style>
 </head>
 <body>
-  <!-- HEADER -->
-  <table class="header-table">
-    <tr>
-      <td style="vertical-align: top; width: 60%;">
-        <div class="company-title">${data.companyName || 'Solar Solutions Pvt Ltd'}</div>
-        <div class="company-sub">Authorized Solar EPC Partner & Turnkey Contractor</div>
-        <div class="company-meta">
-          ${data.companyAddress || 'Corporate Office, Solar Park, Maharashtra'}<br>
-          📞 ${data.companyPhone || '+91 98220 12345'} | ✉️ ${data.companyEmail || 'proposals@wherereadysolar.com'}<br>
-          ${data.companyGstin ? `<strong>GSTIN:</strong> ${data.companyGstin}` : '<strong>GSTIN:</strong> 27AABCS1429B1Z5'} | 
-          ${data.companyPan ? `<strong>PAN:</strong> ${data.companyPan}` : '<strong>PAN:</strong> AABCS1429B'}
-        </div>
-      </td>
-      <td style="vertical-align: top; width: 40%;" class="invoice-title-box">
-        <div class="invoice-title">${docTitle}</div>
-        <div><span class="status-badge">${isPaid ? 'PAID IN FULL' : isOverdue ? 'OVERDUE' : data.status || 'UNPAID'}</span></div>
-        <div class="company-meta">
-          <strong>Invoice No:</strong> ${data.invoiceNumber}<br>
-          <strong>Invoice Date:</strong> ${data.invoiceDate}<br>
-          <strong>Due Date:</strong> ${data.dueDate}<br>
-          <strong>Reverse Charge:</strong> No
-        </div>
-      </td>
-    </tr>
-  </table>
+  <div class="invoice-container">
+    <!-- Header -->
+    <div class="header">
+      <div>
+        ${data.companyLogoUrl ? `<img src="${data.companyLogoUrl}" alt="Logo" style="height: 56px; object-fit: contain; margin-bottom: 12px;" />` : `
+        <h1 class="company-title">${data.companyName || 'Solar Energy EPC'}</h1>`}
+        <p class="company-meta">${data.companyAddress || 'Solar Engineering Headquarters'}</p>
+        ${data.companyGstin ? `<p class="company-gstin">GSTIN: ${data.companyGstin}</p>` : ''}
+        <p class="company-meta">Contact: ${data.companyPhone || '+91 98220 12345'} • ${data.companyEmail || 'billing@wherereadysolar.com'}</p>
+      </div>
 
-  <!-- BILL TO & SHIP TO -->
-  <table class="meta-table">
-    <tr>
-      <td>
-        <div class="meta-heading">Billed To (Client / Customer)</div>
-        <div class="party-name">${data.customerName || 'Valued Customer'}</div>
-        <div class="party-meta">
-          📞 Mobile: ${data.customerPhone || 'N/A'}<br>
-          ${data.customerEmail ? `✉️ Email: ${data.customerEmail}<br>` : ''}
-          📍 Installation Site: ${data.customerAddress || 'Site Location, Maharashtra'}<br>
-          🏛️ State: Maharashtra (Code: 27)
-        </div>
-      </td>
-      <td>
-        <div class="meta-heading">Project & Statutory Profile</div>
-        <div class="party-name">${data.projectName || `${data.customerName}'s Rooftop Solar`}</div>
-        <div class="party-meta">
-          ⚡ System Capacity: <strong>${data.projectCapacityKw || 3.3} kWp Grid-Tied</strong><br>
-          🔌 DISCOM Consumer No: <strong>${data.consumerNumber || 'N/A'}</strong><br>
-          🏢 Utility Provider: ${data.discomName || 'MSEDCL (Mahavitaran)'}<br>
-          🏛️ Scheme: PM Surya Ghar Muft Bijli Yojana
-        </div>
-      </td>
-    </tr>
-  </table>
-
-  <!-- SCOPE BANNER -->
-  <div class="milestone-badge-bar">
-    <div class="milestone-title">📍 Scope / Description: ${data.milestoneTitle || 'Complete Turnkey Rooftop Solar PV Installation'}</div>
-    <div class="milestone-sub">
-      Turnkey Solar Rooftop Contract • Statutory Equipment Supply, Execution & Grid Net-Metering
+      <div class="header-right">
+        <h2 class="doc-title">${docTitle}</h2>
+        <p class="meta-row">Invoice No: <span class="meta-val">${data.invoiceNumber}</span></p>
+        <p class="meta-row">Date: <span class="meta-val">${data.invoiceDate}</span></p>
+        <p class="meta-row">Due Date: <span class="meta-val">${data.dueDate || 'Net 15 Days'}</span></p>
+        <p class="meta-row">Status: <span class="status-badge" style="color: ${statusColor};">${data.status || 'UNPAID'}</span></p>
+      </div>
     </div>
-  </div>
 
-  <!-- ITEMS TABLE -->
-  <table class="items-table">
-    <thead>
-      <tr>
-        <th style="width: 5%;">#</th>
-        <th style="width: 48%; text-align: left;">Item Description</th>
-        <th style="width: 10%;">HSN/SAC</th>
-        <th style="width: 7%;">Qty</th>
-        <th style="width: 15%; text-align: right;">Rate (₹)</th>
-        <th style="width: 15%; text-align: right;">Amount (₹)</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${items
-        .map(
-          (it, idx) => `
+    <!-- Billed To & Project Details -->
+    <div class="party-grid">
+      <div>
+        <div class="section-kicker">BILLED TO (CONSUMER):</div>
+        <div class="party-name">${data.customerName || 'Valued Consumer'}</div>
+        <div class="party-text">${data.customerPhone || ''}</div>
+        ${data.customerEmail ? `<div class="party-text">${data.customerEmail}</div>` : ''}
+        <div class="party-text">${data.customerAddress || 'Site Address as per contract'}</div>
+      </div>
+      <div>
+        <div class="section-kicker">PROJECT & SYSTEM DETAILS:</div>
+        <div class="project-name">${data.projectName || `${data.customerName}'s Rooftop Solar Plant`}</div>
+        <div class="party-text" style="font-weight: 700; color: #334155;">
+          Capacity: ${data.projectCapacityKw || 3.3} kWp On-Grid
+        </div>
+        <div class="party-text">Milestone: ${data.milestoneTitle || 'Solar Deliverable Milestone'}</div>
+        <div class="dbt-eligible">PM Surya Ghar DBT Subsidy Eligible</div>
+      </div>
+    </div>
+
+    <!-- Line Items Table -->
+    <table class="items-table">
+      <thead>
         <tr>
-          <td style="text-align: center; color: #64748b;">${idx + 1}</td>
-          <td>
-            <strong>${it.description}</strong>
-          </td>
-          <td style="text-align: center; font-family: monospace;">${it.hsn || '8541'}</td>
-          <td style="text-align: center;">${it.qty || 1} ${it.unit || 'Stage'}</td>
-          <td style="text-align: right;">₹${formatInr(it.rate || it.amount || 0)}</td>
-          <td style="text-align: right; font-weight: 700;">₹${formatInr(it.amount || 0)}</td>
+          <th style="width: 50%;">Item & Scope Description</th>
+          <th style="width: 10%; text-align: center;">HSN/SAC</th>
+          <th style="width: 8%; text-align: center;">Qty</th>
+          <th style="width: 14%; text-align: right;">Taxable Amt</th>
+          <th style="width: 8%; text-align: right;">GST %</th>
+          <th style="width: 10%; text-align: right;">Total (₹)</th>
         </tr>
-      `
-        )
-        .join('')}
-    </tbody>
-  </table>
-
-  <!-- TOTALS BREAKDOWN -->
-  <div class="totals-container">
-    <table class="totals-table">
-      <tr>
-        <td class="totals-label">Taxable Subtotal</td>
-        <td class="totals-val">₹${formatInr(data.subtotal)}</td>
-      </tr>
-      <tr>
-        <td class="totals-label">CGST (${halfGstRate}%)</td>
-        <td class="totals-val">₹${formatInr(halfGstAmount)}</td>
-      </tr>
-      <tr>
-        <td class="totals-label">SGST (${halfGstRate}%)</td>
-        <td class="totals-val">₹${formatInr(halfGstAmount)}</td>
-      </tr>
-      <tr class="grand-total-row">
-        <td>Total Invoice Value</td>
-        <td style="text-align: right;">₹${formatInr(data.grossTotal)}</td>
-      </tr>
-      ${
-        data.totalPaid > 0
-          ? `
-        <tr>
-          <td class="totals-label" style="color: #059669; font-weight: 700;">Less: Total Paid to Date</td>
-          <td class="totals-val" style="color: #059669; font-weight: 800;">-₹${formatInr(data.totalPaid)}</td>
-        </tr>
-      `
-          : ''
-      }
-      <tr>
-        <td class="totals-label" style="font-weight: 900; font-size: 10pt; color: #0f172a;">Balance Payable</td>
-        <td class="totals-val" style="font-weight: 900; font-size: 11pt; color: ${isPaid ? '#059669' : '#e11d48'};">
-          ₹${formatInr(data.balanceDue)}
-        </td>
-      </tr>
-    </table>
-  </div>
-
-  <div class="words-box">
-    <strong>Total Invoice Amount in Words:</strong> ${amountInWords}
-  </div>
-
-  ${
-    data.payments && data.payments.length > 0
-      ? `
-    <div class="payments-box">
-      <div class="payments-title">Recorded Payment Transactions</div>
-      <table class="payments-table">
-        <thead>
-          <tr style="color: #64748b; font-size: 8pt; text-transform: uppercase;">
-            <th>Date</th>
-            <th>Mode</th>
-            <th>Reference / UTR</th>
-            <th style="text-align: right;">Amount Paid</th>
+      </thead>
+      <tbody>
+        ${items.map(it => `
+          <tr>
+            <td>
+              <p class="item-title">${it.description}</p>
+              <p class="item-desc">Supply of Mono PERC DCR PV Modules, Grid Inverter, Mounting Hardware & Commissioning Services.</p>
+            </td>
+            <td style="text-align: center; color: #475569; font-weight: 600;">${it.hsn || (data.milestoneKey === 'MATERIAL_DELIVERY' ? '8541' : '9954')}</td>
+            <td style="text-align: center; font-weight: 700; color: #1e293b;">${it.qty || 1} ${it.unit || 'Set'}</td>
+            <td style="text-align: right; font-weight: 700; color: #1e293b;">₹ ${formatInr(it.rate || it.amount || taxableBase)}</td>
+            <td style="text-align: right; font-weight: 700; color: #1e293b;">${it.gstRate || 13.8}%</td>
+            <td style="text-align: right; font-weight: 900; color: #0f172a;">₹ ${formatInr(it.amount || data.grossTotal)}</td>
           </tr>
-        </thead>
-        <tbody>
-          ${data.payments
-            .map(
-              (p) => `
-            <tr>
-              <td>${p.date ? new Date(p.date).toLocaleDateString('en-IN') : 'Confirmed'}</td>
-              <td><strong>${p.mode || 'UPI'}</strong></td>
-              <td>${p.reference || 'Standard Transfer'}</td>
-              <td style="text-align: right; color: #059669; font-weight: 800;">₹${formatInr(p.amount || 0)}</td>
-            </tr>
-          `
-            )
-            .join('')}
-        </tbody>
-      </table>
+        `).join('')}
+      </tbody>
+    </table>
+
+    <!-- Tax Breakdown & Totals -->
+    <div class="bottom-grid">
+      <div class="bank-box">
+        <div class="bank-title">Bank Transfer Details:</div>
+        <div class="bank-line">Bank Name: ${data.bankDetails?.bankName || 'HDFC Bank Ltd'}</div>
+        <div class="bank-line">Account: ${data.bankDetails?.accountName || 'Solar EPC Solutions Current A/c'}</div>
+        <div class="bank-line">Account No: ${data.bankDetails?.accountNumber || '50200088992211'}</div>
+        <div class="bank-line">IFSC Code: ${data.bankDetails?.ifsc || 'HDFC0001234'}</div>
+        <div class="bank-line" style="font-weight: 600;">UPI ID: ${data.bankDetails?.upiId || 'solar.epc@upi'}</div>
+
+        <div class="dbt-callout">
+          <div class="dbt-callout-title">PM Surya Ghar DBT Note:</div>
+          <div class="dbt-callout-text">
+            Central Govt subsidy of ₹78,000 will be credited directly to consumer Aadhaar-seeded bank account upon DISCOM net meter installation and CEIG inspection.
+          </div>
+        </div>
+      </div>
+
+      <div class="totals-box">
+        <div class="total-line">
+          <span>Taxable Subtotal</span>
+          <span class="total-line-val">₹ ${formatInr(taxableBase)}</span>
+        </div>
+        <div class="total-line">
+          <span>CGST (6.9%)</span>
+          <span class="total-line-val">₹ ${formatInr(cgst)}</span>
+        </div>
+        <div class="total-line">
+          <span>SGST (6.9%)</span>
+          <span class="total-line-val">₹ ${formatInr(sgst)}</span>
+        </div>
+        <div class="grand-total-line">
+          <span>Total Invoice Value</span>
+          <span class="grand-total-val">₹ ${formatInr(data.grossTotal)}</span>
+        </div>
+        <div class="paid-line">
+          <span>Amount Paid to Date</span>
+          <span>₹ ${formatInr(data.totalPaid)}</span>
+        </div>
+        <div class="bal-line">
+          <span>Balance Outstanding</span>
+          <span>₹ ${formatInr(data.balanceDue)}</span>
+        </div>
+      </div>
     </div>
-  `
-      : ''
-  }
 
-  <!-- BANK DETAILS & SIGNATURE -->
-  <table class="bank-and-sign">
-    <tr>
-      <td>
-        <div class="meta-heading">Bank Transfer & UPI Remittance</div>
-        <div class="party-meta" style="line-height: 1.5;">
-          <strong>Account Name:</strong> ${data.bankDetails?.accountName || data.companyName || 'Solar Solutions Pvt Ltd'}<br>
-          <strong>Bank Name:</strong> ${data.bankDetails?.bankName || 'HDFC Bank Ltd'}<br>
-          <strong>Account Number:</strong> ${data.bankDetails?.accountNumber || '50200088992211'}<br>
-          <strong>IFSC Code:</strong> ${data.bankDetails?.ifsc || 'HDFC0001234'}<br>
-          <strong>UPI ID:</strong> ${data.bankDetails?.upiId || 'solar@hdfcbank'}
-        </div>
-      </td>
-      <td>
-        <div class="meta-heading">Authorized Signatory</div>
-        <div class="sign-box">
-          <div style="font-size: 8pt; color: #64748b;">
-            For <strong>${data.companyName || 'Solar Solutions Pvt Ltd'}</strong>
-          </div>
-          <div style="text-align: center; color: #94a3b8; font-style: italic; font-size: 8pt;">
-            [Digitally Verified Solar ERP Invoice]
-          </div>
-          <div style="font-size: 8.5pt; font-weight: 700; color: #0f172a;">
-            Authorized Signatory
-          </div>
-        </div>
-      </td>
-    </tr>
-  </table>
-
-  <!-- TERMS -->
-  <div class="terms-text">
-    <strong>Terms & Conditions:</strong><br>
-    1. Payment is due within the stipulated due date. Interest @ 18% p.a. applicable on overdue milestone payments.<br>
-    2. Solar PV modules and inverters are warranted by respective OEM manufacturers under PM Surya Ghar guidelines.<br>
-    3. Net-metering clearance and Central CFA Subsidy DBT release are governed by DISCOM & MNRE portal SLAs.<br>
-    4. Subject to local jurisdiction. This is a computer-generated GST tax invoice.
+    <!-- Signatures & Footer -->
+    <div class="footer">
+      <div class="footer-left">
+        <p style="margin: 0 0 2px 0;">Thank you for powering the future with clean solar energy!</p>
+        <p style="margin: 0;">This is a computer generated tax invoice.</p>
+      </div>
+      <div class="signatory-box">
+        <div class="sign-line"></div>
+        <p class="sign-title">Authorized Signatory</p>
+        <p class="sign-comp">${data.companyName || 'Solar Energy EPC'}</p>
+      </div>
+    </div>
   </div>
 </body>
 </html>

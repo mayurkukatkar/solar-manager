@@ -40,7 +40,9 @@ export const DiscomDocsModal: React.FC<DiscomDocsModalProps> = ({
   project,
   onClose,
 }) => {
-  const [selectedDocType, setSelectedDocType] = useState<'FORM_A1' | 'ANNEXURE_2' | 'WCR'>('FORM_A1');
+  const [selectedDocType, setSelectedDocType] = useState<
+    'FORM_A1' | 'ANNEXURE_2' | 'WCR' | 'COMMISSIONING' | 'DCR' | 'FULL_PACK'
+  >('FORM_A1');
   const [generating, setGenerating] = useState(false);
 
   const customerName = project?.customer?.name || project?.name?.replace(/Project.*/i, '').trim() || 'SHRI RAMESH PATIL';
@@ -57,15 +59,33 @@ export const DiscomDocsModal: React.FC<DiscomDocsModalProps> = ({
     },
     {
       id: 'ANNEXURE_2' as const,
-      title: 'Annexure 2: Vendor-Consumer Agreement',
-      subtitle: 'Standard Agreement with Stamp Paper Header',
+      title: 'Annexure 2: Connection Agreement',
+      subtitle: 'Standard Agreement with ₹100 Stamp Paper Header',
       badge: 'Legal',
     },
     {
       id: 'WCR' as const,
       title: 'Work Completion Report (WCR)',
-      subtitle: 'Technical Testing & Earthing Resistance Certificate',
+      subtitle: '5-Point Electrical QA & Earth Resistance (<5Ω) Certificate',
       badge: 'Technical QA',
+    },
+    {
+      id: 'COMMISSIONING' as const,
+      title: 'Annexure - I: Joint Commissioning Certificate',
+      subtitle: 'Official Synchronization & Joint Meter Reading (JMR) Inspection',
+      badge: 'Statutory',
+    },
+    {
+      id: 'DCR' as const,
+      title: 'Annexure - A: DCR Domestic Content Undertaking',
+      subtitle: 'ALMM Module Serial Numbers & MNRE Subsidy Declaration',
+      badge: 'Subsidy DBT',
+    },
+    {
+      id: 'FULL_PACK' as const,
+      title: 'Complete Statutory Dossier (All 5 Forms)',
+      subtitle: 'Compiled Net-Metering Application, Agreement, WCR & DCR Pack',
+      badge: 'Complete Pack',
     },
   ];
 
@@ -84,7 +104,13 @@ export const DiscomDocsModal: React.FC<DiscomDocsModalProps> = ({
           ? 'MSEDCL_Form_A1'
           : selectedDocType === 'ANNEXURE_2'
           ? 'MSEDCL_Annexure2_Agreement'
-          : 'Work_Completion_Report_WCR';
+          : selectedDocType === 'WCR'
+          ? 'Work_Completion_Report_WCR'
+          : selectedDocType === 'COMMISSIONING'
+          ? 'Annexure_I_Commissioning_Certificate'
+          : selectedDocType === 'DCR'
+          ? 'Annexure_A_DCR_Undertaking'
+          : 'Complete_MSEDCL_Statutory_Dossier';
 
       await createAndSharePdf(html, `${docName}_${consumerNumber}.pdf`);
     } catch (err: any) {

@@ -161,7 +161,7 @@ export const ProposalPreviewModal: React.FC<ProposalPreviewModalProps> = ({
           onClose={onClose}
           rightAction={
             <TouchableOpacity onPress={handlePrint} style={styles.previewA4Btn} activeOpacity={0.8}>
-              <Printer size={14} color="#0284c7" />
+              <Printer size={14} color="#C5A059" />
               <Text style={styles.previewA4BtnText}>A4 Preview</Text>
             </TouchableOpacity>
           }
@@ -190,7 +190,7 @@ export const ProposalPreviewModal: React.FC<ProposalPreviewModalProps> = ({
               <Text style={styles.coverJourneyTag}>YOUR JOURNEY TO SMARTER, CLEANER ENERGY</Text>
               <Text style={styles.coverMainTitle}>
                 ROOFTOP SOLAR PV{'\n'}
-                <Text style={{ color: '#38bdf8' }}>TURNKEY ENGINEERING PROPOSAL</Text>
+                <Text style={{ color: '#C5A059' }}>TURNKEY ENGINEERING PROPOSAL</Text>
               </Text>
 
               <View style={styles.capacityBadgeBox}>
@@ -883,24 +883,26 @@ const styles = StyleSheet.create({
   },
   docScroll: {
     flex: 1,
-    backgroundColor: '#1e293b',
+    backgroundColor: '#071C11',
   },
   docContent: {
     padding: 14,
     paddingBottom: 24,
   },
   pageSheet: {
-    backgroundColor: '#ffffff',
+    backgroundColor: '#FAF8F5',
     borderRadius: 12,
     padding: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(7, 28, 17, 0.08)',
     elevation: 3,
   },
   pageSheetDark: {
-    backgroundColor: '#090d16',
+    backgroundColor: '#071C11',
     borderRadius: 12,
     padding: 18,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderColor: 'rgba(197, 160, 89, 0.3)',
   },
   coverTopBar: {
     flexDirection: 'row',
@@ -923,9 +925,9 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
   epcProposalBadge: {
-    backgroundColor: 'rgba(52, 211, 153, 0.15)',
+    backgroundColor: 'rgba(197, 160, 89, 0.15)',
     borderWidth: 1,
-    borderColor: 'rgba(52, 211, 153, 0.3)',
+    borderColor: 'rgba(197, 160, 89, 0.3)',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 12,
@@ -933,7 +935,7 @@ const styles = StyleSheet.create({
   epcProposalBadgeText: {
     fontSize: 9,
     fontWeight: '800',
-    color: '#34d399',
+    color: '#C5A059',
     textTransform: 'uppercase',
   },
   coverHeroBody: {
@@ -942,7 +944,7 @@ const styles = StyleSheet.create({
   coverJourneyTag: {
     fontSize: 9,
     fontWeight: '800',
-    color: '#38bdf8',
+    color: '#C5A059',
     letterSpacing: 1.5,
     textTransform: 'uppercase',
     marginBottom: 6,
@@ -961,7 +963,7 @@ const styles = StyleSheet.create({
     gap: 12,
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
+    borderColor: 'rgba(197, 160, 89, 0.25)',
     borderRadius: 10,
     padding: 10,
     marginBottom: 16,
@@ -970,14 +972,14 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 8,
-    backgroundColor: '#0284c7',
+    backgroundColor: '#C5A059',
     alignItems: 'center',
     justifyContent: 'center',
   },
   capacityKwText: {
     fontSize: 18,
     fontWeight: '900',
-    color: '#38bdf8',
+    color: '#C5A059',
   },
   capacitySubText: {
     fontSize: 10,
@@ -985,9 +987,9 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
   coverClientCard: {
-    backgroundColor: 'rgba(15, 23, 42, 0.9)',
+    backgroundColor: 'rgba(7, 28, 17, 0.95)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
+    borderColor: 'rgba(197, 160, 89, 0.25)',
     borderRadius: 10,
     padding: 12,
   },
@@ -1040,13 +1042,13 @@ const styles = StyleSheet.create({
   sheetSectionTag: {
     fontSize: 8.5,
     fontWeight: '800',
-    color: '#0284c7',
+    color: '#C5A059',
     letterSpacing: 0.5,
   },
   heroBadge: {
-    backgroundColor: '#eff6ff',
+    backgroundColor: 'rgba(197, 160, 89, 0.12)',
     borderWidth: 1,
-    borderColor: '#bfdbfe',
+    borderColor: 'rgba(197, 160, 89, 0.3)',
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 4,
@@ -1056,13 +1058,13 @@ const styles = StyleSheet.create({
   heroBadgeText: {
     fontSize: 8,
     fontWeight: '800',
-    color: '#1d4ed8',
+    color: '#C5A059',
     textTransform: 'uppercase',
   },
   brandTitle: {
     fontSize: 14,
     fontWeight: '900',
-    color: '#0f172a',
+    color: '#071C11',
     letterSpacing: -0.3,
   },
   brandSubtitle: {
@@ -1082,9 +1084,9 @@ const styles = StyleSheet.create({
   },
   kpiBox: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#ffffff',
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: 'rgba(7, 28, 17, 0.1)',
     borderRadius: 8,
     padding: 8,
     alignItems: 'center',
@@ -1092,7 +1094,7 @@ const styles = StyleSheet.create({
   kpiNum: {
     fontSize: 12,
     fontWeight: '900',
-    color: '#0f172a',
+    color: '#071C11',
   },
   kpiLabel: {
     fontSize: 7.5,
@@ -1103,16 +1105,17 @@ const styles = StyleSheet.create({
   },
   tableContainer: {
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: 'rgba(7, 28, 17, 0.1)',
     borderRadius: 8,
     overflow: 'hidden',
     marginBottom: 10,
+    backgroundColor: '#ffffff',
   },
   tableHeaderRow: {
     flexDirection: 'row',
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#FAF8F5',
     borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
+    borderBottomColor: 'rgba(7, 28, 17, 0.1)',
     paddingVertical: 6,
     paddingHorizontal: 8,
   },
@@ -1252,13 +1255,13 @@ const styles = StyleSheet.create({
   sectionBar: {
     width: 3.5,
     height: 12,
-    backgroundColor: '#f59e0b',
+    backgroundColor: '#C5A059',
     borderRadius: 2,
   },
   sectionTitleText: {
     fontSize: 11.5,
     fontWeight: '800',
-    color: '#0f172a',
+    color: '#071C11',
   },
   scopeList: {
     gap: 6,

@@ -213,136 +213,176 @@ export const InvoicePdfModal: React.FC<InvoicePdfModalProps> = ({
 
         {/* INVOICE SUMMARY PREVIEW */}
         <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
-          {/* INVOICE CARD */}
+          {/* INVOICE CARD MATCHING WEB CLIENT TEMPLATE */}
           <View style={styles.invoiceDocCard}>
+            {/* Header */}
             <View style={styles.docHeader}>
-              <View style={{ flex: 1 }}>
+              <View style={{ flex: 1.2 }}>
                 <Text style={styles.docCompany}>{invoicePdfData.companyName}</Text>
-                <Text style={styles.docCompanySub}>GST Registered Solar EPC Turnkey Contractor</Text>
+                <Text style={styles.docCompanyAddress}>{invoicePdfData.companyAddress}</Text>
+                {invoicePdfData.companyGstin && (
+                  <Text style={styles.docCompanyGstin}>GSTIN: {invoicePdfData.companyGstin}</Text>
+                )}
                 <Text style={styles.docCompanyMeta}>
-                  GSTIN: {invoicePdfData.companyGstin} | PAN: {invoicePdfData.companyPan}
+                  Contact: {invoicePdfData.companyPhone} • {invoicePdfData.companyEmail}
                 </Text>
               </View>
-              <View style={{ alignItems: 'flex-end' }}>
-                <View
-                  style={[
-                    styles.statusPill,
-                    isPaid
-                      ? styles.statusPillPaid
-                      : isOverdue
-                      ? styles.statusPillOverdue
-                      : totalPaid > 0
-                      ? styles.statusPillPartial
-                      : styles.statusPillUnpaid,
-                  ]}
-                >
+              <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                <Text style={styles.docTaxInvoiceHeader}>TAX INVOICE</Text>
+                <Text style={styles.docMetaRow}>
+                  Invoice No: <Text style={styles.docMetaVal}>{invoice.invoiceNumber}</Text>
+                </Text>
+                <Text style={styles.docMetaRow}>
+                  Date: <Text style={styles.docMetaVal}>{invoicePdfData.invoiceDate}</Text>
+                </Text>
+                <Text style={styles.docMetaRow}>
+                  Due Date: <Text style={styles.docMetaVal}>{invoicePdfData.dueDate}</Text>
+                </Text>
+                <Text style={styles.docMetaRow}>
+                  Status:{' '}
                   <Text
                     style={[
-                      styles.statusPillText,
-                      isPaid
-                        ? styles.statusPillTextPaid
-                        : isOverdue
-                        ? styles.statusPillTextOverdue
-                        : totalPaid > 0
-                        ? styles.statusPillTextPartial
-                        : styles.statusPillTextUnpaid,
+                      styles.docMetaStatus,
+                      { color: isPaid ? '#059669' : isOverdue ? '#e11d48' : '#d97706' },
                     ]}
                   >
-                    {isPaid ? 'PAID IN FULL' : isOverdue ? 'OVERDUE' : totalPaid > 0 ? 'PARTIAL' : 'UNPAID'}
+                    {isPaid ? 'PAID' : isOverdue ? 'OVERDUE' : totalPaid > 0 ? 'PARTIAL' : 'UNPAID'}
                   </Text>
-                </View>
-                <Text style={styles.docInvNum}>{invoice.invoiceNumber}</Text>
+                </Text>
               </View>
             </View>
 
-            {/* PARTIES ROW */}
+            {/* PARTIES ROW (BILLED TO & PROJECT DETAILS) */}
             <View style={styles.partiesRow}>
               <View style={styles.partyBox}>
-                <Text style={styles.partyBoxLabel}>BILLED TO (CUSTOMER)</Text>
+                <Text style={styles.partyBoxLabel}>BILLED TO (CONSUMER):</Text>
                 <Text style={styles.partyBoxName}>{invoicePdfData.customerName}</Text>
-                <Text style={styles.partyBoxSub}>📞 {invoicePdfData.customerPhone || 'N/A'}</Text>
-                <Text style={styles.partyBoxSub}>📍 {invoicePdfData.customerAddress}</Text>
+                {invoicePdfData.customerPhone ? (
+                  <Text style={styles.partyBoxSub}>{invoicePdfData.customerPhone}</Text>
+                ) : null}
+                {invoicePdfData.customerEmail ? (
+                  <Text style={styles.partyBoxSub}>{invoicePdfData.customerEmail}</Text>
+                ) : null}
+                <Text style={styles.partyBoxSub}>{invoicePdfData.customerAddress}</Text>
               </View>
               <View style={styles.partyBox}>
-                <Text style={styles.partyBoxLabel}>PIPELINE DEAL CONTEXT</Text>
-                <Text style={styles.partyBoxName}>
-                  {invoice.project?.name || `${invoicePdfData.customerName}'s Plant`}
+                <Text style={styles.partyBoxLabel}>PROJECT & SYSTEM DETAILS:</Text>
+                <Text style={styles.projectNameText}>
+                  {invoice.project?.name || `${invoicePdfData.customerName}'s Rooftop Solar`}
                 </Text>
-                <Text style={styles.partyBoxSub}>⚡ Capacity: {invoicePdfData.projectCapacityKw} kWp Grid-Tied</Text>
-                <Text style={styles.partyBoxSub}>🔌 Consumer No: {invoicePdfData.consumerNumber || 'N/A'}</Text>
+                <Text style={styles.partyBoxSubBold}>
+                  Capacity: {invoicePdfData.projectCapacityKw} kWp On-Grid
+                </Text>
+                <Text style={styles.partyBoxSub}>
+                  Milestone: {invoicePdfData.milestoneTitle}
+                </Text>
+                <Text style={styles.dbtEligibleText}>PM Surya Ghar DBT Subsidy Eligible</Text>
               </View>
             </View>
 
-            {/* INVOICE SCOPE BANNER */}
-            <View style={styles.milestoneBanner}>
-              <Text style={styles.milestoneBannerTitle}>
-                🏷️ {invoicePdfData.milestoneTitle || 'Commercial Solar Billing Scope'}
-              </Text>
-              <Text style={styles.milestoneBannerSub}>
-                {invoicePdfData.invoiceType === 'PROFORMA' ? 'Proforma Estimation Document for Bank Sanction & Net-Metering' : invoicePdfData.invoiceType === 'ADVANCE_RECEIPT' ? 'Advance Payment Voucher & Booking Receipt' : 'Official Commercial Tax Invoice & Equipment Supply Schedule'}
-              </Text>
-            </View>
-
-            {/* FINANCIAL SUMMARY TABLE */}
-            <View style={styles.finSummaryTable}>
-              <View style={styles.finRow}>
-                <Text style={styles.finLabel}>Taxable Subtotal</Text>
-                <Text style={styles.finVal}>₹{invoicePdfData.subtotal.toLocaleString('en-IN')}</Text>
+            {/* LINE ITEMS TABLE */}
+            <View style={styles.itemsTable}>
+              <View style={styles.itemsTableHeader}>
+                <Text style={[styles.itemTh, { flex: 2.2 }]}>Item & Scope Description</Text>
+                <Text style={[styles.itemTh, { flex: 0.8, textAlign: 'center' }]}>HSN/SAC</Text>
+                <Text style={[styles.itemTh, { flex: 0.6, textAlign: 'center' }]}>Qty</Text>
+                <Text style={[styles.itemTh, { flex: 1.1, textAlign: 'right' }]}>Total (₹)</Text>
               </View>
-              <View style={styles.finRow}>
-                <Text style={styles.finLabel}>CGST (6.9%) + SGST (6.9%)</Text>
-                <Text style={styles.finVal}>₹{invoicePdfData.taxAmount.toLocaleString('en-IN')}</Text>
-              </View>
-              <View style={[styles.finRow, styles.finRowTotal]}>
-                <Text style={styles.finLabelTotal}>Invoice Total (Gross)</Text>
-                <Text style={styles.finValTotal}>₹{invoicePdfData.grossTotal.toLocaleString('en-IN')}</Text>
-              </View>
-              {totalPaid > 0 && (
-                <View style={styles.finRow}>
-                  <Text style={[styles.finLabel, { color: '#059669', fontWeight: '700' }]}>
-                    Paid to Date
+              <View style={styles.itemsTableRow}>
+                <View style={{ flex: 2.2 }}>
+                  <Text style={styles.itemTitleText}>
+                    {invoicePdfData.milestoneTitle || 'Solar Power Plant Installation & Supply'}
                   </Text>
-                  <Text style={[styles.finVal, { color: '#059669', fontWeight: '800' }]}>
-                    -₹{totalPaid.toLocaleString('en-IN')}
+                  <Text style={styles.itemDescText}>
+                    Supply of Mono PERC DCR PV Modules, Grid Inverter, Mounting Hardware & Commissioning Services.
                   </Text>
                 </View>
-              )}
-              <View style={[styles.finRow, { borderTopWidth: 1, borderTopColor: '#e2e8f0', paddingTop: 8 }]}>
-                <Text style={[styles.finLabel, { fontWeight: '800', color: '#0f172a' }]}>
-                  Balance Due
+                <Text style={[styles.itemTd, { flex: 0.8, textAlign: 'center' }]}>
+                  {invoice.milestone === 'MATERIAL_DELIVERY' ? '8541' : '9954'}
                 </Text>
-                <Text style={[styles.finVal, { fontWeight: '900', color: balance > 0 ? '#d97706' : '#059669', fontSize: 16 }]}>
-                  ₹{balance.toLocaleString('en-IN')}
+                <Text style={[styles.itemTd, { flex: 0.6, textAlign: 'center', fontWeight: '700' }]}>
+                  1 Set
                 </Text>
-              </View>
-            </View>
-
-            {/* DATES & BANK INFO */}
-            <View style={styles.datesBankRow}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.infoLabel}>INVOICE DATE</Text>
-                <Text style={styles.infoVal}>{invoicePdfData.invoiceDate}</Text>
-                <Text style={[styles.infoLabel, { marginTop: 6 }]}>PAYMENT DUE DATE</Text>
-                <Text style={[styles.infoVal, isOverdue && { color: '#e11d48', fontWeight: '800' }]}>
-                  {invoicePdfData.dueDate}
-                </Text>
-              </View>
-              <View style={{ flex: 1.2 }}>
-                <Text style={styles.infoLabel}>BANK REMITTANCE & UPI</Text>
-                <Text style={styles.infoVal}>HDFC Bank: 50200088992211</Text>
-                <Text style={styles.infoVal}>IFSC: HDFC0001234</Text>
-                <Text style={[styles.infoVal, { color: '#059669', fontWeight: '700' }]}>
-                  UPI: solar@hdfcbank
+                <Text style={[styles.itemTd, { flex: 1.1, textAlign: 'right', fontWeight: '900', color: '#0f172a' }]}>
+                  ₹{(invoicePdfData.grossTotal || 0).toLocaleString('en-IN')}
                 </Text>
               </View>
             </View>
 
-            {/* PM SURYA GHAR SUBSIDY NOTE */}
-            <View style={styles.subsidyNoteBox}>
-              <Text style={styles.subsidyNoteTitle}>🏛️ PM Surya Ghar CFA Subsidy Notice</Text>
-              <Text style={styles.subsidyNoteText}>
-                Govt Central Financial Assistance (up to ₹78,000) will be credited directly via DBT to consumer bank account after DISCOM net-metering synchronization.
-              </Text>
+            {/* TAX BREAKDOWN & BANK INFO */}
+            <View style={styles.bottomSection}>
+              {/* Left Column: Bank Details & PM Surya Ghar DBT Callout */}
+              <View style={styles.bankSection}>
+                <Text style={styles.bankTitle}>Bank Transfer Details:</Text>
+                <Text style={styles.bankLine}>Bank Name: HDFC Bank Ltd</Text>
+                <Text style={styles.bankLine}>Account: Solar EPC Solutions Current A/c</Text>
+                <Text style={styles.bankLine}>IFSC Code: HDFC0001234</Text>
+                <Text style={[styles.bankLine, { fontWeight: '700', color: '#0f172a' }]}>
+                  UPI ID: solar.epc@upi
+                </Text>
+
+                <View style={styles.dbtCalloutBox}>
+                  <Text style={styles.dbtCalloutTitle}>PM Surya Ghar DBT Note:</Text>
+                  <Text style={styles.dbtCalloutText}>
+                    Central Govt subsidy of ₹78,000 will be credited directly to consumer Aadhaar-seeded bank account upon DISCOM net meter installation and CEIG inspection.
+                  </Text>
+                </View>
+              </View>
+
+              {/* Right Column: Totals Breakdown */}
+              <View style={styles.totalsSection}>
+                <View style={styles.totalRow}>
+                  <Text style={styles.totalLabel}>Taxable Subtotal</Text>
+                  <Text style={styles.totalVal}>₹{invoicePdfData.subtotal.toLocaleString('en-IN')}</Text>
+                </View>
+                <View style={styles.totalRow}>
+                  <Text style={styles.totalLabel}>CGST (6.9%)</Text>
+                  <Text style={styles.totalVal}>₹{Math.round(invoicePdfData.taxAmount / 2).toLocaleString('en-IN')}</Text>
+                </View>
+                <View style={styles.totalRow}>
+                  <Text style={styles.totalLabel}>SGST (6.9%)</Text>
+                  <Text style={styles.totalVal}>₹{(invoicePdfData.taxAmount - Math.round(invoicePdfData.taxAmount / 2)).toLocaleString('en-IN')}</Text>
+                </View>
+                <View style={styles.grandTotalRow}>
+                  <Text style={styles.grandTotalLabel}>Total Invoice Value</Text>
+                  <Text style={styles.grandTotalVal}>₹{invoicePdfData.grossTotal.toLocaleString('en-IN')}</Text>
+                </View>
+                {totalPaid > 0 && (
+                  <View style={styles.totalRow}>
+                    <Text style={[styles.totalLabel, { color: '#059669', fontWeight: '700' }]}>
+                      Amount Paid to Date
+                    </Text>
+                    <Text style={[styles.totalVal, { color: '#059669', fontWeight: '800' }]}>
+                      ₹{totalPaid.toLocaleString('en-IN')}
+                    </Text>
+                  </View>
+                )}
+                <View style={styles.totalRow}>
+                  <Text style={[styles.totalLabel, { color: balance > 0 ? '#b45309' : '#059669', fontWeight: '900' }]}>
+                    Balance Outstanding
+                  </Text>
+                  <Text style={[styles.totalVal, { color: balance > 0 ? '#b45309' : '#059669', fontWeight: '900' }]}>
+                    ₹{balance.toLocaleString('en-IN')}
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Signatures & Footer */}
+            <View style={styles.footerSection}>
+              <View style={{ flex: 1.5 }}>
+                <Text style={styles.footerNoteText}>
+                  Thank you for powering the future with clean solar energy!
+                </Text>
+                <Text style={styles.footerSubText}>
+                  This is a computer generated tax invoice.
+                </Text>
+              </View>
+              <View style={styles.signatoryContainer}>
+                <View style={styles.signLine} />
+                <Text style={styles.signatoryTitle}>AUTHORIZED SIGNATORY</Text>
+                <Text style={styles.signatoryCompany}>{invoicePdfData.companyName}</Text>
+              </View>
             </View>
           </View>
         </ScrollView>
@@ -457,200 +497,256 @@ const styles = StyleSheet.create({
   docHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingBottom: 14,
+    paddingBottom: 16,
     borderBottomWidth: 2,
     borderBottomColor: '#0f172a',
   },
   docCompany: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '900',
-    color: '#0f172a',
-  },
-  docCompanySub: {
-    fontSize: 10,
     color: '#059669',
+    marginBottom: 2,
+  },
+  docCompanyAddress: {
+    fontSize: 10,
+    color: '#64748b',
+    fontWeight: '500',
+    lineHeight: 14,
+  },
+  docCompanyGstin: {
+    fontSize: 10,
     fontWeight: '700',
-    textTransform: 'uppercase',
+    color: '#334155',
     marginTop: 2,
   },
   docCompanyMeta: {
-    fontSize: 9,
+    fontSize: 9.5,
     color: '#64748b',
     marginTop: 2,
   },
-  docInvNum: {
-    fontSize: 13,
-    fontWeight: '800',
+  docTaxInvoiceHeader: {
+    fontSize: 18,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+    letterSpacing: 1.5,
     color: '#0f172a',
-    marginTop: 4,
+    marginBottom: 4,
   },
-  statusPill: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 4,
-    borderWidth: 1,
+  docMetaRow: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#1e293b',
+    marginTop: 1,
   },
-  statusPillPaid: {
-    backgroundColor: '#ecfdf5',
-    borderColor: '#a7f3d0',
+  docMetaVal: {
+    fontWeight: '500',
+    color: '#475569',
   },
-  statusPillOverdue: {
-    backgroundColor: '#fff1f2',
-    borderColor: '#fecdd3',
-  },
-  statusPillPartial: {
-    backgroundColor: '#eff6ff',
-    borderColor: '#bfdbfe',
-  },
-  statusPillUnpaid: {
-    backgroundColor: '#fffbeb',
-    borderColor: '#fde68a',
-  },
-  statusPillText: {
-    fontSize: 9,
+  docMetaStatus: {
     fontWeight: '800',
-    letterSpacing: 0.4,
-  },
-  statusPillTextPaid: {
-    color: '#059669',
-  },
-  statusPillTextOverdue: {
-    color: '#e11d48',
-  },
-  statusPillTextPartial: {
-    color: '#2563eb',
-  },
-  statusPillTextUnpaid: {
-    color: '#d97706',
+    textTransform: 'uppercase',
   },
   partiesRow: {
     flexDirection: 'row',
-    gap: 10,
-    marginTop: 14,
+    gap: 12,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
   },
   partyBox: {
     flex: 1,
-    backgroundColor: '#f8fafc',
-    borderRadius: 8,
-    padding: 10,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
   },
   partyBoxLabel: {
-    fontSize: 8,
-    fontWeight: '800',
-    color: '#64748b',
+    fontSize: 8.5,
+    fontWeight: '900',
+    color: '#94a3b8',
     textTransform: 'uppercase',
+    letterSpacing: 0.8,
     marginBottom: 4,
   },
   partyBoxName: {
-    fontSize: 12,
-    fontWeight: '800',
+    fontSize: 13,
+    fontWeight: '700',
     color: '#0f172a',
+    marginBottom: 2,
+  },
+  projectNameText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#065f46',
     marginBottom: 2,
   },
   partyBoxSub: {
     fontSize: 10,
     color: '#475569',
     marginTop: 1,
+    lineHeight: 13,
   },
-  milestoneBanner: {
-    backgroundColor: '#ecfdf5',
-    borderRadius: 8,
-    padding: 10,
-    borderWidth: 1,
-    borderColor: '#a7f3d0',
-    marginTop: 12,
-  },
-  milestoneBannerTitle: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#065f46',
-  },
-  milestoneBannerSub: {
-    fontSize: 9.5,
-    color: '#047857',
+  partyBoxSubBold: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#334155',
     marginTop: 1,
   },
-  finSummaryTable: {
-    backgroundColor: '#f8fafc',
-    borderRadius: 10,
-    padding: 12,
-    marginTop: 12,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    gap: 6,
+  dbtEligibleText: {
+    fontSize: 9.5,
+    fontWeight: '700',
+    color: '#1d4ed8',
+    marginTop: 3,
   },
-  finRow: {
+  itemsTable: {
+    marginVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e2e8f0',
+  },
+  itemsTableHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    paddingBottom: 8,
+    borderBottomWidth: 2,
+    borderBottomColor: '#0f172a',
+  },
+  itemTh: {
+    fontSize: 9.5,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    color: '#1e293b',
+  },
+  itemsTableRow: {
+    flexDirection: 'row',
+    paddingVertical: 10,
     alignItems: 'center',
   },
-  finRowTotal: {
-    backgroundColor: '#059669',
-    marginHorizontal: -12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 6,
-    marginVertical: 4,
-  },
-  finLabel: {
+  itemTitleText: {
     fontSize: 11,
-    color: '#64748b',
-    fontWeight: '600',
-  },
-  finVal: {
-    fontSize: 12,
     fontWeight: '700',
     color: '#0f172a',
   },
-  finLabelTotal: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#ffffff',
+  itemDescText: {
+    fontSize: 9,
+    color: '#64748b',
+    marginTop: 2,
+    lineHeight: 12,
   },
-  finValTotal: {
-    fontSize: 14,
-    fontWeight: '900',
-    color: '#ffffff',
+  itemTd: {
+    fontSize: 10.5,
+    color: '#475569',
   },
-  datesBankRow: {
+  bottomSection: {
     flexDirection: 'row',
-    gap: 12,
-    marginTop: 12,
+    gap: 14,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: '#f1f5f9',
+    borderTopColor: '#e2e8f0',
+    marginBottom: 16,
   },
-  infoLabel: {
-    fontSize: 8.5,
-    fontWeight: '800',
-    color: '#64748b',
-    textTransform: 'uppercase',
+  bankSection: {
+    flex: 1.2,
   },
-  infoVal: {
-    fontSize: 10.5,
-    color: '#0f172a',
-    fontWeight: '600',
-    marginTop: 1,
-  },
-  subsidyNoteBox: {
-    backgroundColor: '#eff6ff',
-    borderRadius: 8,
-    padding: 10,
-    borderWidth: 1,
-    borderColor: '#bfdbfe',
-    marginTop: 12,
-  },
-  subsidyNoteTitle: {
+  bankTitle: {
     fontSize: 10,
     fontWeight: '800',
-    color: '#1e40af',
+    color: '#1e293b',
+    marginBottom: 2,
   },
-  subsidyNoteText: {
+  bankLine: {
     fontSize: 9.5,
-    color: '#3b82f6',
+    color: '#475569',
+    lineHeight: 13,
+  },
+  dbtCalloutBox: {
+    backgroundColor: '#eff6ff',
+    borderRadius: 8,
+    padding: 8,
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+    marginTop: 8,
+  },
+  dbtCalloutTitle: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#1e3a8a',
+  },
+  dbtCalloutText: {
+    fontSize: 8.5,
+    color: '#1e40af',
     marginTop: 2,
-    lineHeight: 14,
+    lineHeight: 12,
+  },
+  totalsSection: {
+    flex: 1.1,
+  },
+  totalRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 3,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f8fafc',
+  },
+  totalLabel: {
+    fontSize: 10,
+    color: '#64748b',
+  },
+  totalVal: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#1e293b',
+  },
+  grandTotalRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 6,
+    borderBottomWidth: 2,
+    borderBottomColor: '#0f172a',
+    marginVertical: 2,
+  },
+  grandTotalLabel: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: '#0f172a',
+  },
+  grandTotalVal: {
+    fontSize: 12,
+    fontWeight: '900',
+    color: '#0f172a',
+  },
+  footerSection: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#e2e8f0',
+  },
+  footerNoteText: {
+    fontSize: 9,
+    color: '#94a3b8',
+  },
+  footerSubText: {
+    fontSize: 8.5,
+    color: '#cbd5e1',
+    marginTop: 1,
+  },
+  signatoryContainer: {
+    alignItems: 'center',
+    width: 110,
+  },
+  signLine: {
+    width: 90,
+    borderBottomWidth: 1.5,
+    borderBottomColor: '#94a3b8',
+    height: 24,
+    marginBottom: 4,
+  },
+  signatoryTitle: {
+    fontSize: 8,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+    color: '#0f172a',
+  },
+  signatoryCompany: {
+    fontSize: 8.5,
+    color: '#64748b',
+    marginTop: 1,
   },
 });
