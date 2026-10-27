@@ -159,6 +159,7 @@ model User {
   assignedTasks   ProjectTask[]   @relation("TaskAssignee")
   assignedTickets SupportTicket[] @relation("TicketAssignee")
   projectsOwned   Project[]       @relation("ProjectOwner")
+  assignedSurveys SiteSurvey[]    @relation("SurveyAssignee")
   documents       Document[]
 }
 
@@ -303,14 +304,74 @@ model SiteSurvey {
   leadId String?
   lead   Lead?   @relation(fields: [leadId], references: [id])
 
-  surveyDate  DateTime?
-  proposedCap Float?
-  roofType    String?
-  notes       String?
-  photos      String[]  @default([]) // Cloudinary URLs
-  status      String    @default("SCHEDULED") // SCHEDULED, IN_PROGRESS, SUBMITTED, APPROVED
+  surveyNumber String?   // e.g. "SRV-202610-1042"
+  surveyDate   DateTime?
+  status       String    @default("SCHEDULED") // SCHEDULED, IN_PROGRESS, SUBMITTED, COMPLETED, APPROVED, REJECTED
 
-  projects Project[]
+  // Proposed & Recommended Sizing
+  proposedCap            Float?  // in kW
+  recommendedCapacity    Float?  // Calculated based on shadow-free area / bill
+  maxInstallableCapacity Float?  // in kWp
+
+  // Geolocation & Site Address
+  address       String?
+  city          String?
+  state         String?
+  pincode       String?
+  latitude      Float?
+  longitude     Float?
+  googleMapsUrl String?
+
+  // Rooftop & Structural Details
+  roofType             String?  // RCC Flat Roof, Metal Sheet Trapezoidal, Standing Seam, Tile/Mangalore, Elevated Superstructure
+  totalRoofArea        Float?   // in sq.ft
+  usableShadowFreeArea Float?   // in sq.ft
+  roofObstacles        Json?    // ["Water Tank", "Staircase Mumty", "Parapet Shadow", "Trees", "Adjacent Building"]
+  tiltAngle            Float?   // in degrees (e.g. 15°-22°)
+  azimuthAngle         Float?   // in degrees (180° = South)
+  parapetHeight        Float?   // in feet
+  structurePreference  String?  // Standard Aluminum MMS, HDGI Pre-galvanized, Elevated 7ft Walkway, Non-penetrating Ballasted
+
+  // Electrical & DISCOM Infrastructure
+  discomName           String?  // MSEDCL, TPDDL, BESCOM, etc.
+  discomConsumerNo     String?  // CA / Consumer Number
+  sanctionedLoad       Float?   // in kW or kVA
+  electricalPhase      String?  @default("Three Phase") // Single Phase 230V, Three Phase 415V
+  meterType            String?  // Bi-directional Smart Meter, Static Digital, Electromechanical
+  meterLocation        String?  // Ground Floor DB, Boundary Wall, Meter Room
+  cableRunRoofToMeter  Float?   // Cable length in meters
+  inverterLocation     String?  // Indoor Near DB, Rooftop Canopy, Staircase Landing
+  earthPitFeasibility  String?  // Existing Earth Pit OK, Space for 3 Chemical Pits (AC/DC/LA)
+  lightningArresterReq Boolean  @default(true)
+  gridVoltage          Float?   @default(230) // Volts
+
+  // Consumption & Financial Feasibility
+  avgMonthlyBill         Float?   // in INR
+  avgMonthlyUnits        Float?   // in kWh
+  estimatedAnnualUnits   Float?   // in kWh (Capacity * 1450)
+  estimatedAnnualSavings Float?  // in INR
+
+  // Field Personnel & Assignment
+  assignedEngineerId  String?
+  assignedEngineer    User?    @relation("SurveyAssignee", fields: [assignedEngineerId], references: [id])
+  surveyEngineerName  String?
+  surveyEngineerPhone String?
+  completedAt         DateTime?
+
+  // Technical Assessment Verdict
+  feasibilityVerdict   String?  @default("FEASIBLE") // FEASIBLE, FEASIBLE_WITH_CONDITIONS, NOT_FEASIBLE
+  feasibilityNotes     String?
+  specialRequirements  String?
+  customerSignatureUrl String?
+  engineerSignatureUrl String?
+
+  // Media & Photos
+  photos            String[] @default([]) // Array of image URLs
+  categorizedPhotos Json?    // { rooftop: [], shadow: [], meter: [], inverter: [], cable: [], earthing: [] }
+  notes             String?
+
+  projects   Project[]
+  quotations Quotation[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -326,6 +387,9 @@ model Quotation {
 
   leadId String?
   lead   Lead?   @relation(fields: [leadId], references: [id])
+
+  surveyId String?
+  survey   SiteSurvey? @relation(fields: [surveyId], references: [id])
 
   qNumber      String
   date         DateTime @default(now())

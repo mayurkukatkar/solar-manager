@@ -62,6 +62,10 @@ app.use('/', quotationsRoutes);
 const templatesRoutes = require('./routes/tenant/templates');
 app.use('/', templatesRoutes);
 
+// TENANT - Site Surveys & Technical Feasibility
+const surveysRoutes = require('./routes/tenant/surveys');
+app.use('/', surveysRoutes);
+
 // TENANT - Operations (Surveys, Quotations, Installations)
 const operationsRoutes = require('./routes/tenant/operations');
 app.use('/', operationsRoutes);

@@ -93,6 +93,9 @@ export const ModulesScreen: React.FC<{ route?: any; navigation?: any }> = ({ rou
     surveyDate: '',
     proposedCap: '3.3',
     roofType: 'RCC Flat Roof',
+    usableShadowFreeArea: '350',
+    discomConsumerNo: '',
+    electricalPhase: 'Three Phase',
     notes: '',
   });
   const [savingSurvey, setSavingSurvey] = useState(false);
@@ -494,8 +497,14 @@ Here are the details of your customized Rooftop Solar System:
     setSavingSurvey(true);
     try {
       await surveysApi.createSurvey({
+        customerName: surveyForm.customerName.trim(),
+        phone: surveyForm.phone.trim(),
+        address: surveyForm.address.trim(),
         proposedCap: parseFloat(surveyForm.proposedCap) || 3.3,
         roofType: surveyForm.roofType,
+        usableShadowFreeArea: parseFloat(surveyForm.usableShadowFreeArea) || 350,
+        discomConsumerNo: surveyForm.discomConsumerNo.trim(),
+        electricalPhase: surveyForm.electricalPhase,
         notes: surveyForm.notes,
         surveyDate: surveyForm.surveyDate || new Date().toISOString(),
       });
@@ -912,16 +921,30 @@ Let's schedule your 3D roof survey!`;
                   surveys.map((s) => (
                     <View key={s.id} style={styles.quoteCard}>
                       <View style={{ flex: 1 }}>
-                        <Text style={styles.quoteNumber}>{s.customer?.name || s.lead?.name || 'Customer'}</Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                          <Text style={styles.quoteNumber}>{s.customer?.name || s.lead?.name || 'Customer'}</Text>
+                          {s.surveyNumber ? (
+                            <View style={{ backgroundColor: '#f1f5f9', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4 }}>
+                              <Text style={{ fontSize: 9, color: '#475569', fontWeight: 'bold' }}>{s.surveyNumber}</Text>
+                            </View>
+                          ) : null}
+                        </View>
                         <Text style={styles.quoteCustomer}>
                           {s.customer?.address || s.customer?.city || 'Site Address'}
                         </Text>
                         <Text style={styles.surveyDate}>
-                          {s.surveyDate ? new Date(s.surveyDate).toLocaleDateString() : 'Scheduled'} • Cap: {s.proposedCap || 3.3} kW
+                          {s.surveyDate ? new Date(s.surveyDate).toLocaleDateString() : 'Scheduled'} • Sizing: {s.recommendedCapacity || s.proposedCap || 3.3} kWp • {s.roofType || 'RCC'}
                         </Text>
+                        {s.discomConsumerNo ? (
+                          <Text style={{ fontSize: 10, color: '#047857', marginTop: 2, fontWeight: '600' }}>
+                            DISCOM CA: {s.discomConsumerNo}
+                          </Text>
+                        ) : null}
                       </View>
-                      <View style={styles.surveyStatusPill}>
-                        <Text style={styles.surveyStatusText}>{s.status || 'SCHEDULED'}</Text>
+                      <View style={[styles.surveyStatusPill, (s.status === 'APPROVED' || s.feasibilityVerdict === 'FEASIBLE') ? { backgroundColor: '#ecfdf5' } : {}]}>
+                        <Text style={[styles.surveyStatusText, (s.status === 'APPROVED' || s.feasibilityVerdict === 'FEASIBLE') ? { color: '#047857' } : {}]}>
+                          {s.feasibilityVerdict || s.status || 'SCHEDULED'}
+                        </Text>
                       </View>
                     </View>
                   ))
@@ -1444,6 +1467,39 @@ Let's schedule your 3D roof survey!`;
                 value={surveyForm.address}
                 onChangeText={(t) => setSurveyForm({ ...surveyForm, address: t })}
                 placeholder="Rooftop location address"
+                placeholderTextColor="#94a3b8"
+              />
+
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.inputLabel}>SIZING (kWp)</Text>
+                  <TextInput
+                    style={styles.calcInput}
+                    keyboardType="numeric"
+                    value={surveyForm.proposedCap}
+                    onChangeText={(t) => setSurveyForm({ ...surveyForm, proposedCap: t })}
+                    placeholder="3.3"
+                    placeholderTextColor="#94a3b8"
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.inputLabel}>ROOF TYPE</Text>
+                  <TextInput
+                    style={styles.calcInput}
+                    value={surveyForm.roofType}
+                    onChangeText={(t) => setSurveyForm({ ...surveyForm, roofType: t })}
+                    placeholder="RCC Flat Roof"
+                    placeholderTextColor="#94a3b8"
+                  />
+                </View>
+              </View>
+
+              <Text style={styles.inputLabel}>DISCOM CONSUMER NUMBER (CA #)</Text>
+              <TextInput
+                style={styles.calcInput}
+                value={surveyForm.discomConsumerNo}
+                onChangeText={(t) => setSurveyForm({ ...surveyForm, discomConsumerNo: t })}
+                placeholder="e.g. 028540192842"
                 placeholderTextColor="#94a3b8"
               />
 

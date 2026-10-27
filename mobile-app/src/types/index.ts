@@ -212,7 +212,17 @@ export interface SiteSurvey {
   status: string;
   surveyDate?: string;
   proposedCap?: number;
+  recommendedCapacity?: number;
+  maxInstallableCapacity?: number;
   roofType?: string;
+  totalRoofArea?: number;
+  usableShadowFreeArea?: number;
+  discomName?: string;
+  discomConsumerNo?: string;
+  sanctionedLoad?: number;
+  electricalPhase?: string;
+  feasibilityVerdict?: string;
+  estimatedAnnualSavings?: number;
   notes?: string;
   customer?: {
     name: string;
