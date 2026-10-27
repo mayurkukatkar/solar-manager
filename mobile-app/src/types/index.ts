@@ -9,6 +9,7 @@ export interface UserProfile {
   tenantId?: string | null;
   avatarUrl?: string;
   backendRole?: string;
+  tenant?: any;
 }
 
 export interface HorizonItem {

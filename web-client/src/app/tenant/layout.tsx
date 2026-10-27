@@ -10,65 +10,58 @@ import {
   CircleDollarSign,
   ActivitySquare,
   Users2, MapPin, FileText, HardHat, Package, Truck, Receipt, Banknote, Landmark,
-  FileBox, Wrench, ShieldCheck, MessageSquare, UserPlus, Shield, BarChart2, Zap,
-  Globe, ShoppingCart, Bell, History, Menu, X, Sparkles
-} from 'lucide-react';
+    FileBox, Wrench, ShieldCheck, MessageSquare, UserPlus, Shield, BarChart2, Zap,
+    Bell, History, Menu, X, Sparkles
+  } from 'lucide-react';
 
-const MENU_GROUPS = [
-  {
-    title: 'CORE',
-    items: [
-      { name: 'Dashboard', icon: LayoutDashboard, path: '/tenant/dashboard' },
-      { name: 'Leads', icon: Users, path: '/tenant/leads' },
-      { name: 'CRM', icon: Users2, path: '/tenant/crm' },
-      { name: 'Site Surveys', icon: MapPin, path: '/tenant/surveys' },
-      { name: 'Quotations', icon: FileText, path: '/tenant/quotations' },
-      { name: 'Projects', icon: Briefcase, path: '/tenant/projects' },
-    ]
-  },
-  {
-    title: 'OPERATIONS',
-    items: [
-      { name: 'Installation', icon: HardHat, path: '/tenant/installation' },
-      { name: 'Inventory', icon: Package, path: '/tenant/inventory' },
-      { name: 'Procurement & Vendors', icon: Truck, path: '/tenant/procurement' },
-    ]
-  },
-  {
-    title: 'FINANCE',
-    items: [
-      { name: 'Finance & Billing', icon: Receipt, path: '/tenant/finance' },
-      { name: 'PM Surya Ghar Portal', icon: Landmark, path: '/tenant/subsidy' },
-      { name: 'Loans', icon: Banknote, path: '/tenant/loans' },
-    ]
-  },
-  {
-    title: 'CUSTOMER',
-    items: [
-      { name: 'Documents', icon: FileBox, path: '/tenant/documents' },
-      { name: 'Service & Tickets', icon: Wrench, path: '/tenant/service' },
-      { name: 'AMC', icon: ShieldCheck, path: '/tenant/amc' },
-      { name: 'Communication', icon: MessageSquare, path: '/tenant/communication' },
-    ]
-  },
-  {
-    title: 'MANAGEMENT',
-    items: [
-      { name: 'Staff', icon: UserPlus, path: '/tenant/staff' },
-      { name: 'Users & Permissions', icon: Shield, path: '/tenant/users' },
-      { name: 'Reports & Analytics', icon: BarChart2, path: '/tenant/reports' },
-      { name: 'Automation', icon: Zap, path: '/tenant/automation' },
-    ]
-  },
-  {
-    title: 'GROWTH',
-    items: [
-      { name: 'Website / CMS', icon: Globe, path: '/tenant/website' },
-      { name: 'E-commerce', icon: ShoppingCart, path: '/tenant/ecommerce' },
-    ]
-  },
-  {
-    title: 'SYSTEM',
+  const MENU_GROUPS = [
+    {
+      title: 'CORE',
+      items: [
+        { name: 'Dashboard', icon: LayoutDashboard, path: '/tenant/dashboard' },
+        { name: 'Leads', icon: Users, path: '/tenant/leads' },
+        { name: 'CRM', icon: Users2, path: '/tenant/crm' },
+        { name: 'Site Surveys', icon: MapPin, path: '/tenant/surveys' },
+        { name: 'Quotations', icon: FileText, path: '/tenant/quotations' },
+        { name: 'Projects', icon: Briefcase, path: '/tenant/projects' },
+      ]
+    },
+    {
+      title: 'OPERATIONS',
+      items: [
+        { name: 'Installation', icon: HardHat, path: '/tenant/installation' },
+        { name: 'Inventory', icon: Package, path: '/tenant/inventory' },
+        { name: 'Procurement & Vendors', icon: Truck, path: '/tenant/procurement' },
+      ]
+    },
+    {
+      title: 'FINANCE',
+      items: [
+        { name: 'Finance & Billing', icon: Receipt, path: '/tenant/finance' },
+        { name: 'PM Surya Ghar Portal', icon: Landmark, path: '/tenant/subsidy' },
+        { name: 'Loans', icon: Banknote, path: '/tenant/loans' },
+      ]
+    },
+    {
+      title: 'CUSTOMER',
+      items: [
+        { name: 'Documents', icon: FileBox, path: '/tenant/documents' },
+        { name: 'Service & Tickets', icon: Wrench, path: '/tenant/service' },
+        { name: 'AMC', icon: ShieldCheck, path: '/tenant/amc' },
+        { name: 'Communication', icon: MessageSquare, path: '/tenant/communication' },
+      ]
+    },
+    {
+      title: 'MANAGEMENT',
+      items: [
+        { name: 'Staff', icon: UserPlus, path: '/tenant/staff' },
+        { name: 'Users & Permissions', icon: Shield, path: '/tenant/users' },
+        { name: 'Reports & Analytics', icon: BarChart2, path: '/tenant/reports' },
+        { name: 'Automation', icon: Zap, path: '/tenant/automation' },
+      ]
+    },
+    {
+      title: 'SYSTEM',
     items: [
       { name: 'Notifications', icon: Bell, path: '/tenant/notifications' },
       { name: 'Settings', icon: Settings, path: '/tenant/settings' },

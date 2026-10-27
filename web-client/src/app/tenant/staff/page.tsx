@@ -17,12 +17,12 @@ const ALL_PERMISSIONS = [
 ];
 
 export default function StaffPage() {
-  const [staff, setStaff] = useState([]);
+  const [staff, setStaff] = useState<any[]>([]);
   const [showModal, setShowModal] = useState(false);
-  const [showPermsModal, setShowPermsModal] = useState(null);
+  const [showPermsModal, setShowPermsModal] = useState<any>(null);
   const [tempPassword, setTempPassword] = useState("");
-  const [form, setForm] = useState({ name: "", email: "", permissions: [] });
-  const [selectedPerms, setSelectedPerms] = useState([]);
+  const [form, setForm] = useState<any>({ name: "", email: "", permissions: [] });
+  const [selectedPerms, setSelectedPerms] = useState<string[]>([]);
 
   const fetchStaff = async () => {
     try {
@@ -39,30 +39,30 @@ export default function StaffPage() {
       setTempPassword(res.data.tempPassword || "");
       setForm({ name: "", email: "", permissions: [] });
       fetchStaff();
-    } catch (err) { alert(err.response?.data?.error || "Failed"); }
+    } catch (err: any) { alert(err.response?.data?.error || "Failed"); }
   };
 
-  const handleDelete = async (id) => {
+  const handleDelete = async (id: string) => {
     if (!confirm("Are you sure you want to remove this staff member?")) return;
     try {
       await axios.delete(`${API}/api/tenant/staff/${id}`, { withCredentials: true });
       fetchStaff();
-    } catch (err) { alert(err.response?.data?.error || "Failed"); }
+    } catch (err: any) { alert(err.response?.data?.error || "Failed"); }
   };
 
-  const handleResetPassword = async (id) => {
+  const handleResetPassword = async (id: string) => {
     try {
       const res = await axios.post(`${API}/api/tenant/staff/${id}/reset-password`, {}, { withCredentials: true });
       alert(`New temporary password: ${res.data.tempPassword}`);
-    } catch (err) { alert(err.response?.data?.error || "Failed"); }
+    } catch (err: any) { alert(err.response?.data?.error || "Failed"); }
   };
 
-  const openPermsModal = (member) => {
+  const openPermsModal = (member: any) => {
     setShowPermsModal(member);
     setSelectedPerms(Array.isArray(member.permissions) ? [...member.permissions] : []);
   };
 
-  const togglePerm = (perm) => {
+  const togglePerm = (perm: string) => {
     setSelectedPerms(prev => prev.includes(perm) ? prev.filter(p => p !== perm) : [...prev, perm]);
   };
 
@@ -71,7 +71,7 @@ export default function StaffPage() {
       await axios.patch(`${API}/api/tenant/staff/${showPermsModal.id}/permissions`, { permissions: selectedPerms }, { withCredentials: true });
       setShowPermsModal(null);
       fetchStaff();
-    } catch (err) { alert(err.response?.data?.error || "Failed"); }
+    } catch (err: any) { alert(err.response?.data?.error || "Failed"); }
   };
 
   return (

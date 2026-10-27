@@ -122,6 +122,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               role: meData.user.role,
               tenantName: meData.user.tenant?.name || 'Solar Solutions',
               tenantId: meData.user.tenantId,
+              tenant: meData.user.tenant,
             };
             setUser(verifiedProfile);
             setToken(storedToken);
@@ -217,6 +218,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         let profileName = email.split('@')[0];
         let tenantName = 'Solar Solutions';
         let tenantId = null;
+        let tenantObj: any = null;
 
         try {
           const meData = await authApi.getMe();
@@ -232,6 +234,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             profileName = meData.user.name || profileName;
             tenantName = meData.user.tenant?.name || tenantName;
             tenantId = meData.user.tenantId;
+            tenantObj = meData.user.tenant;
           }
         } catch {
           // meData optional
@@ -244,6 +247,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           role: res.role || 'TENANT_ADMIN',
           tenantName,
           tenantId,
+          tenant: tenantObj,
         };
 
         setUser(profile);

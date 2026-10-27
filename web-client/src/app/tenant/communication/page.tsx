@@ -1,11 +1,14 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import axios from "axios";
 import { 
   MessageSquare, Send, Mail, Phone, MessageCircle, CheckCheck, 
   Clock, AlertCircle, Plus, Search, Filter, RefreshCw, User, 
   Paperclip, ChevronRight, Check, Sparkles, Smartphone, ShieldCheck,
-  Zap, Calendar, ArrowUpRight, Copy, Eye, X
+  Zap, Calendar, ArrowUpRight, Copy, Eye, X, ExternalLink
 } from "lucide-react";
+
+const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
 
 interface MessageRecord {
   id: string;
@@ -15,608 +18,469 @@ interface MessageRecord {
   template: string;
   content: string;
   status: "DELIVERED" | "READ" | "SENT" | "FAILED";
-  timestamp: string;
-  category: "QUOTATION" | "SURVEY" | "INSTALLATION" | "SUBSIDY" | "PAYMENT" | "GENERAL";
+  category: string;
+  createdAt: string;
 }
 
-const INITIAL_MESSAGES: MessageRecord[] = [
-  {
-    id: "MSG-1081",
-    recipientName: "Rajesh Sharma",
-    recipientContact: "+91 98201 44521",
-    channel: "WHATSAPP",
-    template: "Quotation Generated",
-    content: "Namaste Rajesh ji, your 5kW On-Grid Solar Proposal is ready! Estimated annual savings: ₹64,800. View & Approve your detailed proposal: https://solarerp.app/q/q-9021",
-    status: "READ",
-    timestamp: "10 mins ago",
-    category: "QUOTATION"
-  },
-  {
-    id: "MSG-1080",
-    recipientName: "Anil Deshmukh",
-    recipientContact: "+91 97654 32109",
-    channel: "SMS",
-    template: "Site Survey Scheduled",
-    content: "SolarTech Alert: Site survey confirmed for tomorrow at 11:30 AM. Senior Engineer Vikram Patil will visit your premises. Helpdesk: 1800-209-4455.",
-    status: "DELIVERED",
-    timestamp: "45 mins ago",
-    category: "SURVEY"
-  },
-  {
-    id: "MSG-1079",
-    recipientName: "Sunita Verma",
-    recipientContact: "sunita.verma@gmail.com",
-    channel: "EMAIL",
-    template: "Payment Receipt & Tax Invoice",
-    content: "Dear Sunita, payment of ₹1,45,000 against INV-0042 has been successfully received. GST invoice #INV-0042 attached. System dispatch initiated.",
-    status: "DELIVERED",
-    timestamp: "2 hours ago",
-    category: "PAYMENT"
-  },
-  {
-    id: "MSG-1078",
-    recipientName: "Kunal Mehra",
-    recipientContact: "+91 99887 76655",
-    channel: "WHATSAPP",
-    template: "Subsidy Sanctioned Alert",
-    content: "Great news Kunal ji! Your Central Government PM Surya Ghar Subsidy of ₹78,000 has been sanctioned by MNRE. Expected account credit within 7 banking days.",
-    status: "READ",
-    timestamp: "Yesterday",
-    category: "SUBSIDY"
-  },
-  {
-    id: "MSG-1077",
-    recipientName: "Green Valley Housing Society",
-    recipientContact: "+91 91234 56780",
-    channel: "WHATSAPP",
-    template: "Installation Milestone",
-    content: "Update on 50kW Society Solar: Structure fabrication & inverter mounting completed 100%. Net-metering inspection scheduled for Thursday.",
-    status: "DELIVERED",
-    timestamp: "Yesterday",
-    category: "INSTALLATION"
-  },
-  {
-    id: "MSG-1076",
-    recipientName: "Prakash Kulkarni",
-    recipientContact: "+91 98451 22334",
-    channel: "SMS",
-    template: "Annual Maintenance Due",
-    content: "Solar Alert: Your 1st Quarter Solar AMC health checkup is due. Our technician will clean panels and test inverter efficiency this Saturday.",
-    status: "SENT",
-    timestamp: "2 days ago",
-    category: "GENERAL"
-  }
-];
-
-const TEMPLATES = [
-  {
-    id: "T1",
-    title: "Quotation Generated & Shared",
-    category: "QUOTATION",
-    channel: "WHATSAPP",
-    text: "Namaste {{customer_name}}, your {{capacity}}kW Solar System proposal is ready! Estimated monthly savings: ₹{{savings}}. Review your design & quotation here: {{link}}"
-  },
-  {
-    id: "T2",
-    title: "Site Survey Appointment",
-    category: "SURVEY",
-    channel: "SMS",
-    text: "Solar Alert: Site survey for {{customer_name}} is confirmed for {{date}} at {{time}}. Engineer {{engineer_name}} (+91 {{phone}}) is assigned."
-  },
-  {
-    id: "T3",
-    title: "Material Dispatched to Site",
-    category: "INSTALLATION",
-    channel: "WHATSAPP",
-    text: "Your solar material kit (Modules & Inverter) has been dispatched from Pune warehouse via vehicle {{vehicle_no}}. Expected delivery: {{expected_time}}."
-  },
-  {
-    id: "T4",
-    title: "PM Surya Ghar Subsidy Sanctioned",
-    category: "SUBSIDY",
-    channel: "WHATSAPP",
-    text: "Congratulations {{customer_name}}! MNRE subsidy of ₹{{amount}} for Application #{{app_no}} has been sanctioned. Discom net-metering status: ACTIVE."
-  },
-  {
-    id: "T5",
-    title: "Payment Reminder (Friendly)",
-    category: "PAYMENT",
-    channel: "WHATSAPP",
-    text: "Gentle reminder: Invoice #{{invoice_no}} of ₹{{amount}} for your rooftop solar project is due on {{due_date}}. Quick payment link: {{pay_link}}"
-  },
-  {
-    id: "T6",
-    title: "AMC Panel Cleaning Schedule",
-    category: "GENERAL",
-    channel: "SMS",
-    text: "Solar Care: Your scheduled seasonal AMC panel cleaning is booked for {{date}}. Clean panels increase generation by up to 25%! Tollfree: 1800-209-4455."
-  }
-];
+interface TemplateItem {
+  id: string;
+  name: string;
+  channel: string;
+  category: string;
+  content: string;
+}
 
 export default function CommunicationPage() {
-  const [messages, setMessages] = useState<MessageRecord[]>(INITIAL_MESSAGES);
-  const [activeTab, setActiveTab] = useState<"ALL" | "WHATSAPP" | "SMS" | "EMAIL">("ALL");
+  const [messages, setMessages] = useState<MessageRecord[]>([]);
+  const [metrics, setMetrics] = useState({ totalSent: 0, whatsappCount: 0, smsCount: 0, emailCount: 0, deliveredRate: 100 });
+  const [loading, setLoading] = useState(true);
+  const [channelFilter, setChannelFilter] = useState("ALL");
   const [search, setSearch] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState("ALL");
-  const [showComposeModal, setShowComposeModal] = useState(false);
-  const [selectedTemplate, setSelectedTemplate] = useState<any>(null);
-  const [sending, setSending] = useState(false);
-  const [successToast, setSuccessToast] = useState("");
 
-  // Compose form state
-  const [composeForm, setComposeForm] = useState({
+  // Modals & Forms
+  const [showCompose, setShowCompose] = useState(false);
+  const [templates, setTemplates] = useState<TemplateItem[]>([]);
+  const [customers, setCustomers] = useState<any[]>([]);
+  const [submitting, setSubmitting] = useState(false);
+  const [selectedMessage, setSelectedMessage] = useState<MessageRecord | null>(null);
+
+  const [form, setForm] = useState({
+    customerId: "",
     recipientName: "",
     recipientContact: "",
-    channel: "WHATSAPP" as "WHATSAPP" | "SMS" | "EMAIL",
-    category: "QUOTATION" as any,
-    templateTitle: "Custom Message",
+    channel: "WHATSAPP",
+    template: "",
+    category: "GENERAL",
     content: ""
   });
 
-  const handleSelectTemplate = (tpl: any) => {
-    setSelectedTemplate(tpl);
-    setComposeForm({
-      ...composeForm,
-      channel: tpl.channel,
-      category: tpl.category,
-      templateTitle: tpl.title,
-      content: tpl.text
-    });
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      const params: any = {};
+      if (channelFilter !== "ALL") params.channel = channelFilter;
+      if (search) params.search = search;
+
+      const [msgRes, tplRes, custRes] = await Promise.all([
+        axios.get(`${API}/api/tenant/communication/messages`, { params, withCredentials: true }),
+        axios.get(`${API}/api/tenant/communication/templates`, { withCredentials: true }).catch(() => ({ data: { templates: [] } })),
+        axios.get(`${API}/api/tenant/customers`, { withCredentials: true }).catch(() => ({ data: { customers: [] } }))
+      ]);
+
+      setMessages(msgRes.data.messages || []);
+      if (msgRes.data.metrics) setMetrics(msgRes.data.metrics);
+      setTemplates(tplRes.data.templates || []);
+      setCustomers(custRes.data.customers || []);
+    } catch (err) {
+      console.error("Error fetching communication data:", err);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleSendMessage = (e: React.FormEvent) => {
+  useEffect(() => {
+    fetchData();
+  }, [channelFilter]);
+
+  const handleCustomerSelect = (customerId: string) => {
+    const cust = customers.find(c => c.id === customerId);
+    if (!cust) return;
+
+    setForm(prev => ({
+      ...prev,
+      customerId,
+      recipientName: cust.name,
+      recipientContact: cust.mobile || cust.phone || ""
+    }));
+  };
+
+  const handleTemplateSelect = (templateId: string) => {
+    const tpl = templates.find(t => t.id === templateId);
+    if (!tpl) return;
+
+    let parsedContent = tpl.content
+      .replace(/{{customerName}}/g, form.recipientName || "Valued Client")
+      .replace(/{{capacity}}/g, "3.3")
+      .replace(/{{savings}}/g, "48,500")
+      .replace(/{{proposalUrl}}/g, "https://solarerp.app/portal")
+      .replace(/{{date}}/g, new Date().toLocaleDateString("en-IN"))
+      .replace(/{{time}}/g, "11:30 AM")
+      .replace(/{{phone}}/g, "+91 98201 44521")
+      .replace(/{{amount}}/g, "1,45,000")
+      .replace(/{{invoiceNo}}/g, "INV-0042")
+      .replace(/{{appRef}}/g, "PM-SG-2024-9021")
+      .replace(/{{supervisorName}}/g, "Senior Eng. Patil");
+
+    setForm(prev => ({
+      ...prev,
+      template: tpl.name,
+      category: tpl.category,
+      channel: tpl.channel,
+      content: parsedContent
+    }));
+  };
+
+  const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSending(true);
-    setTimeout(() => {
-      const newMsg: MessageRecord = {
-        id: `MSG-${Math.floor(1082 + Math.random() * 500)}`,
-        recipientName: composeForm.recipientName || "Valued Customer",
-        recipientContact: composeForm.recipientContact,
-        channel: composeForm.channel,
-        template: composeForm.templateTitle,
-        content: composeForm.content,
-        status: "DELIVERED",
-        timestamp: "Just now",
-        category: composeForm.category
-      };
-      setMessages([newMsg, ...messages]);
-      setSending(false);
-      setShowComposeModal(false);
-      setSuccessToast(`Message successfully queued and sent via ${composeForm.channel}!`);
-      setTimeout(() => setSuccessToast(""), 4000);
-      setComposeForm({
+    if (!form.recipientContact.trim() || !form.content.trim()) {
+      alert("Please enter recipient contact number and message text");
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      const res = await axios.post(`${API}/api/tenant/communication/send`, form, { withCredentials: true });
+
+      // If WhatsApp, directly launch web or native app
+      if (res.data?.directUrl) {
+        window.open(res.data.directUrl, "_blank");
+      }
+
+      setShowCompose(false);
+      setForm({
+        customerId: "",
         recipientName: "",
         recipientContact: "",
         channel: "WHATSAPP",
-        category: "QUOTATION",
-        templateTitle: "Custom Message",
+        template: "",
+        category: "GENERAL",
         content: ""
       });
-    }, 600);
+      fetchData();
+    } catch (err: any) {
+      console.error(err);
+      alert(err.response?.data?.error || "Failed to dispatch message");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const filteredMessages = messages.filter(m => {
-    const matchesTab = activeTab === "ALL" || m.channel === activeTab;
-    const matchesCategory = categoryFilter === "ALL" || m.category === categoryFilter;
-    const matchesSearch = 
-      m.recipientName.toLowerCase().includes(search.toLowerCase()) ||
-      m.recipientContact.includes(search) ||
-      m.content.toLowerCase().includes(search.toLowerCase());
-    return matchesTab && matchesCategory && matchesSearch;
-  });
+  const handleQuickWhatsApp = (contact: string, content: string) => {
+    const cleanPhone = contact.replace(/[^0-9]/g, "");
+    const url = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(content)}`;
+    window.open(url, "_blank");
+  };
 
-  const whatsappCount = messages.filter(m => m.channel === "WHATSAPP").length;
-  const smsCount = messages.filter(m => m.channel === "SMS").length;
-  const emailCount = messages.filter(m => m.channel === "EMAIL").length;
+  const getChannelBadge = (ch: string) => {
+    switch (ch) {
+      case "WHATSAPP":
+        return (
+          <span className="flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+            <MessageCircle size={12} /> WhatsApp
+          </span>
+        );
+      case "SMS":
+        return (
+          <span className="flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200">
+            <Phone size={12} /> SMS
+          </span>
+        );
+      case "EMAIL":
+        return (
+          <span className="flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-purple-50 text-purple-700 border border-purple-200">
+            <Mail size={12} /> Email
+          </span>
+        );
+      default:
+        return <span className="px-2 py-0.5 rounded text-xs font-medium bg-slate-100">{ch}</span>;
+    }
+  };
+
+  const getStatusBadge = (st: string) => {
+    switch (st) {
+      case "READ":
+        return (
+          <span className="flex items-center gap-1 text-xs font-bold text-sky-600">
+            <CheckCheck size={14} /> Read
+          </span>
+        );
+      case "DELIVERED":
+        return (
+          <span className="flex items-center gap-1 text-xs font-bold text-emerald-600">
+            <CheckCheck size={14} /> Delivered
+          </span>
+        );
+      case "SENT":
+        return (
+          <span className="flex items-center gap-1 text-xs font-bold text-slate-500">
+            <Check size={14} /> Sent
+          </span>
+        );
+      default:
+        return <span className="text-xs text-rose-500 font-bold">{st}</span>;
+    }
+  };
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-300 max-w-7xl mx-auto pb-12">
+    <div className="space-y-6 max-w-7xl mx-auto pb-12 animate-in fade-in duration-300">
       {/* HEADER */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800">
-              Omnichannel Hub
-            </span>
-            <span className="flex items-center gap-1 text-xs text-emerald-600 font-semibold">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-              Live Gateway Active
-            </span>
-          </div>
-          <h1 className="text-3xl font-black tracking-tight text-slate-900">Customer Communication</h1>
-          <p className="text-sm text-slate-500 mt-1">
-            Dispatch quotations, survey alerts, subsidy updates, and payment reminders via WhatsApp, SMS, and Email.
-          </p>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Communication Hub</h1>
+          <p className="text-sm text-slate-500 mt-1">Automated WhatsApp updates, proposal sharing & client notifications.</p>
         </div>
-
         <div className="flex items-center gap-3">
           <button 
-            onClick={() => setShowComposeModal(true)}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-2xl font-bold text-sm transition-all flex items-center gap-2 shadow-lg shadow-emerald-600/20 active:scale-95"
+            onClick={fetchData} 
+            className="p-2.5 text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
+            title="Refresh"
           >
-            <Plus size={18} /> New Broadcast / Message
+            <RefreshCw size={16} />
+          </button>
+          <button 
+            onClick={() => setShowCompose(true)}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm transition-colors flex items-center justify-center gap-2 shadow-sm"
+          >
+            <Send size={16} /> New Message / Broadcast
           </button>
         </div>
       </div>
 
-      {successToast && (
-        <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-3 rounded-2xl flex items-center justify-between shadow-sm animate-in fade-in slide-in-from-top-2">
-          <div className="flex items-center gap-2">
-            <CheckCheck size={18} className="text-emerald-600" />
-            <span className="text-sm font-semibold">{successToast}</span>
-          </div>
-          <button onClick={() => setSuccessToast("")} className="text-emerald-600 hover:text-emerald-800">
-            <X size={16} />
-          </button>
-        </div>
-      )}
-
-      {/* KPI METRICS */}
+      {/* METRICS CARDS */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-sm flex items-center justify-between">
-          <div>
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Total Dispatches</p>
-            <h3 className="text-2xl font-black text-slate-900">{messages.length}</h3>
-            <p className="text-[11px] font-semibold text-emerald-600 mt-1 flex items-center gap-1">
-              <CheckCheck size={12} /> 99.4% Delivery Rate
-            </p>
-          </div>
-          <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-600">
-            <MessageSquare size={22} />
-          </div>
-        </div>
-
-        <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-sm flex items-center justify-between">
-          <div>
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">WhatsApp Business</p>
-            <h3 className="text-2xl font-black text-emerald-700">{whatsappCount}</h3>
-            <p className="text-[11px] font-semibold text-slate-500 mt-1">Meta Cloud API Connected</p>
-          </div>
-          <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-            <MessageCircle size={22} />
-          </div>
-        </div>
-
-        <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-sm flex items-center justify-between">
-          <div>
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Transactional SMS</p>
-            <h3 className="text-2xl font-black text-blue-700">{smsCount}</h3>
-            <p className="text-[11px] font-semibold text-slate-500 mt-1">DLT Approved Routes</p>
-          </div>
-          <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center">
-            <Smartphone size={22} />
-          </div>
-        </div>
-
-        <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-sm flex items-center justify-between">
-          <div>
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Customer Emails</p>
-            <h3 className="text-2xl font-black text-purple-700">{emailCount}</h3>
-            <p className="text-[11px] font-semibold text-slate-500 mt-1">SMTP / Postmark Relay</p>
-          </div>
-          <div className="w-12 h-12 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center">
-            <Mail size={22} />
-          </div>
-        </div>
-      </div>
-
-      {/* QUICK TEMPLATES PREVIEWS */}
-      <div className="bg-gradient-to-br from-slate-900 to-slate-800 text-white rounded-3xl p-6 shadow-xl relative overflow-hidden">
-        <div className="absolute right-0 top-0 translate-x-12 -translate-y-12 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <Sparkles size={18} className="text-emerald-400" />
-            <h2 className="text-lg font-bold">1-Click Solar Customer Templates</h2>
-          </div>
-          <span className="text-xs text-slate-400">Pre-approved for WhatsApp & DLT SMS</span>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-          {TEMPLATES.slice(0, 3).map((tpl) => (
-            <div 
-              key={tpl.id}
-              onClick={() => {
-                handleSelectTemplate(tpl);
-                setShowComposeModal(true);
-              }}
-              className="bg-white/5 hover:bg-white/10 border border-white/10 p-4 rounded-2xl cursor-pointer transition-all hover:scale-[1.01] group flex flex-col justify-between"
-            >
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <span className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full ${
-                    tpl.channel === "WHATSAPP" ? "bg-emerald-500/20 text-emerald-300" : "bg-blue-500/20 text-blue-300"
-                  }`}>
-                    {tpl.channel}
-                  </span>
-                  <span className="text-[10px] font-medium text-slate-400">{tpl.category}</span>
-                </div>
-                <h4 className="font-bold text-sm text-white group-hover:text-emerald-300 transition-colors">{tpl.title}</h4>
-                <p className="text-xs text-slate-300 line-clamp-2 mt-1.5 font-normal leading-relaxed">{tpl.text}</p>
-              </div>
-              <div className="flex items-center gap-1 text-[11px] font-bold text-emerald-400 mt-3">
-                Use Template <ChevronRight size={14} />
-              </div>
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Dispatches</span>
+            <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+              <MessageSquare size={18} />
             </div>
-          ))}
+          </div>
+          <p className="text-2xl font-bold text-slate-900">{metrics.totalSent}</p>
+          <p className="text-xs text-slate-400 mt-1">All outbound customer messages</p>
+        </div>
+
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">WhatsApp Dispatches</span>
+            <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+              <MessageCircle size={18} />
+            </div>
+          </div>
+          <p className="text-2xl font-bold text-emerald-600">{metrics.whatsappCount}</p>
+          <p className="text-xs text-slate-400 mt-1">Direct proposals & receipts sent</p>
+        </div>
+
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">SMS Alerts</span>
+            <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+              <Phone size={18} />
+            </div>
+          </div>
+          <p className="text-2xl font-bold text-blue-600">{metrics.smsCount}</p>
+          <p className="text-xs text-slate-400 mt-1">Technician & survey dispatch alerts</p>
+        </div>
+
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Delivery Rate</span>
+            <div className="w-8 h-8 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center">
+              <CheckCheck size={18} />
+            </div>
+          </div>
+          <p className="text-2xl font-bold text-purple-600">{metrics.deliveredRate}%</p>
+          <p className="text-xs text-slate-400 mt-1">Successfully read or delivered</p>
         </div>
       </div>
 
-      {/* FILTER & DISPATCH HISTORY */}
-      <div className="bg-white rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden">
-        {/* TAB CONTROLS */}
-        <div className="p-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-4 bg-slate-50/50">
-          <div className="flex items-center gap-1 bg-white p-1 rounded-2xl border border-slate-200 shadow-sm">
-            {(["ALL", "WHATSAPP", "SMS", "EMAIL"] as const).map((tab) => (
+      {/* FILTER TABS & SEARCH */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="p-4 border-b border-slate-100 flex flex-col md:flex-row gap-4 justify-between items-center bg-slate-50/50">
+          <div className="flex items-center gap-2 overflow-x-auto w-full md:w-auto">
+            {["ALL", "WHATSAPP", "SMS", "EMAIL"].map((ch) => (
               <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                  activeTab === tab 
-                    ? "bg-slate-900 text-white shadow-sm" 
-                    : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                key={ch}
+                onClick={() => setChannelFilter(ch)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                  channelFilter === ch 
+                    ? "bg-emerald-600 text-white shadow-sm" 
+                    : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
                 }`}
               >
-                {tab === "ALL" ? "All Channels" : tab}
+                {ch}
               </button>
             ))}
           </div>
 
-          <div className="flex items-center gap-3 flex-1 max-w-md">
-            <div className="relative flex-1">
-              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                type="text"
-                placeholder="Search recipient or content..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full bg-white border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
-              />
-            </div>
-
-            <select
-              value={categoryFilter}
-              onChange={(e) => setCategoryFilter(e.target.value)}
-              className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-600 focus:outline-none"
-            >
-              <option value="ALL">All Topics</option>
-              <option value="QUOTATION">Quotations</option>
-              <option value="SURVEY">Site Surveys</option>
-              <option value="INSTALLATION">Installation</option>
-              <option value="SUBSIDY">Govt Subsidy</option>
-              <option value="PAYMENT">Payments</option>
-              <option value="GENERAL">General</option>
-            </select>
+          <div className="relative w-full md:w-80">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input 
+              type="text" 
+              placeholder="Search recipient, phone or text..." 
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && fetchData()}
+              className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:border-emerald-500 transition-colors" 
+            />
           </div>
         </div>
 
-        {/* MESSAGES TABLE */}
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm whitespace-nowrap">
-            <thead className="bg-slate-50/80 text-slate-500 uppercase tracking-wider text-[11px] font-extrabold border-b border-slate-200">
-              <tr>
-                <th className="px-6 py-4">Channel & Recipient</th>
-                <th className="px-6 py-4">Subject / Template</th>
-                <th className="px-6 py-4">Message Snippet</th>
-                <th className="px-6 py-4">Status</th>
-                <th className="px-6 py-4">Timestamp</th>
-                <th className="px-6 py-4 text-right">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filteredMessages.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-slate-400 font-medium">
-                    No dispatched messages match your search criteria.
-                  </td>
-                </tr>
-              ) : (
-                filteredMessages.map((msg) => (
-                  <tr key={msg.id} className="hover:bg-slate-50/80 transition-colors group">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
-                          msg.channel === "WHATSAPP" ? "bg-emerald-50 text-emerald-600" :
-                          msg.channel === "SMS" ? "bg-blue-50 text-blue-600" :
-                          "bg-purple-50 text-purple-600"
-                        }`}>
-                          {msg.channel === "WHATSAPP" && <MessageCircle size={18} />}
-                          {msg.channel === "SMS" && <Smartphone size={18} />}
-                          {msg.channel === "EMAIL" && <Mail size={18} />}
-                        </div>
-                        <div>
-                          <p className="font-bold text-slate-800 leading-tight">{msg.recipientName}</p>
-                          <p className="text-xs text-slate-400 font-medium">{msg.recipientContact}</p>
-                        </div>
-                      </div>
-                    </td>
+        {/* MESSAGES FEED */}
+        <div className="divide-y divide-slate-100">
+          {loading ? (
+            <div className="p-12 text-center">
+              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500"></div>
+            </div>
+          ) : messages.length === 0 ? (
+            <div className="p-12 text-center text-slate-500 font-medium">
+              No messages found. Dispatch a message to see communication history.
+            </div>
+          ) : (
+            messages.map((msg) => (
+              <div key={msg.id} className="p-5 hover:bg-slate-50/80 transition-colors flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                <div className="space-y-1.5 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-bold text-slate-900 text-sm">{msg.recipientName}</span>
+                    <span className="text-xs text-slate-500">({msg.recipientContact})</span>
+                    {getChannelBadge(msg.channel)}
+                    <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded bg-slate-100 text-slate-600">
+                      {msg.category}
+                    </span>
+                  </div>
 
-                    <td className="px-6 py-4">
-                      <span className="text-xs font-bold text-slate-700 bg-slate-100 px-2.5 py-1 rounded-lg">
-                        {msg.template}
-                      </span>
-                    </td>
+                  <p className="text-sm text-slate-700 font-medium leading-relaxed bg-slate-50 p-3 rounded-xl border border-slate-100 max-w-3xl">
+                    {msg.content}
+                  </p>
 
-                    <td className="px-6 py-4 max-w-xs truncate text-xs text-slate-600">
-                      {msg.content}
-                    </td>
+                  <div className="flex items-center gap-3 text-xs text-slate-400">
+                    <span>Template: {msg.template || "Direct"}</span>
+                    <span>•</span>
+                    <span className="flex items-center gap-1">
+                      <Clock size={12} /> {new Date(msg.createdAt).toLocaleString("en-IN", { dateStyle: "short", timeStyle: "short" })}
+                    </span>
+                  </div>
+                </div>
 
-                    <td className="px-6 py-4">
-                      <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider ${
-                        msg.status === "READ" ? "bg-blue-50 text-blue-700" :
-                        msg.status === "DELIVERED" ? "bg-emerald-50 text-emerald-700" :
-                        msg.status === "SENT" ? "bg-amber-50 text-amber-700" :
-                        "bg-red-50 text-red-700"
-                      }`}>
-                        {msg.status === "READ" && <CheckCheck size={12} />}
-                        {msg.status === "DELIVERED" && <Check size={12} />}
-                        {msg.status === "SENT" && <Clock size={12} />}
-                        {msg.status}
-                      </span>
-                    </td>
-
-                    <td className="px-6 py-4 text-xs text-slate-400 font-medium">
-                      {msg.timestamp}
-                    </td>
-
-                    <td className="px-6 py-4 text-right">
-                      <button 
-                        onClick={() => {
-                          setComposeForm({
-                            recipientName: msg.recipientName,
-                            recipientContact: msg.recipientContact,
-                            channel: msg.channel,
-                            category: msg.category,
-                            templateTitle: `Re: ${msg.template}`,
-                            content: ""
-                          });
-                          setShowComposeModal(true);
-                        }}
-                        className="text-xs font-bold text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-xl transition-colors inline-flex items-center gap-1"
-                      >
-                        Reply <ChevronRight size={12} />
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-start gap-3">
+                  {getStatusBadge(msg.status)}
+                  {msg.channel === "WHATSAPP" && (
+                    <button
+                      onClick={() => handleQuickWhatsApp(msg.recipientContact, msg.content)}
+                      className="px-3 py-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg flex items-center gap-1.5 transition-colors"
+                    >
+                      <ExternalLink size={12} /> Open WhatsApp
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
 
-      {/* COMPOSE MODAL */}
-      {showComposeModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-xl w-full overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-            <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+      {/* COMPOSE MESSAGE MODAL */}
+      {showCompose && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-xl w-full max-w-xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="p-6 border-b border-slate-100 flex items-center justify-between">
               <div>
-                <h3 className="text-xl font-black text-slate-900">Send Customer Communication</h3>
-                <p className="text-xs text-slate-500 mt-0.5">Direct dispatch via WhatsApp Business, SMS, or Email</p>
+                <h2 className="text-xl font-bold text-slate-900">Send Customer Notification</h2>
+                <p className="text-xs text-slate-500 mt-0.5">Dispatches via WhatsApp, SMS, or Email and records audit trail</p>
               </div>
-              <button 
-                onClick={() => setShowComposeModal(false)}
-                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 transition-colors"
-              >
-                <X size={16} />
+              <button onClick={() => setShowCompose(false)} className="text-slate-400 hover:text-slate-700 p-2">
+                <X size={20} />
               </button>
             </div>
 
             <form onSubmit={handleSendMessage} className="p-6 space-y-4">
-              {/* Channel Selector */}
-              <div>
-                <label className="text-xs font-extrabold uppercase text-slate-500 tracking-wider mb-1 block">
-                  Delivery Channel
-                </label>
-                <div className="grid grid-cols-3 gap-2">
-                  {[
-                    { id: "WHATSAPP", label: "WhatsApp", icon: MessageCircle, color: "text-emerald-600" },
-                    { id: "SMS", label: "Fast SMS", icon: Smartphone, color: "text-blue-600" },
-                    { id: "EMAIL", label: "Email Relay", icon: Mail, color: "text-purple-600" },
-                  ].map((ch) => {
-                    const Icon = ch.icon;
-                    const isSel = composeForm.channel === ch.id;
-                    return (
-                      <button
-                        type="button"
-                        key={ch.id}
-                        onClick={() => setComposeForm({ ...composeForm, channel: ch.id as any })}
-                        className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-2xl border text-xs font-bold transition-all ${
-                          isSel 
-                            ? "bg-slate-900 text-white border-slate-900 shadow-sm" 
-                            : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
-                        }`}
-                      >
-                        <Icon size={16} className={isSel ? "text-white" : ch.color} />
-                        {ch.label}
-                      </button>
-                    );
-                  })}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">Customer Link</label>
+                  <select 
+                    value={form.customerId} 
+                    onChange={e => handleCustomerSelect(e.target.value)} 
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all bg-white font-medium text-slate-800"
+                  >
+                    <option value="">Select Existing Customer</option>
+                    {customers.map(c => (
+                      <option key={c.id} value={c.id}>{c.name} ({c.mobile || c.phone || 'No phone'})</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">Channel</label>
+                  <select 
+                    value={form.channel} 
+                    onChange={e => setForm({...form, channel: e.target.value})} 
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all bg-white font-medium text-slate-800"
+                  >
+                    <option value="WHATSAPP">WhatsApp (Direct link)</option>
+                    <option value="SMS">SMS Text Alert</option>
+                    <option value="EMAIL">Email</option>
+                  </select>
                 </div>
               </div>
 
-              {/* Recipient details */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-extrabold uppercase text-slate-500 tracking-wider mb-1 block">
-                    Customer Name *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Ramesh Patel"
-                    value={composeForm.recipientName}
-                    onChange={(e) => setComposeForm({ ...composeForm, recipientName: e.target.value })}
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">Recipient Name *</label>
+                  <input 
+                    required 
+                    type="text" 
+                    value={form.recipientName} 
+                    onChange={e => setForm({...form, recipientName: e.target.value})} 
+                    placeholder="e.g. Rajesh Sharma" 
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-medium text-slate-800"
                   />
                 </div>
-                <div>
-                  <label className="text-xs font-extrabold uppercase text-slate-500 tracking-wider mb-1 block">
-                    {composeForm.channel === "EMAIL" ? "Email Address *" : "Mobile Number (+91) *"}
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder={composeForm.channel === "EMAIL" ? "client@gmail.com" : "+91 98765 43210"}
-                    value={composeForm.recipientContact}
-                    onChange={(e) => setComposeForm({ ...composeForm, recipientContact: e.target.value })}
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">Mobile Number / Email *</label>
+                  <input 
+                    required 
+                    type="text" 
+                    value={form.recipientContact} 
+                    onChange={e => setForm({...form, recipientContact: e.target.value})} 
+                    placeholder="e.g. +91 98201 44521" 
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-medium text-slate-800"
                   />
                 </div>
               </div>
 
-              {/* Template Picker */}
-              <div>
-                <label className="text-xs font-extrabold uppercase text-slate-500 tracking-wider mb-1 block">
-                  Select Quick Template
-                </label>
-                <select
-                  onChange={(e) => {
-                    const found = TEMPLATES.find(t => t.id === e.target.value);
-                    if (found) handleSelectTemplate(found);
-                  }}
-                  className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:bg-white"
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">Solar Proposal Template</label>
+                <select 
+                  onChange={e => handleTemplateSelect(e.target.value)} 
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all bg-white font-medium text-slate-800"
                 >
-                  <option value="">-- Choose or write custom message --</option>
-                  {TEMPLATES.map(t => (
-                    <option key={t.id} value={t.id}>[{t.channel}] {t.title}</option>
+                  <option value="">Choose a Template (Optional)</option>
+                  {templates.map(t => (
+                    <option key={t.id} value={t.id}>[{t.channel}] {t.name}</option>
                   ))}
                 </select>
               </div>
 
-              {/* Message Body */}
-              <div>
-                <label className="text-xs font-extrabold uppercase text-slate-500 tracking-wider mb-1 block">
-                  Message Content *
-                </label>
-                <textarea
-                  required
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">Message Content *</label>
+                <textarea 
+                  required 
                   rows={4}
-                  value={composeForm.content}
-                  onChange={(e) => setComposeForm({ ...composeForm, content: e.target.value })}
-                  placeholder="Type your customer notification or update..."
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                  value={form.content} 
+                  onChange={e => setForm({...form, content: e.target.value})} 
+                  placeholder="Type message content or customize template..." 
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all font-medium text-slate-800 resize-none"
                 />
-                <div className="flex items-center justify-between text-[11px] text-slate-400 mt-1">
-                  <span>Characters: {composeForm.content.length}</span>
-                  <span>{composeForm.channel === "SMS" ? `${Math.ceil(composeForm.content.length / 160) || 1} SMS Credit` : "No limit"}</span>
+                <div className="text-right text-xs text-slate-400">
+                  {form.content.length} characters
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setShowComposeModal(false)}
-                  className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-100 transition-colors"
+              <div className="pt-4 flex gap-3">
+                <button 
+                  type="button" 
+                  onClick={() => setShowCompose(false)} 
+                  className="flex-1 py-3 text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl font-bold transition-colors"
                 >
                   Cancel
                 </button>
-                <button
-                  type="submit"
-                  disabled={sending}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-emerald-600/20 transition-all active:scale-95 disabled:opacity-50"
+                <button 
+                  type="submit" 
+                  disabled={submitting}
+                  className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold shadow-md transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                 >
-                  <Send size={14} />
-                  {sending ? "Dispatching..." : "Send Now"}
+                  <Send size={16} />
+                  {submitting ? "Sending..." : form.channel === "WHATSAPP" ? "Dispatch & Open WhatsApp" : "Dispatch Alert"}
                 </button>
               </div>
             </form>

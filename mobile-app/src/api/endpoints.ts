@@ -64,6 +64,10 @@ export const tenantApi = {
     const res = await apiClient.post('/api/tenant/projects', data);
     return res.data;
   },
+  updateProjectDetails: async (projectId: string, data: any) => {
+    const res = await apiClient.patch(`/api/tenant/projects/${projectId}`, data);
+    return res.data;
+  },
 };
 
 // ==========================================

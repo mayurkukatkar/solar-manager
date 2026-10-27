@@ -24,10 +24,14 @@ import {
   X,
   ChevronRight,
   Layers,
+  FileText,
+  QrCode,
 } from 'lucide-react-native';
 import { Header } from '../../components/Header';
 import { tenantApi } from '../../api/endpoints';
 import { Project } from '../../types';
+import { DiscomDocsModal } from './DiscomDocsModal';
+import { BarcodeScannerModal } from '../operations/BarcodeScannerModal';
 
 const STAGES = [
   'Planning',
@@ -56,6 +60,8 @@ export const ProjectsScreen: React.FC = () => {
 
   // Project Detail Intelligence Modal
   const [detailProject, setDetailProject] = useState<Project | null>(null);
+  const [discomProject, setDiscomProject] = useState<any>(null);
+  const [barcodeProject, setBarcodeProject] = useState<any>(null);
 
   useEffect(() => {
     fetchProjects();
@@ -301,14 +307,25 @@ export const ProjectsScreen: React.FC = () => {
                     ) : null}
                   </View>
 
-                  <TouchableOpacity
-                    style={styles.advanceBtn}
-                    onPress={() => handleOpenAdvanceModal(prj)}
-                    activeOpacity={0.85}
-                  >
-                    <Text style={styles.advanceBtnText}>Advance Stage</Text>
-                    <ArrowRight size={14} color="#ffffff" style={{ marginLeft: 6 }} />
-                  </TouchableOpacity>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <TouchableOpacity
+                      style={styles.discomPillBtn}
+                      onPress={() => setDiscomProject(prj)}
+                      activeOpacity={0.8}
+                    >
+                      <FileText size={13} color="#059669" />
+                      <Text style={styles.discomPillText}>DISCOM</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={styles.advanceBtn}
+                      onPress={() => handleOpenAdvanceModal(prj)}
+                      activeOpacity={0.85}
+                    >
+                      <Text style={styles.advanceBtnText}>Advance</Text>
+                      <ArrowRight size={13} color="#ffffff" style={{ marginLeft: 4 }} />
+                    </TouchableOpacity>
+                  </View>
                 </View>
               </TouchableOpacity>
             );
@@ -467,6 +484,34 @@ export const ProjectsScreen: React.FC = () => {
                 </View>
               </View>
 
+              <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
+                <TouchableOpacity
+                  style={[styles.modalDiscomStudioBtn, { flex: 1, marginTop: 0 }]}
+                  onPress={() => {
+                    const p = detailProject;
+                    setDetailProject(null);
+                    setDiscomProject(p);
+                  }}
+                  activeOpacity={0.85}
+                >
+                  <FileText size={14} color="#ffffff" />
+                  <Text style={styles.modalDiscomStudioBtnText}>DISCOM Docs</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.modalBarcodeBtn, { flex: 1 }]}
+                  onPress={() => {
+                    const p = detailProject;
+                    setDetailProject(null);
+                    setBarcodeProject(p);
+                  }}
+                  activeOpacity={0.85}
+                >
+                  <QrCode size={14} color="#ffffff" />
+                  <Text style={styles.modalBarcodeBtnText}>Scan Serials (QR)</Text>
+                </TouchableOpacity>
+              </View>
+
               <TouchableOpacity
                 style={styles.modalAdvanceBtn}
                 onPress={() => {
@@ -482,6 +527,33 @@ export const ProjectsScreen: React.FC = () => {
           </View>
         </View>
       </Modal>
+
+      {/* DISCOM DOCUMENT STUDIO & PDF GENERATOR MODAL */}
+      <DiscomDocsModal
+        visible={Boolean(discomProject)}
+        project={discomProject}
+        onClose={() => setDiscomProject(null)}
+      />
+
+      {/* HARDWARE BARCODE & QR SCANNER MODAL */}
+      {barcodeProject && (
+        <BarcodeScannerModal
+          visible={Boolean(barcodeProject)}
+          project={barcodeProject}
+          initialModuleSerials={barcodeProject?.moduleSerials}
+          initialInverterSerial={barcodeProject?.inverterSerial}
+          onClose={() => setBarcodeProject(null)}
+          onSaveSerials={({ modules, inverter }) => {
+            setProjects((prev) =>
+              prev.map((p) =>
+                p.id === barcodeProject.id
+                  ? { ...p, moduleSerials: modules, inverterSerial: inverter }
+                  : p
+              )
+            );
+          }}
+        />
+      )}
     </View>
   );
 };
@@ -879,11 +951,56 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: 14,
     alignItems: 'center',
-    marginVertical: 20,
+    marginVertical: 14,
   },
   modalAdvanceBtnText: {
     fontSize: 14,
     fontWeight: '700',
+    color: '#ffffff',
+  },
+  discomPillBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#ecfdf5',
+    borderWidth: 1,
+    borderColor: '#a7f3d0',
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+  },
+  discomPillText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#059669',
+  },
+  modalDiscomStudioBtn: {
+    backgroundColor: '#059669',
+    paddingVertical: 14,
+    borderRadius: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 16,
+  },
+  modalDiscomStudioBtnText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#ffffff',
+  },
+  modalBarcodeBtn: {
+    backgroundColor: '#2563eb',
+    paddingVertical: 14,
+    borderRadius: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  modalBarcodeBtnText: {
+    fontSize: 13,
+    fontWeight: '800',
     color: '#ffffff',
   },
 });

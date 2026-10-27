@@ -219,8 +219,21 @@ export const PipelineScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
   const handleOpenDiscomDocs = (item: any) => {
     setSelectedProject({
       ...item,
-      consumerNumber: item.consumerNumber || '410022120526',
-      capacity: item.estimatedCap || 3.3,
+      customer: item.customer || {
+        name: item.name,
+        mobile: item.mobile || item.phone,
+        email: item.email,
+        address: item.address,
+        city: item.city,
+        pincode: item.pincode,
+        consumerNumber: item.consumerNumber || item.electricityConnection || '',
+        sanctionedLoad: item.sanctionedLoad || item.sanctionedLoadKw,
+      },
+      consumerNumber: item.consumerNumber || item.electricityConnection || item.customer?.consumerNumber || '',
+      capacity: item.capacity || item.estimatedCap || item.recommendedKw || 3.3,
+      installationAddress: item.installationAddress || item.address || item.customer?.address || '',
+      city: item.city || item.customer?.city || '',
+      pincode: item.pincode || item.customer?.pincode || '',
     });
     setDiscomModalVisible(true);
   };

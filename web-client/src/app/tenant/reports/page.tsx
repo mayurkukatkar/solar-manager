@@ -6,7 +6,7 @@ import { BarChart2, TrendingUp, Users, Briefcase, Receipt, ArrowUpRight, ArrowDo
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
 
 export default function ReportsPage() {
-  const [data, setData] = useState(null);
+  const [data, setData] = useState<any>(null);
   const [activeTab, setActiveTab] = useState("overview");
 
   useEffect(() => {
@@ -31,19 +31,19 @@ export default function ReportsPage() {
   if (!data) return <div className="flex items-center justify-center h-64 text-slate-400">Loading reports...</div>;
 
   const d = data.dashboard;
-  const statusBreakdown = {};
-  data.projects.forEach(p => { statusBreakdown[p.status] = (statusBreakdown[p.status] || 0) + 1; });
+  const statusBreakdown: Record<string, number> = {};
+  data.projects.forEach((p: any) => { statusBreakdown[p.status] = (statusBreakdown[p.status] || 0) + 1; });
 
-  const leadsBySource = {};
-  data.leads.forEach(l => { leadsBySource[l.source || "Unknown"] = (leadsBySource[l.source || "Unknown"] || 0) + 1; });
+  const leadsBySource: Record<string, number> = {};
+  data.leads.forEach((l: any) => { leadsBySource[l.source || "Unknown"] = (leadsBySource[l.source || "Unknown"] || 0) + 1; });
 
-  const paidInvoices = data.finance.filter(f => f.status === "PAID");
-  const unpaidInvoices = data.finance.filter(f => f.status !== "PAID");
-  const totalRevenue = paidInvoices.reduce((sum, i) => sum + (i.amount || 0), 0);
-  const totalPending = unpaidInvoices.reduce((sum, i) => sum + (i.amount || 0), 0);
+  const paidInvoices = data.finance.filter((f: any) => f.status === "PAID");
+  const unpaidInvoices = data.finance.filter((f: any) => f.status !== "PAID");
+  const totalRevenue = paidInvoices.reduce((sum: number, i: any) => sum + (i.amount || 0), 0);
+  const totalPending = unpaidInvoices.reduce((sum: number, i: any) => sum + (i.amount || 0), 0);
 
-  const monthlyRev = {};
-  paidInvoices.forEach(inv => {
+  const monthlyRev: Record<string, number> = {};
+  paidInvoices.forEach((inv: any) => {
     const month = new Date(inv.createdAt).toLocaleDateString("en-IN", { month: "short", year: "2-digit" });
     monthlyRev[month] = (monthlyRev[month] || 0) + (inv.amount || 0);
   });
@@ -59,7 +59,8 @@ export default function ReportsPage() {
 
       <div className="flex gap-2 mb-6">
         {tabs.map(t => (
-          <button key={t} onClick={() => setActiveTab(t)} className={`px-4 py-2 rounded-xl text-sm font-semibold capitalize transition-colors ${activeTab === t ? "bg-emerald-600 text-white" : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"}`}>
+          <button key={t} onClick={() => setActiveTab(t)}
+            className={`px-4 py-2 rounded-lg text-sm font-semibold capitalize transition-all ${activeTab === t ? "bg-emerald-600 text-white shadow-sm" : "bg-white text-slate-600 hover:bg-slate-50 border border-slate-200"}`}>
             {t}
           </button>
         ))}
@@ -68,32 +69,38 @@ export default function ReportsPage() {
       {activeTab === "overview" && (
         <>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-            {[
-              { label: "Total Revenue", value: `₹${totalRevenue.toLocaleString()}`, icon: TrendingUp, color: "text-emerald-600", bg: "bg-emerald-50" },
-              { label: "Outstanding", value: `₹${totalPending.toLocaleString()}`, icon: Receipt, color: "text-amber-600", bg: "bg-amber-50" },
-              { label: "Total Leads", value: d.totalLeads, icon: Users, color: "text-blue-600", bg: "bg-blue-50" },
-              { label: "Active Projects", value: d.totalProjects, icon: Briefcase, color: "text-purple-600", bg: "bg-purple-50" }
-            ].map((m, i) => (
-              <div key={i} className="bg-white rounded-xl border border-slate-200 p-5">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs font-semibold text-slate-500">{m.label}</span>
-                  <div className={`w-8 h-8 rounded-lg ${m.bg} flex items-center justify-center`}><m.icon size={16} className={m.color} /></div>
-                </div>
-                <p className={`text-2xl font-bold ${m.color}`}>{m.value}</p>
-              </div>
-            ))}
+            <div className="bg-white rounded-xl border border-slate-200 p-5">
+              <span className="text-xs font-semibold text-slate-400 uppercase">Total Revenue</span>
+              <p className="text-2xl font-bold text-slate-800 mt-1">₹{totalRevenue.toLocaleString()}</p>
+              <span className="text-xs text-emerald-600 font-semibold flex items-center gap-1 mt-1"><ArrowUpRight size={14} /> Collected</span>
+            </div>
+            <div className="bg-white rounded-xl border border-slate-200 p-5">
+              <span className="text-xs font-semibold text-slate-400 uppercase">Pending Invoices</span>
+              <p className="text-2xl font-bold text-slate-800 mt-1">₹{totalPending.toLocaleString()}</p>
+              <span className="text-xs text-amber-600 font-semibold flex items-center gap-1 mt-1">{unpaidInvoices.length} unpaid</span>
+            </div>
+            <div className="bg-white rounded-xl border border-slate-200 p-5">
+              <span className="text-xs font-semibold text-slate-400 uppercase">Active Projects</span>
+              <p className="text-2xl font-bold text-slate-800 mt-1">{data.projects.length}</p>
+              <span className="text-xs text-slate-500 font-semibold mt-1 block">In pipeline</span>
+            </div>
+            <div className="bg-white rounded-xl border border-slate-200 p-5">
+              <span className="text-xs font-semibold text-slate-400 uppercase">Total Leads</span>
+              <p className="text-2xl font-bold text-slate-800 mt-1">{data.leads.length}</p>
+              <span className="text-xs text-blue-600 font-semibold mt-1 block">{leadsBySource["Referral"] || 0} via referral</span>
+            </div>
           </div>
 
           <div className="grid md:grid-cols-2 gap-6">
             <div className="bg-white rounded-xl border border-slate-200 p-6">
-              <h3 className="text-sm font-bold text-slate-800 mb-4">Monthly Revenue</h3>
+              <h3 className="text-sm font-bold text-slate-800 mb-4">Monthly Revenue Trend</h3>
               {Object.entries(monthlyRev).length > 0 ? (
                 <div className="space-y-3">
-                  {Object.entries(monthlyRev).map(([month, val]) => (
+                  {Object.entries(monthlyRev).map(([month, val]: [string, number]) => (
                     <div key={month} className="flex items-center gap-3">
                       <span className="text-xs font-semibold text-slate-500 w-20">{month}</span>
                       <div className="flex-1 bg-slate-100 rounded-full h-6 overflow-hidden">
-                        <div className="bg-emerald-500 h-6 rounded-full flex items-center justify-end pr-2 transition-all" style={{ width: `${Math.min((val / totalRevenue) * 100, 100)}%` }}>
+                        <div className="bg-emerald-500 h-6 rounded-full flex items-center justify-end pr-2 transition-all" style={{ width: `${Math.min((val / (totalRevenue || 1)) * 100, 100)}%` }}>
                           <span className="text-[10px] font-bold text-white">₹{val.toLocaleString()}</span>
                         </div>
                       </div>
@@ -105,7 +112,7 @@ export default function ReportsPage() {
             <div className="bg-white rounded-xl border border-slate-200 p-6">
               <h3 className="text-sm font-bold text-slate-800 mb-4">Project Status Breakdown</h3>
               <div className="space-y-3">
-                {Object.entries(statusBreakdown).map(([status, count]) => (
+                {Object.entries(statusBreakdown).map(([status, count]: [string, number]) => (
                   <div key={status} className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0">
                     <span className="text-sm text-slate-600">{status}</span>
                     <span className="text-sm font-bold text-slate-800">{count}</span>
@@ -123,7 +130,7 @@ export default function ReportsPage() {
           <div className="bg-white rounded-xl border border-slate-200 p-6">
             <h3 className="text-sm font-bold text-slate-800 mb-4">Leads by Source</h3>
             <div className="space-y-3">
-              {Object.entries(leadsBySource).sort((a, b) => b[1] - a[1]).map(([source, count]) => (
+              {Object.entries(leadsBySource).sort((a: any, b: any) => b[1] - a[1]).map(([source, count]: [string, number]) => (
                 <div key={source} className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0">
                   <span className="text-sm text-slate-600">{source}</span>
                   <span className="text-sm font-bold text-slate-800">{count}</span>
@@ -134,7 +141,7 @@ export default function ReportsPage() {
           <div className="bg-white rounded-xl border border-slate-200 p-6">
             <h3 className="text-sm font-bold text-slate-800 mb-4">Lead Status Summary</h3>
             <div className="space-y-3">
-              {Object.entries(data.leads.reduce((acc, l) => { acc[l.status] = (acc[l.status] || 0) + 1; return acc; }, {})).map(([status, count]) => (
+              {Object.entries(data.leads.reduce((acc: any, l: any) => { acc[l.status] = (acc[l.status] || 0) + 1; return acc; }, {})).map(([status, count]: any) => (
                 <div key={status} className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0">
                   <span className="text-sm text-slate-600">{status}</span>
                   <span className="text-sm font-bold text-slate-800">{count}</span>
@@ -155,7 +162,7 @@ export default function ReportsPage() {
               ))}
             </tr></thead>
             <tbody>
-              {data.projects.map(p => (
+              {data.projects.map((p: any) => (
                 <tr key={p.id} className="border-b border-slate-100">
                   <td className="px-3 py-2.5 font-semibold text-slate-800">{p.name || p.projectNumber}</td>
                   <td className="px-3 py-2.5 text-slate-600">{p.customer?.name || "-"}</td>
@@ -180,7 +187,7 @@ export default function ReportsPage() {
               ))}
             </tr></thead>
             <tbody>
-              {data.finance.map(inv => (
+              {data.finance.map((inv: any) => (
                 <tr key={inv.id} className="border-b border-slate-100">
                   <td className="px-3 py-2.5 font-semibold text-slate-800">{inv.invoiceNumber}</td>
                   <td className="px-3 py-2.5 text-slate-600">{inv.customer?.name || "-"}</td>

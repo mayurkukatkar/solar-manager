@@ -346,7 +346,7 @@ export const FieldProjectsScreen: React.FC<{ navigation?: any }> = ({ navigation
               const custName = p.customer?.name || p.lead?.name || p.name?.replace(/Project.*/i, '').trim() || 'Client';
               const phone = p.customer?.mobile || p.customer?.phone || p.lead?.mobile;
               const consumerNo =
-                p.consumerNumber || p.customer?.consumerNumber || p.lead?.electricityConnection || '410022120526';
+                p.consumerNumber || p.customer?.consumerNumber || p.lead?.electricityConnection || 'Pending';
               const docsCount = (p.Document || []).length;
               const stagePill = getStagePill(p.currentStage, p.status);
 
@@ -489,7 +489,27 @@ export const FieldProjectsScreen: React.FC<{ navigation?: any }> = ({ navigation
         <BarcodeScannerModal
           visible={barcodeModalVisible}
           project={selectedProject}
+          initialModuleSerials={selectedProject?.moduleSerials}
+          initialInverterSerial={selectedProject?.inverterSerial}
           onClose={() => setBarcodeModalVisible(false)}
+          onSaveSerials={({ modules, inverter }) => {
+            setSelectedProject((prev: any) =>
+              prev
+                ? {
+                    ...prev,
+                    moduleSerials: modules,
+                    inverterSerial: inverter,
+                  }
+                : prev
+            );
+            setProjects((prevList: any[]) =>
+              prevList.map((p) =>
+                p.id === selectedProject.id
+                  ? { ...p, moduleSerials: modules, inverterSerial: inverter }
+                  : p
+              )
+            );
+          }}
         />
       )}
 

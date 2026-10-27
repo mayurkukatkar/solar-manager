@@ -257,10 +257,11 @@ export default function Finance() {
   const generatePDF = async (invoice: any) => {
     setGeneratingPdf(invoice.id);
     try {
-      const html2pdf = (await import('html2pdf.js')).default;
+      const html2pdf: any = (await import('html2pdf.js')).default;
       const element = document.getElementById(`invoice-template-${invoice.id}`);
+      if (!element) return;
       
-      const opt = {
+      const opt: any = {
         margin: [0.3, 0.3, 0.3, 0.3],
         filename: `Invoice_${invoice.invoiceNumber || invoice.id}.pdf`,
         image: { type: 'jpeg', quality: 0.98 },

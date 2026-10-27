@@ -120,7 +120,7 @@ export const InstallationQAModal: React.FC<InstallationQAModalProps> = ({
               <Text style={styles.capText}>{project?.capacity || 3.3} kWp System</Text>
             </View>
             <Text style={styles.heroName}>{project?.customer?.name || project?.name || 'Customer Plant'}</Text>
-            <Text style={styles.heroSub}>Consumer No: {project?.consumerNumber || '410022120526'}</Text>
+            <Text style={styles.heroSub}>Consumer No: {project?.consumerNumber || project?.customer?.consumerNumber || 'Pending'}</Text>
           </View>
 
           {/* SECTION 1: ELECTRICAL TEST MEASUREMENTS */}

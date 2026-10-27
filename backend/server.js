@@ -70,11 +70,34 @@ app.use('/', operationsRoutes);
 const workflowRoutes = require('./routes/tenant/workflow');
 app.use('/', workflowRoutes);
 
-// TENANT - Finance, Payments, Procurement, Service, Dashboard, Warehouses, Tasks
-const financeRoutes = require('./routes/tenant/finance');
-app.use('/', financeRoutes);
+// TENANT - Procurement & Purchase Orders
 const procurementRoutes = require('./routes/tenant/procurement');
 app.use('/', procurementRoutes);
+
+// TENANT - Notifications & Statutory Alerts
+const notificationsRoutes = require('./routes/tenant/notifications');
+app.use('/', notificationsRoutes);
+
+// TENANT - Communications (WhatsApp, SMS, Email)
+const communicationRoutes = require('./routes/tenant/communication');
+app.use('/', communicationRoutes);
+
+// TENANT - Automation & Workflow Rules
+const automationRoutes = require('./routes/tenant/automation');
+app.use('/', automationRoutes);
+
+// TENANT - Security & Audit Logs
+const auditLogsRoutes = require('./routes/tenant/auditLogs');
+app.use('/', auditLogsRoutes);
+
+// TENANT - Users & RBAC Permissions
+const usersRoutes = require('./routes/tenant/users');
+app.use('/', usersRoutes);
+
+// TENANT - Finance, Payments, Service, Dashboard, Warehouses, Tasks
+const financeRoutes = require('./routes/tenant/finance');
+app.use('/', financeRoutes);
+
 // TENANT - Documents & OCR Bill Scanning
 const documentsRoutes = require('./routes/tenant/documents');
 app.use('/', documentsRoutes);
@@ -105,7 +128,7 @@ app.use('/', supportRoutes);
 const staffRoutes = require('./routes/tenant/staff');
 app.use('/', staffRoutes);
 
-// TENANT - Settings, Audit Logs, Notifications
+// TENANT - Settings
 const settingsRoutes = require('./routes/tenant/settings');
 app.use('/', settingsRoutes);
 if (process.env.NODE_ENV !== 'production') {

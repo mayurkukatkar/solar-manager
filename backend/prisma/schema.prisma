@@ -82,6 +82,9 @@ model Tenant {
   updatedAt              DateTime                        @updatedAt
   DocumentType           DocumentType[]
   DocumentRequest        DocumentRequest[]
+  notifications          TenantNotification[]
+  communicationLogs      CommunicationLog[]
+  automationRules        AutomationRule[]
 }
 
 // ----------------------------------------------------
@@ -1509,4 +1512,56 @@ model PlatformLead {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 }
+
+// ----------------------------------------------------
+// 14. TENANT NOTIFICATIONS, COMMUNICATIONS & AUTOMATION
+// ----------------------------------------------------
+
+model TenantNotification {
+  id          String    @id @default(uuid())
+  tenantId    String
+  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  type        String    @default("INFO") // INFO, WARNING, CRITICAL, ANNOUNCEMENT
+  title       String
+  content     String
+  isRead      Boolean   @default(false)
+  actionUrl   String?
+  actionLabel String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model CommunicationLog {
+  id               String   @id @default(uuid())
+  tenantId         String
+  tenant           Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  recipientName    String
+  recipientContact String
+  channel          String   @default("WHATSAPP") // WHATSAPP, SMS, EMAIL
+  template         String?
+  content          String
+  status           String   @default("SENT") // SENT, DELIVERED, READ, FAILED
+  category         String   @default("GENERAL") // QUOTATION, SURVEY, INSTALLATION, SUBSIDY, PAYMENT, GENERAL
+  customerId       String?
+  projectId        String?
+  createdAt        DateTime @default(now())
+}
+
+model AutomationRule {
+  id           String    @id @default(uuid())
+  tenantId     String
+  tenant       Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name         String
+  description  String?
+  category     String    @default("CRM") // CRM, PROJECTS, FINANCE, DISCOM, AMC
+  trigger      String
+  condition    String?
+  action       String
+  isActive     Boolean   @default(true)
+  lastExecuted DateTime?
+  runCount     Int       @default(0)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
 

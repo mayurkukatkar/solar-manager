@@ -5,12 +5,20 @@ import { Banknote, Plus, X, TrendingUp, Clock, CheckCircle, XCircle } from "luci
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
 
+const statusColors: Record<string, string> = {
+  APPLIED: "bg-blue-50 text-blue-700",
+  REVIEW: "bg-yellow-50 text-yellow-700",
+  APPROVED: "bg-emerald-50 text-emerald-700",
+  DISBURSED: "bg-purple-50 text-purple-700",
+  REJECTED: "bg-red-50 text-red-700"
+};
+
 export default function LoansPage() {
-  const [loans, setLoans] = useState([]);
-  const [metrics, setMetrics] = useState({});
+  const [loans, setLoans] = useState<any[]>([]);
+  const [metrics, setMetrics] = useState<any>({});
   const [showModal, setShowModal] = useState(false);
-  const [customers, setCustomers] = useState([]);
-  const [projects, setProjects] = useState([]);
+  const [customers, setCustomers] = useState<any[]>([]);
+  const [projects, setProjects] = useState<any[]>([]);
   const [filter, setFilter] = useState("");
   const [form, setForm] = useState({ customerId: "", projectId: "", lender: "", applicationNo: "", amount: "" });
 
@@ -36,20 +44,14 @@ export default function LoansPage() {
       setShowModal(false);
       setForm({ customerId: "", projectId: "", lender: "", applicationNo: "", amount: "" });
       fetchData();
-    } catch (err) { alert(err.response?.data?.error || "Failed"); }
+    } catch (err: any) { alert(err.response?.data?.error || "Failed"); }
   };
 
-  const handleStatusChange = async (id, status) => {
+  const handleStatusChange = async (id: string, status: string) => {
     try {
       await axios.patch(`${API}/api/tenant/loans/${id}`, { status }, { withCredentials: true });
       fetchData();
     } catch (err) { console.error(err); }
-  };
-
-  const statusColors = {
-    APPLIED: "bg-blue-50 text-blue-700", REVIEW: "bg-yellow-50 text-yellow-700",
-    APPROVED: "bg-emerald-50 text-emerald-700", DISBURSED: "bg-purple-50 text-purple-700",
-    REJECTED: "bg-red-50 text-red-700"
   };
 
   return (
@@ -60,21 +62,21 @@ export default function LoansPage() {
           <p className="text-sm text-slate-500 mt-1">Track customer loan applications for solar installations</p>
         </div>
         <button onClick={() => setShowModal(true)} className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-emerald-700 transition-colors shadow-sm">
-          <Plus size={16} /> New Loan Application
+          <Plus size={16} /> New Application
         </button>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
         {[
-          { label: "Total", value: metrics.total || 0, icon: Banknote, color: "text-slate-600" },
-          { label: "Applied", value: metrics.applied || 0, icon: Clock, color: "text-blue-600" },
-          { label: "Under Review", value: metrics.review || 0, icon: TrendingUp, color: "text-yellow-600" },
-          { label: "Approved", value: metrics.approved || 0, icon: CheckCircle, color: "text-emerald-600" },
-          { label: "Total Disbursed", value: `₹${(metrics.totalDisbursed || 0).toLocaleString()}`, icon: Banknote, color: "text-purple-600" }
+          { label: "Total Applications", value: metrics.total || 0, color: "text-slate-600" },
+          { label: "Applied", value: metrics.applied || 0, color: "text-blue-600" },
+          { label: "In Review", value: metrics.review || 0, color: "text-amber-600" },
+          { label: "Approved", value: metrics.approved || 0, color: "text-emerald-600" },
+          { label: "Total Disbursed", value: `₹${(metrics.totalDisbursed || 0).toLocaleString()}`, color: "text-purple-600" }
         ].map((m, i) => (
           <div key={i} className="bg-white rounded-xl border border-slate-200 p-4">
-            <div className="flex items-center gap-2 mb-1"><m.icon size={14} className={m.color} /><span className="text-xs font-semibold text-slate-500">{m.label}</span></div>
-            <p className={`text-xl font-bold ${m.color}`}>{m.value}</p>
+            <span className="text-xs font-semibold text-slate-500">{m.label}</span>
+            <p className={`text-xl font-bold mt-1 ${m.color}`}>{m.value}</p>
           </div>
         ))}
       </div>
@@ -90,23 +92,25 @@ export default function LoansPage() {
       <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
         <table className="w-full text-sm">
           <thead><tr className="bg-slate-50 border-b border-slate-200">
-            {["Application No", "Customer", "Lender", "Project", "Amount", "Status", "Date", "Actions"].map(h => (
+            {["App No", "Customer", "Lender", "Project", "Amount", "Status", "Date", "Actions"].map(h => (
               <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase">{h}</th>
             ))}
           </tr></thead>
           <tbody>
-            {loans.map(l => (
+            {loans.map((l: any) => (
               <tr key={l.id} className="border-b border-slate-100 hover:bg-slate-50/50">
                 <td className="px-4 py-3 font-semibold text-slate-800">{l.applicationNo || "-"}</td>
                 <td className="px-4 py-3 text-slate-600">{l.customer?.name || "-"}</td>
                 <td className="px-4 py-3 text-slate-600">{l.lender || "-"}</td>
                 <td className="px-4 py-3 text-slate-600">{l.project?.name || "-"}</td>
                 <td className="px-4 py-3 font-semibold text-slate-800">₹{(l.amount || 0).toLocaleString()}</td>
-                <td className="px-4 py-3"><span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${statusColors[l.status] || "bg-slate-100 text-slate-600"}`}>{l.status}</span></td>
+                <td className="px-4 py-3"><span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${statusColors[l.status] || "bg-slate-100 text-slate-700"}`}>{l.status}</span></td>
                 <td className="px-4 py-3 text-slate-500">{new Date(l.createdAt).toLocaleDateString()}</td>
                 <td className="px-4 py-3">
                   <select value={l.status} onChange={e => handleStatusChange(l.id, e.target.value)} className="text-xs border border-slate-200 rounded-lg px-2 py-1 bg-white">
-                    {["APPLIED", "REVIEW", "APPROVED", "DISBURSED", "REJECTED"].map(st => <option key={st} value={st}>{st}</option>)}
+                    {["APPLIED", "REVIEW", "APPROVED", "DISBURSED", "REJECTED"].map(s => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
                   </select>
                 </td>
               </tr>
@@ -128,29 +132,31 @@ export default function LoansPage() {
                 <label className="block text-xs font-semibold text-slate-600 mb-1">Customer *</label>
                 <select value={form.customerId} onChange={e => setForm({...form, customerId: e.target.value})} className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm">
                   <option value="">Select Customer</option>
-                  {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  {customers.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-600 mb-1">Project</label>
                 <select value={form.projectId} onChange={e => setForm({...form, projectId: e.target.value})} className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm">
                   <option value="">Select Project</option>
-                  {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  {projects.map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
               </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">Lender / Bank</label>
-                <input value={form.lender} onChange={e => setForm({...form, lender: e.target.value})} className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm" placeholder="e.g. SBI, HDFC" />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">Lender / Bank *</label>
+                  <input value={form.lender} onChange={e => setForm({...form, lender: e.target.value})} className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm" placeholder="SBI / HDFC" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">Application No</label>
+                  <input value={form.applicationNo} onChange={e => setForm({...form, applicationNo: e.target.value})} className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm" placeholder="LOAN-123" />
+                </div>
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">Application Number</label>
-                <input value={form.applicationNo} onChange={e => setForm({...form, applicationNo: e.target.value})} className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm" />
+                <label className="block text-xs font-semibold text-slate-600 mb-1">Loan Amount (₹) *</label>
+                <input type="number" value={form.amount} onChange={e => setForm({...form, amount: e.target.value})} className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm" placeholder="150000" />
               </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">Amount (₹)</label>
-                <input type="number" value={form.amount} onChange={e => setForm({...form, amount: e.target.value})} className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm" placeholder="0" />
-              </div>
-              <button onClick={handleCreate} disabled={!form.customerId} className="w-full bg-emerald-600 text-white py-2.5 rounded-xl text-sm font-semibold hover:bg-emerald-700 disabled:opacity-50 transition-colors">Submit Application</button>
+              <button onClick={handleCreate} disabled={!form.customerId || !form.lender || !form.amount} className="w-full bg-emerald-600 text-white py-2.5 rounded-xl text-sm font-semibold hover:bg-emerald-700 disabled:opacity-50 transition-colors">Submit Application</button>
             </div>
           </div>
         </div>

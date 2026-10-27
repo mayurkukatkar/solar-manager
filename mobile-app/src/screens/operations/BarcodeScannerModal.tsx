@@ -24,12 +24,16 @@ import {
 } from 'lucide-react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { ModalHeader } from '../../components/Header';
+import { SafeStorage } from '../../api/client';
+import { tenantApi } from '../../api/endpoints';
 
 interface BarcodeScannerModalProps {
   visible: boolean;
   project: any;
   onClose: () => void;
   onSaveSerials?: (serials: { modules: string[]; inverter: string }) => void;
+  initialModuleSerials?: string[];
+  initialInverterSerial?: string;
 }
 
 export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
@@ -37,6 +41,8 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
   project,
   onClose,
   onSaveSerials,
+  initialModuleSerials,
+  initialInverterSerial,
 }) => {
   const [permission, requestPermission] = useCameraPermissions();
   const [scannedMode, setScannedMode] = useState<'MODULE' | 'INVERTER'>('MODULE');
@@ -54,6 +60,45 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
       requestPermission();
     }
   }, [visible]);
+
+  useEffect(() => {
+    if (visible) {
+      if (initialModuleSerials && initialModuleSerials.length > 0) {
+        setModuleSerials(initialModuleSerials);
+      } else if (project?.moduleSerials && Array.isArray(project.moduleSerials) && project.moduleSerials.length > 0) {
+        setModuleSerials(project.moduleSerials);
+      } else if (project?.dcrModuleSerials) {
+        try {
+          const parsed = typeof project.dcrModuleSerials === 'string'
+            ? project.dcrModuleSerials.split(/[\n,]/).map((s: string) => s.trim()).filter(Boolean)
+            : project.dcrModuleSerials;
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setModuleSerials(parsed);
+          }
+        } catch {}
+      } else if (project?.id) {
+        SafeStorage.getItem(`@solar_project_serials_${project.id}`).then((val) => {
+          if (val) {
+            try {
+              const p = JSON.parse(val);
+              if (p.modules && Array.isArray(p.modules) && p.modules.length > 0) {
+                setModuleSerials(p.modules);
+              }
+              if (p.inverter && !inverterSerial) {
+                setInverterSerial(p.inverter);
+              }
+            } catch {}
+          }
+        });
+      }
+
+      if (initialInverterSerial) {
+        setInverterSerial(initialInverterSerial);
+      } else if (project?.inverterSerial) {
+        setInverterSerial(project.inverterSerial);
+      }
+    }
+  }, [visible, project?.id]);
 
   const handleBarcodeScanned = ({ data }: { data: string }) => {
     if (!isScanning || !data) return;
@@ -100,10 +145,28 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
     setModuleSerials((prev) => prev.filter((s) => s !== serial));
   };
 
-  const handleSaveAndConfirm = () => {
+  const handleSaveAndConfirm = async () => {
     if (!inverterSerial && moduleSerials.length === 0) {
       Alert.alert('No Serials Scanned', 'Please scan or enter at least one module or inverter serial.');
       return;
+    }
+
+    if (project) {
+      project.moduleSerials = moduleSerials;
+      if (inverterSerial) project.inverterSerial = inverterSerial;
+    }
+
+    if (project?.id) {
+      try {
+        await SafeStorage.setItem(
+          `@solar_project_serials_${project.id}`,
+          JSON.stringify({ modules: moduleSerials, inverter: inverterSerial })
+        );
+        await tenantApi.updateProjectDetails(project.id, {
+          dcrModuleSerials: moduleSerials.join(','),
+          ...(inverterSerial ? { inverterSerial } : {}),
+        });
+      } catch {}
     }
 
     if (onSaveSerials) {

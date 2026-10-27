@@ -43,6 +43,10 @@ export default function PMSuryaGharStudio() {
   const [dcrFormatterSub, setDcrFormatterSub] = useState<any>(null); // Bulk DCR Formatter Modal
   const [bankCheckerSub, setBankCheckerSub] = useState<any>(null); // Bank Verification Modal
   const [printDossierSub, setPrintDossierSub] = useState<any>(null); // Offline Inspection Dossier
+  const [checkingBank, setCheckingBank] = useState(false);
+  const [bankCheckResult, setBankCheckResult] = useState<any>(null);
+  const [rawDcrText, setRawDcrText] = useState("");
+  const setViewModeWithStorage = (mode: 'kanban' | 'table') => setViewMode(mode);
 
   // Toast notification for clipboard copy
   const [copySuccess, setCopySuccess] = useState<string | null>(null);
@@ -386,7 +390,7 @@ IFSC Code: SBIN0001234`;
     if (!dcrFormatterSub) return;
     const cleaned = rawDcrText
       .split(/[\n,;\t]+/)
-      .map(s => s.trim().toUpperCase())
+      .map((s: string) => s.trim().toUpperCase())
       .filter(Boolean);
 
     const formatted = cleaned.join(", ");
@@ -1137,7 +1141,7 @@ IFSC Code: SBIN0001234`;
               <div className="p-3 bg-indigo-50 rounded-xl text-xs text-indigo-900 flex items-center justify-between font-bold">
                 <span>Detected Modules:</span>
                 <span className="text-sm font-black">
-                  {rawDcrText.split(/[\n,;\t]+/).map(s => s.trim()).filter(Boolean).length} Panels
+                  {rawDcrText.split(/[\n,;\t]+/).map((s: string) => s.trim()).filter(Boolean).length} Panels
                 </span>
               </div>
 

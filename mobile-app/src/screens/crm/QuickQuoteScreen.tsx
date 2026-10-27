@@ -9,6 +9,7 @@ import {
   Alert,
   ActivityIndicator,
   Platform,
+  Modal,
 } from 'react-native';
 import {
   Calculator,
@@ -28,12 +29,139 @@ import {
   Layers,
   ShieldCheck,
   Building,
+  Plus,
+  Edit3,
+  Sliders,
+  X,
+  Tag,
 } from 'lucide-react-native';
 import { Header } from '../../components/Header';
 import { generateQuotationHtml, sharePdfFile, printDirectly, QuotationPdfProps } from '../../services/pdfService';
 import { openWhatsAppWithPitch } from '../../services/whatsappService';
 import { quotationsApi } from '../../api/endpoints';
 import { ProposalPreviewModal } from '../../components/ProposalPreviewModal';
+import { SafeStorage } from '../../api/client';
+
+export interface DynamicGearItem {
+  id: string;
+  name: string;
+  brand: string;
+  wattage?: number;
+  subtitle: string;
+  tag: string;
+  isCustom?: boolean;
+}
+
+export const DEFAULT_PANEL_OPTIONS: DynamicGearItem[] = [
+  {
+    id: 'waaree_540',
+    name: 'Waaree 540W Mono PERC Bifacial',
+    brand: 'Waaree',
+    wattage: 540,
+    subtitle: '25 Years Warranty • DCR ALMM Approved • High Yield',
+    tag: 'DCR Tier-1',
+  },
+  {
+    id: 'adani_545',
+    name: 'Adani 545W TopCon DCR Bifacial',
+    brand: 'Adani',
+    wattage: 545,
+    subtitle: 'N-Type TopCon Cells • 30 Years Linear Warranty',
+    tag: 'N-Type TOPCon',
+  },
+  {
+    id: 'tata_545',
+    name: 'Tata Power 545W Mono PERC DCR',
+    brand: 'Tata Power Solar',
+    wattage: 545,
+    subtitle: 'Tier-1 High Reliability • 25 Years Performance Guarantee',
+    tag: 'Tata Tier-1',
+  },
+  {
+    id: 'vikram_540',
+    name: 'Vikram Solar 540W Suryava Bifacial',
+    brand: 'Vikram Solar',
+    wattage: 540,
+    subtitle: 'ALMM Listed • High Wind & Snow Load Certified',
+    tag: 'ALMM Listed',
+  },
+  {
+    id: 'goldi_545',
+    name: 'Goldi 545W HELOC Plus Mono Bifacial',
+    brand: 'Goldi Solar',
+    wattage: 545,
+    subtitle: 'Multi-Busbar Technology • Low Degradation',
+    tag: 'MBB Tech',
+  },
+  {
+    id: 'premier_545',
+    name: 'Premier Energies 545W DCR Bifacial',
+    brand: 'Premier Energies',
+    wattage: 545,
+    subtitle: 'DCR Cell & Module • High Temp Coefficient',
+    tag: 'DCR Compliant',
+  },
+  {
+    id: 'rayzon_545',
+    name: 'Rayzon 545W Mono PERC Bifacial',
+    brand: 'Rayzon Solar',
+    wattage: 545,
+    subtitle: 'MNRE / ALMM Approved • Indian Manufacturing',
+    tag: 'ALMM Listed',
+  },
+];
+
+export const DEFAULT_INVERTER_OPTIONS: DynamicGearItem[] = [
+  {
+    id: 'solis_smart',
+    name: 'Solis Dual MPPT Smart Inverter',
+    brand: 'Solis',
+    subtitle: 'Dual MPPT • 10 Years Warranty • WiFi Telemetry',
+    tag: 'Dual MPPT',
+  },
+  {
+    id: 'growatt_smart',
+    name: 'Growatt Smart On-Grid Inverter',
+    brand: 'Growatt',
+    subtitle: 'Integrated DC Switch • 98.4% Efficiency • Remote Monitoring',
+    tag: 'High Yield',
+  },
+  {
+    id: 'polycab_grid',
+    name: 'Polycab Solar Grid-Tied Inverter',
+    brand: 'Polycab',
+    subtitle: 'BIS Approved • Rugged Heavy Duty Indian Grid Design',
+    tag: 'BIS Certified',
+  },
+  {
+    id: 'sungrow_string',
+    name: 'Sungrow Dual MPPT String Inverter',
+    brand: 'Sungrow',
+    subtitle: 'Max 98.6% Efficiency • Smart IV Curve Diagnosis',
+    tag: 'Global #1',
+  },
+  {
+    id: 'goodwe_smart',
+    name: 'GoodWe Smart On-Grid Inverter',
+    brand: 'GoodWe',
+    subtitle: 'IP65 Water Resistant • Built-in Surge Protection Type II',
+    tag: 'Type II SPD',
+  },
+  {
+    id: 'deye_grid',
+    name: 'Deye On-Grid High Efficiency Inverter',
+    brand: 'Deye',
+    subtitle: 'Dual MPPT • LCD Screen Display & App Control',
+    tag: 'Smart Display',
+  },
+  {
+    id: 'havells_enviro',
+    name: 'Havells Enviro Grid-Tied Inverter',
+    brand: 'Havells',
+    subtitle: '10 Years Replacement Warranty • Native Indian Grid Ready',
+    tag: '10-Yr Warranty',
+  },
+];
 
 export const QuickQuoteScreen: React.FC<{ navigation?: any; route?: any }> = ({ navigation, route }) => {
   const initialParams = route?.params || {};
@@ -41,6 +169,14 @@ export const QuickQuoteScreen: React.FC<{ navigation?: any; route?: any }> = ({ 
   const [panelBrand, setPanelBrand] = useState('Waaree 540W Mono PERC Bifacial');
   const [inverterBrand, setInverterBrand] = useState('Solis Dual MPPT On-Grid');
   const [structureType, setStructureType] = useState('Elevated HDG Structure');
+  const [customPanels, setCustomPanels] = useState<DynamicGearItem[]>([]);
+  const [customInverters, setCustomInverters] = useState<DynamicGearItem[]>([]);
+  const [gearModalVisible, setGearModalVisible] = useState(false);
+  const [gearModalType, setGearModalType] = useState<'PANEL' | 'INVERTER'>('PANEL');
+  const [customGearName, setCustomGearName] = useState('');
+  const [customGearWattage, setCustomGearWattage] = useState('550');
+  const [customGearSubtitle, setCustomGearSubtitle] = useState('');
+  const [customGearTag, setCustomGearTag] = useState('');
   const [prospectName, setProspectName] = useState(initialParams.prospectName || initialParams.lead?.name || '');
   const [prospectPhone, setProspectPhone] = useState(initialParams.prospectPhone || initialParams.lead?.mobile || '');
   const [monthlyBill, setMonthlyBill] = useState(initialParams.monthlyBill || (initialParams.lead?.monthlyBill ? String(initialParams.lead.monthlyBill) : '3500'));
@@ -72,6 +208,86 @@ export const QuickQuoteScreen: React.FC<{ navigation?: any; route?: any }> = ({ 
       }
     }
   }, [route?.params]);
+
+  const allPanels: DynamicGearItem[] = [...DEFAULT_PANEL_OPTIONS, ...customPanels];
+  const allInverters: DynamicGearItem[] = [...DEFAULT_INVERTER_OPTIONS, ...customInverters];
+
+  React.useEffect(() => {
+    (async () => {
+      try {
+        const storedPanels = await SafeStorage.getItem('@solar_custom_modules');
+        if (storedPanels) {
+          const parsed = JSON.parse(storedPanels);
+          if (Array.isArray(parsed)) setCustomPanels(parsed);
+        }
+        const storedInverters = await SafeStorage.getItem('@solar_custom_inverters');
+        if (storedInverters) {
+          const parsed = JSON.parse(storedInverters);
+          if (Array.isArray(parsed)) setCustomInverters(parsed);
+        }
+      } catch (err) {
+        console.warn('Failed to load custom gear:', err);
+      }
+    })();
+  }, []);
+
+  const handleOpenAddGear = (type: 'PANEL' | 'INVERTER') => {
+    setGearModalType(type);
+    setCustomGearName('');
+    setCustomGearWattage(type === 'PANEL' ? '550' : '');
+    setCustomGearSubtitle(
+      type === 'PANEL'
+        ? '25 Years Linear Warranty • Tier-1 ALMM Approved'
+        : '10 Years Replacement Warranty • Dual MPPT'
+    );
+    setCustomGearTag(type === 'PANEL' ? 'Custom Tier-1' : 'Custom');
+    setGearModalVisible(true);
+  };
+
+  const handleSaveCustomGear = async () => {
+    if (!customGearName.trim()) {
+      Alert.alert('Name Required', 'Please enter the make / model name.');
+      return;
+    }
+    if (gearModalType === 'PANEL') {
+      const parsedW = parseInt(customGearWattage) || 545;
+      const newItem: DynamicGearItem = {
+        id: `custom_p_${Date.now()}`,
+        name: customGearName.trim(),
+        brand: customGearName.trim().split(' ')[0] || 'Custom',
+        wattage: parsedW,
+        subtitle: customGearSubtitle.trim() || `${parsedW}W High Yield DCR Approved Module`,
+        tag: customGearTag.trim() || 'Custom DCR',
+        isCustom: true,
+      };
+      const updated = [...customPanels, newItem];
+      setCustomPanels(updated);
+      setPanelBrand(newItem.name);
+      try {
+        await SafeStorage.setItem('@solar_custom_modules', JSON.stringify(updated));
+      } catch (e) {
+        console.warn(e);
+      }
+    } else {
+      const newItem: DynamicGearItem = {
+        id: `custom_inv_${Date.now()}`,
+        name: customGearName.trim(),
+        brand: customGearName.trim().split(' ')[0] || 'Custom',
+        subtitle: customGearSubtitle.trim() || 'Smart On-Grid Inverter • WiFi Telemetry',
+        tag: customGearTag.trim() || 'Custom Inverter',
+        isCustom: true,
+      };
+      const updated = [...customInverters, newItem];
+      setCustomInverters(updated);
+      setInverterBrand(newItem.name);
+      try {
+        await SafeStorage.setItem('@solar_custom_inverters', JSON.stringify(updated));
+      } catch (e) {
+        console.warn(e);
+      }
+    }
+    setGearModalVisible(false);
+  };
 
   // Calculations: Single input drives turnkey pricing (All GST Included)
   const cap = parseFloat(capacityKw) || 3.3;
@@ -116,6 +332,13 @@ export const QuickQuoteScreen: React.FC<{ navigation?: any; route?: any }> = ({ 
   const buildPdfPayload = (): QuotationPdfProps => {
     const subtotal = Math.round(gross / 1.138);
     const taxAmount = gross - subtotal;
+    const matchedPanel = allPanels.find((p) => p.name === panelBrand);
+    const parsedWattage =
+      matchedPanel?.wattage ||
+      (() => {
+        const m = panelBrand.match(/(\d{3})\s*W/i);
+        return m ? Number(m[1]) : 545;
+      })();
     return {
       quotationNumber: syncedQuote?.qNumber || `QQ-${Date.now().toString().slice(-6)}`,
       quotationDate: new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
@@ -137,9 +360,9 @@ export const QuickQuoteScreen: React.FC<{ navigation?: any; route?: any }> = ({ 
       systemCapacityKw: cap,
       inverterCapacityKw: cap,
       panelBrand,
-      panelWattage: panelBrand.includes('545') ? 545 : 540,
-      panelQuantity: Math.ceil((cap * 1000) / (panelBrand.includes('545') ? 545 : 540)),
-      panelWarranty: '25 Years Performance',
+      panelWattage: parsedWattage,
+      panelQuantity: Math.ceil((cap * 1000) / parsedWattage),
+      panelWarranty: matchedPanel?.subtitle || '25 Years Performance',
       inverterBrand,
       inverterWarranty: '10 Years Replacement',
       structureType,
@@ -496,67 +719,85 @@ export const QuickQuoteScreen: React.FC<{ navigation?: any; route?: any }> = ({ 
             </View>
 
             {/* Equipment 1: Modules */}
-            <Text style={[styles.label, { marginTop: 12 }]}>Tier-1 DCR Solar Modules</Text>
+            <View style={styles.gearHeaderRow}>
+              <Text style={styles.label}>Tier-1 DCR Solar Modules</Text>
+              <TouchableOpacity
+                style={styles.addGearHeaderBtn}
+                onPress={() => handleOpenAddGear('PANEL')}
+                activeOpacity={0.8}
+              >
+                <Plus size={12} color="#0066FF" strokeWidth={2.5} />
+                <Text style={styles.addGearHeaderBtnText}>+ Add Brand</Text>
+              </TouchableOpacity>
+            </View>
             <View style={styles.gearSelectionCol}>
-              <TouchableOpacity
-                style={[styles.gearCard, panelBrand.includes('Waaree') && styles.gearCardActive]}
-                onPress={() => setPanelBrand('Waaree 540W Mono PERC Bifacial')}
-                activeOpacity={0.8}
-              >
-                <View style={styles.gearCardTop}>
-                  <Text style={[styles.gearCardTitle, panelBrand.includes('Waaree') && styles.gearCardTitleActive]}>
-                    Waaree 540W Mono PERC Bifacial
-                  </Text>
-                  {panelBrand.includes('Waaree') && <Check size={14} color="#0066FF" />}
-                </View>
-                <Text style={styles.gearCardSub}>25 Years Warranty • DCR ALMM Approved • High Yield</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.gearCard, panelBrand.includes('Adani') && styles.gearCardActive]}
-                onPress={() => setPanelBrand('Adani 545W TopCon DCR Bifacial')}
-                activeOpacity={0.8}
-              >
-                <View style={styles.gearCardTop}>
-                  <Text style={[styles.gearCardTitle, panelBrand.includes('Adani') && styles.gearCardTitleActive]}>
-                    Adani 545W TopCon DCR Bifacial
-                  </Text>
-                  {panelBrand.includes('Adani') && <Check size={14} color="#0066FF" />}
-                </View>
-                <Text style={styles.gearCardSub}>N-Type TopCon Cells • 30 Years Linear Warranty</Text>
-              </TouchableOpacity>
+              {allPanels.map((panel) => {
+                const isSelected = panelBrand === panel.name;
+                return (
+                  <TouchableOpacity
+                    key={panel.id}
+                    style={[styles.gearCard, isSelected && styles.gearCardActive]}
+                    onPress={() => setPanelBrand(panel.name)}
+                    activeOpacity={0.8}
+                  >
+                    <View style={styles.gearCardTop}>
+                      <View style={styles.gearCardTitleRow}>
+                        <Text style={[styles.gearCardTitle, isSelected && styles.gearCardTitleActive]}>
+                          {panel.name}
+                        </Text>
+                        <View style={[styles.gearTagPill, isSelected && styles.gearTagPillActive]}>
+                          <Text style={[styles.gearTagPillText, isSelected && styles.gearTagPillTextActive]}>
+                            {panel.tag}
+                          </Text>
+                        </View>
+                      </View>
+                      {isSelected && <Check size={14} color="#0066FF" strokeWidth={3} />}
+                    </View>
+                    <Text style={styles.gearCardSub}>{panel.subtitle}</Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
 
             {/* Equipment 2: Inverter */}
-            <Text style={[styles.label, { marginTop: 12 }]}>Grid-Tied Solar Inverter</Text>
+            <View style={[styles.gearHeaderRow, { marginTop: 14 }]}>
+              <Text style={styles.label}>Grid-Tied Solar Inverter</Text>
+              <TouchableOpacity
+                style={styles.addGearHeaderBtn}
+                onPress={() => handleOpenAddGear('INVERTER')}
+                activeOpacity={0.8}
+              >
+                <Plus size={12} color="#0066FF" strokeWidth={2.5} />
+                <Text style={styles.addGearHeaderBtnText}>+ Add Inverter</Text>
+              </TouchableOpacity>
+            </View>
             <View style={styles.gearSelectionCol}>
-              <TouchableOpacity
-                style={[styles.gearCard, inverterBrand.includes('Solis') && styles.gearCardActive]}
-                onPress={() => setInverterBrand('Solis Dual MPPT On-Grid')}
-                activeOpacity={0.8}
-              >
-                <View style={styles.gearCardTop}>
-                  <Text style={[styles.gearCardTitle, inverterBrand.includes('Solis') && styles.gearCardTitleActive]}>
-                    Solis Dual MPPT Smart Inverter
-                  </Text>
-                  {inverterBrand.includes('Solis') && <Check size={14} color="#0066FF" />}
-                </View>
-                <Text style={styles.gearCardSub}>Dual MPPT • 10 Years Warranty • WiFi Telemetry</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.gearCard, inverterBrand.includes('Growatt') && styles.gearCardActive]}
-                onPress={() => setInverterBrand('Growatt 3.3kW Smart Inverter')}
-                activeOpacity={0.8}
-              >
-                <View style={styles.gearCardTop}>
-                  <Text style={[styles.gearCardTitle, inverterBrand.includes('Growatt') && styles.gearCardTitleActive]}>
-                    Growatt Smart On-Grid Inverter
-                  </Text>
-                  {inverterBrand.includes('Growatt') && <Check size={14} color="#0066FF" />}
-                </View>
-                <Text style={styles.gearCardSub}>Integrated DC Switch • 98.4% Efficiency</Text>
-              </TouchableOpacity>
+              {allInverters.map((inv) => {
+                const isSelected = inverterBrand === inv.name;
+                return (
+                  <TouchableOpacity
+                    key={inv.id}
+                    style={[styles.gearCard, isSelected && styles.gearCardActive]}
+                    onPress={() => setInverterBrand(inv.name)}
+                    activeOpacity={0.8}
+                  >
+                    <View style={styles.gearCardTop}>
+                      <View style={styles.gearCardTitleRow}>
+                        <Text style={[styles.gearCardTitle, isSelected && styles.gearCardTitleActive]}>
+                          {inv.name}
+                        </Text>
+                        <View style={[styles.gearTagPill, isSelected && styles.gearTagPillActive]}>
+                          <Text style={[styles.gearTagPillText, isSelected && styles.gearTagPillTextActive]}>
+                            {inv.tag}
+                          </Text>
+                        </View>
+                      </View>
+                      {isSelected && <Check size={14} color="#0066FF" strokeWidth={3} />}
+                    </View>
+                    <Text style={styles.gearCardSub}>{inv.subtitle}</Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
 
             {/* Turnkey System Pricing Input */}
@@ -727,6 +968,107 @@ export const QuickQuoteScreen: React.FC<{ navigation?: any; route?: any }> = ({ 
           isSynced={Boolean(syncedQuote)}
         />
       )}
+
+      {/* CUSTOM GEAR SPECIFICATION MODAL */}
+      <Modal
+        visible={gearModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setGearModalVisible(false)}
+      >
+        <View style={styles.gearModalOverlay}>
+          <View style={styles.gearModalContent}>
+            <View style={styles.gearModalHeader}>
+              <View style={{ flex: 1, paddingRight: 8 }}>
+                <Text style={styles.gearModalTitle}>
+                  {gearModalType === 'PANEL' ? 'Add Custom Solar Module' : 'Add Custom Solar Inverter'}
+                </Text>
+                <Text style={styles.gearModalSubtitle}>
+                  {gearModalType === 'PANEL'
+                    ? 'Enter custom Tier-1 / ALMM module details & wattage'
+                    : 'Enter custom grid-tied inverter make & model'}
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setGearModalVisible(false)}
+                style={styles.gearModalCloseBtn}
+                activeOpacity={0.7}
+              >
+                <X size={18} color="#64748b" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.gearModalBody}>
+              <Text style={styles.modalFieldLabel}>Equipment Name / Model *</Text>
+              <TextInput
+                style={styles.modalInput}
+                placeholder={
+                  gearModalType === 'PANEL'
+                    ? 'e.g. Vikram Solar 550W Mono PERC'
+                    : 'e.g. Sungrow 3.3kW Dual MPPT'
+                }
+                placeholderTextColor="#94a3b8"
+                value={customGearName}
+                onChangeText={setCustomGearName}
+              />
+
+              {gearModalType === 'PANEL' && (
+                <>
+                  <Text style={styles.modalFieldLabel}>Rated Wattage (Wp) *</Text>
+                  <TextInput
+                    style={styles.modalInput}
+                    placeholder="e.g. 550"
+                    placeholderTextColor="#94a3b8"
+                    value={customGearWattage}
+                    onChangeText={setCustomGearWattage}
+                    keyboardType="numeric"
+                  />
+                </>
+              )}
+
+              <Text style={styles.modalFieldLabel}>Warranty / Tech Specifications</Text>
+              <TextInput
+                style={styles.modalInput}
+                placeholder={
+                  gearModalType === 'PANEL'
+                    ? 'e.g. 25 Years Performance • DCR ALMM'
+                    : 'e.g. 10 Years Warranty • Dual MPPT • WiFi'
+                }
+                placeholderTextColor="#94a3b8"
+                value={customGearSubtitle}
+                onChangeText={setCustomGearSubtitle}
+              />
+
+              <Text style={styles.modalFieldLabel}>Category Badge / Tag</Text>
+              <TextInput
+                style={styles.modalInput}
+                placeholder="e.g. DCR Tier-1 or TopCon"
+                placeholderTextColor="#94a3b8"
+                value={customGearTag}
+                onChangeText={setCustomGearTag}
+              />
+            </View>
+
+            <View style={styles.gearModalFooter}>
+              <TouchableOpacity
+                style={styles.gearModalCancelBtn}
+                onPress={() => setGearModalVisible(false)}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.gearModalCancelBtnText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.gearModalSaveBtn}
+                onPress={handleSaveCustomGear}
+                activeOpacity={0.85}
+              >
+                <Check size={16} color="#ffffff" strokeWidth={2.5} />
+                <Text style={styles.gearModalSaveBtnText}>Save & Select</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -1401,5 +1743,141 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '800',
     color: '#0066FF',
+  },
+  gearHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+    marginTop: 8,
+  },
+  addGearHeaderBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#eff6ff',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+  },
+  addGearHeaderBtnText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#0066FF',
+  },
+  gearCardTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flex: 1,
+    flexWrap: 'wrap',
+  },
+  gearTagPill: {
+    backgroundColor: '#e2e8f0',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  gearTagPillActive: {
+    backgroundColor: '#dbeafe',
+  },
+  gearTagPillText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#475569',
+  },
+  gearTagPillTextActive: {
+    color: '#1d4ed8',
+  },
+  gearModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.65)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  gearModalContent: {
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    width: '100%',
+    maxWidth: 420,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    elevation: 8,
+  },
+  gearModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 16,
+  },
+  gearModalTitle: {
+    fontSize: 16,
+    fontWeight: '900',
+    color: '#0f172a',
+  },
+  gearModalSubtitle: {
+    fontSize: 11,
+    color: '#64748b',
+    marginTop: 2,
+  },
+  gearModalCloseBtn: {
+    padding: 4,
+  },
+  gearModalBody: {
+    gap: 10,
+    marginBottom: 18,
+  },
+  modalFieldLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#334155',
+  },
+  modalInput: {
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 13,
+    color: '#0f172a',
+  },
+  gearModalFooter: {
+    flexDirection: 'row',
+    gap: 10,
+    justifyContent: 'flex-end',
+  },
+  gearModalCancelBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: '#f1f5f9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  gearModalCancelBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#64748b',
+  },
+  gearModalSaveBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: '#0066FF',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  gearModalSaveBtnText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#ffffff',
   },
 });

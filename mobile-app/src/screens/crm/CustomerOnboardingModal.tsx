@@ -27,6 +27,8 @@ import {
   Trash2,
   Sparkles,
   Zap,
+  Info,
+  Clock,
 } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
@@ -167,7 +169,7 @@ export const CustomerOnboardingModal: React.FC<CustomerOnboardingModalProps> = (
         {
           id: 'ELECTRICITY_BILL',
           title: 'Electricity Bill (Latest Copy)',
-          subtitle: 'Mandatory for MSEDCL Consumer Number & load verification',
+          subtitle: 'Recommended for DISCOM Consumer No. & load verification (can upload later)',
           required: false,
           uri: lead.billPhotoUri || undefined,
           fileName: lead.billPhotoUri ? 'Electricity_Bill.jpg' : undefined,
@@ -253,8 +255,40 @@ export const CustomerOnboardingModal: React.FC<CustomerOnboardingModalProps> = (
   };
 
   const handleCompleteOnboarding = async () => {
-    if (!legalName.trim() || mobile.trim().length < 10) {
-      Alert.alert('Missing Details', 'Please verify customer legal name and 10-digit mobile number.');
+    const trimmedLegal = legalName.trim();
+    const trimmedMobile = mobile.trim();
+    const trimmedConsumer = consumerNumber.trim();
+
+    if (!trimmedLegal) {
+      Alert.alert(
+        'Customer Name Required',
+        'Customer legal name matching electricity bill is compulsory to complete onboarding.'
+      );
+      return;
+    }
+
+    if (trimmedMobile.length < 10) {
+      Alert.alert(
+        'Mobile Number Incomplete',
+        'Please enter a valid 10-digit mobile number for portal communications and SMS updates.'
+      );
+      return;
+    }
+
+    // Requirement: DISCOM consumer number is COMPULSORY and form cannot submit without it
+    if (!trimmedConsumer) {
+      Alert.alert(
+        'DISCOM Consumer No. Compulsory',
+        'DISCOM Consumer Account No. is compulsory to complete onboarding. Without the consumer number, the project cannot be created or submitted for DISCOM grid connection & subsidy.'
+      );
+      return;
+    }
+
+    if (trimmedConsumer.length < 6) {
+      Alert.alert(
+        'Invalid Consumer Number',
+        'Please enter a valid DISCOM Consumer Account Number (minimum 6 digits/characters).'
+      );
       return;
     }
 
@@ -276,7 +310,7 @@ export const CustomerOnboardingModal: React.FC<CustomerOnboardingModalProps> = (
             accountNumber,
             ifscCode,
             accountHolderName,
-            consumerNumber: consumerNumber.trim() || lead?.consumerNumber || '410022120526',
+            consumerNumber: consumerNumber.trim() || lead?.consumerNumber || lead?.electricityConnection || '',
           });
           projectResult = convertRes?.project;
         } catch (apiErr: any) {
@@ -311,7 +345,7 @@ export const CustomerOnboardingModal: React.FC<CustomerOnboardingModalProps> = (
             mobile,
             address,
             city,
-            consumerNumber: lead?.consumerNumber || '410022120526',
+            consumerNumber: consumerNumber.trim() || lead?.consumerNumber || lead?.electricityConnection || '',
           },
         };
       }
@@ -454,12 +488,18 @@ export const CustomerOnboardingModal: React.FC<CustomerOnboardingModalProps> = (
 
             <View style={styles.formRow}>
               <View style={styles.formCol}>
-                <Text style={styles.label}>DISCOM Consumer No.</Text>
+                <View style={styles.labelWithBadgeRow}>
+                  <Text style={styles.label}>DISCOM Consumer No. *</Text>
+                  <View style={styles.compulsoryPill}>
+                    <Text style={styles.compulsoryPillText}>Compulsory</Text>
+                  </View>
+                </View>
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, !consumerNumber.trim() && styles.inputHighlightRequired]}
                   value={consumerNumber}
                   onChangeText={setConsumerNumber}
-                  placeholder="e.g. 410022120526"
+                  placeholder="e.g. 12-digit Consumer No."
+                  placeholderTextColor="#94a3b8"
                   keyboardType="numeric"
                 />
               </View>
@@ -513,12 +553,24 @@ export const CustomerOnboardingModal: React.FC<CustomerOnboardingModalProps> = (
             </View>
           </View>
 
-          {/* SECTION 3: 6-POINT KYC UPLOAD CENTER */}
+          {/* SECTION 3: KYC & SITE DOCUMENTS (RECOMMENDED - CAN BE UPLOADED LATER) */}
           <View style={styles.card}>
             <View style={styles.cardHeader}>
-              <Text style={styles.cardTitle}>3. Mandatory KYC Document Center</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Text style={styles.cardTitle}>3. KYC & Site Documents</Text>
+                <View style={styles.recommendedPill}>
+                  <Text style={styles.recommendedPillText}>Recommended</Text>
+                </View>
+              </View>
               <Text style={styles.cardSubtitle}>
-                Upload clear photos or PDFs for DISCOM & PM Surya Ghar
+                Not compulsory at this step. Documents can be uploaded now or later by staff or customer.
+              </Text>
+            </View>
+
+            <View style={styles.docOptionalBanner}>
+              <Info size={14} color="#0284c7" />
+              <Text style={styles.docOptionalBannerText}>
+                Documents are optional right now. You can proceed with onboarding and upload KYC files anytime later from Project Details.
               </Text>
             </View>
 
@@ -535,9 +587,9 @@ export const CustomerOnboardingModal: React.FC<CustomerOnboardingModalProps> = (
                       <Text style={styles.uploadedBadgeText}>Attached</Text>
                     </View>
                   ) : (
-                    <View style={styles.pendingBadge}>
-                      <AlertCircle size={13} color="#ea580c" />
-                      <Text style={styles.pendingBadgeText}>Required</Text>
+                    <View style={styles.optionalBadge}>
+                      <Clock size={11} color="#64748b" />
+                      <Text style={styles.optionalBadgeText}>Upload Later</Text>
                     </View>
                   )}
                 </View>
@@ -999,5 +1051,78 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '800',
     color: '#ffffff',
+  },
+  labelWithBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  compulsoryPill: {
+    backgroundColor: '#fef2f2',
+    borderWidth: 1,
+    borderColor: '#fca5a5',
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 4,
+  },
+  compulsoryPillText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#dc2626',
+    textTransform: 'uppercase',
+  },
+  inputHighlightRequired: {
+    borderColor: '#f87171',
+    backgroundColor: '#fff7f7',
+  },
+  recommendedPill: {
+    backgroundColor: '#eff6ff',
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  recommendedPillText: {
+    fontSize: 9.5,
+    fontWeight: '800',
+    color: '#2563eb',
+    textTransform: 'uppercase',
+  },
+  docOptionalBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#f0f9ff',
+    borderWidth: 1,
+    borderColor: '#bae6fd',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    marginBottom: 12,
+  },
+  docOptionalBannerText: {
+    fontSize: 11,
+    color: '#0369a1',
+    fontWeight: '600',
+    flex: 1,
+    lineHeight: 16,
+  },
+  optionalBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#f1f5f9',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  optionalBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#64748b',
   },
 });

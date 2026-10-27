@@ -1439,35 +1439,116 @@ export const createAndSharePdf = sharePdfFile;
 export const sharePdfToWhatsApp = sharePdfFile;
 
 /**
+ * Indian Rupee to Words Converter (Ported from web MsedclFormsPDF.tsx)
+ */
+export function toIndianWords(num: number): string {
+  if (!num || isNaN(num)) return 'ZERO ONLY';
+  const a = [
+    '', 'ONE', 'TWO', 'THREE', 'FOUR', 'FIVE', 'SIX', 'SEVEN', 'EIGHT', 'NINE', 'TEN',
+    'ELEVEN', 'TWELVE', 'THIRTEEN', 'FOURTEEN', 'FIFTEEN', 'SIXTEEN', 'SEVENTEEN', 'EIGHTEEN', 'NINETEEN'
+  ];
+  const b = ['', '', 'TWENTY', 'THIRTY', 'FORTY', 'FIFTY', 'SIXTY', 'SEVENTY', 'EIGHTY', 'NINETY'];
+
+  function convertTens(n: number): string {
+    if (n < 20) return a[n];
+    return b[Math.floor(n / 10)] + (n % 10 !== 0 ? ' ' + a[n % 10] : '');
+  }
+
+  function convertHundreds(n: number): string {
+    if (n > 99) {
+      return a[Math.floor(n / 100)] + ' HUNDRED' + (n % 100 !== 0 ? ' ' + convertTens(n % 100) : '');
+    }
+    return convertTens(n);
+  }
+
+  let n = Math.round(num);
+  let crore = Math.floor(n / 10000000);
+  n %= 10000000;
+  let lakh = Math.floor(n / 100000);
+  n %= 100000;
+  let thousand = Math.floor(n / 1000);
+  n %= 1000;
+  let remainder = Math.floor(n);
+
+  let str = '';
+  if (crore > 0) str += convertHundreds(crore) + ' CRORE ';
+  if (lakh > 0) str += convertHundreds(lakh) + ' LAKH ';
+  if (thousand > 0) str += convertHundreds(thousand) + ' THOUSAND ';
+  if (remainder > 0) str += convertHundreds(remainder) + ' ';
+
+  return (str.trim() + ' ONLY').toUpperCase();
+}
+
+/**
  * Official MSEDCL DISCOM Statutory Documents Generator
  * Ported directly from web-client (MsedclFormsPDF.tsx) for 100% template parity.
+ * Supports:
+ * - WCR_FULL (Work Completion Report Pack - 3-Page Dossier)
+ * - WCR (WCR Page 1 - Work Completion Report)
+ * - AnnexureI / COMMISSIONING (Annexure - I Commissioning Certificate)
+ * - DCR (Annexure - A DCR & Module Serials Undertaking)
+ * - NetMetering / ANNEXURE_3 (Annexure - 3 Net Metering Connection Agreement - 6 Pages under MERC 2019)
+ * - ConsumerVendor / ANNEXURE_2 (Annexure 2 PM Surya Ghar Model Agreement - 3 Pages)
+ * - StandardQuotation (Official Standard 1-Page Quotation with BOQ)
+ * - Guarantee (Guarantee Certificate Undertaking for 5-Year CMC)
+ * - FORM_A1 (MSEDCL Form A-1 Interconnection Application)
  */
-export function generateDiscomHtml(type: string, data: any): string {
-  const beneficiaryName = (data.beneficiaryName || data.customerName || 'SHRI. SURENDRA RAMBHAU THAKRE').toUpperCase();
-  const consumerNo = data.consumerNumber || data.consumerAccountNo || '410022120526';
-  const bu = data.bu || data.billingUnit || '4100';
-  const capacityKw = Number(data.systemCapacityKw || data.appliedCapacity || data.capacity || 3.3).toFixed(1);
-  const installedCapKw = (Number(capacityKw) * 0.97).toFixed(2);
-  const company = data.companyName || 'WhereReady Solar Technologies Pvt Ltd';
-  const vendorName = (data.vendorName || company).toUpperCase();
-  const address = (data.address || data.installationAddress || 'Plot No 87, Navin Nagar, Near Ring Road').toUpperCase();
-  const city = (data.city || data.district || 'Nagpur').toUpperCase();
-  const state = (data.state || 'Maharashtra').toUpperCase();
-  const pincode = data.pincode || '440008';
-  const appRef = data.applicationRefNo || data.nationalPortalAppNo || `NP-MHSED26-${consumerNo.slice(-6)}`;
-  const appDate = data.applicationDate || new Date().toLocaleDateString('en-IN');
+export function generateDiscomHtml(type: string, data: any, options: { includeStamp?: boolean } = {}): string {
+  const beneficiaryName = (data.beneficiaryName || data.customerName || 'BENEFICIARY NAME').toUpperCase();
+  const consumerNo = data.consumerNumber || data.consumerAccountNo || 'NOT SPECIFIED';
+  const bu = data.bu || data.billingUnit || '';
+  const appRef = data.applicationRefNo || data.nationalPortalAppNo || 'PENDING PORTAL REF';
+  const appDate = data.applicationDate || data.quotationDate || new Date().toLocaleDateString('en-IN');
   const commDate = data.commissioningDate || new Date().toLocaleDateString('en-IN');
-  const mobile = data.mobile || data.phone || data.customerMobile || '9822012345';
-  const email = data.email || data.customerEmail || 'customer@gmail.com';
-  const moduleMake = (data.moduleMake || data.panelBrand || 'Waaree Solar 540Wp Mono PERC').toUpperCase();
-  const inverterMake = (data.inverterMake || data.inverterBrand || 'Growatt Dual MPPT Grid-Tied').toUpperCase();
-  const moduleQty = data.moduleQuantity || Math.ceil((Number(capacityKw) * 1000) / 540);
-  const moduleWatt = data.moduleWattage || 540;
+  const mobile = data.mobileNo || data.mobile || data.customerMobile || data.customerPhone || '';
+  const email = data.email || data.customerEmail || '';
+  const category = data.category || 'Residential';
+  const address = (data.address || data.installationAddress || 'SITE ADDRESS PENDING').toUpperCase();
+  const district = (data.district || data.city || '').toUpperCase();
+  const city = (data.city || data.district || '').toUpperCase();
+  const state = (data.state || 'MAHARASHTRA').toUpperCase();
+  const pincode = data.pincode || '';
 
-  // Dynamic Serial Numbers for DCR Undertaking
-  const serials: string[] = Array.isArray(data.moduleSerialNumbers) && data.moduleSerialNumbers.length > 0
-    ? data.moduleSerialNumbers
-    : Array.from({ length: moduleQty }).map((_, i) => `MS2608211A${4100 + i * 15}`);
+  const sanctionedLoad = data.sanctionedLoad ? Number(data.sanctionedLoad).toFixed(3) : '1.000';
+  const appliedCap = data.appliedCapacity ? Number(data.appliedCapacity).toFixed(3) : Number(data.capacity || data.systemCapacityKw || 3.3).toFixed(3);
+  const installedCap = data.installedCapacity ? Number(data.installedCapacity).toFixed(3) : (Number(appliedCap) * 0.97).toFixed(3);
+  const moduleQty = Number(data.moduleQuantity || Math.ceil((Number(appliedCap) * 1000) / (data.moduleWattage || 535)));
+  const moduleWatt = Number(data.moduleWattage || 535);
+  const moduleMake = (data.moduleMake || data.panelBrand || 'ALMM Approved PV Modules').toUpperCase();
+  const moduleMfr = (data.moduleManufacturer || data.cellManufacturer || data.moduleMake || 'ALMM / DCR Compliant Manufacturer').toUpperCase();
+  const cellMfr = (data.cellManufacturer || 'ALMM / DCR Compliant').toUpperCase();
+  const inverterCap = data.inverterCapacity || appliedCap;
+  const inverterMake = data.inverterMake || data.inverterBrand || 'Grid-Tied Solar Inverter';
+  const inverterBrand = data.inverterBrand || data.inverterMake || 'Grid-Tied Solar Inverter';
+  const inverterQty = data.inverterQuantity || 1;
+  const phase = data.phase || (Number(appliedCap) > 5 ? 'Three Phase' : 'Single Phase');
+  const structureBrand = data.structureBrand || 'GI Structure';
+  const earthing = data.earthingProtection || 'Separate AC, DC & LA Earthing provided as per MNRE standards';
+  const vendorName = (data.vendorName || data.companyName || 'REGISTERED SOLAR EPC VENDOR').toUpperCase();
+  const vendorAddress = (data.vendorAddress || data.companyAddress || '').toUpperCase();
+  const vendorCity = (data.vendorCity || city || '').toUpperCase();
+  const vendorState = (data.vendorState || state || '').toUpperCase();
+  const vendorPincode = data.vendorPincode || '';
+  const gstin = data.gstin || '';
+  const subDivision = (data.subDivision || (district ? `${district} S/DN` : 'SUB-DIVISION')).toUpperCase();
+  const witness1 = (data.witness1 || beneficiaryName).toUpperCase();
+  const witness2 = (data.witness2 || 'AUTHORISED SIGNATORY').toUpperCase();
+  const quotationNumber = data.quotationNumber || `QUOT/${new Date().getFullYear()}/${data.projectNumber || '001'}`;
+  const quotationDate = data.quotationDate || new Date().toLocaleDateString('en-IN');
+  const totalAmount = Number(data.total || data.grand_total || data.estimatedValue || 0);
+  const totalInWords = data.amount_in_words_custom || (totalAmount > 0 ? toIndianWords(totalAmount) : 'ZERO RUPEES ONLY');
+
+  // Agreement dates
+  const day = data.agreementDay || String(new Date().getDate()).padStart(2, '0');
+  const month = (data.agreementMonth || new Date().toLocaleString('default', { month: 'short' })).toUpperCase();
+  const year = data.agreementYear || String(new Date().getFullYear());
+  const location = (data.agreementCity || city || 'SITE LOCATION').toUpperCase();
+
+  // Stamp paper toggle
+  const includeStamp = options.includeStamp !== undefined ? options.includeStamp : (data.includeStampGraphic ?? data.includeStamp ?? true);
+
+  // Module serial numbers (strictly from scanned hardware barcodes, no fake auto-generation)
+  const serials: string[] = Array.isArray(data.moduleSerialNumbers) ? data.moduleSerialNumbers : [];
 
   // Base CSS for MSEDCL Statutory Forms
   const baseStyles = `
@@ -1475,7 +1556,7 @@ export function generateDiscomHtml(type: string, data: any): string {
     * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     body {
       font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif;
-      font-size: 11px;
+      font-size: 11.5px;
       line-height: 1.45;
       color: #000000;
       background: #ffffff;
@@ -1491,34 +1572,76 @@ export function generateDiscomHtml(type: string, data: any): string {
       position: relative;
       background: #ffffff;
       page-break-after: always;
+      break-after: page;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
     }
-    .page:last-child { page-break-after: avoid; }
-    .doc-header { text-align: center; margin-bottom: 18px; }
+    .page:last-child { page-break-after: avoid; break-after: avoid; }
+    .doc-header { text-align: center; margin-bottom: 20px; }
     .doc-org { font-size: 13.5px; font-weight: bold; text-transform: uppercase; color: #000; letter-spacing: 0.3px; margin: 0 0 4px 0; }
     .doc-title { font-size: 12.5px; font-weight: bold; text-transform: uppercase; color: #000; margin: 0; }
     .doc-sub { font-size: 10px; color: #475569; margin-top: 2px; }
-    table { width: 100%; border-collapse: collapse; margin-bottom: 12px; font-size: 10.5px; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 14px; font-size: 11px; }
     th, td { border: 1px solid #000000; padding: 6px 8px; vertical-align: middle; }
-    th { background: #f3f4f6; font-weight: bold; text-align: left; }
-    .section-head { background: #e5e7eb; font-weight: bold; font-size: 11px; }
-    .stamp-header {
-      border: 3px double #8b1e42;
-      border-radius: 4px;
-      padding: 8px 12px;
-      background: #fdf2f4;
-      margin-bottom: 16px;
-      text-align: center;
-      font-family: serif;
-    }
-    .stamp-title { font-size: 14px; font-weight: 900; color: #8b1e42; letter-spacing: 2px; }
-    .stamp-meta { display: flex; justify-content: space-between; font-size: 9.5px; font-weight: bold; color: #1e293b; margin-top: 4px; border-top: 1px solid #e2e8f0; padding-top: 3px; font-family: monospace; }
-    .sign-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-top: 32px; text-align: center; font-size: 10px; }
+    th { background: #f3f4f6; font-weight: bold; text-align: left; font-size: 11.5px; }
+    .section-head { background: #f3f4f6; font-weight: bold; font-size: 11.5px; }
+    .sign-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-top: 32px; text-align: center; font-size: 10.5px; }
     .sign-box { border-top: 1px solid #000; padding-top: 4px; font-weight: bold; }
     .sign-space { height: 48px; display: flex; align-items: center; justify-content: center; }
   `;
+
+  // Stamp Paper Header Helper
+  const renderStampPaper = () => {
+    if (!includeStamp) {
+      return `
+        <div style="width: 100%; height: 115mm; display: flex; flex-direction: column; align-items: center; justify-content: center; border-bottom: 2px dashed #94a3b8; margin-bottom: 24px; text-align: center; color: #64748b; font-family: sans-serif; padding: 16px; box-sizing: border-box;">
+          <p style="font-weight: bold; text-transform: uppercase; letter-spacing: 1px; font-size: 11px; margin: 0; color: #475569;">Reserved For Physical ₹100 Non-Judicial Stamp Paper</p>
+          <p style="font-size: 9.5px; margin: 4px 0 0 0;">Feed pre-purchased ₹100 stamp paper into printer tray. Content will print below this margin.</p>
+        </div>
+      `;
+    }
+
+    return `
+      <div style="width: 100%; margin-bottom: 20px; font-family: serif;">
+        <div style="border: 4px double #8b1e42; padding: 10px; border-radius: 4px; background: linear-gradient(135deg, #fbf4f6 0%, #f7e6eb 50%, #fbf4f6 100%);">
+          <div style="border: 1px solid #aa3355; padding: 8px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; color: #8b1e42; font-weight: bold;">
+              <div style="text-align: left;">
+                <div style="font-size: 13px;">एक सौ रुपये</div>
+                <div style="font-size: 22px; font-weight: 900; line-height: 1; margin-top: 2px;">रु. 100</div>
+              </div>
+              <div style="text-align: center;">
+                <div style="font-size: 16px; font-weight: 800; letter-spacing: 1px; color: #7a1232;">भारतीय गैर न्यायिक</div>
+                <div style="font-size: 9px; font-family: sans-serif; letter-spacing: 2px; text-transform: uppercase; margin-top: 2px; color: #a83250;">India Non Judicial</div>
+              </div>
+              <div style="text-align: right;">
+                <div style="font-size: 13px;">Rs. 100</div>
+                <div style="font-size: 13px; font-weight: 900; line-height: 1; margin-top: 2px;">ONE HUNDRED RUPEES</div>
+              </div>
+            </div>
+            <div style="text-align: center; margin: 6px 0;">
+              <div style="display: inline-block; padding: 3px 8px; border: 1px solid #8b1e42; border-radius: 2px; background: rgba(255,255,255,0.85); font-size: 7px; font-weight: bold; color: #8b1e42; letter-spacing: 1px;">
+                सत्यमेव जयते
+              </div>
+            </div>
+            <div style="text-align: center; margin-top: 2px;">
+              <div style="font-size: 24px; font-weight: 900; letter-spacing: 0.2em; color: #8b1e42; line-height: 1.1;">भारत INDIA</div>
+              <div style="font-size: 12px; font-weight: 800; letter-spacing: 0.3em; text-transform: uppercase; color: #7a1232; font-family: sans-serif; margin-top: 2px;">INDIA NON JUDICIAL</div>
+            </div>
+          </div>
+        </div>
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 4px 12px; font-size: 10.5px; font-weight: bold; color: #1e293b; border-bottom: 1px solid #cbd5e1; font-family: sans-serif; margin-top: 4px;">
+          <div><span>महाराष्ट्र </span><span style="letter-spacing: 1px;">MAHARASHTRA</span></div>
+          <div style="font-family: monospace; font-size: 11px;">● ${year} ●</div>
+          <div style="text-align: right;">
+            <span style="font-size: 9.5px; color: #475569; text-transform: uppercase; margin-right: 8px;">${location} TREASURY</span>
+            <span style="font-family: monospace; color: #581c87; font-weight: 800;">55AB 416416</span>
+          </div>
+        </div>
+      </div>
+    `;
+  };
 
   // 1. WORK COMPLETION REPORT (WCR)
   const renderWcrHtml = () => `
@@ -1527,7 +1650,6 @@ export function generateDiscomHtml(type: string, data: any): string {
         <div class="doc-header">
           <div class="doc-org">MAHARASHTRA STATE ELECTRICITY DISTRIBUTION CO. LTD. (MSEDCL)</div>
           <div class="doc-title">WORK COMPLETION REPORT (WCR) FOR GRID-CONNECTED SOLAR PV SYSTEM</div>
-          <div class="doc-sub">Statutory Interconnection Compliance Under PM Surya Ghar: Muft Bijli Yojana</div>
         </div>
 
         <table>
@@ -1537,10 +1659,10 @@ export function generateDiscomHtml(type: string, data: any): string {
           <tbody>
             <tr><td style="width: 35%; font-weight: bold;">Beneficiary Name</td><td style="font-weight: bold;">${beneficiaryName}</td></tr>
             <tr><td style="font-weight: bold;">Application Ref. No. & Date</td><td>${appRef} / ${appDate}</td></tr>
-            <tr><td style="font-weight: bold;">Consumer Account No.</td><td style="font-weight: bold;">${consumerNo} (BU: ${bu})</td></tr>
+            <tr><td style="font-weight: bold;">Consumer Account No.</td><td style="font-weight: bold;">${consumerNo}</td></tr>
             <tr><td style="font-weight: bold;">Mobile No. & Email</td><td>${mobile} | ${email}</td></tr>
-            <tr><td style="font-weight: bold;">Tariff Category</td><td>LT-I Residential</td></tr>
-            <tr><td style="font-weight: bold;">Installation Address</td><td>${address}, District: ${city}, State: ${state}, PIN: ${pincode}</td></tr>
+            <tr><td style="font-weight: bold;">Category</td><td>${category}</td></tr>
+            <tr><td style="font-weight: bold;">Installation Address</td><td>${address}, District: ${district}, State: ${state}, PIN Code: ${pincode}</td></tr>
           </tbody>
         </table>
 
@@ -1549,44 +1671,34 @@ export function generateDiscomHtml(type: string, data: any): string {
             <tr class="section-head"><th colspan="2">2. System Technical Specifications</th></tr>
           </thead>
           <tbody>
-            <tr><td style="width: 35%; font-weight: bold;">Sanctioned Load</td><td>${capacityKw} kW</td></tr>
-            <tr><td style="font-weight: bold;">Applied Capacity</td><td style="font-weight: bold;">${capacityKw} kWp (Installed: ${installedCapKw} kWp)</td></tr>
-            <tr><td style="font-weight: bold;">PV Modules Make & Model</td><td>${moduleMake} (${moduleWatt}Wp × ${moduleQty} Nos)</td></tr>
-            <tr><td style="font-weight: bold;">PCU / Inverter Capacity & Make</td><td>${capacityKw} kW Grid-Tied (${inverterMake})</td></tr>
-            <tr><td style="font-weight: bold;">Earthing & Lightning Protection</td><td>Separate AC, DC & LA Earthing provided as per MNRE standards (&lt; 5.0 Ohms)</td></tr>
-            <tr><td style="font-weight: bold;">Empaneled Vendor Name</td><td style="font-weight: bold;">${vendorName}</td></tr>
+            <tr><td style="width: 35%; font-weight: bold;">Sanctioned Load</td><td>${sanctionedLoad} kW</td></tr>
+            <tr><td style="font-weight: bold;">Applied Capacity</td><td style="font-weight: bold;">${appliedCap} kWp</td></tr>
+            <tr><td style="font-weight: bold;">Total Solar Capacity Installed</td><td style="font-weight: bold;">${installedCap} kWp (${moduleQty} x ${moduleWatt} Wp) / ${appliedCap} kWp Applied</td></tr>
+            <tr><td style="font-weight: bold;">System Type</td><td>Grid-Tied Rooftop Solar PV System</td></tr>
+            <tr><td style="font-weight: bold;">PV Module Make & Rating</td><td>${moduleMake} / ${moduleMfr} (${moduleWatt} Wp - ${moduleQty} NOS)</td></tr>
+            <tr><td style="font-weight: bold;">Solar Inverter Capacity</td><td>${inverterCap} kW ${inverterMake} Inverter</td></tr>
+            <tr><td style="font-weight: bold;">Earthing & Protection</td><td>${earthing}</td></tr>
           </tbody>
         </table>
 
-        <table>
-          <thead>
-            <tr class="section-head"><th colspan="4">3. Statutory Electrical Safety & Interconnection Test Certificate</th></tr>
-            <tr style="background: #f9fafb;">
-              <th>Test Parameter</th><th>Standard Norm</th><th>Observed Value</th><th>Compliance</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr><td>Earth Pit 1 (Inverter Body)</td><td>&lt; 5.0 Ohms</td><td style="font-family: monospace;">2.10 Ohms</td><td style="font-weight: bold; color: green;">PASS</td></tr>
-            <tr><td>Earth Pit 2 (PV Module Structure)</td><td>&lt; 5.0 Ohms</td><td style="font-family: monospace;">1.85 Ohms</td><td style="font-weight: bold; color: green;">PASS</td></tr>
-            <tr><td>Earth Pit 3 (Lightning Arrestor)</td><td>&lt; 5.0 Ohms</td><td style="font-family: monospace;">2.40 Ohms</td><td style="font-weight: bold; color: green;">PASS</td></tr>
-            <tr><td>Anti-Islanding Test (Mains Trip)</td><td>Trips &lt; 2.0 sec</td><td style="font-family: monospace;">0.18 sec</td><td style="font-weight: bold; color: green;">PASS</td></tr>
-            <tr><td>DC Insulation Resistance</td><td>&gt; 1000 Mega Ohms</td><td style="font-family: monospace;">&gt; 2000 MΩ</td><td style="font-weight: bold; color: green;">PASS</td></tr>
-          </tbody>
-        </table>
+
+        <p style="text-align: justify; font-size: 11.5px; line-height: 1.5; margin: 16px 0;">
+          Certified that the solar rooftop system of <strong>${appliedCap} kWp</strong> capacity has been installed, tested, and commissioned satisfactorily at the above-mentioned premise in accordance with MSEDCL and MNRE specifications.
+        </p>
       </div>
 
       <div class="sign-grid">
         <div>
           <div class="sign-space"><span>${beneficiaryName.split(' ')[0]}</span></div>
-          <div class="sign-box">(Signature of Consumer)<br><span style="font-size: 9px;">${beneficiaryName}</span></div>
+          <div class="sign-box">(Signature of Consumer)<br><span style="font-size: 9.5px;">${beneficiaryName}</span></div>
         </div>
         <div>
           <div class="sign-space"><span style="border: 1px solid #1e40af; color: #1e40af; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-size: 8.5px;">${vendorName}</span></div>
-          <div class="sign-box">(Authorized Solar Vendor)<br><span style="font-size: 9px;">License: PWD/EL/2026/0994</span></div>
+          <div class="sign-box">(Authorized Vendor)<br><span style="font-size: 9.5px;">${vendorName}</span></div>
         </div>
         <div>
           <div class="sign-space"><span style="border: 1px dashed #94a3b8; color: #94a3b8; padding: 4px 8px; font-size: 8px;">Official Seal</span></div>
-          <div class="sign-box">(MSEDCL Section Officer)<br><span style="font-size: 9px;">Seal & Signature</span></div>
+          <div class="sign-box">(MSEDCL Officer)<br><span style="font-size: 9.5px;">Seal & Signature</span></div>
         </div>
       </div>
     </div>
@@ -1599,56 +1711,54 @@ export function generateDiscomHtml(type: string, data: any): string {
         <div class="doc-header">
           <div class="doc-org">ANNEXURE - I</div>
           <div class="doc-title">COMMISSIONING CERTIFICATE FOR GRID CONNECTED SOLAR ROOFTOP PV SYSTEM</div>
-          <div class="doc-sub">Maharashtra State Electricity Distribution Co. Ltd. (MSEDCL)</div>
         </div>
 
-        <p style="text-align: justify; line-height: 1.6; margin-bottom: 16px;">
-          Certified that the Solar Power Plant of capacity <strong>${capacityKw} kWp</strong> installed at <strong>${address}, District: ${city}, State: ${state}, PIN: ${pincode}</strong> for <strong>${beneficiaryName}</strong> (Consumer No. <strong>${consumerNo}</strong>) is complete in all respects and ready for Grid Interconnection.
+        <p style="text-align: justify; line-height: 1.6; margin-bottom: 18px; font-size: 12px;">
+          Certified that the Solar Power Plant of capacity <strong>${appliedCap} kWp</strong> installed at <strong>${address}, District: ${district}, State: ${state}, PIN Code: ${pincode}</strong> for <strong>${beneficiaryName}</strong> (Consumer No. <strong>${consumerNo}</strong>) is complete in all respects and ready for Grid Connection.
         </p>
 
-        <table>
-          <thead><tr class="section-head"><th colspan="2">System Technical Details</th></tr></thead>
-          <tbody>
-            <tr>
-              <td style="width: 50%; vertical-align: top; padding: 10px;">
-                <p style="font-weight: bold; margin: 0 0 6px 0; border-bottom: 1px solid #000; padding-bottom: 2px;">Solar PV Array Details</p>
-                <p>• <strong>Capacity:</strong> ${capacityKw} kWp (Installed: ${installedCapKw} kWp)</p>
-                <p>• <strong>Make:</strong> ${moduleMake}</p>
-                <p>• <strong>Module Rating:</strong> ${moduleWatt} Wp (${moduleQty} NOS)</p>
-                <p>• <strong>Sanctioned Load:</strong> ${capacityKw} kW</p>
-              </td>
-              <td style="width: 50%; vertical-align: top; padding: 10px;">
-                <p style="font-weight: bold; margin: 0 0 6px 0; border-bottom: 1px solid #000; padding-bottom: 2px;">Power Conditioning Unit (Inverter) Details</p>
-                <p>• <strong>Capacity:</strong> ${capacityKw} kW Grid-Tied</p>
-                <p>• <strong>Make:</strong> ${inverterMake}</p>
-                <p>• <strong>Type:</strong> Single Phase / 3-Phase LT</p>
-                <p>• <strong>Protection:</strong> IP65 / Anti-Islanding Embedded</p>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+        <div style="border: 1px solid #000; margin-bottom: 16px;">
+          <div style="background: #f3f4f6; padding: 6px 10px; font-weight: bold; font-size: 11.5px; border-bottom: 1px solid #000;">System Technical Details</div>
+          <div style="display: flex; font-size: 11px;">
+            <div style="width: 50%; padding: 10px; border-right: 1px solid #000;">
+              <p style="font-weight: bold; text-decoration: underline; margin: 0 0 6px 0;">Solar PV Array Details</p>
+              <p style="margin: 3px 0;">• <strong>Capacity:</strong> ${appliedCap} kWp (Installed: ${installedCap} kWp)</p>
+              <p style="margin: 3px 0;">• <strong>Make:</strong> ${moduleMake} (${moduleMfr})</p>
+              <p style="margin: 3px 0;">• <strong>Module Rating:</strong> ${moduleWatt} Wp (${moduleQty} NOS)</p>
+              <p style="margin: 3px 0;">• <strong>Sanctioned Load:</strong> ${sanctionedLoad} kW</p>
+            </div>
+            <div style="width: 50%; padding: 10px;">
+              <p style="font-weight: bold; text-decoration: underline; margin: 0 0 6px 0;">Power Conditioning Unit (Inverter) Details</p>
+              <p style="margin: 3px 0;">• <strong>Capacity:</strong> ${inverterCap} kW Grid-Tied</p>
+              <p style="margin: 3px 0;">• <strong>Type:</strong> ${phase}</p>
+              <p style="margin: 3px 0;">• <strong>Protections:</strong> IP65 / Anti-Islanding Embedded</p>
+            </div>
+          </div>
+        </div>
 
-        <table>
-          <thead><tr class="section-head"><th colspan="2">Metering & Earthing Synchronization</th></tr></thead>
-          <tbody>
-            <tr>
-              <td style="width: 50%; padding: 8px;">• <strong>Metering Type:</strong> Bi-directional Net Meter & Generation Meter (Class 1.0 accuracy)</td>
-              <td style="width: 50%; padding: 8px;">• <strong>Earthing:</strong> 3 Dedicated chemical earth pits (< 5.0 Ohms) for AC, DC, LA</td>
-            </tr>
-          </tbody>
-        </table>
+        <div style="border: 1px solid #000; margin-bottom: 20px;">
+          <div style="background: #f3f4f6; padding: 6px 10px; font-weight: bold; font-size: 11.5px; border-bottom: 1px solid #000;">Metering & Earthing Details</div>
+          <div style="display: flex; font-size: 11px;">
+            <div style="width: 50%; padding: 10px; border-right: 1px solid #000;">
+              <p style="margin: 0; line-height: 1.5;">• <strong>Metering Type:</strong> Bi-directional Net Meter & Solar Generation Meter</p>
+            </div>
+            <div style="width: 50%; padding: 10px;">
+              <p style="margin: 0; line-height: 1.5;">• <strong>Earthing:</strong> Dedicated Earthing provided for Solar PV System</p>
+            </div>
+          </div>
+        </div>
 
-        <p style="font-weight: bold; margin-top: 16px;">Date of Commissioning: ${commDate}</p>
+        <p style="font-weight: bold; font-size: 12px; margin-top: 16px;">Date of Commissioning: ${commDate}</p>
       </div>
 
-      <div class="sign-grid" style="grid-template-columns: 1fr 1fr;">
+      <div class="sign-grid" style="grid-template-columns: 1fr 1fr; margin-top: 60px;">
         <div>
           <div class="sign-space"><span>${beneficiaryName.split(' ')[0]}</span></div>
-          <div class="sign-box">(Consumer Signature)<br><span style="font-size: 9px;">${beneficiaryName}</span></div>
+          <div class="sign-box">Consumer Signature<br><span style="font-size: 10px;">${beneficiaryName}</span></div>
         </div>
         <div>
           <div class="sign-space"><span style="border: 1px solid #1e40af; color: #1e40af; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-size: 8.5px;">${vendorName}</span></div>
-          <div class="sign-box">(Vendor Signature & Stamp)<br><span style="font-size: 9px;">${vendorName}</span></div>
+          <div class="sign-box">Vendor Signature & Stamp<br><span style="font-size: 10px;">${vendorName}</span></div>
         </div>
       </div>
     </div>
@@ -1661,117 +1771,465 @@ export function generateDiscomHtml(type: string, data: any): string {
         <div class="doc-header">
           <div class="doc-org">ANNEXURE - A</div>
           <div class="doc-title">(SELF-DECLARATION / UNDERTAKING FOR DOMESTIC CONTENT REQUIREMENT)</div>
-          <div class="doc-sub">PM Surya Ghar: Muft Bijli Yojana • MNRE Phase-II Central CFA Scheme</div>
         </div>
+
+        <p style="text-align: justify; line-height: 1.5; margin-bottom: 10px;">
+          This is to certify that <strong>${vendorName}</strong> has installed <strong>${appliedCap} kWp</strong> Grid Connected Rooftop Solar (GCRTS) Power Plant for <strong>${beneficiaryName}</strong> at <strong>${address}, District: ${district}, State: ${state}, PIN Code: ${pincode}</strong>, under MNRE Rooftop Solar Scheme Phase-II, against Application Reference Number: <strong>${appRef}</strong>.
+        </p>
 
         <p style="text-align: justify; line-height: 1.5; margin-bottom: 12px;">
-          This is to certify that <strong>${vendorName}</strong> has installed <strong>${capacityKw} kWp</strong> Grid Connected Rooftop Solar (GCRTS) Power Plant for <strong>${beneficiaryName}</strong> at <strong>${address}, District: ${city}, State: ${state}, PIN: ${pincode}</strong>, under MNRE Rooftop Solar Scheme Phase-II, against Application Reference Number: <strong>${appRef}</strong>.
+          The system has been commissioned on <strong>${commDate}</strong>. The details of domestically manufactured Solar PV Modules installed are as below:
         </p>
 
-        <table style="margin-bottom: 10px;">
-          <thead><tr class="section-head"><th colspan="2">Details of Domestically Manufactured Solar PV Modules</th></tr></thead>
-          <tbody>
-            <tr><td style="width: 45%;">1. Total No. of Modules Installed</td><td style="font-weight: bold;">${moduleQty} NOS</td></tr>
-            <tr><td>2. Rating of Each Module</td><td style="font-weight: bold;">${moduleWatt} Wp</td></tr>
-            <tr><td>3. Total Capacity Installed</td><td style="font-weight: bold;">${installedCapKw} kWp (Applied: ${capacityKw} kWp)</td></tr>
-            <tr><td>4. PV Module Make</td><td style="font-weight: bold;">${moduleMake}</td></tr>
-            <tr><td>5. Cell Manufacturer Name</td><td>Mundra Solar PV Ltd (Adani) / Waaree Energies Ltd</td></tr>
-            <tr><td>6. Module Manufacturer Name</td><td>Mundra Solar PV Ltd (Adani) / Waaree Energies Ltd</td></tr>
-          </tbody>
-        </table>
-
-        <table>
-          <thead>
-            <tr style="background: #f3f4f6;"><th style="width: 60px; text-align: center;">Sr. No.</th><th>PV Module Serial Number (Tier-1 ALMM Listed)</th><th style="width: 90px; text-align: center;">Rating</th></tr>
-          </thead>
-          <tbody style="font-family: monospace;">
-            ${serials.slice(0, 10).map((s, idx) => `
-              <tr>
-                <td style="text-align: center;">${idx + 1}</td>
-                <td><strong>${s}</strong></td>
-                <td style="text-align: center;">${moduleWatt} Wp</td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-
-        <p style="text-align: justify; font-size: 9.5px; color: #334155; line-height: 1.4;">
-          I / We hereby undertake that the above mentioned Solar PV Modules are domestically manufactured using domestic manufactured solar cells and conform to the Domestic Content Requirement (DCR) criteria as per MNRE guidelines. In case any document is found incorrect, MNRE / MSEDCL may take appropriate action against us.
-        </p>
-      </div>
-
-      <div class="sign-grid" style="grid-template-columns: 1fr 1fr;">
-        <div>
-          <div class="sign-space"><span>${beneficiaryName.split(' ')[0]}</span></div>
-          <div class="sign-box">(Signature of Beneficiary)<br><span style="font-size: 9px;">Name: ${beneficiaryName}</span></div>
-        </div>
-        <div>
-          <div class="sign-space"><span style="border: 1px solid #1e40af; color: #1e40af; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-size: 8.5px;">${vendorName}</span></div>
-          <div class="sign-box">(Authorized Signatory)<br><span style="font-size: 9px;">For ${vendorName}</span></div>
-        </div>
-      </div>
-    </div>
-  `;
-
-  // 4. NET METERING CONNECTION AGREEMENT (ANNEXURE 2 / 3)
-  const renderAgreementHtml = () => `
-    <div class="page">
-      <div>
-        <!-- STAMP PAPER HEADER -->
-        <div class="stamp-header">
-          <div class="stamp-title">INDIA NON JUDICIAL</div>
-          <div style="font-size: 11px; font-weight: bold; color: #8b1e42; margin-top: 2px;">GOVERNMENT OF MAHARASHTRA</div>
-          <div class="stamp-meta">
-            <span>MAHARASHTRA</span>
-            <span>● 2026 ●</span>
-            <span>${city} TREASURY • 55AB 416416</span>
+        <div style="border: 1px solid #000; padding: 10px; margin-bottom: 14px; background: #fafafa; font-size: 11px;">
+          <p style="font-weight: bold; text-decoration: underline; margin: 0 0 6px 0; font-size: 11.5px;">Details of Solar PV Modules</p>
+          <div style="display: grid; grid-template-columns: 220px 1fr; gap: 4px;">
+            <span>1. Total No. of Modules Installed</span><span style="font-weight: bold;">: ${moduleQty} NOS</span>
+            <span>2. Rating of Each Module</span><span style="font-weight: bold;">: ${moduleWatt} Wp</span>
+            <span>3. Total Capacity Installed (kWp)</span><span style="font-weight: bold;">: ${installedCap} kWp (Applied: ${appliedCap} kWp)</span>
+            <span>4. PV Module Make</span><span style="font-weight: bold;">: ${moduleMake}</span>
+            <span>5. Cell Manufacturer's Name</span><span style="font-weight: bold;">: ${cellMfr}</span>
+            <span>6. Module Manufacturer's Name</span><span style="font-weight: bold;">: ${moduleMfr}</span>
           </div>
         </div>
 
-        <div class="doc-header">
-          <div class="doc-org">ANNEXURE – 3 / ANNEXURE - 2</div>
-          <div class="doc-title">NET METERING CONNECTION AGREEMENT</div>
-          <div class="doc-sub">(Under MERC Grid Interactive Renewable Energy Systems Regulations, 2019)</div>
+        <table>
+          <thead>
+            <tr class="section-head"><th colspan="3">List of Serial Numbers of ${moduleQty} NOS ${moduleMake} PV Modules (${moduleWatt} Wp)</th></tr>
+            <tr style="background: #f9fafb; text-align: center;">
+              <th style="width: 50px; text-align: center;">Sr. No.</th>
+              <th style="text-align: left; padding-left: 12px;">PV Module Serial Number</th>
+              <th style="width: 80px; text-align: center;">Rating</th>
+            </tr>
+          </thead>
+          <tbody style="font-family: monospace;">
+            ${serials.length > 0 ? serials.map((s, idx) => `
+              <tr>
+                <td style="text-align: center;">${idx + 1}</td>
+                <td style="padding-left: 12px;"><strong>${s}</strong></td>
+                <td style="text-align: center;">${moduleWatt} Wp</td>
+              </tr>
+            `).join('') : `
+              <tr>
+                <td colspan="3" style="text-align: center; color: #b91c1c; padding: 16px; font-family: sans-serif; font-size: 11px; background: #fff1f2;">
+                  <strong>⚠️ Hardware Barcodes Pending On-Site Scan</strong><br>
+                  <span style="font-size: 10px; color: #9f1239;">Scan physical solar panel barcodes using the Mobile Hardware Barcode Scanner. (Auto-generation disabled)</span>
+                </td>
+              </tr>
+            `}
+          </tbody>
+        </table>
+
+        <div style="text-align: justify; font-size: 10.5px; line-height: 1.45; color: #1e293b;">
+          <p style="margin: 4px 0;">
+            I / We hereby undertake that the above mentioned Solar PV Modules are domestically manufactured using domestic manufactured solar cells and conform to the Domestic Content Requirement (DCR) criteria as per MNRE guidelines. The cell and module manufacturer(s) have also provided requisite declarations/certificates regarding DCR compliance.
+          </p>
+          <p style="margin: 4px 0;">
+            In case any information/document is found to be false/incorrect at a later stage, MNRE / MSEDCL may take appropriate action against us, including blacklisting or recovery of CFA. We also agree to provide supporting documents as and when required by MNRE or its designated agency.
+          </p>
         </div>
-
-        <p style="text-align: justify; line-height: 1.6; margin-bottom: 12px;">
-          This Agreement is made and entered into at <strong>${city}</strong> on this <strong>${new Date().getDate()}</strong> day of <strong>${new Date().toLocaleString('en-US', { month: 'short' })} 2026</strong> between the Eligible Consumer (Name: <strong>${beneficiaryName}</strong>, premises: <strong>${address}, ${city}</strong>, Consumer No. <strong>${consumerNo}</strong>) as First Party, AND
-        </p>
-
-        <p style="text-align: justify; line-height: 1.6; margin-bottom: 12px;">
-          <strong>MSEDCL (Distribution Licensee) & Empaneled Vendor (${vendorName})</strong> as Second Party.
-        </p>
-
-        <h4 style="margin: 12px 0 4px 0; font-size: 11px; text-transform: uppercase;">1. Technical Standards & Interconnection</h4>
-        <p style="text-align: justify; font-size: 10px; line-height: 1.45; margin-bottom: 8px;">
-          The Renewable Energy Generating System (${capacityKw} kWp) meets the applicable technical norms and safety standards specified by CEA and MERC. The Eligible Consumer shall maintain the system in safe operational condition.
-        </p>
-
-        <h4 style="margin: 8px 0 4px 0; font-size: 11px; text-transform: uppercase;">2. Islanding & Grid Protection</h4>
-        <p style="text-align: justify; font-size: 10px; line-height: 1.45; margin-bottom: 8px;">
-          The system is equipped with automatic anti-islanding protection (IEC 62109, IEC 61727). In the event of grid power failure, the solar plant shall disconnect within 0.20 seconds to prevent back-feeding into the grid.
-        </p>
-
-        <h4 style="margin: 8px 0 4px 0; font-size: 11px; text-transform: uppercase;">3. Commercial Net Metering & Energy Accounting</h4>
-        <p style="text-align: justify; font-size: 10px; line-height: 1.45; margin-bottom: 12px;">
-          Electricity generated from the solar rooftop plant shall be measured by a bi-directional net meter installed by MSEDCL and accounted in the monthly billing cycle.
-        </p>
       </div>
 
-      <div class="sign-grid" style="grid-template-columns: 1fr 1fr;">
+      <div class="sign-grid" style="grid-template-columns: 1fr 1fr; margin-top: 32px;">
         <div>
           <div class="sign-space"><span>${beneficiaryName.split(' ')[0]}</span></div>
-          <div class="sign-box">First Party (Eligible Consumer)<br><span style="font-size: 9px;">${beneficiaryName}</span></div>
+          <div class="sign-box">(Signature of Beneficiary)<br><span style="font-size: 10px;">Name: ${beneficiaryName}</span></div>
         </div>
         <div>
           <div class="sign-space"><span style="border: 1px solid #1e40af; color: #1e40af; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-size: 8.5px;">${vendorName}</span></div>
-          <div class="sign-box">Second Party (Vendor / Licensee)<br><span style="font-size: 9px;">${vendorName}</span></div>
+          <div class="sign-box">(Signature of Authorized Signatory)<br><span style="font-size: 10px;">For ${vendorName}</span></div>
         </div>
       </div>
     </div>
   `;
 
-  // 5. FORM A-1: NET METERING APPLICATION
+  // 4. NET METERING CONNECTION AGREEMENT (6 PAGES)
+  const renderNetMeteringHtml = () => `
+    <!-- PAGE 1 -->
+    <div class="page">
+      <div>
+        ${renderStampPaper()}
+        <div class="doc-header">
+          <div class="doc-org">ANNEXURE – 3</div>
+          <div class="doc-title">NET METERING CONNECTION AGREEMENT</div>
+        </div>
+        <div style="line-height: 1.6; text-align: justify;">
+          <p style="margin-bottom: 12px;">
+            This Agreement is made and entered into at (location) <strong>${location}</strong> on this (date) <strong>${day}</strong> day of (month) <strong>${month}</strong> (year) <strong>${year}</strong> between the Eligible Consumer (Name <strong>${beneficiaryName}</strong> having premises at (address <strong>${address}, District: ${district}</strong> and Consumer No. <strong>${consumerNo}</strong> as the first Party, AND
+          </p>
+          <p style="margin-bottom: 12px;">
+            <strong>MSEDCL) ${subDivision}</strong> (hereinafter referred to as ‘the Licensee’) and having its Registered Office at (address) <strong>${location}</strong> as second Party of this Agreement. Whereas the Eligible Consumer has applied to MSEDCL for approval of a Net Metering Arrangement under the provisions of the Maharashtra Electricity Regulatory Commission (Grid Interactive Renewable Energy Generating Systems) Regulations, 2019 (‘the Grid Interactive Renewable Regulations’) and sought its connectivity to MSEDCL’s distribution Network;
+          </p>
+          <p style="margin-bottom: 12px;">
+            And whereas MSEDCL has agreed to provide Network connectivity to the Eligible Consumer for injection of electricity generated from its Renewable Energy Generating System of <strong>${appliedCap} kilowatt</strong>;
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- PAGE 2 -->
+    <div class="page">
+      <div>
+        ${renderStampPaper()}
+        <p style="font-weight: bold; margin-bottom: 12px;">Both Parties hereby agree as follows:</p>
+        <div style="line-height: 1.6; text-align: justify;">
+          <h3 style="font-size: 12px; margin: 12px 0 4px 0;">1 Eligibility</h3>
+          <p style="margin-bottom: 12px;">The Renewable Energy Generating System meets the applicable norms for being integrated into the distribution network, and that the Eligible Consumer shall maintain the System accordingly for the duration of this Agreement.</p>
+          <h3 style="font-size: 12px; margin: 12px 0 4px 0;">2 Technical and Inter-connection Requirements</h3>
+          <p style="margin-bottom: 8px;"><strong>2.1</strong> The metering arrangement and the inter-connection of the Renewable Energy Generating System with the Network of MSEDCL shall be as per the provisions of the Grid Interactive Renewable Regulations, and the technical standards and norms specified by the Central Electricity Authority for connectivity of distributed generation resources and for the installation and operation of meters.</p>
+          <p style="margin-bottom: 8px;"><strong>2.2</strong> The Eligible Consumer agrees, that he shall install, prior to connection of the Renewable Energy Generating System to the Network of MSEDCL, an isolation device (both automatic and in-built within inverter and external manual relays); and MSEDCL shall have access to it if required for the repair and maintenance of the distribution Network.</p>
+          <p style="margin-bottom: 8px;"><strong>2.3</strong> MSEDCL shall specify the interface/inter-connection point and metering point.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- PAGE 3 -->
+    <div class="page">
+      <div style="line-height: 1.6; text-align: justify; padding-top: 12px;">
+        <p style="margin-bottom: 12px;"><strong>2.4</strong> The Eligible Consumer shall furnish all relevant data, such as voltage, frequency, circuit breaker, isolator position in his System, as and when required by MSEDCL.</p>
+        <h3 style="font-size: 12px; margin: 12px 0 4px 0;">3 Safety</h3>
+        <p style="margin-bottom: 8px;"><strong>3.1</strong> The equipment connected to MSEDCL’s distribution System shall be compliant with relevant International (IEEE/IEC) or Indian standards (BIS), as the case may be, and the installation of electrical equipment shall comply with the requirements specified by the Central Electricity Authority regarding safety and electricity supply.</p>
+        <p style="margin-bottom: 8px;"><strong>3.2</strong> The design, installation, maintenance and operation of the Renewable Energy Generating System shall be undertaken in a manner conducive to the safety of the Renewable Energy Generating System as well as MSEDCL’s Network.</p>
+        <p style="margin-bottom: 8px;"><strong>3.3</strong> If, at any time, MSEDCL determines that the Eligible Consumer’s Renewable Energy Generating System is causing or may cause damage to and/or results in MSEDCL’s other consumers or its assets, the Eligible Consumer shall disconnect the Renewable Energy Generating System from the distribution Network upon direction from MSEDCL, and shall undertake corrective measures at his own expense prior to re-connection.</p>
+        <p style="margin-bottom: 12px;"><strong>3.4</strong> MSEDCL shall not be responsible for any accident resulting in injury to human beings or animals or damage to property that may occur due to back-feeding from the Renewable Energy Generating System when the grid supply is off. MSEDCL may disconnect the installation at any time in the event of such exigencies to prevent such accident.</p>
+        <h3 style="font-size: 12px; margin: 12px 0 4px 0;">4 Other Clearances and Approvals</h3>
+        <p style="margin-bottom: 12px;">The Eligible Consumer shall obtain any statutory approvals and clearances that may be required, such as from the Electrical Inspector or the municipal or other authorities, before connecting the Renewable Energy Generating System to the distribution Network.</p>
+        <h3 style="font-size: 12px; margin: 12px 0 4px 0;">5 Period of Agreement, and Termination</h3>
+        <p style="margin-bottom: 6px;"><strong>5.1</strong> This Agreement shall be for a period for 20 years, but may be terminated prematurely:</p>
+        <p style="margin-left: 20px; margin-bottom: 4px;">a) By mutual consent; or</p>
+        <p style="margin-left: 20px; margin-bottom: 4px;">b) By the Eligible Consumer, by giving 90 days’ notice to MSEDCL;</p>
+        <p style="margin-left: 20px; margin-bottom: 4px;">c) By MSEDCL, by giving 30 days’ notice, if the Eligible Consumer breaches any terms of this Agreement or the provisions of the Grid Interactive Rooftop Renewable Energy Generating Systems Regulations and does not remedy such breach within 30 days of receiving notice;</p>
+      </div>
+    </div>
+
+    <!-- PAGE 4 -->
+    <div class="page">
+      <div style="line-height: 1.6; text-align: justify; padding-top: 12px;">
+        <p style="margin-left: 20px; margin-bottom: 12px;">d) By MSEDCL, by giving 30 days’ notice, if the Eligible Consumer fails to pay his dues in a timely manner or indulges in any malpractices.</p>
+        <h3 style="font-size: 12px; margin: 12px 0 4px 0;">6 Access and Disconnection</h3>
+        <p style="margin-bottom: 8px;"><strong>6.1</strong> The Eligible Consumer shall provide access to MSEDCL to the metering equipment and disconnecting devices of Renewable Energy Generating System, both automatic and manual, by the Eligible Consumer.</p>
+        <p style="margin-bottom: 8px;"><strong>6.2</strong> If, in an emergent or outage situation, MSEDCL cannot access the disconnecting devices of the Renewable Energy Generating System, both automatic and manual, it may disconnect power supply to the premises.</p>
+        <p style="margin-bottom: 12px;"><strong>6.3</strong> Upon termination of this Agreement under Clause 5, the Eligible Consumer shall disconnect the Renewable Energy Generating System forthwith from the Network of MSEDCL.</p>
+        <h3 style="font-size: 12px; margin: 12px 0 4px 0;">7 Liabilities</h3>
+        <p style="margin-bottom: 8px;"><strong>7.1</strong> The Parties shall indemnify each other for damages or adverse effects of either Party’s negligence or misconduct during the installation of the Renewable Energy Generating System, connectivity with the distribution Network and operation of the System.</p>
+        <p style="margin-bottom: 12px;"><strong>7.2</strong> The Parties shall not be liable to each other for any loss of profits or revenues, business interruption losses, loss of contract or goodwill, or for indirect, consequential, incidental or special damages.</p>
+        <h3 style="font-size: 12px; margin: 12px 0 4px 0;">8 Commercial Settlement</h3>
+        <p style="margin-bottom: 8px;"><strong>8.1</strong> The commercial settlements under this Agreement shall be in accordance with the Grid Interactive Renewable Regulations.</p>
+        <p style="margin-bottom: 8px;"><strong>8.2</strong> MSEDCL shall not be liable to compensate the Eligible Consumer if his Renewable Energy Generating System is unable to inject surplus power generated into MSEDCL’s Network on account of failure of power supply in the grid/Network.</p>
+        <p style="margin-bottom: 8px;"><strong>8.3</strong> The existing metering System, if not in accordance with the Grid Interactive Renewable Regulations, shall be replaced by a bi-directional meter (whole current/CT operated) and a separate Renewable Energy Generation Meter shall be provided to measure Renewable Energy generation.</p>
+        <p style="margin-bottom: 8px;"><strong>8.4</strong> The uni-directional and bi-directional meters shall be fixed in separate meter boxes in the same proximity.</p>
+      </div>
+    </div>
+
+    <!-- PAGE 5 -->
+    <div class="page">
+      <div style="line-height: 1.6; text-align: justify; padding-top: 12px;">
+        <p style="margin-bottom: 8px;"><strong>8.5</strong> The energy generated by the Renewable Energy Generating Station shall be offset against the energy consumption of the consumer from the MSEDCL in the following manner:</p>
+        <div style="margin-left: 20px; font-size: 11px;">
+          <p style="margin-bottom: 6px;">a) If the quantum of electricity exported exceeds the quantum imported during the Billing Period, the excess quantum shall be carried forward to the next Billing Period as credited Units of electricity;</p>
+          <p style="margin-bottom: 6px;">b) If the quantum of electricity Units imported by the Eligible Consumer during any Billing Period exceeds the quantum exported, the MSEDCL shall raise its invoice for the net electricity consumption after adjusting the credited Units;</p>
+          <p style="margin-bottom: 6px;">c) The unadjusted net credited Units of electricity as at the end of each financial year shall be purchased by the MSEDCL at the Generic Tariff approved by the Commission for that year;</p>
+          <p style="margin-bottom: 6px;">d) In case the Eligible Consumer is within the ambit of Time of Day (ToD) tariff, the electricity consumption in any time block shall be first compensated with the quantum of electricity injected in the same time block;</p>
+          <p style="margin-bottom: 12px;">e) MSEDCL shall compute the amount payable to the Eligible Consumer for the excess Renewable Energy purchased and provide credit in the immediately succeeding Billing Cycle.</p>
+        </div>
+        <h3 style="font-size: 12px; margin: 12px 0 4px 0;">9 Connection Costs</h3>
+        <p style="margin-bottom: 12px;">The Eligible Consumer shall bear all costs related to the setting up of the Renewable Energy Generating System, including the cost of the Renewable Energy Generation Meter.</p>
+        <h3 style="font-size: 12px; margin: 12px 0 4px 0;">10 Dispute Resolution</h3>
+        <p style="margin-bottom: 8px;"><strong>10.1</strong> Any dispute arising under this Agreement shall be resolved promptly, in good faith and in an equitable manner by both the Parties.</p>
+        <p style="margin-bottom: 16px;"><strong>10.2</strong> The Eligible Consumer shall have recourse to the concerned Consumer Grievance Redressal Forum constituted under the relevant Regulations in respect of any grievance regarding billing.</p>
+        <p style="margin-top: 16px;">In the witness whereof <strong>${vendorName}</strong> for and on behalf of Eligible Consumer and <strong>${beneficiaryName}</strong> for and on behalf of MSEDCL (Licensee) agree to this agreement.</p>
+      </div>
+    </div>
+
+    <!-- PAGE 6 -->
+    <div class="page">
+      <div style="padding-top: 24px;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 32px; font-size: 12px;">
+          <div>
+            <p style="font-weight: bold; font-size: 13px; margin: 0;">${beneficiaryName}</p>
+            <p style="color: #475569; margin: 4px 0 0 0;">for and on behalf of Eligible Consumer</p>
+          </div>
+          <div style="text-align: right;">
+            <p style="font-weight: bold; font-size: 13px; margin: 0;">for and on behalf of MSEDCL Witness</p>
+          </div>
+        </div>
+
+        <div style="margin-bottom: 48px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+            <div>
+              <p style="font-weight: bold; margin: 0;">1: Witness . ${witness1}</p>
+              <div style="height: 36px; border-bottom: 1px solid #000; width: 240px; margin-top: 6px;"></div>
+            </div>
+            <div style="text-align: right;">
+              <p style="font-weight: bold; margin: 0;">2: Witness __________________</p>
+            </div>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <p style="font-weight: bold; margin: 0;">1: Witness ${witness2}</p>
+              <div style="height: 36px; border-bottom: 1px solid #000; width: 240px; margin-top: 6px;"></div>
+            </div>
+            <div style="text-align: right;">
+              <p style="font-weight: bold; margin: 0;">2: Witness __________________</p>
+            </div>
+          </div>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; margin-top: 60px;">
+          <div style="text-align: center; width: 240px;">
+            <div style="height: 60px; display: flex; align-items: center; justify-content: center;">
+              <div style="border: 1px solid #1e40af; color: #1e40af; padding: 4px 12px; border-radius: 4px; font-size: 9px; font-weight: bold; text-transform: uppercase;">
+                ${vendorName}<br><span style="font-size: 8px;">PROPRIETOR</span>
+              </div>
+            </div>
+            <div style="border-top: 1px solid #000; padding-top: 4px;">
+              <p style="font-weight: bold; font-size: 12px; text-transform: uppercase; margin: 0;">${vendorName}</p>
+              <p style="font-size: 10px; color: #64748b; margin: 2px 0 0 0;">Authorized Vendor Stamp & Sign</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // 5. CONSUMER & VENDOR AGREEMENT (PM SURYA GHAR - 3 PAGES)
+  const renderConsumerVendorAgreementHtml = () => `
+    <!-- PAGE 1 -->
+    <div class="page">
+      <div>
+        ${renderStampPaper()}
+        <div class="doc-header">
+          <div class="doc-org">ANNEXURE 2</div>
+          <div class="doc-title" style="line-height: 1.4;">
+            Model Draft Agreement between Consumer & Vendor for installation of grid<br/>
+            connected rooftop solar (RTS) project under PM – Surya Ghar: Muft Bijli Yojana
+          </div>
+        </div>
+        <div style="line-height: 1.6; text-align: justify;">
+          <p style="margin-bottom: 16px;">
+            This agreement is executed on --<strong>${day}</strong>--(Day)-----<strong>${month}</strong>-----(Month)-----<strong>${year.slice(-2)}</strong>-----(Year) for design, supply, installation, commissioning and 5-year comprehensive maintenance of RTS project/system along with warranty under PM Surya Ghar: Muft Bijli Yojana
+          </p>
+          <div style="text-align: center; font-weight: bold; font-size: 13px; margin: 16px 0;">Between</div>
+          <div style="margin-bottom: 16px;">
+            <p style="font-weight: bold; font-size: 13px; margin: 0 0 4px 0;">${beneficiaryName}</p>
+            <p style="margin: 0;">having address at <strong>${address}, District: ${district}, State: ${state}, PIN Code: ${pincode}</strong> (hereinafter referred to as First Party / Consumer)</p>
+          </div>
+          <div style="text-align: center; font-weight: bold; font-size: 13px; margin: 16px 0;">And</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PAGE 2 -->
+    <div class="page">
+      <div style="line-height: 1.55; text-align: justify; padding-top: 12px;">
+        <p style="margin-bottom: 12px;">
+          (<strong>${vendorName}</strong>) having registered office at <strong>${vendorAddress} ${vendorPincode}</strong> (hereinafter referred to as Second Party / Vendor).
+        </p>
+        <div style="text-align: center; margin: 12px 0;">
+          <h3 style="font-weight: bold; font-size: 13px; margin: 0;">Whereas</h3>
+          <p style="font-size: 11px; color: #475569; margin: 2px 0;">Guidelines for PM-Surya Ghar: Muft Bijli Yojana</p>
+          <p style="font-size: 11px; color: #475569; margin: 0;">Central Financial Assistance to Residential Consumers</p>
+        </div>
+        <p style="margin-bottom: 12px;">
+          First Party wishes to install a Grid Connected Rooftop Solar Plant on the rooftop of the residential building of the Consumer under PM Surya Ghar: Muft Bijli Yojana.
+        </p>
+        <p style="margin-bottom: 12px;">
+          <strong>And whereas</strong> Second Party has verified availability of appropriate roof and found it feasible to install a Grid Connected Roof Top Solar plant and that the second party is willing to design, supply, install, test, commission and carry out Operation & Maintenance of the Rooftop Solar plant for 5 year period.
+        </p>
+        <p style="margin-bottom: 8px;">
+          On this day, the First Party and Second Party agree to the following: The First Party hereby undertakes to perform the following activities:
+        </p>
+        <div style="margin-left: 16px; font-size: 11px;">
+          <p style="margin-bottom: 4px;"><strong>1.</strong> Submission of online application at National Portal for installation of RTS project/system, Submission of application for net-metering and system inspection and upload of the relevant documents on the National Portal.</p>
+          <p style="margin-bottom: 4px;"><strong>2.</strong> Provide secure storage of the material of the RTS plant delivered at the premises till handover of the system.</p>
+          <p style="margin-bottom: 4px;"><strong>3.</strong> Provide access to the Roof Top during installation of the plant, operation & maintenance, testing of the plant and equipment.</p>
+          <p style="margin-bottom: 4px;"><strong>4.</strong> Provide electricity during plant installation and water for cleaning of the panels.</p>
+          <p style="margin-bottom: 4px;"><strong>5.</strong> Report any malfunctioning of the plant to the Vendor during the warranty period.</p>
+          <p style="margin-bottom: 8px;"><strong>6.</strong> Pay the amount as per the payment schedule as mutually agreed with the vendor.</p>
+        </div>
+        <p style="margin-top: 10px; margin-bottom: 6px;">The Second Party hereby undertakes to perform the following activities:</p>
+        <div style="margin-left: 16px; font-size: 11px;">
+          <p><strong>1.</strong> The Vendor must follow all the standards and safety guidelines prescribed under state regulations and technical standards prescribed by MNRE for RTS projects, failing which the vendor is liable for blacklisting from participation in the govt. project/ scheme.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- PAGE 3 -->
+    <div class="page">
+      <div style="line-height: 1.5; text-align: justify; padding-top: 12px; font-size: 11px;">
+        <p style="margin-bottom: 8px;">
+          <strong>2. Site Survey:</strong> Site visit, survey and development of detailed project report for installation of RTS system. This also includes feasibility study of roof, strength of roof and shadow free area.
+        </p>
+        <p style="margin-bottom: 8px;">
+          <strong>3. Design & Engineering:</strong> Design of plant along with drawings and selection of components as per standard provided by the DISCOM/SERC/MNRE for best performance and safety of the plant.
+        </p>
+        <p style="margin-bottom: 8px;">
+          <strong>4. Module and Inverter:</strong> The solar modules, including the solar cells, should be manufactured in India. Both the solar modules and inverters shall conform to the relevant standards and specifications prescribed by MNRE.
+        </p>
+        <div style="text-align: center; margin: 10px 0; color: #475569; font-weight: bold;">
+          <p style="margin: 0;">Guidelines for PM-Surya Ghar: Muft Bijli Yojana</p>
+          <p style="margin: 2px 0 0 0;">Central Financial Assistance to Residential Consumers</p>
+        </div>
+        <p style="margin-bottom: 8px;">
+          maintain the PR of the plant till warranty of project i.e. 5 years from the date of commissioning.
+        </p>
+        <p style="font-weight: bold; margin-bottom: 16px;">
+          19. Mutually Agreed Terms of Payment …
+        </p>
+
+        <div style="border-top: 1px solid #cbd5e1; padding-top: 16px; margin-top: 24px;">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; font-size: 11px;">
+            <div>
+              <p style="font-weight: bold; text-decoration: underline; margin: 0 0 6px 0;">First Party (Consumer)</p>
+              <p style="margin: 3px 0;">Name: <strong>${beneficiaryName}</strong></p>
+              <p style="margin: 3px 0;">Address: ${address}, ${district}</p>
+              <div style="margin-top: 36px;">
+                <div style="height: 36px; border-bottom: 1px solid #000; width: 180px; margin-bottom: 4px;"></div>
+                <p style="font-size: 10px; margin: 0;">Sign: ____________________</p>
+                <p style="font-size: 10px; margin: 4px 0 0 0;">Date: ${day}/${month}/${year}</p>
+              </div>
+            </div>
+
+            <div>
+              <p style="font-weight: bold; text-decoration: underline; margin: 0 0 6px 0;">Second Party (Vendor)</p>
+              <p style="margin: 3px 0;">Name: <strong>${vendorName}</strong></p>
+              <p style="margin: 3px 0;">Address: ${vendorAddress}</p>
+              <div style="margin-top: 36px;">
+                <div style="height: 36px; border-bottom: 1px solid #000; width: 180px; margin-bottom: 4px;"></div>
+                <p style="font-size: 10px; margin: 0;">Sign: ____________________</p>
+                <p style="font-size: 10px; margin: 4px 0 0 0;">Date: ${day}/${month}/${year}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // 6. OFFICIAL STANDARD 1-PAGE QUOTATION
+  const renderStandardQuotationHtml = () => `
+    <div class="page">
+      <div>
+        <h1 style="text-align: center; font-weight: 900; font-size: 22px; letter-spacing: 2px; margin: 0 0 24px 0; text-transform: uppercase;">
+          QUOTATION
+        </h1>
+
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px;">
+          <div>
+            <h2 style="font-size: 14px; font-weight: 800; margin: 0 0 4px 0;">${vendorName}</h2>
+            <p style="font-size: 11px; margin: 2px 0; color: #334155;">GST No.: ${gstin}</p>
+            <p style="font-size: 11px; margin: 2px 0; color: #334155;">Date: ${quotationDate}</p>
+            <p style="font-size: 11px; margin: 2px 0; color: #334155;">Quotation No.: ${quotationNumber}</p>
+          </div>
+        </div>
+
+        <div style="margin-bottom: 16px;">
+          <p style="font-weight: bold; font-size: 12px; text-decoration: underline; margin: 0 0 4px 0;">Consumer Details</p>
+          <p style="font-size: 11.5px; font-weight: bold; margin: 2px 0;">Consumer Name:- ${beneficiaryName}</p>
+          <p style="font-size: 11.5px; font-weight: bold; margin: 2px 0;">Consumer Number: ${consumerNo}</p>
+        </div>
+
+        <table>
+          <thead>
+            <tr style="background: #f3f4f6; text-align: center; font-weight: bold;">
+              <th style="width: 50px; text-align: center;">Sr No</th>
+              <th style="text-align: left; padding-left: 12px;">Item Description</th>
+              <th style="width: 90px; text-align: center;">Quantity</th>
+              <th style="text-align: left; padding-left: 12px;">Specification</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style="text-align: center; font-weight: bold;">1</td>
+              <td style="padding-left: 12px; font-weight: 500;">Solar Inverter / PV Modules</td>
+              <td style="text-align: center;">${moduleQty}</td>
+              <td style="padding-left: 12px;">${moduleMake} Panel – ${moduleWatt} Watt</td>
+            </tr>
+            <tr>
+              <td style="text-align: center; font-weight: bold;">2</td>
+              <td style="padding-left: 12px; font-weight: 500;">Solar Inverter</td>
+              <td style="text-align: center;">${inverterQty}</td>
+              <td style="padding-left: 12px;">${inverterBrand} ${inverterCap}kW</td>
+            </tr>
+            <tr>
+              <td style="text-align: center; font-weight: bold;">3</td>
+              <td style="padding-left: 12px; font-weight: 500;">Mounting Structure</td>
+              <td style="text-align: center;">1 Set</td>
+              <td style="padding-left: 12px;">${structureBrand}</td>
+            </tr>
+            <tr>
+              <td style="text-align: center; font-weight: bold;">4</td>
+              <td style="padding-left: 12px; font-weight: 500;">DC/AC Wiring & Accessories</td>
+              <td style="text-align: center;">1 Set</td>
+              <td style="padding-left: 12px;">Standard Solar Cable</td>
+            </tr>
+            <tr>
+              <td style="text-align: center; font-weight: bold;">5</td>
+              <td style="padding-left: 12px; font-weight: 500;">Installation & Commissioning</td>
+              <td style="text-align: center;">1</td>
+              <td style="padding-left: 12px;">Complete Setup</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div style="margin-bottom: 20px; padding: 10px; background: #f8fafc; border: 1px solid #cbd5e1;">
+          <p style="font-weight: bold; font-size: 12.5px; margin: 0;">
+            Total Quotation Amount: ${formatINR(totalAmount)}/- (${totalInWords})
+          </p>
+        </div>
+
+        <div style="margin-bottom: 24px; font-size: 11px; color: #334155;">
+          <p style="font-weight: bold; font-size: 11.5px; margin: 0 0 6px 0; color: #000;">Terms & Conditions</p>
+          <p style="margin: 3px 0;">• Price includes installation and standard accessories.</p>
+          <p style="margin: 3px 0;">• Transportation charges may apply depending on site location.</p>
+          <p style="margin: 3px 0;">• Payment Terms: 50% advance and 50% after installation.</p>
+          <p style="margin: 3px 0;">• Product warranty as per manufacturer policy.</p>
+        </div>
+      </div>
+
+      <div style="padding-bottom: 24px;">
+        <div style="width: 240px;">
+          <p style="font-weight: bold; font-size: 11.5px; margin: 0;">Authorized Signatory</p>
+          <p style="font-size: 11px; color: #475569; margin: 2px 0 0 0;">For ${vendorName}</p>
+          <div style="height: 50px; display: flex; align-items: center; margin: 6px 0;">
+            <div style="border: 1px solid #1e40af; color: #1e40af; padding: 2px 8px; border-radius: 3px; font-size: 8.5px; font-weight: bold;">
+              ${vendorName}
+            </div>
+          </div>
+          <p style="font-size: 11px; font-weight: 600; margin: 0;">Signature: _________________________</p>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // 7. GUARANTEE CERTIFICATE
+  const renderGuaranteeHtml = () => `
+    <div class="page">
+      <div>
+        <h2 style="font-weight: bold; font-size: 16px; margin: 0 0 24px 0; text-decoration: underline; text-align: center;">
+          Guarantee Certificate Undertaking to be submitted by VENDOR
+        </h2>
+        <p style="text-align: justify; line-height: 1.6; font-size: 12.5px; margin-bottom: 24px;">
+          The undersigned will provide the services to the consumers for repairs/maintenance of the RTS plant free of cost for 5 years of the comprehensive Maintenance Contract (CMC) period from the date of commissioning of the plant. Non performing/under-performing system component will be replaced/repaired free of cost in the CMC period.
+        </p>
+        <div style="margin-bottom: 28px; font-size: 12px; line-height: 1.8;">
+          <p>Signature [Vendor]: _________________________</p>
+          <p>Stamp & Seal: _________________________</p>
+        </div>
+        <div style="margin-bottom: 28px; font-size: 12px;">
+          <h3 style="font-weight: bold; text-decoration: underline; margin: 0 0 6px 0;">Identity Details of Consumer:</h3>
+          <p style="margin: 4px 0;">Name: <strong>${beneficiaryName}</strong></p>
+          <p style="margin: 4px 0;">Aadhar Number: ___________________________________________</p>
+        </div>
+        <div style="border: 2px dashed #94a3b8; padding: 60px 20px; text-align: center;">
+          <p style="color: #64748b; font-weight: bold; margin: 0 0 4px 0;">Attach Xerox copy of AADHAR CARD HERE</p>
+          <p style="color: #94a3b8; font-size: 11px; margin: 0;">SHOULD BE SELF ATTESTED BY CONSUMER</p>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // 8. FORM A-1: NET METERING APPLICATION (Legacy)
   const renderFormA1Html = () => `
     <div class="page">
       <div>
@@ -1789,15 +2247,15 @@ export function generateDiscomHtml(type: string, data: any): string {
             <tr><td style="font-weight: bold;">3. Billing Unit (BU)</td><td style="font-family: monospace;">${bu}</td></tr>
             <tr><td style="font-weight: bold;">4. Service Connection Address</td><td>${address}, District: ${city}, PIN: ${pincode}</td></tr>
             <tr><td style="font-weight: bold;">5. Mobile & Email</td><td>${mobile} | ${email}</td></tr>
-            <tr><td style="font-weight: bold;">6. Tariff Category</td><td>LT-I Residential</td></tr>
-            <tr><td style="font-weight: bold;">7. Sanctioned Connected Load</td><td>${capacityKw} kW</td></tr>
-            <tr><td style="font-weight: bold;">8. Proposed Solar Capacity</td><td style="font-weight: bold;">${capacityKw} kWp Grid-Tied</td></tr>
+            <tr><td style="font-weight: bold;">6. Tariff Category</td><td>${category}</td></tr>
+            <tr><td style="font-weight: bold;">7. Sanctioned Connected Load</td><td>${sanctionedLoad} kW</td></tr>
+            <tr><td style="font-weight: bold;">8. Proposed Solar Capacity</td><td style="font-weight: bold;">${appliedCap} kWp Grid-Tied</td></tr>
             <tr><td style="font-weight: bold;">9. Inverter Specifications</td><td>${inverterMake} (Compliant with IEC 62109, IEC 61727)</td></tr>
             <tr><td style="font-weight: bold;">10. Approved Solar EPC Partner</td><td style="font-weight: bold;">${vendorName}</td></tr>
           </tbody>
         </table>
 
-        <p style="font-size: 10px; color: #334155; line-height: 1.5; margin-top: 16px;">
+        <p style="font-size: 10.5px; color: #334155; line-height: 1.5; margin-top: 16px;">
           I/We hereby apply for grid interconnection of our Rooftop Solar PV System under the Net-Metering arrangement. I agree to abide by the terms and conditions stipulated by MERC (Grid Interactive Renewable Energy Systems) Regulations, 2019 and MSEDCL guidelines.
         </p>
 
@@ -1823,19 +2281,29 @@ export function generateDiscomHtml(type: string, data: any): string {
 
   // Select appropriate document or full statutory pack
   let content = '';
-  if (type === 'ANNEXURE_2' || type === 'AGREEMENT') {
-    content = renderAgreementHtml();
-  } else if (type === 'WCR') {
+  const normalizedType = String(type || '').toUpperCase();
+
+  if (normalizedType === 'WCR_FULL' || normalizedType === 'FULL_PACK') {
+    content = renderWcrHtml() + renderCommissioningHtml() + renderDcrHtml();
+  } else if (normalizedType === 'WCR') {
     content = renderWcrHtml();
-  } else if (type === 'COMMISSIONING') {
+  } else if (normalizedType === 'ANNEXUREI' || normalizedType === 'COMMISSIONING') {
     content = renderCommissioningHtml();
-  } else if (type === 'DCR') {
+  } else if (normalizedType === 'DCR') {
     content = renderDcrHtml();
-  } else if (type === 'FULL_PACK') {
-    content = renderFormA1Html() + renderAgreementHtml() + renderWcrHtml() + renderCommissioningHtml() + renderDcrHtml();
-  } else {
-    // Default: Form A-1
+  } else if (normalizedType === 'NETMETERING' || normalizedType === 'ANNEXURE_3') {
+    content = renderNetMeteringHtml();
+  } else if (normalizedType === 'CONSUMERVENDOR' || normalizedType === 'ANNEXURE_2' || normalizedType === 'AGREEMENT') {
+    content = renderConsumerVendorAgreementHtml();
+  } else if (normalizedType === 'STANDARDQUOTATION' || normalizedType === 'QUOTATION') {
+    content = renderStandardQuotationHtml();
+  } else if (normalizedType === 'GUARANTEE') {
+    content = renderGuaranteeHtml();
+  } else if (normalizedType === 'FORM_A1') {
     content = renderFormA1Html();
+  } else {
+    // Default fallback to WCR Full Pack
+    content = renderWcrHtml() + renderCommissioningHtml() + renderDcrHtml();
   }
 
   return `
