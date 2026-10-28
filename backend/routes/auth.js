@@ -86,9 +86,17 @@ router.post('/login', async (req, res) => {
 });
 
 router.post('/force-reset-password', async (req, res) => {
-  const { email, temporaryPassword, newPassword } = req.body;
+  const email = (req.body.email || '').trim().toLowerCase();
+  const { temporaryPassword, newPassword } = req.body;
   try {
-    const user = await prisma.user.findUnique({ where: { email } });
+    const user = await prisma.user.findFirst({
+      where: {
+        email: {
+          equals: email,
+          mode: 'insensitive'
+        }
+      }
+    });
     if (!user || !user.mustChangePassword) {
       return res.status(400).json({ error: 'Invalid request' });
     }
