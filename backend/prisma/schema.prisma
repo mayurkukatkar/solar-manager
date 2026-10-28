@@ -85,6 +85,8 @@ model Tenant {
   notifications          TenantNotification[]
   communicationLogs      CommunicationLog[]
   automationRules        AutomationRule[]
+  staffMembers           Staff[]
+  departments            Department[]
 }
 
 // ----------------------------------------------------
@@ -161,6 +163,7 @@ model User {
   projectsOwned   Project[]       @relation("ProjectOwner")
   assignedSurveys SiteSurvey[]    @relation("SurveyAssignee")
   documents       Document[]
+  staffProfile    Staff?
 }
 
 // ----------------------------------------------------
@@ -879,6 +882,7 @@ model Project {
   CompletionCertificate CompletionCertificate[]
   Document              Document[]
   DocumentRequest       DocumentRequest[]
+  staffAssignments      ProjectStaffAssignment[]
 }
 
 model ProjectStageHistory {
@@ -1627,5 +1631,80 @@ model AutomationRule {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 }
+
+// ----------------------------------------------------
+// 14. WORKFORCE & STAFF MANAGEMENT
+// ----------------------------------------------------
+
+model Department {
+  id           String    @id @default(uuid())
+  tenantId     String
+  tenant       Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name         String
+  code         String?
+  description  String?
+  color        String?   @default("blue")
+  designations String[]  @default([])
+  staff        Staff[]
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@unique([tenantId, name])
+}
+
+model Staff {
+  id               String         @id @default(uuid())
+  tenantId         String
+  tenant           Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  employeeId       String
+  name             String
+  email            String?
+  phone            String?
+  emergencyContact String?
+
+  departmentId     String?
+  departmentRef    Department?    @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  department       String         @default("Operations")
+  designation      String
+
+  employmentType   String         @default("FULL_TIME") // FULL_TIME, PART_TIME, CONTRACT, INTERN
+  status           String         @default("ACTIVE")    // ACTIVE, ON_LEAVE, INACTIVE, PROBATION
+  joiningDate      DateTime?
+  workLocation     String?
+  skills           String[]       @default([])
+  team             String?
+  notes            String?
+
+  managerId        String?
+  manager          Staff?         @relation("StaffHierarchy", fields: [managerId], references: [id], onDelete: SetNull)
+  directReports    Staff[]        @relation("StaffHierarchy")
+
+  userId           String?        @unique
+  user             User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  projectAssignments ProjectStaffAssignment[]
+
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  @@unique([tenantId, employeeId])
+}
+
+model ProjectStaffAssignment {
+  id         String   @id @default(uuid())
+  tenantId   String
+  staffId    String
+  staff      Staff    @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  projectId  String
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  role       String   @default("TECHNICIAN") // PROJECT_LEAD, SITE_ENGINEER, LEAD_ELECTRICIAN, TECHNICIAN, SAFETY_INSPECTOR, HELPER
+  status     String   @default("ACTIVE")     // ACTIVE, COMPLETED, RELEASED
+  assignedAt DateTime @default(now())
+  notes      String?
+
+  @@unique([staffId, projectId])
+}
+
 
 
