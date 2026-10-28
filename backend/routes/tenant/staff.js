@@ -4,6 +4,12 @@ const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const prisma = require('../../db');
 const { requireTenantAuth, logAudit } = require('../../middleware/auth');
+const {
+  sendEmployeeCredentials,
+  sendPasswordReset,
+  sendAccountSuspended,
+  sendAccountReactivated
+} = require('../../services/emailService');
 
 // Helper: generate next Employee ID for tenant
 async function generateEmployeeId(tenantId) {
@@ -488,10 +494,40 @@ router.post('/api/tenant/staff', requireTenantAuth, async (req, res) => {
       hasUserAccount: !!createdUser
     });
 
+    let emailSent = false;
+    let emailError = null;
+
+    if (createdUser && cleanEmail && tempPassword) {
+      try {
+        const tenant = await prisma.tenant.findUnique({
+          where: { id: tenantId },
+          select: { name: true }
+        });
+        const mailRes = await sendEmployeeCredentials({
+          to: cleanEmail,
+          employeeName: newStaff.name,
+          employeeId: newStaff.employeeId,
+          email: cleanEmail,
+          password: tempPassword,
+          role: createdUser.role,
+          organizationName: tenant?.name || 'WhereReady Solar OS'
+        });
+        emailSent = mailRes.sent;
+        if (!mailRes.sent) emailError = mailRes.error || mailRes.reason;
+      } catch (mailErr) {
+        console.warn('[Email] Failed to send credentials to employee:', mailErr.message);
+        emailError = mailErr.message;
+      }
+    }
+
     res.status(201).json({
-      message: 'Staff member created successfully',
+      message: emailSent
+        ? `Staff member created successfully. System credentials emailed to ${cleanEmail}.`
+        : 'Staff member created successfully',
       staff: newStaff,
-      tempPassword
+      tempPassword,
+      emailSent,
+      emailError
     });
   } catch (error) {
     console.error('Error creating staff member:', error);
@@ -624,7 +660,7 @@ router.patch('/api/tenant/staff/:id', requireTenantAuth, async (req, res) => {
 });
 
 // ----------------------------------------------------
-// 6. UPDATE STAFF STATUS (LIFECYCLE: ACTIVE / ON_LEAVE / INACTIVE)
+// 6. UPDATE STAFF STATUS (LIFECYCLE: ACTIVE / ON_LEAVE / INACTIVE / PROBATION / SUSPENDED)
 // ----------------------------------------------------
 router.patch('/api/tenant/staff/:id/status', requireTenantAuth, async (req, res) => {
   try {
@@ -633,17 +669,18 @@ router.patch('/api/tenant/staff/:id/status', requireTenantAuth, async (req, res)
     const { status } = req.body;
 
     if (req.user.role !== 'TENANT_ADMIN') {
-      return res.status(403).json({ error: 'Only Tenant Administrators can change staff status' });
+      return res.status(403).json({ error: 'Only Tenant Administrators have authority to change staff status' });
     }
 
-    const validStatuses = ['ACTIVE', 'ON_LEAVE', 'INACTIVE', 'PROBATION'];
+    const validStatuses = ['ACTIVE', 'ON_LEAVE', 'INACTIVE', 'PROBATION', 'SUSPENDED'];
     if (!validStatuses.includes(status)) {
-      return res.status(400).json({ error: 'Invalid status. Must be ACTIVE, ON_LEAVE, INACTIVE, or PROBATION' });
+      return res.status(400).json({ error: 'Invalid status. Must be ACTIVE, ON_LEAVE, INACTIVE, PROBATION, or SUSPENDED' });
     }
 
     const staff = await prisma.staff.findFirst({
       where: { id, tenantId },
       include: {
+        user: true,
         _count: { select: { projectAssignments: true, directReports: true } }
       }
     });
@@ -652,34 +689,46 @@ router.patch('/api/tenant/staff/:id/status', requireTenantAuth, async (req, res)
     }
 
     // Check if user is deactivating their own staff record
-    if (status === 'INACTIVE' && staff.userId && staff.userId === req.user.userId) {
-      return res.status(400).json({ error: 'You cannot deactivate your own administrative profile' });
+    if ((status === 'INACTIVE' || status === 'SUSPENDED') && staff.userId && staff.userId === req.user.userId) {
+      return res.status(400).json({ error: 'You cannot suspend or deactivate your own administrative profile' });
     }
 
-    const warnings = [];
-    if (status === 'INACTIVE') {
-      if (staff._count.projectAssignments > 0) {
-        warnings.push(`Staff member has ${staff._count.projectAssignments} active project assignment(s). Please reassign them.`);
-      }
-      if (staff._count.directReports > 0) {
-        warnings.push(`Staff member has ${staff._count.directReports} direct report(s). Consider reassigning their manager.`);
-      }
-    }
-
+    const previousStatus = staff.status;
     const updated = await prisma.staff.update({
       where: { id },
       data: { status }
     });
 
+    const tenant = await prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { name: true }
+    });
+
+    // Email notifications on status change
+    if (staff.email) {
+      if (status === 'SUSPENDED' && previousStatus !== 'SUSPENDED') {
+        sendAccountSuspended({
+          to: staff.email,
+          employeeName: staff.name,
+          organizationName: tenant?.name || 'WhereReady Solar OS'
+        }).catch(err => console.warn('Failed to send suspension email:', err.message));
+      } else if (status === 'ACTIVE' && (previousStatus === 'SUSPENDED' || previousStatus === 'INACTIVE')) {
+        sendAccountReactivated({
+          to: staff.email,
+          employeeName: staff.name,
+          organizationName: tenant?.name || 'WhereReady Solar OS'
+        }).catch(err => console.warn('Failed to send reactivation email:', err.message));
+      }
+    }
+
     await logAudit(req, 'STATUS_CHANGE', 'Staff', id, {
-      previousStatus: staff.status,
+      previousStatus,
       newStatus: status
     });
 
     res.json({
       message: `Staff status updated to ${status}`,
-      staff: updated,
-      warnings
+      staff: updated
     });
   } catch (error) {
     console.error('Error changing staff status:', error);
@@ -688,7 +737,210 @@ router.patch('/api/tenant/staff/:id/status', requireTenantAuth, async (req, res)
 });
 
 // ----------------------------------------------------
-// 7. CREATE / RESET USER ACCOUNT FOR EXISTING STAFF
+// 6.1 EXPLICIT EMPLOYEE SUSPENSION (TENANT ADMIN AUTHORITY)
+// ----------------------------------------------------
+router.post('/api/tenant/staff/:id/suspend', requireTenantAuth, async (req, res) => {
+  try {
+    const tenantId = req.user.tenantId;
+    const { id } = req.params;
+    const { reason } = req.body;
+
+    if (req.user.role !== 'TENANT_ADMIN') {
+      return res.status(403).json({ error: 'Only Tenant Administrators have authority to suspend employees' });
+    }
+
+    const staff = await prisma.staff.findFirst({
+      where: { id, tenantId },
+      include: { user: true }
+    });
+    if (!staff) {
+      return res.status(404).json({ error: 'Staff member not found' });
+    }
+
+    if (staff.userId && staff.userId === req.user.userId) {
+      return res.status(400).json({ error: 'You cannot suspend your own administrative account' });
+    }
+
+    const updated = await prisma.staff.update({
+      where: { id },
+      data: { status: 'SUSPENDED' }
+    });
+
+    const tenant = await prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { name: true }
+    });
+
+    if (staff.email) {
+      sendAccountSuspended({
+        to: staff.email,
+        employeeName: staff.name,
+        organizationName: tenant?.name || 'WhereReady Solar OS'
+      }).catch(err => console.warn('Failed to send suspension email:', err.message));
+    }
+
+    await logAudit(req, 'SUSPEND_STAFF', 'Staff', id, {
+      name: staff.name,
+      employeeId: staff.employeeId,
+      reason: reason || 'Suspended by Tenant Administrator'
+    });
+
+    res.json({
+      message: `Employee ${staff.name} (${staff.employeeId}) has been suspended. System login and active sessions are disabled immediately.`,
+      staff: updated
+    });
+  } catch (error) {
+    console.error('Error suspending employee:', error);
+    res.status(500).json({ error: 'Failed to suspend employee' });
+  }
+});
+
+// ----------------------------------------------------
+// 6.2 EXPLICIT EMPLOYEE REACTIVATION (TENANT ADMIN AUTHORITY)
+// ----------------------------------------------------
+router.post('/api/tenant/staff/:id/reactivate', requireTenantAuth, async (req, res) => {
+  try {
+    const tenantId = req.user.tenantId;
+    const { id } = req.params;
+
+    if (req.user.role !== 'TENANT_ADMIN') {
+      return res.status(403).json({ error: 'Only Tenant Administrators have authority to reactivate employees' });
+    }
+
+    const staff = await prisma.staff.findFirst({
+      where: { id, tenantId }
+    });
+    if (!staff) {
+      return res.status(404).json({ error: 'Staff member not found' });
+    }
+
+    const updated = await prisma.staff.update({
+      where: { id },
+      data: { status: 'ACTIVE' }
+    });
+
+    const tenant = await prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { name: true }
+    });
+
+    if (staff.email) {
+      sendAccountReactivated({
+        to: staff.email,
+        employeeName: staff.name,
+        organizationName: tenant?.name || 'WhereReady Solar OS'
+      }).catch(err => console.warn('Failed to send reactivation email:', err.message));
+    }
+
+    await logAudit(req, 'REACTIVATE_STAFF', 'Staff', id, {
+      name: staff.name,
+      employeeId: staff.employeeId
+    });
+
+    res.json({
+      message: `Employee ${staff.name} (${staff.employeeId}) has been reactivated successfully. System login restored.`,
+      staff: updated
+    });
+  } catch (error) {
+    console.error('Error reactivating employee:', error);
+    res.status(500).json({ error: 'Failed to reactivate employee' });
+  }
+});
+
+// ----------------------------------------------------
+// 6.3 RESEND LOGIN CREDENTIALS TO EMPLOYEE EMAIL
+// ----------------------------------------------------
+router.post('/api/tenant/staff/:id/resend-credentials', requireTenantAuth, async (req, res) => {
+  try {
+    const tenantId = req.user.tenantId;
+    const { id } = req.params;
+
+    if (req.user.role !== 'TENANT_ADMIN') {
+      return res.status(403).json({ error: 'Only Tenant Administrators can resend login credentials' });
+    }
+
+    const staff = await prisma.staff.findFirst({
+      where: { id, tenantId },
+      include: { user: true }
+    });
+    if (!staff) {
+      return res.status(404).json({ error: 'Staff member not found' });
+    }
+
+    if (!staff.email) {
+      return res.status(400).json({ error: 'Staff member has no work email configured. Please update their profile with an email address.' });
+    }
+
+    const tenant = await prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { name: true }
+    });
+
+    const tempPassword = `Solar@${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
+    const hashedPassword = await bcrypt.hash(tempPassword, 10);
+
+    let targetUserId = staff.userId;
+    if (!targetUserId) {
+      // Create user account if not exists
+      const newUser = await prisma.user.create({
+        data: {
+          name: staff.name,
+          email: staff.email.toLowerCase(),
+          password: hashedPassword,
+          role: 'TENANT_SUB_ADMIN',
+          tenantId,
+          mustChangePassword: true,
+          permissions: {
+            modules: ['leads', 'projects', 'surveys']
+          }
+        }
+      });
+      await prisma.staff.update({
+        where: { id: staff.id },
+        data: { userId: newUser.id }
+      });
+      targetUserId = newUser.id;
+    } else {
+      await prisma.user.update({
+        where: { id: targetUserId },
+        data: {
+          password: hashedPassword,
+          mustChangePassword: true
+        }
+      });
+    }
+
+    const mailRes = await sendEmployeeCredentials({
+      to: staff.email,
+      employeeName: staff.name,
+      employeeId: staff.employeeId,
+      email: staff.email,
+      password: tempPassword,
+      role: 'TENANT_SUB_ADMIN',
+      organizationName: tenant?.name || 'WhereReady Solar OS'
+    });
+
+    await logAudit(req, 'RESEND_CREDENTIALS', 'Staff', id, {
+      email: staff.email,
+      emailSent: mailRes.sent
+    });
+
+    res.json({
+      message: mailRes.sent 
+        ? `Login credentials successfully dispatched to ${staff.email}`
+        : 'Credentials regenerated, but email could not be delivered.',
+      tempPassword,
+      emailSent: mailRes.sent,
+      emailError: mailRes.error
+    });
+  } catch (error) {
+    console.error('Error resending credentials:', error);
+    res.status(500).json({ error: 'Failed to resend credentials' });
+  }
+});
+
+// ----------------------------------------------------
+// 7. CREATE / RESET USER ACCOUNT FOR EXISTING STAFF (WITH EMAIL)
 // ----------------------------------------------------
 router.post('/api/tenant/staff/:id/account', requireTenantAuth, async (req, res) => {
   try {
@@ -711,7 +963,12 @@ router.post('/api/tenant/staff/:id/account', requireTenantAuth, async (req, res)
     const tempPassword = `Solar@${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
     const hashedPassword = await bcrypt.hash(tempPassword, 10);
 
-    // If staff already has a linked User account, reset its password
+    const tenant = await prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { name: true }
+    });
+
+    // If staff already has a linked User account, reset its password and email them
     if (staff.user) {
       await prisma.user.update({
         where: { id: staff.user.id },
@@ -725,9 +982,23 @@ router.post('/api/tenant/staff/:id/account', requireTenantAuth, async (req, res)
 
       await logAudit(req, 'RESET_PASSWORD', 'User', staff.user.id, { staffId: staff.id });
 
+      let emailSent = false;
+      if (staff.email) {
+        const mailRes = await sendPasswordReset({
+          to: staff.email,
+          employeeName: staff.name,
+          password: tempPassword,
+          organizationName: tenant?.name || 'WhereReady Solar OS'
+        });
+        emailSent = mailRes.sent;
+      }
+
       return res.json({
-        message: 'Password reset successfully',
+        message: emailSent
+          ? `Password reset successfully. New temporary password sent to ${staff.email}.`
+          : 'Password reset successfully',
         tempPassword,
+        emailSent,
         account: { id: staff.user.id, email: staff.user.email, role }
       });
     }
@@ -771,9 +1042,26 @@ router.post('/api/tenant/staff/:id/account', requireTenantAuth, async (req, res)
 
     await logAudit(req, 'INVITE_USER', 'User', newUser.id, { staffId: staff.id });
 
+    let emailSent = false;
+    if (staff.email) {
+      const mailRes = await sendEmployeeCredentials({
+        to: staff.email,
+        employeeName: staff.name,
+        employeeId: staff.employeeId,
+        email: staff.email,
+        password: tempPassword,
+        role: newUser.role,
+        organizationName: tenant?.name || 'WhereReady Solar OS'
+      });
+      emailSent = mailRes.sent;
+    }
+
     res.status(201).json({
-      message: 'System login account created successfully',
+      message: emailSent
+        ? `System login account created. Login credentials sent to ${staff.email}.`
+        : 'System login account created successfully',
       tempPassword,
+      emailSent,
       account: {
         id: newUser.id,
         email: newUser.email,
@@ -838,65 +1126,309 @@ router.delete('/api/tenant/staff/:id/account', requireTenantAuth, async (req, re
 });
 
 // ----------------------------------------------------
-// 9. DELETE / DEACTIVATE STAFF MEMBER (SAFE LIFECYCLE)
+// 9. DELETE EMPLOYEE WITH FULL TENANT ADMIN AUTHORITY & REASSIGNMENT
 // ----------------------------------------------------
 router.delete('/api/tenant/staff/:id', requireTenantAuth, async (req, res) => {
   try {
     const tenantId = req.user.tenantId;
     const { id } = req.params;
+    const reassignTo = req.body?.reassignTo || req.query?.reassignTo;
+    const force = req.body?.force === true || req.query?.force === 'true';
 
     if (req.user.role !== 'TENANT_ADMIN') {
-      return res.status(403).json({ error: 'Only Tenant Administrators can remove staff members' });
+      return res.status(403).json({ error: 'Only Tenant Administrators have authority to delete employees' });
     }
 
     const staff = await prisma.staff.findFirst({
       where: { id, tenantId },
       include: {
-        _count: { select: { projectAssignments: true, directReports: true } }
+        user: true,
+        projectAssignments: { where: { status: 'ACTIVE' } },
+        directReports: true
       }
     });
     if (!staff) {
       return res.status(404).json({ error: 'Staff member not found' });
     }
 
-    // Prevent deleting yourself
+    // Prevent deleting your own administrative profile
     if (staff.userId && staff.userId === req.user.userId) {
-      return res.status(400).json({ error: 'Cannot remove your own staff account' });
+      return res.status(400).json({ error: 'Cannot delete your own administrative account' });
     }
 
-    // If staff has active project assignments or direct reports, archive as INACTIVE rather than hard delete
-    if (staff._count.projectAssignments > 0 || staff._count.directReports > 0) {
-      await prisma.staff.update({
-        where: { id },
-        data: { status: 'INACTIVE' }
-      });
+    const activeAssignmentsCount = staff.projectAssignments.length;
+    const directReportsCount = staff.directReports.length;
 
-      await logAudit(req, 'DEACTIVATE', 'Staff', id, {
-        reason: 'Archived due to existing project or reporting dependencies'
-      });
-
-      return res.json({
-        message: 'Staff member deactivated and archived. Project and reporting history preserved.',
-        action: 'ARCHIVED'
+    // If staff has active responsibilities and no reassignment or force is specified, notify admin
+    if ((activeAssignmentsCount > 0 || directReportsCount > 0) && !reassignTo && !force) {
+      return res.status(400).json({
+        error: 'Employee has active assignments or direct reports. Please select a colleague to reassign responsibilities, or confirm forced deletion.',
+        requiresReassignment: true,
+        dependencies: {
+          activeProjects: activeAssignmentsCount,
+          directReports: directReportsCount
+        }
       });
     }
 
-    // If clean, safely delete
-    await prisma.staff.delete({
-      where: { id }
+    // Reassignment workflow
+    if (reassignTo) {
+      const targetStaff = await prisma.staff.findFirst({
+        where: { id: reassignTo, tenantId },
+        include: { user: true }
+      });
+      if (!targetStaff) {
+        return res.status(400).json({ error: 'Reassignment target colleague was not found in your organization' });
+      }
+
+      // Reassign project assignments
+      for (const assignment of staff.projectAssignments) {
+        await prisma.projectStaffAssignment.upsert({
+          where: { staffId_projectId: { staffId: targetStaff.id, projectId: assignment.projectId } },
+          update: { role: assignment.role, status: 'ACTIVE' },
+          create: {
+            tenantId,
+            staffId: targetStaff.id,
+            projectId: assignment.projectId,
+            role: assignment.role,
+            status: 'ACTIVE'
+          }
+        });
+      }
+
+      // Reassign direct reports
+      await prisma.staff.updateMany({
+        where: { managerId: staff.id, tenantId },
+        data: { managerId: targetStaff.id }
+      });
+
+      // Reassign User-linked items if both users exist
+      if (staff.userId && targetStaff.userId) {
+        await prisma.lead.updateMany({
+          where: { assigneeId: staff.userId, tenantId },
+          data: { assigneeId: targetStaff.userId }
+        });
+        await prisma.projectTask.updateMany({
+          where: { assigneeId: staff.userId },
+          data: { assigneeId: targetStaff.userId }
+        });
+        await prisma.supportTicket.updateMany({
+          where: { assigneeId: staff.userId, tenantId },
+          data: { assigneeId: targetStaff.userId }
+        });
+        await prisma.siteSurvey.updateMany({
+          where: { surveyorId: staff.userId, tenantId },
+          data: { surveyorId: targetStaff.userId }
+        });
+      }
+    }
+
+    // Delete staff project assignments
+    await prisma.projectStaffAssignment.deleteMany({
+      where: { staffId: staff.id }
     });
 
-    // Also delete orphaned user account if exists
-    if (staff.userId) {
-      await prisma.user.delete({ where: { id: staff.userId } }).catch(() => null);
+    // Unlink any direct reports if not already reassigned
+    await prisma.staff.updateMany({
+      where: { managerId: staff.id, tenantId },
+      data: { managerId: null }
+    });
+
+    const staffUserId = staff.userId;
+
+    // Delete the Staff record
+    await prisma.staff.delete({
+      where: { id: staff.id }
+    });
+
+    // Delete linked User auth account if exists
+    if (staffUserId) {
+      await prisma.user.delete({
+        where: { id: staffUserId }
+      }).catch(err => console.warn('Could not delete user auth record:', err.message));
     }
 
-    await logAudit(req, 'DELETE', 'Staff', id, { name: staff.name, employeeId: staff.employeeId });
+    await logAudit(req, 'DELETE_STAFF', 'Staff', id, {
+      name: staff.name,
+      employeeId: staff.employeeId,
+      reassignedTo: reassignTo || null,
+      hadUserAccount: !!staffUserId
+    });
 
-    res.json({ message: 'Staff member removed successfully', action: 'DELETED' });
+    res.json({
+      message: `Employee ${staff.name} (${staff.employeeId}) has been completely deleted${reassignTo ? ' and all responsibilities were successfully transferred' : ''}.`,
+      action: 'DELETED'
+    });
   } catch (error) {
-    console.error('Error removing staff member:', error);
-    res.status(500).json({ error: 'Failed to remove staff member' });
+    console.error('Error deleting staff member:', error);
+    res.status(500).json({ error: 'Failed to delete staff member' });
+  }
+});
+
+// ----------------------------------------------------
+// 9.1 EMPLOYEE ACTIVITY AUDIT & WORKFORCE VISIBILITY (TENANT ADMIN FULL CONTROL)
+// ----------------------------------------------------
+router.get('/api/tenant/staff/:id/activity', requireTenantAuth, async (req, res) => {
+  try {
+    const tenantId = req.user.tenantId;
+    const { id } = req.params;
+
+    const staff = await prisma.staff.findFirst({
+      where: { id, tenantId },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            role: true,
+            mustChangePassword: true,
+            createdAt: true,
+            updatedAt: true,
+            permissions: true
+          }
+        },
+        projectAssignments: {
+          include: {
+            project: { select: { id: true, name: true, projectNumber: true, currentStage: true, status: true, capacity: true } }
+          },
+          orderBy: { assignedAt: 'desc' }
+        }
+      }
+    });
+
+    if (!staff) {
+      return res.status(404).json({ error: 'Staff member not found' });
+    }
+
+    // 1. Audit logs: actions on this staff or by this staff
+    const auditWhere = {
+      tenantId,
+      OR: [
+        { entityId: staff.id },
+        { entity: 'Staff', entityId: staff.id }
+      ]
+    };
+    if (staff.userId) {
+      auditWhere.OR.push({ actorId: staff.userId });
+      auditWhere.OR.push({ entityId: staff.userId });
+    }
+
+    const auditLogs = await prisma.auditLog.findMany({
+      where: auditWhere,
+      orderBy: { createdAt: 'desc' },
+      take: 40
+    });
+
+    // 2. Lead Activities performed by this staff member
+    let leadActivities = [];
+    if (staff.userId) {
+      leadActivities = await prisma.leadActivity.findMany({
+        where: { performedBy: staff.userId },
+        include: {
+          lead: { select: { id: true, name: true, leadNumber: true, status: true, city: true } }
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 20
+      });
+    }
+
+    // 3. Leads currently assigned
+    let assignedLeads = [];
+    if (staff.userId) {
+      assignedLeads = await prisma.lead.findMany({
+        where: { assigneeId: staff.userId, tenantId },
+        select: { id: true, name: true, leadNumber: true, status: true, estimatedCap: true, createdAt: true, updatedAt: true },
+        orderBy: { updatedAt: 'desc' },
+        take: 10
+      });
+    }
+
+    // 4. Tasks currently assigned
+    let assignedTasks = [];
+    if (staff.userId) {
+      assignedTasks = await prisma.projectTask.findMany({
+        where: { assigneeId: staff.userId },
+        include: {
+          project: { select: { id: true, name: true, projectNumber: true } }
+        },
+        orderBy: { updatedAt: 'desc' },
+        take: 15
+      });
+    }
+
+    // 5. Build Unified Chronological Feed
+    const events = [];
+
+    // Audit Log Events
+    auditLogs.forEach(log => {
+      const isActor = staff.userId && log.actorId === staff.userId;
+      events.push({
+        id: `audit-${log.id}`,
+        timestamp: log.createdAt,
+        type: isActor ? 'EMPLOYEE_ACTION' : 'ADMIN_ACTION',
+        category: log.entity,
+        title: isActor ? `Performed ${log.action} on ${log.entity}` : `Administrative: ${log.action}`,
+        description: log.details?.reason || log.details?.name || (typeof log.details === 'string' ? log.details : JSON.stringify(log.details || {})),
+        actor: isActor ? staff.name : 'Organization Administrator',
+        ipAddress: log.ipAddress,
+        raw: log
+      });
+    });
+
+    // Lead Activities
+    leadActivities.forEach(la => {
+      events.push({
+        id: `lead-act-${la.id}`,
+        timestamp: la.createdAt,
+        type: 'EMPLOYEE_ACTION',
+        category: 'CRM_LEAD',
+        title: `Updated Lead ${la.lead?.leadNumber || la.lead?.name || ''}`,
+        description: `${la.type}: ${la.description}`,
+        actor: staff.name,
+        target: la.lead ? { id: la.lead.id, name: la.lead.name, leadNumber: la.lead.leadNumber } : null
+      });
+    });
+
+    // Project Assignments
+    staff.projectAssignments.forEach(pa => {
+      events.push({
+        id: `pa-${pa.id}`,
+        timestamp: pa.assignedAt,
+        type: 'PROJECT_ASSIGNMENT',
+        category: 'PROJECTS',
+        title: `Assigned to ${pa.project?.name || 'Solar Project'} (${pa.role})`,
+        description: `Project Number: ${pa.project?.projectNumber || 'N/A'} | Status: ${pa.status}${pa.notes ? ` | Notes: ${pa.notes}` : ''}`,
+        actor: 'Management',
+        target: pa.project
+      });
+    });
+
+    // Sort descending by timestamp
+    events.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+    res.json({
+      staff: {
+        id: staff.id,
+        name: staff.name,
+        employeeId: staff.employeeId,
+        department: staff.department,
+        designation: staff.designation,
+        status: staff.status,
+        user: staff.user
+      },
+      stats: {
+        totalEvents: events.length,
+        activeProjects: staff.projectAssignments.filter(p => p.status === 'ACTIVE').length,
+        assignedLeadsCount: assignedLeads.length,
+        assignedTasksCount: assignedTasks.length
+      },
+      events: events.slice(0, 50),
+      assignedLeads,
+      assignedTasks
+    });
+  } catch (error) {
+    console.error('Error fetching staff activity:', error);
+    res.status(500).json({ error: 'Failed to fetch employee activity' });
   }
 });
 

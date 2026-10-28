@@ -4,6 +4,7 @@ const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const prisma = require('../../db');
 const { requireTenantAuth } = require('../../middleware/auth');
+const { sendEmployeeCredentials, sendPasswordReset } = require('../../services/emailService');
 
 // ----------------------------------------------------
 // USERS & RBAC PERMISSIONS (TENANT)
@@ -137,8 +138,30 @@ router.post('/api/tenant/users/invite', requireTenantAuth, async (req, res) => {
       }
     }).catch(() => null);
 
+    // Send credentials email to employee/user
+    let emailSent = false;
+    try {
+      const tenant = await prisma.tenant.findUnique({
+        where: { id: req.user.tenantId },
+        select: { name: true }
+      });
+      const mailRes = await sendEmployeeCredentials({
+        to: newUser.email,
+        employeeName: newUser.name,
+        email: newUser.email,
+        password: tempPassword,
+        role: newUser.role,
+        organizationName: tenant?.name || 'WhereReady Solar OS'
+      });
+      emailSent = mailRes.sent;
+    } catch (mailErr) {
+      console.warn('[Email] Failed to send user invite email:', mailErr.message);
+    }
+
     res.status(201).json({
-      message: 'User invited successfully',
+      message: emailSent
+        ? `User invited successfully. Login credentials sent to ${newUser.email}.`
+        : 'User invited successfully',
       user: {
         id: newUser.id,
         name: newUser.name,
@@ -147,7 +170,8 @@ router.post('/api/tenant/users/invite', requireTenantAuth, async (req, res) => {
         department: department || 'Operations',
         status: 'INVITED'
       },
-      tempPassword
+      tempPassword,
+      emailSent
     });
   } catch (error) {
     console.error('Error inviting user:', error);
@@ -199,7 +223,30 @@ router.post('/api/tenant/users/:id/reset-password', requireTenantAuth, async (re
       data: { password: hashedPassword, mustChangePassword: true }
     });
 
-    res.json({ message: 'Password reset successfully', tempPassword });
+    let emailSent = false;
+    try {
+      const tenant = await prisma.tenant.findUnique({
+        where: { id: req.user.tenantId },
+        select: { name: true }
+      });
+      const mailRes = await sendPasswordReset({
+        to: user.email,
+        employeeName: user.name,
+        password: tempPassword,
+        organizationName: tenant?.name || 'WhereReady Solar OS'
+      });
+      emailSent = mailRes.sent;
+    } catch (mailErr) {
+      console.warn('[Email] Failed to send password reset email:', mailErr.message);
+    }
+
+    res.json({
+      message: emailSent
+        ? `Password reset successfully. New temporary password sent to ${user.email}.`
+        : 'Password reset successfully',
+      tempPassword,
+      emailSent
+    });
   } catch (error) {
     console.error('Error resetting password:', error);
     res.status(500).json({ error: 'Failed to reset password' });

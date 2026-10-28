@@ -94,7 +94,7 @@ interface StaffMember {
   department: string;
   designation: string;
   employmentType: "FULL_TIME" | "PART_TIME" | "CONTRACT" | "INTERN";
-  status: "ACTIVE" | "ON_LEAVE" | "INACTIVE" | "PROBATION";
+  status: "ACTIVE" | "ON_LEAVE" | "INACTIVE" | "PROBATION" | "SUSPENDED";
   joiningDate?: string | null;
   workLocation?: string | null;
   skills: string[];
@@ -248,10 +248,22 @@ export default function StaffPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingStaff, setEditingStaff] = useState<StaffMember | null>(null);
   const [selectedStaffProfile, setSelectedStaffProfile] = useState<StaffMember | null>(null);
+  const [profileTab, setProfileTab] = useState<"details" | "activity">("details");
+  const [staffActivity, setStaffActivity] = useState<any | null>(null);
+  const [activityLoading, setActivityLoading] = useState(false);
   const [profileAuditLogs, setProfileAuditLogs] = useState<any[]>([]);
   const [profileLoading, setProfileLoading] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState<{ staff: StaffMember } | null>(null);
   const [showDeptModal, setShowDeptModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState<{
+    staff: StaffMember;
+    reassignTo: string;
+    force: boolean;
+  } | null>(null);
+  const [showSuspendModal, setShowSuspendModal] = useState<{
+    staff: StaffMember;
+    reason: string;
+  } | null>(null);
   const [tempPasswordModal, setTempPasswordModal] = useState<{ user: string; pass: string } | null>(null);
   const [copied, setCopied] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
@@ -267,7 +279,7 @@ export default function StaffPage() {
     department: "Project Execution & Installation",
     designation: "Solar Technician",
     employmentType: "FULL_TIME" as "FULL_TIME" | "PART_TIME" | "CONTRACT" | "INTERN",
-    status: "ACTIVE" as "ACTIVE" | "ON_LEAVE" | "INACTIVE" | "PROBATION",
+    status: "ACTIVE" as "ACTIVE" | "ON_LEAVE" | "INACTIVE" | "PROBATION" | "SUSPENDED",
     joiningDate: new Date().toISOString().split("T")[0],
     workLocation: "Field Deployment Sites",
     skills: [] as string[],
@@ -418,13 +430,28 @@ export default function StaffPage() {
   const handleOpenProfile = async (staffId: string) => {
     try {
       setProfileLoading(true);
+      setProfileTab("details");
       const res = await axios.get(`${API}/api/tenant/staff/${staffId}`, { withCredentials: true });
       setSelectedStaffProfile(res.data.member || null);
       setProfileAuditLogs(res.data.auditLogs || []);
+      fetchStaffActivity(staffId);
     } catch (err: any) {
       setFeedbackMsg({ type: "error", text: err.response?.data?.error || "Failed to load staff profile" });
     } finally {
       setProfileLoading(false);
+    }
+  };
+
+  // Fetch full employee activity and audit timeline
+  const fetchStaffActivity = async (staffId: string) => {
+    try {
+      setActivityLoading(true);
+      const res = await axios.get(`${API}/api/tenant/staff/${staffId}/activity`, { withCredentials: true });
+      setStaffActivity(res.data);
+    } catch (err: any) {
+      console.warn("Failed to load employee activity:", err.message);
+    } finally {
+      setActivityLoading(false);
     }
   };
 
@@ -599,7 +626,7 @@ export default function StaffPage() {
     }
   };
 
-  // Toggle Staff Status (Active / On Leave / Inactive)
+  // Toggle Staff Status (Active / On Leave / Inactive / Suspended)
   const handleQuickStatusChange = async (staffId: string, newStatus: string) => {
     try {
       setActionLoading(true);
@@ -609,12 +636,7 @@ export default function StaffPage() {
         { withCredentials: true }
       );
 
-      if (res.data.warnings && res.data.warnings.length > 0) {
-        setFeedbackMsg({ type: "success", text: `Status changed to ${newStatus}. Note: ${res.data.warnings[0]}` });
-      } else {
-        setFeedbackMsg({ type: "success", text: `Staff status updated to ${newStatus}` });
-      }
-
+      setFeedbackMsg({ type: "success", text: `Staff status updated to ${newStatus}` });
       fetchStaff();
       fetchOverview();
       if (selectedStaffProfile?.id === staffId) {
@@ -627,15 +649,95 @@ export default function StaffPage() {
     }
   };
 
-  // Create or Reset System Password
+  // Suspend employee access immediately
+  const handleSuspendStaff = async (staff: StaffMember, reason?: string) => {
+    try {
+      setActionLoading(true);
+      const res = await axios.post(
+        `${API}/api/tenant/staff/${staff.id}/suspend`,
+        { reason: reason || "Administrative suspension" },
+        { withCredentials: true }
+      );
+      setFeedbackMsg({ type: "success", text: res.data?.message || `Employee ${staff.name} suspended.` });
+      setShowSuspendModal(null);
+      fetchStaff();
+      fetchOverview();
+      fetchUsers();
+      if (selectedStaffProfile?.id === staff.id) {
+        handleOpenProfile(staff.id);
+      }
+    } catch (err: any) {
+      setFeedbackMsg({ type: "error", text: err.response?.data?.error || "Failed to suspend employee" });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Reactivate employee access
+  const handleReactivateStaff = async (staff: StaffMember) => {
+    try {
+      setActionLoading(true);
+      const res = await axios.post(
+        `${API}/api/tenant/staff/${staff.id}/reactivate`,
+        {},
+        { withCredentials: true }
+      );
+      setFeedbackMsg({ type: "success", text: res.data?.message || `Employee ${staff.name} reactivated.` });
+      fetchStaff();
+      fetchOverview();
+      fetchUsers();
+      if (selectedStaffProfile?.id === staff.id) {
+        handleOpenProfile(staff.id);
+      }
+    } catch (err: any) {
+      setFeedbackMsg({ type: "error", text: err.response?.data?.error || "Failed to reactivate employee" });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Resend login credentials directly to employee's email
+  const handleResendCredentials = async (staff: StaffMember) => {
+    if (!staff.email) {
+      setFeedbackMsg({ type: "error", text: "Please update this staff member with a work email before sending login credentials." });
+      return;
+    }
+    try {
+      setActionLoading(true);
+      const res = await axios.post(
+        `${API}/api/tenant/staff/${staff.id}/resend-credentials`,
+        {},
+        { withCredentials: true }
+      );
+      if (res.data?.tempPassword) {
+        setTempPasswordModal({
+          user: staff.email,
+          pass: res.data.tempPassword
+        });
+      }
+      setFeedbackMsg({ type: "success", text: res.data?.message || `Login credentials dispatched to ${staff.email}` });
+      fetchStaff();
+      fetchOverview();
+      fetchUsers();
+      if (selectedStaffProfile?.id === staff.id) {
+        handleOpenProfile(staff.id);
+      }
+    } catch (err: any) {
+      setFeedbackMsg({ type: "error", text: err.response?.data?.error || "Failed to send credentials" });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Create or Reset System Password (with email dispatch)
   const handleAccountCredentials = async (staff: StaffMember) => {
     if (!staff.email) {
       alert("Please update this staff member with a work email before provisioning a login account.");
       return;
     }
 
-    const actionText = staff.userId ? "Reset password" : "Provision system login";
-    if (!confirm(`${actionText} for ${staff.name} (${staff.email})?`)) return;
+    const actionText = staff.userId ? "Reset password and email new temporary credentials" : "Provision system login and email credentials";
+    if (!confirm(`${actionText} to ${staff.name} (${staff.email})?`)) return;
 
     try {
       setActionLoading(true);
@@ -651,7 +753,7 @@ export default function StaffPage() {
           pass: res.data.tempPassword
         });
       }
-      setFeedbackMsg({ type: "success", text: res.data?.message || "Account updated" });
+      setFeedbackMsg({ type: "success", text: res.data?.message || "Account updated and credentials emailed." });
       fetchStaff();
       fetchOverview();
       fetchUsers();
@@ -686,19 +788,29 @@ export default function StaffPage() {
     }
   };
 
-  // Safe Staff Deletion or Archival
-  const handleDeleteStaff = async (staff: StaffMember) => {
-    const promptMsg = staff.projectAssignments && staff.projectAssignments.length > 0
-      ? `Staff member ${staff.name} has active project assignments. Removing them will safely archive their record as INACTIVE to protect historical data. Continue?`
-      : `Are you sure you want to remove staff member ${staff.name}?`;
+  // Open safe Delete & Reassignment Modal
+  const handleDeleteStaff = (staff: StaffMember) => {
+    setShowDeleteModal({
+      staff,
+      reassignTo: "",
+      force: false
+    });
+  };
 
-    if (!confirm(promptMsg)) return;
-
+  // Execute Deletion with Reassignment or Force
+  const handleExecuteDeleteStaff = async (staffId: string, reassignTo?: string, force?: boolean) => {
     try {
       setActionLoading(true);
-      const res = await axios.delete(`${API}/api/tenant/staff/${staff.id}`, { withCredentials: true });
-      setFeedbackMsg({ type: "success", text: res.data?.message || "Staff removed" });
-      if (selectedStaffProfile?.id === staff.id) {
+      const res = await axios.delete(
+        `${API}/api/tenant/staff/${staffId}`,
+        {
+          data: { reassignTo: reassignTo || undefined, force: !!force },
+          withCredentials: true
+        }
+      );
+      setFeedbackMsg({ type: "success", text: res.data?.message || "Staff member removed successfully." });
+      setShowDeleteModal(null);
+      if (selectedStaffProfile?.id === staffId) {
         setSelectedStaffProfile(null);
       }
       fetchStaff();
@@ -1012,6 +1124,8 @@ export default function StaffPage() {
         return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200/60"><Clock size={12} className="text-amber-500" /> On Leave</span>;
       case "PROBATION":
         return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200/60"><Sparkles size={12} className="text-purple-500" /> Probation</span>;
+      case "SUSPENDED":
+        return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200/80"><ShieldAlert size={12} className="text-rose-600" /> Suspended</span>;
       case "INACTIVE":
       default:
         return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 border border-slate-200"><UserX size={12} /> Inactive</span>;
@@ -1770,7 +1884,7 @@ export default function StaffPage() {
                             <button
                               onClick={() => handleOpenProfile(member.id)}
                               className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
-                              title="View Full Profile"
+                              title="View Full Profile & Activity"
                             >
                               <Eye size={15} />
                             </button>
@@ -1791,18 +1905,38 @@ export default function StaffPage() {
                               <Briefcase size={15} />
                             </button>
 
-                            <button
-                              onClick={() => handleAccountCredentials(member)}
-                              className="p-1.5 rounded-lg text-slate-400 hover:text-purple-600 hover:bg-purple-50 transition-colors"
-                              title={member.userId ? "Reset Password" : "Provision Login"}
-                            >
-                              <Key size={15} />
-                            </button>
+                            {member.email && (
+                              <button
+                                onClick={() => handleResendCredentials(member)}
+                                className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                                title="Send Login Credentials to Email"
+                              >
+                                <Mail size={15} />
+                              </button>
+                            )}
+
+                            {member.status === "SUSPENDED" ? (
+                              <button
+                                onClick={() => handleReactivateStaff(member)}
+                                className="p-1.5 rounded-lg text-emerald-600 hover:bg-emerald-50 transition-colors"
+                                title="Reactivate Employee Access"
+                              >
+                                <ShieldCheck size={15} />
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => setShowSuspendModal({ staff: member, reason: "" })}
+                                className="p-1.5 rounded-lg text-slate-400 hover:text-amber-600 hover:bg-amber-50 transition-colors"
+                                title="Suspend Employee Access"
+                              >
+                                <ShieldAlert size={15} />
+                              </button>
+                            )}
 
                             <button
                               onClick={() => handleDeleteStaff(member)}
                               className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
-                              title="Remove or Archive"
+                              title="Delete & Reassign Employee"
                             >
                               <Trash2 size={15} />
                             </button>
@@ -1876,8 +2010,33 @@ export default function StaffPage() {
                         <button
                           onClick={() => handleOpenEditModal(member)}
                           className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100"
+                          title="Edit Details"
                         >
                           <Edit3 size={14} />
+                        </button>
+                        {member.status === "SUSPENDED" ? (
+                          <button
+                            onClick={() => handleReactivateStaff(member)}
+                            className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg"
+                            title="Reactivate Employee"
+                          >
+                            <ShieldCheck size={14} />
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => setShowSuspendModal({ staff: member, reason: "" })}
+                            className="p-1.5 text-amber-600 hover:bg-amber-50 rounded-lg"
+                            title="Suspend Employee"
+                          >
+                            <ShieldAlert size={14} />
+                          </button>
+                        )}
+                        <button
+                          onClick={() => handleDeleteStaff(member)}
+                          className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg"
+                          title="Delete Employee"
+                        >
+                          <Trash2 size={14} />
                         </button>
                       </div>
                     </div>
@@ -2730,202 +2889,506 @@ export default function StaffPage() {
               </button>
             </div>
 
+            {/* Profile Drawer Sub-Tabs */}
+            <div className="flex border-b border-slate-200 bg-slate-50 px-6 gap-6 text-xs font-bold">
+              <button
+                onClick={() => setProfileTab("details")}
+                className={`py-3 flex items-center gap-1.5 border-b-2 transition-colors ${
+                  profileTab === "details"
+                    ? "border-slate-900 text-slate-900"
+                    : "border-transparent text-slate-500 hover:text-slate-800"
+                }`}
+              >
+                <FileText size={14} /> Employment & Record
+              </button>
+              <button
+                onClick={() => {
+                  setProfileTab("activity");
+                  if (selectedStaffProfile) fetchStaffActivity(selectedStaffProfile.id);
+                }}
+                className={`py-3 flex items-center gap-1.5 border-b-2 transition-colors ${
+                  profileTab === "activity"
+                    ? "border-slate-900 text-slate-900"
+                    : "border-transparent text-slate-500 hover:text-slate-800"
+                }`}
+              >
+                <Clock size={14} /> Employee Activity & Audit Trail
+                {staffActivity?.stats?.totalEvents !== undefined && (
+                  <span className="px-1.5 py-0.2 rounded-full bg-slate-200 text-slate-700 text-[10px]">
+                    {staffActivity.stats.totalEvents}
+                  </span>
+                )}
+              </button>
+            </div>
+
             {/* Profile Content */}
             <div className="p-6 space-y-5 max-h-[70vh] overflow-y-auto custom-scrollbar">
-              {/* Contact & Status Bar */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-200/80 text-xs">
-                <div>
-                  <span className="text-[11px] text-slate-400 block font-semibold">Status:</span>
-                  <div className="mt-1">{getStatusBadge(selectedStaffProfile.status)}</div>
-                </div>
-                <div>
-                  <span className="text-[11px] text-slate-400 block font-semibold">Phone:</span>
-                  <p className="font-bold text-slate-800 mt-1">{selectedStaffProfile.phone || "Not set"}</p>
-                </div>
-                <div>
-                  <span className="text-[11px] text-slate-400 block font-semibold">Work Email:</span>
-                  <p className="font-bold text-slate-800 mt-1 truncate">{selectedStaffProfile.email || "Not set"}</p>
-                </div>
-                <div>
-                  <span className="text-[11px] text-slate-400 block font-semibold">Joined:</span>
-                  <p className="font-bold text-slate-800 mt-1">
-                    {selectedStaffProfile.joiningDate ? selectedStaffProfile.joiningDate.split("T")[0] : "Recent"}
-                  </p>
-                </div>
-              </div>
-
-              {/* Hierarchy & Location */}
-              <div className="space-y-2">
-                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Workforce Context</h4>
-                <div className="p-4 rounded-2xl border border-slate-200/80 space-y-2 text-xs">
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-500">Reporting Line:</span>
-                    <span className="font-bold text-slate-800">
-                      {selectedStaffProfile.manager ? `${selectedStaffProfile.manager.name} (${selectedStaffProfile.manager.designation})` : "Direct Executive Level"}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-500">Assigned Team:</span>
-                    <span className="font-bold text-slate-800">{selectedStaffProfile.team || "General Pool"}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-500">Operating Region:</span>
-                    <span className="font-bold text-slate-800">{selectedStaffProfile.workLocation || "Field Sites"}</span>
-                  </div>
-                  {selectedStaffProfile.emergencyContact && (
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-500">Emergency Contact:</span>
-                      <span className="font-bold text-slate-800">{selectedStaffProfile.emergencyContact}</span>
+              {profileTab === "details" ? (
+                <>
+                  {/* Contact & Status Bar */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-200/80 text-xs">
+                    <div>
+                      <span className="text-[11px] text-slate-400 block font-semibold">Status:</span>
+                      <div className="mt-1">{getStatusBadge(selectedStaffProfile.status)}</div>
                     </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Skills & Certifications */}
-              {selectedStaffProfile.skills && selectedStaffProfile.skills.length > 0 && (
-                <div className="space-y-2">
-                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Skills & Certifications</h4>
-                  <div className="flex flex-wrap gap-1.5">
-                    {selectedStaffProfile.skills.map(skill => (
-                      <span key={skill} className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 text-slate-800 border border-slate-200">
-                        {skill}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Active Project Assignments */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-                    Assigned Solar Projects ({selectedStaffProfile.projectAssignments?.length || 0})
-                  </h4>
-                  <button
-                    onClick={() => {
-                      setShowAssignModal({ staff: selectedStaffProfile });
-                    }}
-                    className="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1"
-                  >
-                    <Plus size={13} /> Assign to Project
-                  </button>
-                </div>
-
-                <div className="space-y-2">
-                  {selectedStaffProfile.projectAssignments && selectedStaffProfile.projectAssignments.length > 0 ? (
-                    selectedStaffProfile.projectAssignments.map(pa => (
-                      <div key={pa.id} className="p-3.5 rounded-xl border border-slate-200 flex items-center justify-between bg-slate-50/50">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="font-bold text-slate-900 text-xs">{pa.project.name}</span>
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-100 text-amber-800">
-                              {pa.role}
-                            </span>
-                          </div>
-                          <p className="text-[11px] text-slate-400 mt-0.5">
-                            Stage: {pa.project.currentStage || "Active"} • Capacity: {pa.project.capacity || 0} kW
-                          </p>
-                        </div>
-                        <button
-                          onClick={() => handleUnassignProject(selectedStaffProfile.id, pa.project.id)}
-                          className="text-xs font-bold text-rose-600 hover:bg-rose-50 px-2 py-1 rounded-lg transition-colors"
-                        >
-                          Release
-                        </button>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="text-xs text-slate-400 italic p-3 border border-dashed border-slate-200 rounded-xl text-center">
-                      Not currently assigned to any active project
+                    <div>
+                      <span className="text-[11px] text-slate-400 block font-semibold">Phone:</span>
+                      <p className="font-bold text-slate-800 mt-1">{selectedStaffProfile.phone || "Not set"}</p>
                     </div>
-                  )}
-                </div>
-              </div>
-
-              {/* System User Account Management */}
-              <div className="space-y-2 pt-2 border-t border-slate-100">
-                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">System Login Account</h4>
-                <div className="p-4 rounded-2xl border border-slate-200/80 bg-slate-50 flex items-center justify-between">
-                  <div>
-                    {selectedStaffProfile.user ? (
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-slate-900 text-xs">{selectedStaffProfile.user.email}</span>
-                          <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-purple-100 text-purple-800">
-                            {selectedStaffProfile.user.role}
-                          </span>
-                        </div>
-                        <p className="text-[11px] text-slate-500 mt-0.5">
-                          {selectedStaffProfile.user.mustChangePassword ? "Pending password setup" : "Active verified user account"}
-                        </p>
-                      </div>
-                    ) : (
-                      <div>
-                        <p className="font-bold text-slate-800 text-xs">No System Login Account</p>
-                        <p className="text-[11px] text-slate-500">Operating as dedicated field staff without application sign-in</p>
-                      </div>
-                    )}
+                    <div>
+                      <span className="text-[11px] text-slate-400 block font-semibold">Work Email:</span>
+                      <p className="font-bold text-slate-800 mt-1 truncate">{selectedStaffProfile.email || "Not set"}</p>
+                    </div>
+                    <div>
+                      <span className="text-[11px] text-slate-400 block font-semibold">Joined:</span>
+                      <p className="font-bold text-slate-800 mt-1">
+                        {selectedStaffProfile.joiningDate ? selectedStaffProfile.joiningDate.split("T")[0] : "Recent"}
+                      </p>
+                    </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => handleAccountCredentials(selectedStaffProfile)}
-                      className="px-3 py-1.5 text-xs font-bold bg-white border border-slate-200 text-slate-800 hover:bg-slate-100 rounded-xl transition-colors shadow-xs"
-                    >
-                      {selectedStaffProfile.user ? "Reset Password" : "Provision Login"}
-                    </button>
-                    {selectedStaffProfile.user && (
-                      <button
-                        onClick={() => handleRevokeAccount(selectedStaffProfile)}
-                        className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-xl transition-colors"
-                        title="Revoke System Access"
-                      >
-                        <UserX size={16} />
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Audit History */}
-              {profileAuditLogs.length > 0 && (
-                <div className="space-y-2 pt-2 border-t border-slate-100">
-                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Recent Activity Audit</h4>
-                  <div className="space-y-1.5">
-                    {profileAuditLogs.map(log => (
-                      <div key={log.id} className="p-2.5 rounded-xl border border-slate-100 bg-slate-50/50 flex items-center justify-between text-xs">
-                        <div>
-                          <span className="font-bold text-slate-800">{log.action}</span>
-                          <span className="text-slate-400 text-[11px] ml-2">by {log.actorId}</span>
-                        </div>
-                        <span className="text-[10px] text-slate-400">
-                          {new Date(log.createdAt).toLocaleDateString()} {new Date(log.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  {/* Hierarchy & Location */}
+                  <div className="space-y-2">
+                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Workforce Context</h4>
+                    <div className="p-4 rounded-2xl border border-slate-200/80 space-y-2 text-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-500">Reporting Line:</span>
+                        <span className="font-bold text-slate-800">
+                          {selectedStaffProfile.manager ? `${selectedStaffProfile.manager.name} (${selectedStaffProfile.manager.designation})` : "Direct Executive Level"}
                         </span>
                       </div>
-                    ))}
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-500">Assigned Team:</span>
+                        <span className="font-bold text-slate-800">{selectedStaffProfile.team || "General Pool"}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-500">Operating Region:</span>
+                        <span className="font-bold text-slate-800">{selectedStaffProfile.workLocation || "Field Sites"}</span>
+                      </div>
+                      {selectedStaffProfile.emergencyContact && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-500">Emergency Contact:</span>
+                          <span className="font-bold text-slate-800">{selectedStaffProfile.emergencyContact}</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
+
+                  {/* Skills & Certifications */}
+                  {selectedStaffProfile.skills && selectedStaffProfile.skills.length > 0 && (
+                    <div className="space-y-2">
+                      <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Skills & Certifications</h4>
+                      <div className="flex flex-wrap gap-1.5">
+                        {selectedStaffProfile.skills.map(skill => (
+                          <span key={skill} className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 text-slate-800 border border-slate-200">
+                            {skill}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Active Project Assignments */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                        Assigned Solar Projects ({selectedStaffProfile.projectAssignments?.length || 0})
+                      </h4>
+                      <button
+                        onClick={() => {
+                          setShowAssignModal({ staff: selectedStaffProfile });
+                        }}
+                        className="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                      >
+                        <Plus size={13} /> Assign to Project
+                      </button>
+                    </div>
+
+                    <div className="space-y-2">
+                      {selectedStaffProfile.projectAssignments && selectedStaffProfile.projectAssignments.length > 0 ? (
+                        selectedStaffProfile.projectAssignments.map(pa => (
+                          <div key={pa.id} className="p-3.5 rounded-xl border border-slate-200 flex items-center justify-between bg-slate-50/50">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-slate-900 text-xs">{pa.project.name}</span>
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-100 text-amber-800">
+                                  {pa.role}
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-slate-400 mt-0.5">
+                                Stage: {pa.project.currentStage || "Active"} • Capacity: {pa.project.capacity || 0} kW
+                              </p>
+                            </div>
+                            <button
+                              onClick={() => handleUnassignProject(selectedStaffProfile.id, pa.project.id)}
+                              className="text-xs font-bold text-rose-600 hover:bg-rose-50 px-2 py-1 rounded-lg transition-colors"
+                            >
+                              Release
+                            </button>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-xs text-slate-400 italic p-3 border border-dashed border-slate-200 rounded-xl text-center">
+                          Not currently assigned to any active project
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* System User Account Management */}
+                  <div className="space-y-2 pt-2 border-t border-slate-100">
+                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">System Login Account</h4>
+                    <div className="p-4 rounded-2xl border border-slate-200/80 bg-slate-50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                      <div>
+                        {selectedStaffProfile.user ? (
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-slate-900 text-xs">{selectedStaffProfile.user.email}</span>
+                              <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-purple-100 text-purple-800">
+                                {selectedStaffProfile.user.role}
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-slate-500 mt-0.5">
+                              {selectedStaffProfile.user.mustChangePassword ? "Pending password setup (temporary credentials active)" : "Active verified user account"}
+                            </p>
+                          </div>
+                        ) : (
+                          <div>
+                            <p className="font-bold text-slate-800 text-xs">No System Login Account</p>
+                            <p className="text-[11px] text-slate-500">Operating as dedicated field staff without application sign-in</p>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {selectedStaffProfile.email && (
+                          <button
+                            onClick={() => handleResendCredentials(selectedStaffProfile)}
+                            className="px-3 py-1.5 text-xs font-bold bg-white border border-slate-200 text-blue-600 hover:bg-blue-50 rounded-xl transition-colors shadow-xs flex items-center gap-1"
+                            title="Send Login Credentials Email"
+                          >
+                            <Mail size={13} /> Send Credentials
+                          </button>
+                        )}
+                        <button
+                          onClick={() => handleAccountCredentials(selectedStaffProfile)}
+                          className="px-3 py-1.5 text-xs font-bold bg-white border border-slate-200 text-slate-800 hover:bg-slate-100 rounded-xl transition-colors shadow-xs"
+                        >
+                          {selectedStaffProfile.user ? "Reset Password" : "Provision Login"}
+                        </button>
+                        {selectedStaffProfile.user && (
+                          <button
+                            onClick={() => handleRevokeAccount(selectedStaffProfile)}
+                            className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-xl transition-colors"
+                            title="Revoke System Access"
+                          >
+                            <UserX size={16} />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                /* LIVE EMPLOYEE ACTIVITY & AUDIT TRAIL TAB */
+                <div className="space-y-4">
+                  {activityLoading ? (
+                    <div className="py-12 text-center space-y-2">
+                      <div className="inline-block animate-spin rounded-full h-7 w-7 border-2 border-slate-900 border-t-transparent" />
+                      <p className="text-xs font-bold text-slate-500">Loading live employee activity...</p>
+                    </div>
+                  ) : (
+                    <>
+                      {/* Activity Stats Summary */}
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                        <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-xl text-center">
+                          <span className="text-[10px] text-slate-400 font-bold uppercase block">Total Logged Events</span>
+                          <span className="text-lg font-extrabold text-slate-900">{staffActivity?.stats?.totalEvents || 0}</span>
+                        </div>
+                        <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-xl text-center">
+                          <span className="text-[10px] text-slate-400 font-bold uppercase block">Active Projects</span>
+                          <span className="text-lg font-extrabold text-emerald-600">{staffActivity?.stats?.activeProjects || 0}</span>
+                        </div>
+                        <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-xl text-center">
+                          <span className="text-[10px] text-slate-400 font-bold uppercase block">Assigned Leads</span>
+                          <span className="text-lg font-extrabold text-blue-600">{staffActivity?.stats?.assignedLeadsCount || 0}</span>
+                        </div>
+                        <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-xl text-center">
+                          <span className="text-[10px] text-slate-400 font-bold uppercase block">Project Tasks</span>
+                          <span className="text-lg font-extrabold text-purple-600">{staffActivity?.stats?.assignedTasksCount || 0}</span>
+                        </div>
+                      </div>
+
+                      {/* Chronological Activity Feed */}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                            Real-Time Activity Feed ({staffActivity?.events?.length || 0})
+                          </h4>
+                          <button
+                            onClick={() => fetchStaffActivity(selectedStaffProfile.id)}
+                            className="text-xs font-bold text-slate-500 hover:text-slate-800 flex items-center gap-1"
+                          >
+                            <RefreshCw size={12} /> Refresh
+                          </button>
+                        </div>
+
+                        {staffActivity?.events && staffActivity.events.length > 0 ? (
+                          <div className="space-y-2 border-l-2 border-slate-200 pl-3 ml-2">
+                            {staffActivity.events.map((evt: any) => (
+                              <div
+                                key={evt.id}
+                                className="p-3 bg-slate-50/70 border border-slate-200/70 rounded-xl text-xs space-y-1 relative"
+                              >
+                                <div className="flex items-center justify-between flex-wrap gap-1">
+                                  <div className="flex items-center gap-1.5">
+                                    <span
+                                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                        evt.type === "EMPLOYEE_ACTION"
+                                          ? "bg-blue-100 text-blue-800"
+                                          : evt.type === "ADMIN_ACTION"
+                                          ? "bg-purple-100 text-purple-800"
+                                          : "bg-emerald-100 text-emerald-800"
+                                      }`}
+                                    >
+                                      {evt.category || evt.type}
+                                    </span>
+                                    <span className="font-bold text-slate-800">{evt.title}</span>
+                                  </div>
+                                  <span className="text-[11px] text-slate-400">
+                                    {new Date(evt.timestamp).toLocaleDateString()} {new Date(evt.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                  </span>
+                                </div>
+
+                                {evt.description && (
+                                  <p className="text-[11px] text-slate-600 break-words font-mono bg-white p-2 rounded-lg border border-slate-100">
+                                    {evt.description}
+                                  </p>
+                                )}
+
+                                <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1">
+                                  <span>Actor: <strong className="text-slate-700">{evt.actor}</strong></span>
+                                  {evt.ipAddress && <span>IP: {evt.ipAddress}</span>}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="text-center py-8 bg-slate-50 rounded-2xl border border-dashed border-slate-200 space-y-1 text-xs">
+                            <Clock size={20} className="text-slate-400 mx-auto" />
+                            <p className="font-bold text-slate-700">No activity events recorded yet</p>
+                            <p className="text-slate-400 text-[11px]">Actions on leads, projects, site surveys, and platform logins are audited live.</p>
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
             </div>
 
-            {/* Profile Footer */}
-            <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
-              <button
-                onClick={() => {
-                  const s = selectedStaffProfile;
-                  setSelectedStaffProfile(null);
-                  handleOpenEditModal(s);
-                }}
-                className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs flex items-center gap-1.5"
-              >
-                <Edit3 size={14} /> Edit Full Record
-              </button>
+            {/* Profile Footer - Tenant Admin Authority Controls */}
+            <div className="p-4 bg-slate-50 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  onClick={() => {
+                    const s = selectedStaffProfile;
+                    setSelectedStaffProfile(null);
+                    handleOpenEditModal(s);
+                  }}
+                  className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs flex items-center gap-1.5 transition-colors"
+                >
+                  <Edit3 size={14} /> Edit Record
+                </button>
+
+                {selectedStaffProfile.email && (
+                  <button
+                    onClick={() => handleResendCredentials(selectedStaffProfile)}
+                    className="px-3.5 py-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-100 text-blue-700 font-bold text-xs flex items-center gap-1.5 transition-colors shadow-xs"
+                    title="Send Login Credentials to Email"
+                  >
+                    <Mail size={14} /> Send Login Email
+                  </button>
+                )}
+
+                {selectedStaffProfile.status === "SUSPENDED" ? (
+                  <button
+                    onClick={() => handleReactivateStaff(selectedStaffProfile)}
+                    className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 transition-colors shadow-xs"
+                  >
+                    <ShieldCheck size={14} /> Reactivate Access
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => setShowSuspendModal({ staff: selectedStaffProfile, reason: "" })}
+                    className="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs flex items-center gap-1.5 transition-colors shadow-xs"
+                  >
+                    <ShieldAlert size={14} /> Suspend Access
+                  </button>
+                )}
+
+                <button
+                  onClick={() => setShowDeleteModal({ staff: selectedStaffProfile, reassignTo: "", force: false })}
+                  className="px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs flex items-center gap-1.5 transition-colors shadow-xs"
+                >
+                  <Trash2 size={14} /> Delete Employee
+                </button>
+              </div>
 
               <button
                 onClick={() => setSelectedStaffProfile(null)}
-                className="px-4 py-2 rounded-xl border border-slate-200 font-bold text-xs text-slate-700 hover:bg-white"
+                className="px-4 py-2 rounded-xl border border-slate-200 font-bold text-xs text-slate-700 hover:bg-white transition-colors"
               >
-                Close Profile
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SUSPEND EMPLOYEE MODAL (TENANT ADMIN AUTHORITY) */}
+      {showSuspendModal && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200 p-6 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2 text-rose-600">
+                <ShieldAlert size={20} />
+                <h3 className="text-base font-bold text-slate-900">Suspend Employee Access</h3>
+              </div>
+              <button onClick={() => setShowSuspendModal(null)} className="text-slate-400 hover:text-slate-700">
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs text-slate-600">
+              <p>
+                Are you sure you want to suspend <strong className="text-slate-900">{showSuspendModal.staff.name}</strong> ({showSuspendModal.staff.employeeId})?
+              </p>
+
+              <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl space-y-1 text-rose-800">
+                <p className="font-bold flex items-center gap-1">
+                  <AlertTriangle size={14} /> Immediate Security Enforcement:
+                </p>
+                <ul className="list-disc list-inside space-y-0.5 text-[11px] text-rose-700">
+                  <li>Active sessions are invalidated immediately</li>
+                  <li>System login is blocked across web and mobile</li>
+                  <li>Suspension notice will be dispatched to their work email</li>
+                </ul>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-slate-600 font-bold block">Suspension Reason (Logged in Audit Trail):</label>
+                <input
+                  type="text"
+                  placeholder="e.g., Performance review, Contract ended, Security policy"
+                  value={showSuspendModal.reason}
+                  onChange={e => setShowSuspendModal({ ...showSuspendModal, reason: e.target.value })}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-800 outline-none focus:border-rose-500"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                onClick={() => setShowSuspendModal(null)}
+                className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleSuspendStaff(showSuspendModal.staff, showSuspendModal.reason)}
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-colors shadow-sm"
+              >
+                Confirm Suspension
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* DELETE EMPLOYEE & REASSIGNMENT MODAL (TENANT ADMIN FULL CONTROL) */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-200 p-6 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2 text-rose-600">
+                <Trash2 size={20} />
+                <h3 className="text-base font-bold text-slate-900">Delete Employee Profile</h3>
+              </div>
+              <button onClick={() => setShowDeleteModal(null)} className="text-slate-400 hover:text-slate-700">
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs text-slate-600">
+              <p>
+                You are initiating permanent deletion for <strong className="text-slate-900">{showDeleteModal.staff.name}</strong> ({showDeleteModal.staff.employeeId}).
+              </p>
+
+              {/* Dependencies Check */}
+              {((showDeleteModal.staff.projectAssignments && showDeleteModal.staff.projectAssignments.length > 0) ||
+                (showDeleteModal.staff._count?.directReports && showDeleteModal.staff._count.directReports > 0)) && (
+                <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl space-y-2 text-amber-900">
+                  <p className="font-bold flex items-center gap-1.5">
+                    <AlertTriangle size={15} /> Active Responsibilities Detected:
+                  </p>
+                  <p className="text-[11px] text-amber-800">
+                    This staff member has {showDeleteModal.staff.projectAssignments?.length || 0} active project assignment(s) and {showDeleteModal.staff._count?.directReports || 0} direct report(s). Select a team member to seamlessly inherit these duties:
+                  </p>
+
+                  <div className="space-y-1 pt-1">
+                    <label className="text-[11px] font-bold text-amber-900 block">Reassign Responsibilities To:</label>
+                    <select
+                      value={showDeleteModal.reassignTo}
+                      onChange={e => setShowDeleteModal({ ...showDeleteModal, reassignTo: e.target.value })}
+                      className="w-full px-3 py-2 rounded-xl border border-amber-300 bg-white text-xs font-semibold text-slate-800"
+                    >
+                      <option value="">-- Choose Colleague to Reassign --</option>
+                      {staffList
+                        .filter(s => s.id !== showDeleteModal.staff.id)
+                        .map(s => (
+                          <option key={s.id} value={s.id}>
+                            {s.name} ({s.designation} - {s.employeeId})
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+                </div>
+              )}
+
+              <div className="pt-1">
+                <label className="flex items-center gap-2 cursor-pointer select-none text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={showDeleteModal.force}
+                    onChange={e => setShowDeleteModal({ ...showDeleteModal, force: e.target.checked })}
+                    className="w-4 h-4 rounded text-rose-600 focus:ring-rose-500"
+                  />
+                  <span className="text-[11px] font-semibold">
+                    Proceed with deletion (assignments will be released, orphaned reports unlinked)
+                  </span>
+                </label>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                onClick={() => setShowDeleteModal(null)}
+                className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                disabled={Boolean(
+                  !showDeleteModal.force &&
+                  !showDeleteModal.reassignTo &&
+                  ((showDeleteModal.staff.projectAssignments && showDeleteModal.staff.projectAssignments.length > 0) ||
+                    ((showDeleteModal.staff._count?.directReports ?? 0) > 0))
+                )}
+                onClick={() => handleExecuteDeleteStaff(showDeleteModal.staff.id, showDeleteModal.reassignTo, showDeleteModal.force)}
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 disabled:opacity-40 text-white text-xs font-bold transition-colors shadow-sm"
+              >
+                Delete Employee
               </button>
             </div>
           </div>

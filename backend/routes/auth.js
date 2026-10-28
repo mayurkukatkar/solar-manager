@@ -19,6 +19,9 @@ router.post('/login', async (req, res) => {
       include: {
         tenant: {
           select: { id: true, name: true, status: true }
+        },
+        staffProfile: {
+          select: { id: true, status: true }
         }
       }
     });
@@ -46,6 +49,15 @@ router.post('/login', async (req, res) => {
           isSuspended: true
         });
       }
+    }
+
+    // ENFORCE EMPLOYEE SUSPENSION: Block suspended/deactivated staff members
+    if (user.staffProfile && (user.staffProfile.status === 'SUSPENDED' || user.staffProfile.status === 'INACTIVE')) {
+      return res.status(403).json({
+        error: 'Access Suspended: Your employee account has been suspended or deactivated by your organization administrator.',
+        code: 'EMPLOYEE_SUSPENDED',
+        isSuspended: true
+      });
     }
 
     if (user.mustChangePassword) {

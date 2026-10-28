@@ -86,6 +86,21 @@ const requireTenantAuth = async (req, res, next) => {
       });
     }
 
+    // LIVE EMPLOYEE STATUS CHECK - Immediate session block if employee was suspended
+    if (payload.role === 'TENANT_SUB_ADMIN') {
+      const staffMember = await prisma.staff.findFirst({
+        where: { userId: payload.userId, tenantId: payload.tenantId },
+        select: { status: true }
+      });
+      if (staffMember && (staffMember.status === 'SUSPENDED' || staffMember.status === 'INACTIVE')) {
+        return res.status(403).json({
+          error: 'Account Suspended: Your staff access has been suspended by your organization administrator.',
+          code: 'EMPLOYEE_SUSPENDED',
+          isSuspended: true
+        });
+      }
+    }
+
     req.user = payload;
     next();
   } catch (err) {
