@@ -76,7 +76,6 @@ const MENU_GROUPS: MenuGroup[] = [
       { name: 'Staff & Technicians', icon: UserPlus, path: '/tenant/staff' },
       { name: 'Users & Permissions', icon: Shield, path: '/tenant/users' },
       { name: 'Reports & Analytics', icon: BarChart2, path: '/tenant/reports' },
-      { name: 'Automation', icon: Zap, path: '/tenant/automation' },
     ]
   },
   {

@@ -1602,8 +1602,8 @@ export default function TenantDashboard() {
           status="Lead Follow-ups Online"
           isGood={true}
           icon={Zap}
-          link="/tenant/automation"
-          cta="Configure Rules"
+          link="/tenant/communication"
+          cta="View Messages"
         />
       </div>
 
