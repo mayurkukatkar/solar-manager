@@ -550,10 +550,10 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col lg:flex-row font-sans selection:bg-blue-100 selection:text-blue-900 w-full overflow-x-hidden">
+    <div className="h-screen w-full flex flex-col lg:flex-row bg-slate-50 font-sans selection:bg-blue-100 selection:text-blue-900 overflow-hidden">
       
       {/* MOBILE TOPBAR (< lg) */}
-      <header className="lg:hidden sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 px-4 py-3 flex items-center justify-between shadow-xs">
+      <header className="lg:hidden sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 px-4 py-3 flex items-center justify-between shadow-xs shrink-0">
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-xl bg-white border border-slate-200 p-1 flex items-center justify-center shadow-2xs">
             <Image 
@@ -599,15 +599,15 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
         {renderSidebarContent(true)}
       </aside>
 
-      {/* DESKTOP SIDEBAR (lg+) */}
-      <aside className={`h-screen sticky top-0 bg-white text-slate-800 border-r border-slate-200 shadow-sm hidden lg:flex flex-col shrink-0 z-30 transition-all duration-300 ease-in-out ${
+      {/* DESKTOP SIDEBAR (lg+) - FIXED VIEWPORT HEIGHT, NEVER SCROLLS WITH PAGE */}
+      <aside className={`h-full bg-white text-slate-800 border-r border-slate-200 shadow-sm hidden lg:flex flex-col shrink-0 z-30 transition-all duration-300 ease-in-out ${
         sidebarCollapsed ? 'w-16' : 'w-72'
       }`}>
         {renderSidebarContent(false)}
       </aside>
 
-      {/* MAIN CONTENT AREA */}
-      <main className="flex-1 flex flex-col min-h-screen min-w-0 w-full relative bg-white overflow-x-hidden">
+      {/* MAIN CONTENT AREA - INDEPENDENT SCROLLBAR */}
+      <main className="flex-1 h-full min-w-0 flex flex-col overflow-y-auto overflow-x-hidden bg-white relative custom-scrollbar">
         {/* Engineering 32px Square Grid Background */}
         <div 
           className="pointer-events-none absolute inset-0 opacity-70"
