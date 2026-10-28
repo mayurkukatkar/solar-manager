@@ -54,6 +54,10 @@ interface DashboardData {
   outstanding: number;
   orderBook: number;
   totalCapacity: number;
+  isFinanceAuthorized?: boolean;
+  openSurveys?: number;
+  userRole?: string;
+  permissions?: string[];
   aging?: {
     under15: number;
     under30: number;
@@ -89,6 +93,8 @@ export default function TenantDashboard() {
     outstanding: 0,
     orderBook: 0,
     totalCapacity: 0,
+    isFinanceAuthorized: false,
+    openSurveys: 0,
     aging: { under15: 0, under30: 0, over30: 0 },
     horizonAnalytics: {
       monthly: [],
@@ -134,21 +140,29 @@ export default function TenantDashboard() {
     fetchDashboard();
   }, []);
 
+  // Role-Based Authorization Guard for Confidential Financial Metrics
+  const isFinanceAuthorized = Boolean(
+    data.isFinanceAuthorized ?? 
+    (data.userRole === 'TENANT_ADMIN' || 
+     data.userRole === 'SUPER_ADMIN' || 
+     (Array.isArray(data.permissions) && (data.permissions.includes('finance') || data.permissions.includes('*'))))
+  );
+
   // Compute dynamic statistical monthly series from real database records
   const monthlyTrends = (data.horizonAnalytics?.monthly && data.horizonAnalytics.monthly.length > 0)
     ? data.horizonAnalytics.monthly.map(m => ({
         month: m.period,
         capacity: m.capacity,
-        revenue: m.revenue,
+        revenue: isFinanceAuthorized ? m.revenue : 0,
         projects: m.clients
       }))
     : [
-        { month: 'Nov', capacity: 18.5, revenue: 8.4, projects: 4 },
-        { month: 'Dec', capacity: 25.2, revenue: 11.2, projects: 6 },
-        { month: 'Jan', capacity: 33.8, revenue: 14.8, projects: 8 },
-        { month: 'Feb', capacity: 28.4, revenue: 12.6, projects: 7 },
-        { month: 'Mar', capacity: 44.0, revenue: 20.2, projects: 10 },
-        { month: 'Apr', capacity: 37.1, revenue: 66.7, projects: 11 },
+        { month: 'Nov', capacity: 18.5, revenue: isFinanceAuthorized ? 8.4 : 0, projects: 4 },
+        { month: 'Dec', capacity: 25.2, revenue: isFinanceAuthorized ? 11.2 : 0, projects: 6 },
+        { month: 'Jan', capacity: 33.8, revenue: isFinanceAuthorized ? 14.8 : 0, projects: 8 },
+        { month: 'Feb', capacity: 28.4, revenue: isFinanceAuthorized ? 12.6 : 0, projects: 7 },
+        { month: 'Mar', capacity: 44.0, revenue: isFinanceAuthorized ? 20.2 : 0, projects: 10 },
+        { month: 'Apr', capacity: 37.1, revenue: isFinanceAuthorized ? 66.7 : 0, projects: 11 },
       ];
 
   // ----------------------------------------------------
@@ -160,59 +174,71 @@ export default function TenantDashboard() {
     data: HorizonItem[];
   }> = {
     monthly: {
-      label: 'Monthly Client & Revenue Trajectory',
-      sublabel: 'Month-over-month performance across energized clients and collected revenue',
+      label: isFinanceAuthorized ? 'Monthly Client & Revenue Trajectory' : 'Monthly Client & System Capacity Trajectory',
+      sublabel: isFinanceAuthorized ? 'Month-over-month performance across energized clients and collected revenue' : 'Month-over-month rooftop solar capacity (kWp) energized across clients',
       data: [
-        { period: 'Nov', clients: 4, revenue: 8.4, capacity: 18.5, avgDeal: '₹2.10L', growth: '+14% MoM', status: 'On Target' },
-        { period: 'Dec', clients: 6, revenue: 11.2, capacity: 25.2, avgDeal: '₹1.87L', growth: '+33% MoM', status: 'Expanding' },
-        { period: 'Jan', clients: 8, revenue: 14.8, capacity: 33.8, avgDeal: '₹1.85L', growth: '+32% MoM', status: 'Surge' },
-        { period: 'Feb', clients: 7, revenue: 12.6, capacity: 28.4, avgDeal: '₹1.80L', growth: '-15% MoM', status: 'Stable' },
-        { period: 'Mar', clients: 10, revenue: 20.2, capacity: 44.0, avgDeal: '₹2.02L', growth: '+60% MoM', status: 'Record High' },
-        { period: 'Apr', clients: 11, revenue: 66.7, capacity: 37.1, avgDeal: '₹6.06L', growth: '+28% MoM', status: 'Current Peak' },
+        { period: 'Nov', clients: 4, revenue: isFinanceAuthorized ? 8.4 : 0, capacity: 18.5, avgDeal: isFinanceAuthorized ? '₹2.10L' : '4.6 kWp/Site', growth: '+14% MoM', status: 'On Target' },
+        { period: 'Dec', clients: 6, revenue: isFinanceAuthorized ? 11.2 : 0, capacity: 25.2, avgDeal: isFinanceAuthorized ? '₹1.87L' : '4.2 kWp/Site', growth: '+33% MoM', status: 'Expanding' },
+        { period: 'Jan', clients: 8, revenue: isFinanceAuthorized ? 14.8 : 0, capacity: 33.8, avgDeal: isFinanceAuthorized ? '₹1.85L' : '4.2 kWp/Site', growth: '+32% MoM', status: 'Surge' },
+        { period: 'Feb', clients: 7, revenue: isFinanceAuthorized ? 12.6 : 0, capacity: 28.4, avgDeal: isFinanceAuthorized ? '₹1.80L' : '4.1 kWp/Site', growth: '-15% MoM', status: 'Stable' },
+        { period: 'Mar', clients: 10, revenue: isFinanceAuthorized ? 20.2 : 0, capacity: 44.0, avgDeal: isFinanceAuthorized ? '₹2.02L' : '4.4 kWp/Site', growth: '+60% MoM', status: 'Record High' },
+        { period: 'Apr', clients: 11, revenue: isFinanceAuthorized ? 66.7 : 0, capacity: 37.1, avgDeal: isFinanceAuthorized ? '₹6.06L' : '3.4 kWp/Site', growth: '+28% MoM', status: 'Current Peak' },
       ]
     },
     quarterly: {
-      label: 'Quarterly Client & Revenue Velocity (Q1–Q4)',
-      sublabel: 'Fiscal quarters comparing customer rooftop acquisition and financial execution',
+      label: isFinanceAuthorized ? 'Quarterly Client & Revenue Velocity (Q1–Q4)' : 'Quarterly Client & Capacity Velocity (Q1–Q4)',
+      sublabel: isFinanceAuthorized ? 'Fiscal quarters comparing customer rooftop acquisition and financial execution' : 'Fiscal quarters comparing energized solar rooftop installations and total kWp',
       data: [
-        { period: 'Q1 (Apr–Jun)', clients: 22, revenue: 44.8, capacity: 94.6, avgDeal: '₹2.04L', growth: '+18% YoY', status: 'Stable' },
-        { period: 'Q2 (Jul–Sep)', clients: 18, revenue: 36.2, capacity: 78.2, avgDeal: '₹2.01L', growth: '+22% YoY', status: 'Monsoon Cycle' },
-        { period: 'Q3 (Oct–Dec)', clients: 29, revenue: 59.5, capacity: 126.4, avgDeal: '₹2.05L', growth: '+41% YoY', status: 'Festive Surge' },
-        { period: 'Q4 (Jan–Mar)', clients: 38, revenue: 78.4, capacity: 168.0, avgDeal: '₹2.06L', growth: '+54% YoY', status: 'Year-End High' },
+        { period: 'Q1 (Apr–Jun)', clients: 22, revenue: isFinanceAuthorized ? 44.8 : 0, capacity: 94.6, avgDeal: isFinanceAuthorized ? '₹2.04L' : '4.3 kWp/Site', growth: '+18% YoY', status: 'Stable' },
+        { period: 'Q2 (Jul–Sep)', clients: 18, revenue: isFinanceAuthorized ? 36.2 : 0, capacity: 78.2, avgDeal: isFinanceAuthorized ? '₹2.01L' : '4.3 kWp/Site', growth: '+22% YoY', status: 'Monsoon Cycle' },
+        { period: 'Q3 (Oct–Dec)', clients: 29, revenue: isFinanceAuthorized ? 59.5 : 0, capacity: 126.4, avgDeal: isFinanceAuthorized ? '₹2.05L' : '4.4 kWp/Site', growth: '+41% YoY', status: 'Festive Surge' },
+        { period: 'Q4 (Jan–Mar)', clients: 38, revenue: isFinanceAuthorized ? 78.4 : 0, capacity: 168.0, avgDeal: isFinanceAuthorized ? '₹2.06L' : '4.4 kWp/Site', growth: '+54% YoY', status: 'Year-End High' },
       ]
     },
     halfAnnual: {
-      label: 'Half-Annual Solar Performance Comparison (H1 vs H2)',
-      sublabel: 'Pre-monsoon installation cycle vs post-monsoon PM Surya Ghar rooftop boom',
+      label: isFinanceAuthorized ? 'Half-Annual Solar Performance Comparison (H1 vs H2)' : 'Half-Annual Solar Installation Comparison (H1 vs H2)',
+      sublabel: isFinanceAuthorized ? 'Pre-monsoon installation cycle vs post-monsoon PM Surya Ghar rooftop boom' : 'Pre-monsoon installation cycle vs post-monsoon rooftop deployment surge',
       data: [
-        { period: 'H1 FY25 (Apr–Sep)', clients: 32, revenue: 64.0, capacity: 138.0, avgDeal: '₹2.00L', growth: '+28% YoY', status: 'Baseline' },
-        { period: 'H2 FY25 (Oct–Mar)', clients: 51, revenue: 104.2, capacity: 224.5, avgDeal: '₹2.04L', growth: '+62% YoY', status: 'Strong Surge' },
-        { period: 'H1 FY26 (Apr–Sep)', clients: 40, revenue: 81.0, capacity: 172.8, avgDeal: '₹2.03L', growth: '+26% YoY', status: 'Expanded' },
-        { period: 'H2 FY26 (Oct–Mar)', clients: 67, revenue: 137.9, capacity: 294.4, avgDeal: '₹2.06L', growth: '+70% YoY', status: 'All-Time Record' },
+        { period: 'H1 FY25 (Apr–Sep)', clients: 32, revenue: isFinanceAuthorized ? 64.0 : 0, capacity: 138.0, avgDeal: isFinanceAuthorized ? '₹2.00L' : '4.3 kWp/Site', growth: '+28% YoY', status: 'Baseline' },
+        { period: 'H2 FY25 (Oct–Mar)', clients: 51, revenue: isFinanceAuthorized ? 104.2 : 0, capacity: 224.5, avgDeal: isFinanceAuthorized ? '₹2.04L' : '4.4 kWp/Site', growth: '+62% YoY', status: 'Strong Surge' },
+        { period: 'H1 FY26 (Apr–Sep)', clients: 40, revenue: isFinanceAuthorized ? 81.0 : 0, capacity: 172.8, avgDeal: isFinanceAuthorized ? '₹2.03L' : '4.3 kWp/Site', growth: '+26% YoY', status: 'Expanded' },
+        { period: 'H2 FY26 (Oct–Mar)', clients: 67, revenue: isFinanceAuthorized ? 137.9 : 0, capacity: 294.4, avgDeal: isFinanceAuthorized ? '₹2.06L' : '4.4 kWp/Site', growth: '+70% YoY', status: 'All-Time Record' },
       ]
     },
     annual: {
-      label: 'Annual Multi-Year Growth & Client Expansion (YoY)',
-      sublabel: 'Year-over-year enterprise scaling across energized clients, capacity, and revenue',
+      label: isFinanceAuthorized ? 'Annual Multi-Year Growth & Client Expansion (YoY)' : 'Annual Solar Capacity & Fleet Scaling (YoY)',
+      sublabel: isFinanceAuthorized ? 'Year-over-year enterprise scaling across energized clients, capacity, and revenue' : 'Year-over-year growth across energized rooftop clients and commissioned kWp',
       data: [
-        { period: 'FY 2023–24', clients: 48, revenue: 98.5, capacity: 208.0, avgDeal: '₹2.05L', growth: 'Baseline Year', status: 'Early Growth' },
-        { period: 'FY 2024–25', clients: 76, revenue: 154.2, capacity: 332.0, avgDeal: '₹2.03L', growth: '+56.5% YoY', status: 'Scaling' },
-        { period: 'FY 2025–26 (Current)', clients: 107, revenue: 218.9, capacity: 467.2, avgDeal: '₹2.05L', growth: '+42.0% YoY', status: 'Market Leader' },
-        { period: 'FY 2026–27 (Target)', clients: 160, revenue: 340.0, capacity: 720.0, avgDeal: '₹2.12L', growth: '+55.3% Projected', status: 'Target Goal' },
+        { period: 'FY 2023–24', clients: 48, revenue: isFinanceAuthorized ? 98.5 : 0, capacity: 208.0, avgDeal: isFinanceAuthorized ? '₹2.05L' : '4.3 kWp/Site', growth: 'Baseline Year', status: 'Early Growth' },
+        { period: 'FY 2024–25', clients: 76, revenue: isFinanceAuthorized ? 154.2 : 0, capacity: 332.0, avgDeal: isFinanceAuthorized ? '₹2.03L' : '4.4 kWp/Site', growth: '+56.5% YoY', status: 'Scaling' },
+        { period: 'FY 2025–26 (Current)', clients: 107, revenue: isFinanceAuthorized ? 218.9 : 0, capacity: 467.2, avgDeal: isFinanceAuthorized ? '₹2.05L' : '4.4 kWp/Site', growth: '+42.0% YoY', status: 'Market Leader' },
+        { period: 'FY 2026–27 (Target)', clients: 160, revenue: isFinanceAuthorized ? 340.0 : 0, capacity: 720.0, avgDeal: isFinanceAuthorized ? '₹2.12L' : '4.5 kWp/Site', growth: '+55.3% Projected', status: 'Target Goal' },
       ]
     }
   };
 
   const activeHorizonConfig = fallbackHorizonDataMap[periodHorizon];
-  const activeHorizonData: HorizonItem[] = (data.horizonAnalytics && data.horizonAnalytics[periodHorizon] && data.horizonAnalytics[periodHorizon].length > 0)
+  const rawHorizonData: HorizonItem[] = (data.horizonAnalytics && data.horizonAnalytics[periodHorizon] && data.horizonAnalytics[periodHorizon].length > 0)
     ? data.horizonAnalytics[periodHorizon]
     : activeHorizonConfig.data;
 
+  const activeHorizonData: HorizonItem[] = isFinanceAuthorized
+    ? rawHorizonData
+    : rawHorizonData.map(item => ({
+        ...item,
+        revenue: 0,
+        avgDeal: `${(item.capacity / (item.clients || 1)).toFixed(1)} kWp/Site`
+      }));
+
   // Aggregate stats for the currently selected horizon
   const totalHorizonClients = activeHorizonData.reduce((acc, curr) => acc + curr.clients, 0);
-  const totalHorizonRevenue = activeHorizonData.reduce((acc, curr) => acc + curr.revenue, 0).toFixed(1);
+  const totalHorizonRevenue = isFinanceAuthorized
+    ? activeHorizonData.reduce((acc, curr) => acc + curr.revenue, 0).toFixed(1)
+    : '0';
   const totalHorizonCapacity = activeHorizonData.reduce((acc, curr) => acc + curr.capacity, 0).toFixed(1);
-  const avgHorizonDeal = (Number(totalHorizonRevenue) / (totalHorizonClients || 1)).toFixed(2);
+  const avgHorizonDeal = isFinanceAuthorized
+    ? (Number(totalHorizonRevenue) / (totalHorizonClients || 1)).toFixed(2)
+    : (Number(totalHorizonCapacity) / (totalHorizonClients || 1)).toFixed(1);
 
   // Real System Segmentation Donut
   const fallbackSegmentationData = [
@@ -249,10 +275,10 @@ export default function TenantDashboard() {
 
   // Real PM Surya Ghar Direct Benefit Transfer (DBT) Milestones
   const fallbackSubsidyFunnel = [
-    { step: '01', title: 'DISCOM Feasibility Approved', count: 24, amount: '₹18.7 Lakhs', status: 'Feasibility Sanctioned' },
-    { step: '02', title: 'Vendor Work Order & Install', count: 18, amount: '₹14.0 Lakhs', status: 'Work Order Active' },
-    { step: '03', title: 'Joint Inspection Report (JIR)', count: 12, amount: '₹9.3 Lakhs', status: 'Uploaded to Portal' },
-    { step: '04', title: 'Direct Subsidy Credited (DBT)', count: 9, amount: '₹7.02 Lakhs', status: 'Credited to Customer' },
+    { step: '01', title: 'DISCOM Feasibility Approved', count: 24, amount: isFinanceAuthorized ? '₹18.7 Lakhs' : '108 kWp Approved', status: 'Feasibility Sanctioned' },
+    { step: '02', title: 'Vendor Work Order & Install', count: 18, amount: isFinanceAuthorized ? '₹14.0 Lakhs' : '81 kWp In-Flight', status: 'Work Order Active' },
+    { step: '03', title: 'Joint Inspection Report (JIR)', count: 12, amount: isFinanceAuthorized ? '₹9.3 Lakhs' : '54 kWp Inspected', status: 'Uploaded to Portal' },
+    { step: '04', title: 'Direct Subsidy Credited (DBT)', count: 9, amount: isFinanceAuthorized ? '₹7.02 Lakhs' : '40.5 kWp Energized', status: 'Credited to Customer' },
   ];
   const subsidyFunnel = (data.subsidyFunnel && data.subsidyFunnel.length > 0)
     ? data.subsidyFunnel
@@ -262,22 +288,22 @@ export default function TenantDashboard() {
     ? data.totalCapacity.toFixed(1)
     : (monthlyTrends.reduce((acc, m) => acc + m.capacity, 0)).toFixed(0);
 
-  const totalRevenueLakhs = data.totalRevenue > 0
+  const totalRevenueLakhs = isFinanceAuthorized && data.totalRevenue > 0
     ? Number((data.totalRevenue / 100000).toFixed(1))
-    : 84.6;
+    : (isFinanceAuthorized ? 84.6 : 0);
 
-  const totalCollectedLakhs = data.totalCollected > 0
+  const totalCollectedLakhs = isFinanceAuthorized && data.totalCollected > 0
     ? Number((data.totalCollected / 100000).toFixed(1))
-    : Number((totalRevenueLakhs * 0.65).toFixed(1));
+    : (isFinanceAuthorized ? Number((totalRevenueLakhs * 0.65).toFixed(1)) : 0);
 
-  const outstandingLakhs = data.outstanding > 0
+  const outstandingLakhs = isFinanceAuthorized && data.outstanding > 0
     ? Number((data.outstanding / 100000).toFixed(1))
-    : Math.max(0, Number((totalRevenueLakhs - totalCollectedLakhs).toFixed(1)));
+    : (isFinanceAuthorized ? Math.max(0, Number((totalRevenueLakhs - totalCollectedLakhs).toFixed(1))) : 0);
 
-  const collectedPct = totalRevenueLakhs > 0
+  const collectedPct = isFinanceAuthorized && totalRevenueLakhs > 0
     ? Math.min(100, Math.round((totalCollectedLakhs / totalRevenueLakhs) * 100))
-    : 60;
-  const outstandingPct = Math.max(0, 100 - collectedPct);
+    : 0;
+  const outstandingPct = isFinanceAuthorized ? Math.max(0, 100 - collectedPct) : 0;
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-3 duration-500 pb-24">
@@ -288,14 +314,18 @@ export default function TenantDashboard() {
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50/80 border border-blue-200/60 mb-2.5">
             <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
             <span className="text-[11px] font-bold text-blue-900 tracking-wide uppercase">
-              WhereReady Solar OS • Executive Command Center
+              {isFinanceAuthorized 
+                ? "WhereReady Solar OS • Executive Command Center" 
+                : "WhereReady Solar OS • Operations Command Center"}
             </span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-            Solar Operations Command Center
+            {isFinanceAuthorized ? "Solar Operations & Financial Command" : "Solar Field Operations Command Center"}
           </h1>
           <p className="text-slate-500 text-sm mt-0.5 font-normal">
-            Effortless oversight of leads, rooftop site audits, hardware inventory, and PM Surya Ghar subsidies.
+            {isFinanceAuthorized
+              ? "Effortless oversight of leads, rooftop site audits, hardware inventory, and PM Surya Ghar subsidies."
+              : "Real-time dispatch oversight of leads, rooftop site audits, hardware stock buffer, and field installations."}
           </p>
         </div>
 
@@ -347,7 +377,15 @@ export default function TenantDashboard() {
                 <span className="text-xs text-slate-500 font-medium hidden sm:inline">• Automated Priority Queue</span>
               </div>
               <p className="text-xs sm:text-sm text-slate-800 mt-1 font-semibold leading-relaxed">
-                <strong>{data.totalLeads || 3} rooftop proposals</strong> awaiting follow-up, <strong>{data.totalProjects || 2} active installations</strong> on schedule, and <strong>₹{outstandingLakhs}L milestone receivables</strong> maturing this cycle.
+                {isFinanceAuthorized ? (
+                  <>
+                    <strong>{data.totalLeads || 3} rooftop proposals</strong> awaiting follow-up, <strong>{data.totalProjects || 2} active installations</strong> on schedule, and <strong>₹{outstandingLakhs}L milestone receivables</strong> maturing this cycle.
+                  </>
+                ) : (
+                  <>
+                    <strong>{data.totalLeads || 3} rooftop proposals</strong> awaiting follow-up, <strong>{data.totalProjects || 2} active installations</strong> on schedule, and <strong>{data.openSurveys || data.totalCustomers || 4} site surveys</strong> queued for technician dispatch.
+                  </>
+                )}
               </p>
             </div>
           </div>
@@ -372,15 +410,27 @@ export default function TenantDashboard() {
 
       {/* 3. EXECUTIVE KEY PERFORMANCE TICKER CARDS */}
       <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
-        <ExecutiveTickerCard 
-          label="Committed Order Book"
-          value={`₹${totalRevenueLakhs} Lakhs`}
-          change="+18.4% MoM"
-          isPositive={true}
-          icon={Wallet}
-          accent="blue"
-          href="/tenant/finance"
-        />
+        {isFinanceAuthorized ? (
+          <ExecutiveTickerCard 
+            label="Committed Order Book"
+            value={`₹${totalRevenueLakhs} Lakhs`}
+            change="+18.4% MoM"
+            isPositive={true}
+            icon={Wallet}
+            accent="blue"
+            href="/tenant/finance"
+          />
+        ) : (
+          <ExecutiveTickerCard 
+            label="Active Project Sites"
+            value={`${data.totalProjects || 0} Sites Active`}
+            change="Field Work On Schedule"
+            isPositive={true}
+            icon={HardHat}
+            accent="blue"
+            href="/tenant/projects"
+          />
+        )}
         <ExecutiveTickerCard 
           label="Energized Fleet Size"
           value={`${totalCapacityKWp} kWp`}
@@ -390,15 +440,27 @@ export default function TenantDashboard() {
           accent="amber"
           href="/tenant/projects"
         />
-        <ExecutiveTickerCard 
-          label="DBT Subsidy Disbursed"
-          value={subsidyFunnel[3]?.amount || "₹24.8 Lakhs"}
-          change="PM Surya Ghar Scheme"
-          isPositive={true}
-          icon={Landmark}
-          accent="emerald"
-          href="/tenant/subsidy"
-        />
+        {isFinanceAuthorized ? (
+          <ExecutiveTickerCard 
+            label="DBT Subsidy Disbursed"
+            value={subsidyFunnel[3]?.amount || "₹24.8 Lakhs"}
+            change="PM Surya Ghar Scheme"
+            isPositive={true}
+            icon={Landmark}
+            accent="emerald"
+            href="/tenant/subsidy"
+          />
+        ) : (
+          <ExecutiveTickerCard 
+            label="Site Surveys & Audits"
+            value={`${data.openSurveys || data.totalCustomers || 0} Scheduled`}
+            change="Pre-Install Roof Audits"
+            isPositive={true}
+            icon={MapPin}
+            accent="emerald"
+            href="/tenant/surveys"
+          />
+        )}
         <ExecutiveTickerCard 
           label="Site Turnaround Time"
           value="14.8 Days"
@@ -408,15 +470,27 @@ export default function TenantDashboard() {
           accent="indigo"
           href="/tenant/installation"
         />
-        <ExecutiveTickerCard 
-          label="Quotation Win-Rate"
-          value="41.2%"
-          change="60s Proposal Conversion"
-          isPositive={true}
-          icon={Award}
-          accent="sky"
-          href="/tenant/quotations"
-        />
+        {isFinanceAuthorized ? (
+          <ExecutiveTickerCard 
+            label="Quotation Win-Rate"
+            value="41.2%"
+            change="60s Proposal Conversion"
+            isPositive={true}
+            icon={Award}
+            accent="sky"
+            href="/tenant/quotations"
+          />
+        ) : (
+          <ExecutiveTickerCard 
+            label="Inbound Inquiries"
+            value={`${data.totalLeads || 0} Active Leads`}
+            change="Pipeline Inflow"
+            isPositive={true}
+            icon={Users}
+            accent="sky"
+            href="/tenant/crm"
+          />
+        )}
       </div>
 
       {/* 4. CONVENIENT VIEW SWITCHER TABS */}
@@ -442,18 +516,20 @@ export default function TenantDashboard() {
               : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
           }`}
         >
-          📊 Periodic Horizons (Clients & Revenue)
+          {isFinanceAuthorized ? "📊 Periodic Horizons (Clients & Revenue)" : "📊 Periodic Horizons (Clients & Capacity)"}
         </button>
-        <button 
-          onClick={() => setCurrentTab('financial')}
-          className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
-            currentTab === 'financial' 
-              ? 'bg-slate-900 text-white shadow-xs' 
-              : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
-          }`}
-        >
-          💰 Revenue & Cashflow Waterfall
-        </button>
+        {isFinanceAuthorized && (
+          <button 
+            onClick={() => setCurrentTab('financial')}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
+              currentTab === 'financial' 
+                ? 'bg-slate-900 text-white shadow-xs' 
+                : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+            }`}
+          >
+            💰 Revenue & Cashflow Waterfall
+          </button>
+        )}
         <button 
           onClick={() => setCurrentTab('operations')}
           className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
@@ -502,10 +578,12 @@ export default function TenantDashboard() {
                 </span>
               </div>
               <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-                {activeHorizonConfig.label}
+                {isFinanceAuthorized ? activeHorizonConfig.label : activeHorizonConfig.label.replace('Revenue', 'Capacity')}
               </h2>
               <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-                {activeHorizonConfig.sublabel}
+                {isFinanceAuthorized 
+                  ? activeHorizonConfig.sublabel 
+                  : activeHorizonConfig.sublabel.replace('collected revenue', 'commissioned capacity (kWp)').replace('financial execution', 'field milestone execution')}
               </p>
             </div>
 
@@ -570,13 +648,23 @@ export default function TenantDashboard() {
                 >
                   Clients
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setHorizonMetricFocus('revenue')}
-                  className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${horizonMetricFocus === 'revenue' ? 'bg-emerald-600 text-white shadow-2xs' : 'hover:text-slate-900'}`}
-                >
-                  Revenue ₹
-                </button>
+                {isFinanceAuthorized ? (
+                  <button
+                    type="button"
+                    onClick={() => setHorizonMetricFocus('revenue')}
+                    className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${horizonMetricFocus === 'revenue' ? 'bg-emerald-600 text-white shadow-2xs' : 'hover:text-slate-900'}`}
+                  >
+                    Revenue ₹
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setHorizonMetricFocus('revenue')}
+                    className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${horizonMetricFocus === 'revenue' ? 'bg-indigo-600 text-white shadow-2xs' : 'hover:text-slate-900'}`}
+                  >
+                    Capacity kWp
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -600,56 +688,113 @@ export default function TenantDashboard() {
               </div>
             </div>
 
-            <div className="p-4 rounded-2xl bg-emerald-50/70 border border-emerald-200/60 flex items-center justify-between">
-              <div>
-                <p className="text-[11px] font-bold text-emerald-900/70 uppercase tracking-wider">
-                  Realized Period Revenue
-                </p>
-                <p className="text-2xl sm:text-3xl font-black text-emerald-950 mt-0.5">
-                  ₹{totalHorizonRevenue} Lakhs
-                </p>
-                <span className="text-[10px] font-bold text-emerald-700 mt-1 inline-flex items-center gap-1">
-                  <TrendingUp size={11} /> 100% Invoiced & Realized
-                </span>
+            {isFinanceAuthorized ? (
+              <div className="p-4 rounded-2xl bg-emerald-50/70 border border-emerald-200/60 flex items-center justify-between">
+                <div>
+                  <p className="text-[11px] font-bold text-emerald-900/70 uppercase tracking-wider">
+                    Realized Period Revenue
+                  </p>
+                  <p className="text-2xl sm:text-3xl font-black text-emerald-950 mt-0.5">
+                    ₹{totalHorizonRevenue} Lakhs
+                  </p>
+                  <span className="text-[10px] font-bold text-emerald-700 mt-1 inline-flex items-center gap-1">
+                    <TrendingUp size={11} /> 100% Invoiced & Realized
+                  </span>
+                </div>
+                <div className="w-10 h-10 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-sm shadow-emerald-500/20">
+                  <Wallet size={18} />
+                </div>
               </div>
-              <div className="w-10 h-10 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-sm shadow-emerald-500/20">
-                <Wallet size={18} />
+            ) : (
+              <div className="p-4 rounded-2xl bg-indigo-50/70 border border-indigo-200/60 flex items-center justify-between">
+                <div>
+                  <p className="text-[11px] font-bold text-indigo-900/70 uppercase tracking-wider">
+                    Capacity Energized
+                  </p>
+                  <p className="text-2xl sm:text-3xl font-black text-indigo-950 mt-0.5">
+                    {totalHorizonCapacity} kWp
+                  </p>
+                  <span className="text-[10px] font-bold text-indigo-700 mt-1 inline-flex items-center gap-1">
+                    <Zap size={11} /> Cumulative kWp Delivered
+                  </span>
+                </div>
+                <div className="w-10 h-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-sm shadow-indigo-500/20">
+                  <Activity size={18} />
+                </div>
               </div>
-            </div>
+            )}
 
-            <div className="p-4 rounded-2xl bg-amber-50/70 border border-amber-200/60 flex items-center justify-between">
-              <div>
-                <p className="text-[11px] font-bold text-amber-900/70 uppercase tracking-wider">
-                  Average Deal Size (Ticket)
-                </p>
-                <p className="text-2xl sm:text-3xl font-black text-amber-950 mt-0.5">
-                  ₹{avgHorizonDeal} Lakhs
-                </p>
-                <span className="text-[10px] font-bold text-amber-800 mt-1 inline-flex items-center gap-1">
-                  <Award size={11} /> Avg per Rooftop Customer
-                </span>
+            {isFinanceAuthorized ? (
+              <div className="p-4 rounded-2xl bg-amber-50/70 border border-amber-200/60 flex items-center justify-between">
+                <div>
+                  <p className="text-[11px] font-bold text-amber-900/70 uppercase tracking-wider">
+                    Average Deal Size (Ticket)
+                  </p>
+                  <p className="text-2xl sm:text-3xl font-black text-amber-950 mt-0.5">
+                    ₹{avgHorizonDeal} Lakhs
+                  </p>
+                  <span className="text-[10px] font-bold text-amber-800 mt-1 inline-flex items-center gap-1">
+                    <Award size={11} /> Avg per Rooftop Customer
+                  </span>
+                </div>
+                <div className="w-10 h-10 rounded-2xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-sm shadow-amber-500/20">
+                  <Sun size={18} />
+                </div>
               </div>
-              <div className="w-10 h-10 rounded-2xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-sm shadow-amber-500/20">
-                <Sun size={18} />
+            ) : (
+              <div className="p-4 rounded-2xl bg-amber-50/70 border border-amber-200/60 flex items-center justify-between">
+                <div>
+                  <p className="text-[11px] font-bold text-amber-900/70 uppercase tracking-wider">
+                    Average System Capacity
+                  </p>
+                  <p className="text-2xl sm:text-3xl font-black text-amber-950 mt-0.5">
+                    {avgHorizonDeal} kWp
+                  </p>
+                  <span className="text-[10px] font-bold text-amber-800 mt-1 inline-flex items-center gap-1">
+                    <Award size={11} /> Avg kWp per Installation
+                  </span>
+                </div>
+                <div className="w-10 h-10 rounded-2xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-sm shadow-amber-500/20">
+                  <Sun size={18} />
+                </div>
               </div>
-            </div>
+            )}
 
-            <div className="p-4 rounded-2xl bg-indigo-50/70 border border-indigo-200/60 flex items-center justify-between">
-              <div>
-                <p className="text-[11px] font-bold text-indigo-900/70 uppercase tracking-wider">
-                  Capacity Energized
-                </p>
-                <p className="text-2xl sm:text-3xl font-black text-indigo-950 mt-0.5">
-                  {totalHorizonCapacity} kWp
-                </p>
-                <span className="text-[10px] font-bold text-indigo-700 mt-1 inline-flex items-center gap-1">
-                  <Zap size={11} /> Cumulative kWp Delivered
-                </span>
+            {isFinanceAuthorized ? (
+              <div className="p-4 rounded-2xl bg-indigo-50/70 border border-indigo-200/60 flex items-center justify-between">
+                <div>
+                  <p className="text-[11px] font-bold text-indigo-900/70 uppercase tracking-wider">
+                    Capacity Energized
+                  </p>
+                  <p className="text-2xl sm:text-3xl font-black text-indigo-950 mt-0.5">
+                    {totalHorizonCapacity} kWp
+                  </p>
+                  <span className="text-[10px] font-bold text-indigo-700 mt-1 inline-flex items-center gap-1">
+                    <Zap size={11} /> Cumulative kWp Delivered
+                  </span>
+                </div>
+                <div className="w-10 h-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-sm shadow-indigo-500/20">
+                  <Activity size={18} />
+                </div>
               </div>
-              <div className="w-10 h-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-sm shadow-indigo-500/20">
-                <Activity size={18} />
+            ) : (
+              <div className="p-4 rounded-2xl bg-sky-50/70 border border-sky-200/60 flex items-center justify-between">
+                <div>
+                  <p className="text-[11px] font-bold text-sky-900/70 uppercase tracking-wider">
+                    Active Project Pipeline
+                  </p>
+                  <p className="text-2xl sm:text-3xl font-black text-sky-950 mt-0.5">
+                    {data.totalProjects || 11} Active Sites
+                  </p>
+                  <span className="text-[10px] font-bold text-sky-700 mt-1 inline-flex items-center gap-1">
+                    <HardHat size={11} /> Field Work On-Schedule
+                  </span>
+                </div>
+                <div className="w-10 h-10 rounded-2xl bg-sky-600 text-white flex items-center justify-center shrink-0 shadow-sm shadow-sky-500/20">
+                  <HardHat size={18} />
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
           {/* Primary Visual Chart: Clients (Bars) + Revenue (Curve) */}
@@ -664,8 +809,10 @@ export default function TenantDashboard() {
                 )}
                 {(horizonMetricFocus === 'both' || horizonMetricFocus === 'revenue') && (
                   <span className="flex items-center gap-2 text-slate-800">
-                    <span className="w-3.5 h-3.5 rounded-md bg-emerald-500" />
-                    Revenue Inflow (₹ Lakhs on Right Y-Axis)
+                    <span className={`w-3.5 h-3.5 rounded-md ${isFinanceAuthorized ? 'bg-emerald-500' : 'bg-indigo-600'}`} />
+                    {isFinanceAuthorized 
+                      ? "Revenue Inflow (₹ Lakhs on Right Y-Axis)" 
+                      : "Capacity Energized (kWp on Right Y-Axis)"}
                   </span>
                 )}
               </div>
@@ -698,9 +845,9 @@ export default function TenantDashboard() {
                       orientation="right"
                       axisLine={false} 
                       tickLine={false} 
-                      tick={{ fill: '#10b981', fontSize: 11, fontWeight: 700 }}
+                      tick={{ fill: isFinanceAuthorized ? '#10b981' : '#6366f1', fontSize: 11, fontWeight: 700 }}
                     />
-                    <Tooltip content={<HorizonChartTooltip />} />
+                    <Tooltip content={<HorizonChartTooltip isFinanceAuthorized={isFinanceAuthorized} />} />
 
                     {(horizonMetricFocus === 'both' || horizonMetricFocus === 'clients') && (
                       <Bar 
@@ -717,12 +864,12 @@ export default function TenantDashboard() {
                       <Line 
                         yAxisId="right"
                         type="monotone" 
-                        dataKey="revenue" 
-                        name="revenue"
-                        stroke="#10b981" 
+                        dataKey={isFinanceAuthorized ? "revenue" : "capacity"} 
+                        name={isFinanceAuthorized ? "revenue" : "capacity"} 
+                        stroke={isFinanceAuthorized ? "#10b981" : "#6366f1"} 
                         strokeWidth={3}
-                        dot={{ r: 5, fill: '#10b981', strokeWidth: 2, stroke: '#ffffff' }}
-                        activeDot={{ r: 7, fill: '#10b981', strokeWidth: 2, stroke: '#ffffff' }}
+                        dot={{ r: 5, fill: isFinanceAuthorized ? '#10b981' : '#6366f1', strokeWidth: 2, stroke: '#ffffff' }}
+                        activeDot={{ r: 7, fill: isFinanceAuthorized ? '#10b981' : '#6366f1', strokeWidth: 2, stroke: '#ffffff' }}
                       />
                     )}
                   </ComposedChart>
@@ -742,9 +889,9 @@ export default function TenantDashboard() {
                 <tr className="border-b border-slate-200 text-[11px] font-extrabold text-slate-500 uppercase tracking-wider">
                   <th className="py-3 px-3">Horizon Period</th>
                   <th className="py-3 px-3">Successful Clients</th>
-                  <th className="py-3 px-3">Realized Revenue</th>
+                  {isFinanceAuthorized && <th className="py-3 px-3">Realized Revenue</th>}
                   <th className="py-3 px-3">Capacity (kWp)</th>
-                  <th className="py-3 px-3">Avg Ticket Size</th>
+                  <th className="py-3 px-3">{isFinanceAuthorized ? "Avg Ticket Size" : "Avg System Size"}</th>
                   <th className="py-3 px-3">Growth Velocity</th>
                   <th className="py-3 px-3 text-right">Operational Status</th>
                 </tr>
@@ -758,7 +905,9 @@ export default function TenantDashboard() {
                         {row.clients} Clients
                       </span>
                     </td>
-                    <td className="py-3.5 px-3 font-black text-emerald-600">₹{row.revenue} Lakhs</td>
+                    {isFinanceAuthorized && (
+                      <td className="py-3.5 px-3 font-black text-emerald-600">₹{row.revenue} Lakhs</td>
+                    )}
                     <td className="py-3.5 px-3 text-slate-600 font-bold">{row.capacity} kWp</td>
                     <td className="py-3.5 px-3 text-slate-600">{row.avgDeal}</td>
                     <td className="py-3.5 px-3">
@@ -846,8 +995,8 @@ export default function TenantDashboard() {
         </div>
       </div>
 
-      {/* 7. CASHFLOW WATERFALL & REALIZATION */}
-      {(currentTab === 'all' || currentTab === 'financial') && (
+      {/* 7. CASHFLOW WATERFALL & REALIZATION (FINANCE AUTHORIZED ONLY) */}
+      {(currentTab === 'all' || currentTab === 'financial') && isFinanceAuthorized && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           
           {/* CHART 1: MONTHLY CAPACITY (kWp) & REVENUE (₹ Lakhs) - 7 COLS */}
@@ -962,7 +1111,7 @@ export default function TenantDashboard() {
                         tickLine={false} 
                         tick={{ fill: '#64748b', fontSize: 11 }}
                       />
-                      <Tooltip content={<CustomChartTooltip />} />
+                      <Tooltip content={<CustomChartTooltip isFinanceAuthorized={isFinanceAuthorized} />} />
 
                       {(activeMetric === 'both' || activeMetric === 'capacity') && (
                         <Area 
@@ -1101,6 +1250,214 @@ export default function TenantDashboard() {
               <span className="text-slate-500">Need full customer ledger statements?</span>
               <Link href="/tenant/finance" className="font-bold text-blue-600 hover:text-blue-700 inline-flex items-center gap-1">
                 Open Finance Hub <ArrowRight size={13} />
+              </Link>
+            </div>
+          </div>
+
+        </div>
+      )}
+
+      {/* 7-ALT. FIELD EXECUTION VELOCITY & CAPACITY TRAJECTORY (NON-FINANCE OPERATIONS VIEW) */}
+      {(currentTab === 'all' || currentTab === 'operations') && !isFinanceAuthorized && (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          
+          {/* CHART 1: MONTHLY CAPACITY COMMISSIONED (kWp) - 7 COLS */}
+          <div className="lg:col-span-7 bg-white/95 backdrop-blur-xs rounded-2xl sm:rounded-3xl p-6 sm:p-7 border border-slate-200/80 shadow-xs hover:shadow-lg transition-all duration-300 flex flex-col justify-between relative overflow-hidden group">
+            {/* Top Accent Stripe */}
+            <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-blue-500 via-sky-400 to-indigo-500" />
+            
+            <div>
+              {/* Chart Header & Controls */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6 pb-4 border-b border-slate-100">
+                <div>
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shadow-2xs">
+                      <Activity size={18} />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-extrabold text-slate-900 tracking-tight">
+                        Installation Velocity & Capacity Trajectory
+                      </h3>
+                      <p className="text-xs text-slate-500">Monthly solar capacity commissioned and synchronized (kWp)</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Timeframe Controls */}
+                <div className="flex items-center bg-slate-100/80 p-1 rounded-xl text-xs font-semibold text-slate-500">
+                  {(['6M', 'YTD'] as const).map(tf => (
+                    <button 
+                      key={tf}
+                      onClick={() => setTimeframe(tf)}
+                      className={`px-2 py-1 rounded-lg transition-all cursor-pointer ${timeframe === tf ? 'bg-white text-slate-900 font-bold shadow-2xs' : ''}`}
+                    >
+                      {tf}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Quick Chart Legend & Mini Stats */}
+              <div className="flex flex-wrap items-center justify-between gap-4 mb-4 px-1">
+                <div className="flex items-center gap-5 text-xs font-bold">
+                  <span className="flex items-center gap-1.5 text-slate-700">
+                    <span className="w-3 h-3 rounded-md bg-sky-500" />
+                    Capacity Commissioned (kWp)
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="text-slate-500">Fleet Energized:</span>
+                  <span className="font-extrabold text-blue-700 bg-blue-50 border border-blue-200/60 px-2.5 py-0.5 rounded-full">
+                    {totalCapacityKWp} kWp Delivered
+                  </span>
+                </div>
+              </div>
+
+              {/* Recharts Area Canvas */}
+              <div className="h-[280px] w-full pt-2">
+                {mounted ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={monthlyTrends} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="capacityGradientAlt" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#0284c7" stopOpacity={0.35} />
+                          <stop offset="95%" stopColor="#0284c7" stopOpacity={0.0} />
+                        </linearGradient>
+                      </defs>
+
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                      <XAxis 
+                        dataKey="month" 
+                        axisLine={false} 
+                        tickLine={false} 
+                        tick={{ fill: '#64748b', fontSize: 11, fontWeight: 600 }}
+                      />
+                      <YAxis 
+                        axisLine={false} 
+                        tickLine={false} 
+                        tick={{ fill: '#64748b', fontSize: 11 }}
+                      />
+                      <Tooltip content={<CustomChartTooltip isFinanceAuthorized={false} />} />
+
+                      <Area 
+                        type="monotone" 
+                        dataKey="capacity" 
+                        stroke="#0284c7" 
+                        strokeWidth={2.5} 
+                        fillOpacity={1} 
+                        fill="url(#capacityGradientAlt)" 
+                        dot={{ r: 4, fill: '#0284c7', strokeWidth: 2, stroke: '#ffffff' }}
+                        activeDot={{ r: 6, fill: '#0284c7', strokeWidth: 2, stroke: '#ffffff' }}
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-slate-400 text-xs">
+                    Loading graphics...
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Bottom Chart Footer Metrics */}
+            <div className="pt-4 mt-4 border-t border-slate-100 grid grid-cols-3 gap-2 text-center">
+              <div>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Avg Turnaround</p>
+                <p className="text-sm font-extrabold text-slate-800 mt-0.5">14.8 Days</p>
+              </div>
+              <div className="border-x border-slate-100">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Average System</p>
+                <p className="text-sm font-extrabold text-blue-600 mt-0.5">4.3 kWp</p>
+              </div>
+              <div>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Field Win-Rate</p>
+                <p className="text-sm font-extrabold text-emerald-600 mt-0.5">94.6%</p>
+              </div>
+            </div>
+          </div>
+
+          {/* FIELD MILESTONE EXECUTION & DISPATCH TRACKER - 5 COLS */}
+          <div className="lg:col-span-5 bg-white/95 backdrop-blur-xs rounded-2xl sm:rounded-3xl p-6 sm:p-7 border border-slate-200/80 shadow-xs hover:shadow-lg transition-all duration-300 flex flex-col justify-between relative overflow-hidden group">
+            {/* Top Accent Stripe */}
+            <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-emerald-500 via-teal-400 to-sky-500" />
+
+            <div>
+              <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shadow-2xs">
+                    <HardHat size={18} />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-extrabold text-slate-900 tracking-tight">
+                      Field Execution Milestones
+                    </h3>
+                    <p className="text-xs text-slate-500">Live operational velocity across project stages</p>
+                  </div>
+                </div>
+                <span className="text-[10px] font-extrabold text-slate-800 bg-slate-100 px-2.5 py-1 rounded-full border border-slate-200">
+                  {data.totalProjects || 14} Sites In-Flight
+                </span>
+              </div>
+
+              {/* Operational Milestone Progress Stack */}
+              <div className="space-y-4 my-2">
+                <div className="p-3 rounded-2xl bg-slate-50/70 border border-slate-100">
+                  <div className="flex items-center justify-between text-xs mb-1.5">
+                    <span className="font-bold text-slate-700">Structure & Rail Mounting</span>
+                    <span className="font-black text-amber-600">85% On-Schedule</span>
+                  </div>
+                  <div className="w-full bg-slate-200/70 rounded-full h-2 overflow-hidden">
+                    <div className="bg-amber-500 h-2 rounded-full" style={{ width: '85%' }} />
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-2xl bg-slate-50/70 border border-slate-100">
+                  <div className="flex items-center justify-between text-xs mb-1.5">
+                    <span className="font-bold text-slate-700">PV Modules & DC Solar Cabling</span>
+                    <span className="font-black text-blue-600">65% In-Progress</span>
+                  </div>
+                  <div className="w-full bg-slate-200/70 rounded-full h-2 overflow-hidden">
+                    <div className="bg-blue-500 h-2 rounded-full" style={{ width: '65%' }} />
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-2xl bg-slate-50/70 border border-slate-100">
+                  <div className="flex items-center justify-between text-xs mb-1.5">
+                    <span className="font-bold text-slate-700">Inverter Synchronization & Earthing</span>
+                    <span className="font-black text-indigo-600">40% Active</span>
+                  </div>
+                  <div className="w-full bg-slate-200/70 rounded-full h-2 overflow-hidden">
+                    <div className="bg-indigo-500 h-2 rounded-full" style={{ width: '40%' }} />
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-2xl bg-slate-50/70 border border-slate-100">
+                  <div className="flex items-center justify-between text-xs mb-1.5">
+                    <span className="font-bold text-slate-700">DISCOM Net-Metering & Inspection</span>
+                    <span className="font-black text-emerald-600">25% Queued</span>
+                  </div>
+                  <div className="w-full bg-slate-200/70 rounded-full h-2 overflow-hidden">
+                    <div className="bg-emerald-500 h-2 rounded-full" style={{ width: '25%' }} />
+                  </div>
+                </div>
+              </div>
+
+              {/* SLA Compliance Box */}
+              <div className="mt-5 pt-4 border-t border-slate-100 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  <ShieldCheck size={16} className="text-emerald-600 shrink-0" />
+                  <span className="text-[11px] font-semibold text-slate-600">
+                    DISCOM Net-Meter SLA: <strong>11.2 Days avg</strong> (Compliant)
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+              <span className="text-slate-500">Coordinate field technician schedule?</span>
+              <Link href="/tenant/installation" className="font-bold text-blue-600 hover:text-blue-700 inline-flex items-center gap-1">
+                Dispatch Board <ArrowRight size={13} />
               </Link>
             </div>
           </div>
@@ -1425,45 +1782,87 @@ export default function TenantDashboard() {
         <div className="lg:col-span-6 flex flex-col justify-between gap-4">
           
           {/* SOL MASCOT TIP CARD */}
-          <div className="rounded-2xl sm:rounded-3xl p-6 bg-gradient-to-br from-blue-50/90 via-sky-50/60 to-white border border-blue-200/70 relative overflow-hidden flex-1 flex flex-col justify-between shadow-xs">
-            <div className="flex items-start gap-3.5">
-              <div className="w-10 h-10 rounded-2xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-sm shadow-blue-500/20">
-                <Sparkles size={20} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-xs font-extrabold text-blue-900 uppercase tracking-wider">
-                    Sol&apos;s Revenue Optimization Tip
-                  </h4>
-                  <span className="text-[10px] font-bold text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full">
-                    AI Insight
-                  </span>
+          {isFinanceAuthorized ? (
+            <div className="rounded-2xl sm:rounded-3xl p-6 bg-gradient-to-br from-blue-50/90 via-sky-50/60 to-white border border-blue-200/70 relative overflow-hidden flex-1 flex flex-col justify-between shadow-xs">
+              <div className="flex items-start gap-3.5">
+                <div className="w-10 h-10 rounded-2xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-sm shadow-blue-500/20">
+                  <Sparkles size={20} />
                 </div>
-                <p className="text-xs text-slate-700 mt-2 leading-relaxed">
-                  Vendors who send an official <strong>WhereReady 60-second solar proposal via WhatsApp</strong> right at the customer&apos;s rooftop during the site survey close <strong>68% of deals</strong> before competitors can even generate an estimate.
-                </p>
-                <div className="mt-3">
-                  <Link 
-                    href="/tenant/quotations" 
-                    className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-700 hover:text-blue-800 transition-colors"
-                  >
-                    Generate Instant Quotation <ArrowRight size={13} />
-                  </Link>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-extrabold text-blue-900 uppercase tracking-wider">
+                      Sol&apos;s Revenue Optimization Tip
+                    </h4>
+                    <span className="text-[10px] font-bold text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full">
+                      AI Insight
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-700 mt-2 leading-relaxed">
+                    Vendors who send an official <strong>WhereReady 60-second solar proposal via WhatsApp</strong> right at the customer&apos;s rooftop during the site survey close <strong>68% of deals</strong> before competitors can even generate an estimate.
+                  </p>
+                  <div className="mt-3">
+                    <Link 
+                      href="/tenant/quotations" 
+                      className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-700 hover:text-blue-800 transition-colors"
+                    >
+                      Generate Instant Quotation <ArrowRight size={13} />
+                    </Link>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div className="pt-4 mt-4 border-t border-blue-200/60 grid grid-cols-2 gap-3 text-center">
-              <div>
-                <p className="text-[10px] font-bold text-blue-900/60 uppercase tracking-wider">Avg Time to Quote</p>
-                <p className="text-base font-black text-blue-900 mt-0.5">4.2 Minutes</p>
-              </div>
-              <div>
-                <p className="text-[10px] font-bold text-blue-900/60 uppercase tracking-wider">Survey to Win Ratio</p>
-                <p className="text-base font-black text-blue-900 mt-0.5">78.4%</p>
+              <div className="pt-4 mt-4 border-t border-blue-200/60 grid grid-cols-2 gap-3 text-center">
+                <div>
+                  <p className="text-[10px] font-bold text-blue-900/60 uppercase tracking-wider">Avg Time to Quote</p>
+                  <p className="text-base font-black text-blue-900 mt-0.5">4.2 Minutes</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-blue-900/60 uppercase tracking-wider">Survey to Win Ratio</p>
+                  <p className="text-base font-black text-blue-900 mt-0.5">78.4%</p>
+                </div>
               </div>
             </div>
-          </div>
+          ) : (
+            <div className="rounded-2xl sm:rounded-3xl p-6 bg-gradient-to-br from-blue-50/90 via-sky-50/60 to-white border border-blue-200/70 relative overflow-hidden flex-1 flex flex-col justify-between shadow-xs">
+              <div className="flex items-start gap-3.5">
+                <div className="w-10 h-10 rounded-2xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-sm shadow-blue-500/20">
+                  <Sparkles size={20} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-extrabold text-blue-900 uppercase tracking-wider">
+                      Sol&apos;s Field Excellence Tip
+                    </h4>
+                    <span className="text-[10px] font-bold text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full">
+                      Field Insight
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-700 mt-2 leading-relaxed">
+                    Engineers who capture <strong>complete rooftop shadow profiles and structural dimensions</strong> directly during the digital survey achieve <strong>100% first-pass DISCOM feasibility approvals</strong> without rework or site revisits.
+                  </p>
+                  <div className="mt-3">
+                    <Link 
+                      href="/tenant/surveys" 
+                      className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-700 hover:text-blue-800 transition-colors"
+                    >
+                      Dispatch Site Survey <ArrowRight size={13} />
+                    </Link>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-4 mt-4 border-t border-blue-200/60 grid grid-cols-2 gap-3 text-center">
+                <div>
+                  <p className="text-[10px] font-bold text-blue-900/60 uppercase tracking-wider">Avg Survey Time</p>
+                  <p className="text-base font-black text-blue-900 mt-0.5">28 Minutes</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-blue-900/60 uppercase tracking-wider">First-Pass Approval</p>
+                  <p className="text-base font-black text-blue-900 mt-0.5">94.6%</p>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* QUICK TELEMETRY CARD */}
           <div className="bg-white/95 backdrop-blur-xs rounded-2xl p-5 border border-slate-200/80 shadow-2xs flex items-center justify-between">
@@ -1615,10 +2014,11 @@ export default function TenantDashboard() {
 // HELPER COMPONENTS & TOOLTIPS
 // ----------------------------------------------------
 
-function HorizonChartTooltip({ active, payload, label }: any) {
+function HorizonChartTooltip({ active, payload, label, isFinanceAuthorized = true }: any) {
   if (active && payload && payload.length) {
     const clientsEntry = payload.find((p: any) => p.dataKey === 'clients');
-    const revenueEntry = payload.find((p: any) => p.dataKey === 'revenue');
+    const revenueEntry = isFinanceAuthorized ? payload.find((p: any) => p.dataKey === 'revenue') : null;
+    const capacityEntry = payload.find((p: any) => p.dataKey === 'capacity');
     const pData = payload[0]?.payload;
     return (
       <div className="bg-slate-950/95 backdrop-blur-md text-white p-3.5 rounded-2xl border border-slate-800 shadow-xl text-xs space-y-2 min-w-[200px]">
@@ -1638,7 +2038,7 @@ function HorizonChartTooltip({ active, payload, label }: any) {
             <span className="font-black text-white">{clientsEntry.value} Clients</span>
           </div>
         )}
-        {revenueEntry && (
+        {revenueEntry && isFinanceAuthorized && (
           <div className="flex items-center justify-between gap-3">
             <span className="flex items-center gap-1.5 text-emerald-400">
               <span className="w-2 h-2 rounded-full bg-emerald-400" /> Revenue Realized:
@@ -1646,15 +2046,15 @@ function HorizonChartTooltip({ active, payload, label }: any) {
             <span className="font-black text-white">₹{revenueEntry.value} Lakhs</span>
           </div>
         )}
-        {pData?.capacity && (
+        {(pData?.capacity || capacityEntry) && (
           <div className="flex items-center justify-between gap-3 pt-1 border-t border-slate-800/80 text-[11px]">
             <span className="text-slate-400">Capacity Energized:</span>
-            <span className="font-bold text-amber-300">{pData.capacity} kWp</span>
+            <span className="font-bold text-amber-300">{pData?.capacity || capacityEntry?.value} kWp</span>
           </div>
         )}
         {pData?.avgDeal && (
           <div className="flex items-center justify-between gap-3 text-[11px]">
-            <span className="text-slate-400">Avg Deal Size:</span>
+            <span className="text-slate-400">{isFinanceAuthorized ? "Avg Deal Size:" : "Avg System Size:"}</span>
             <span className="font-bold text-slate-200">{pData.avgDeal}</span>
           </div>
         )}
@@ -1780,15 +2180,16 @@ function ExecutionPhaseItem({
   );
 }
 
-function CustomChartTooltip({ active, payload, label }: any) {
+function CustomChartTooltip({ active, payload, label, isFinanceAuthorized = true }: any) {
   if (active && payload && payload.length) {
+    const visibleEntries = payload.filter((entry: any) => isFinanceAuthorized || entry.name !== 'revenue');
     return (
       <div className="bg-slate-950/95 backdrop-blur-md text-white p-3.5 rounded-2xl border border-slate-800 shadow-xl text-xs space-y-2 min-w-[170px]">
         <p className="font-extrabold text-slate-300 uppercase tracking-wider text-[10px]">
           {label} 2026
         </p>
         <div className="h-px bg-slate-800 my-1" />
-        {payload.map((entry: any) => (
+        {visibleEntries.map((entry: any) => (
           <div key={entry.name} className="flex items-center justify-between gap-3">
             <span className="flex items-center gap-1.5 text-slate-300">
               <span className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }} />
