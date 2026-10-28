@@ -32,18 +32,29 @@ router.get('/api/tenant/users', requireTenantAuth, async (req, res) => {
         permissions: true,
         mustChangePassword: true,
         createdAt: true,
-        updatedAt: true
+        updatedAt: true,
+        staffProfile: {
+          select: {
+            id: true,
+            employeeId: true,
+            department: true,
+            designation: true,
+            status: true
+          }
+        }
       },
       orderBy: { createdAt: 'desc' }
     });
 
     // Format for Users & Permissions screen
     const formatted = users.map(u => {
-      let department = 'Operations';
-      if (u.role === 'TENANT_ADMIN') department = 'Executive Management';
-      else if (u.permissions?.modules?.includes('finance')) department = 'Finance & Accounts';
-      else if (u.permissions?.modules?.includes('leads') || u.permissions?.modules?.includes('crm')) department = 'Sales & CRM';
-      else if (u.permissions?.modules?.includes('surveys') || u.permissions?.modules?.includes('installations')) department = 'Field Engineering';
+      let department = u.staffProfile?.department || 'Operations';
+      if (!u.staffProfile) {
+        if (u.role === 'TENANT_ADMIN') department = 'Executive Management';
+        else if (u.permissions?.modules?.includes('finance')) department = 'Finance & Accounts';
+        else if (u.permissions?.modules?.includes('leads') || u.permissions?.modules?.includes('crm')) department = 'Sales & CRM';
+        else if (u.permissions?.modules?.includes('surveys') || u.permissions?.modules?.includes('installations')) department = 'Field Engineering';
+      }
 
       return {
         id: u.id,
@@ -51,6 +62,7 @@ router.get('/api/tenant/users', requireTenantAuth, async (req, res) => {
         email: u.email,
         role: u.role,
         department,
+        staffProfile: u.staffProfile || null,
         permissions: u.permissions || {},
         mfaEnabled: true,
         status: u.mustChangePassword ? 'INVITED' : 'ACTIVE',
@@ -69,7 +81,7 @@ router.get('/api/tenant/users', requireTenantAuth, async (req, res) => {
 // Invite/create new team member
 router.post('/api/tenant/users/invite', requireTenantAuth, async (req, res) => {
   try {
-    const { name, email, role, department, permissions } = req.body;
+    const { name, email, role, department, permissions, staffId } = req.body;
 
     if (!name || !name.trim()) return res.status(400).json({ error: 'Name is required' });
     if (!email || !email.trim()) return res.status(400).json({ error: 'Email is required' });
@@ -98,6 +110,19 @@ router.post('/api/tenant/users/invite', requireTenantAuth, async (req, res) => {
         }
       }
     });
+
+    // Auto-link to staff profile if specified or matching by email
+    if (staffId) {
+      await prisma.staff.update({
+        where: { id: staffId, tenantId: req.user.tenantId },
+        data: { userId: newUser.id }
+      }).catch(() => null);
+    } else {
+      await prisma.staff.updateMany({
+        where: { email: email.trim().toLowerCase(), tenantId: req.user.tenantId, userId: null },
+        data: { userId: newUser.id }
+      }).catch(() => null);
+    }
 
     // Record audit log
     await prisma.auditLog.create({

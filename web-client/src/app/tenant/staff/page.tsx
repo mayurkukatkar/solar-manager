@@ -46,7 +46,8 @@ import {
   Sparkles,
   GitBranch,
   ShieldCheck,
-  UserX
+  UserX,
+  ShieldOff
 } from "lucide-react";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
@@ -119,6 +120,25 @@ interface StaffMember {
   createdAt: string;
 }
 
+interface UserAccount {
+  id: string;
+  name: string;
+  email: string;
+  role: "TENANT_ADMIN" | "TENANT_SUB_ADMIN";
+  department: string;
+  staffProfile?: {
+    id: string;
+    employeeId: string;
+    department: string;
+    designation: string;
+    status: string;
+  } | null;
+  permissions?: any;
+  mfaEnabled: boolean;
+  status: "ACTIVE" | "INVITED" | "SUSPENDED";
+  lastActive: string;
+}
+
 interface Department {
   id: string;
   name: string;
@@ -180,7 +200,7 @@ const AVAILABLE_MODULES = [
 
 export default function StaffPage() {
   // Navigation tabs
-  const [activeTab, setActiveTab] = useState<"overview" | "directory" | "departments" | "assignments" | "hierarchy">("directory");
+  const [activeTab, setActiveTab] = useState<"overview" | "directory" | "permissions" | "departments" | "assignments" | "hierarchy">("directory");
 
   // Core data states
   const [staffList, setStaffList] = useState<StaffMember[]>([]);
@@ -190,7 +210,7 @@ export default function StaffPage() {
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<"table" | "grid">("table");
 
-  // Filtering & Pagination
+  // Filtering & Pagination for Staff Directory
   const [search, setSearch] = useState("");
   const [filterDept, setFilterDept] = useState("ALL");
   const [filterStatus, setFilterStatus] = useState("ALL");
@@ -200,6 +220,29 @@ export default function StaffPage() {
   const [pageSize, setPageSize] = useState(15);
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
+
+  // Users & RBAC Permissions state
+  const [usersList, setUsersList] = useState<UserAccount[]>([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [userSearch, setUserSearch] = useState("");
+  const [userRoleFilter, setUserRoleFilter] = useState("ALL");
+  const [showInviteUserModal, setShowInviteUserModal] = useState(false);
+  const [editingUserPerms, setEditingUserPerms] = useState<UserAccount | null>(null);
+  const [userPermsForm, setUserPermsForm] = useState<{ role: "TENANT_ADMIN" | "TENANT_SUB_ADMIN"; modules: string[] }>({
+    role: "TENANT_SUB_ADMIN",
+    modules: ["leads", "crm", "projects", "surveys", "quotations"]
+  });
+
+  const [inviteUserForm, setInviteUserForm] = useState({
+    staffId: "",
+    name: "",
+    email: "",
+    role: "TENANT_SUB_ADMIN" as "TENANT_ADMIN" | "TENANT_SUB_ADMIN",
+    department: "Field Engineering",
+    permissions: {
+      modules: ["leads", "crm", "projects", "surveys", "quotations"]
+    }
+  });
 
   // Modals & Drawers
   const [showAddModal, setShowAddModal] = useState(false);
@@ -260,6 +303,25 @@ export default function StaffPage() {
     }
   }, [feedbackMsg]);
 
+  // URL Tab Parameter Detection
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const urlParams = new URLSearchParams(window.location.search);
+      const tabParam = urlParams.get("tab");
+      if (tabParam === "permissions") {
+        setActiveTab("permissions");
+      } else if (tabParam === "overview") {
+        setActiveTab("overview");
+      } else if (tabParam === "departments") {
+        setActiveTab("departments");
+      } else if (tabParam === "assignments") {
+        setActiveTab("assignments");
+      } else if (tabParam === "hierarchy") {
+        setActiveTab("hierarchy");
+      }
+    }
+  }, []);
+
   // Fetch Overview Metrics
   const fetchOverview = async () => {
     try {
@@ -287,6 +349,19 @@ export default function StaffPage() {
       setProjects(res.data.projects || []);
     } catch (err) {
       console.error("Failed to fetch projects:", err);
+    }
+  };
+
+  // Fetch Users & RBAC
+  const fetchUsers = async () => {
+    try {
+      setUsersLoading(true);
+      const res = await axios.get(`${API}/api/tenant/users`, { withCredentials: true });
+      setUsersList(res.data.users || []);
+    } catch (err) {
+      console.error("Failed to fetch tenant users:", err);
+    } finally {
+      setUsersLoading(false);
     }
   };
 
@@ -327,6 +402,7 @@ export default function StaffPage() {
     fetchOverview();
     fetchDepartments();
     fetchProjects();
+    fetchUsers();
   }, [page, pageSize, filterDept, filterStatus, filterType, filterAccount]);
 
   // Search debounce
@@ -369,7 +445,7 @@ export default function StaffPage() {
     });
   };
 
-  // Toggle module permissions in form
+  // Toggle module permissions in staff form
   const handleToggleModule = (modKey: string) => {
     setFormData(prev => {
       const exists = prev.permissions.includes(modKey);
@@ -471,6 +547,7 @@ export default function StaffPage() {
         setShowAddModal(false);
         fetchStaff();
         fetchOverview();
+        fetchUsers();
         if (selectedStaffProfile?.id === editingStaff.id) {
           handleOpenProfile(editingStaff.id);
         }
@@ -513,6 +590,7 @@ export default function StaffPage() {
 
         fetchStaff();
         fetchOverview();
+        fetchUsers();
       }
     } catch (err: any) {
       setFeedbackMsg({ type: "error", text: err.response?.data?.error || "Operation failed" });
@@ -576,6 +654,7 @@ export default function StaffPage() {
       setFeedbackMsg({ type: "success", text: res.data?.message || "Account updated" });
       fetchStaff();
       fetchOverview();
+      fetchUsers();
       if (selectedStaffProfile?.id === staff.id) {
         handleOpenProfile(staff.id);
       }
@@ -596,6 +675,7 @@ export default function StaffPage() {
       setFeedbackMsg({ type: "success", text: "Login access revoked. Employment record preserved." });
       fetchStaff();
       fetchOverview();
+      fetchUsers();
       if (selectedStaffProfile?.id === staff.id) {
         handleOpenProfile(staff.id);
       }
@@ -623,6 +703,7 @@ export default function StaffPage() {
       }
       fetchStaff();
       fetchOverview();
+      fetchUsers();
     } catch (err: any) {
       setFeedbackMsg({ type: "error", text: err.response?.data?.error || "Failed to remove staff" });
     } finally {
@@ -716,6 +797,155 @@ export default function StaffPage() {
     }
   };
 
+  // ----------------------------------------------------------------------
+  // USERS & RBAC PERMISSIONS ACTIONS
+  // ----------------------------------------------------------------------
+  const handleOpenEditUserPerms = (user: UserAccount) => {
+    setEditingUserPerms(user);
+    const existingModules = Array.isArray(user.permissions?.modules)
+      ? user.permissions.modules
+      : (Array.isArray(user.permissions) ? user.permissions : ["leads", "crm", "projects", "surveys", "quotations"]);
+
+    setUserPermsForm({
+      role: user.role,
+      modules: existingModules
+    });
+  };
+
+  const handleToggleEditUserModule = (modKey: string) => {
+    setUserPermsForm(prev => ({
+      ...prev,
+      modules: prev.modules.includes(modKey)
+        ? prev.modules.filter(m => m !== modKey)
+        : [...prev.modules, modKey]
+    }));
+  };
+
+  const handleSaveUserPermissions = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingUserPerms) return;
+
+    try {
+      setActionLoading(true);
+      await axios.patch(
+        `${API}/api/tenant/users/${editingUserPerms.id}/role`,
+        {
+          role: userPermsForm.role,
+          permissions: { modules: userPermsForm.modules }
+        },
+        { withCredentials: true }
+      );
+
+      setFeedbackMsg({ type: "success", text: `Permissions updated for ${editingUserPerms.name}` });
+      setEditingUserPerms(null);
+      fetchUsers();
+      fetchStaff();
+    } catch (err: any) {
+      setFeedbackMsg({ type: "error", text: err.response?.data?.error || "Failed to update permissions" });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleResetUserPasswordAction = async (userId: string, email: string) => {
+    if (!confirm(`Reset credentials for ${email}? A new temporary password will be generated.`)) return;
+
+    try {
+      setActionLoading(true);
+      const res = await axios.post(`${API}/api/tenant/users/${userId}/reset-password`, {}, { withCredentials: true });
+      if (res.data?.tempPassword) {
+        setTempPasswordModal({
+          user: email,
+          pass: res.data.tempPassword
+        });
+      }
+      setFeedbackMsg({ type: "success", text: "Password reset successfully" });
+      fetchUsers();
+    } catch (err: any) {
+      setFeedbackMsg({ type: "error", text: err.response?.data?.error || "Failed to reset password" });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleDeleteUserAccountAction = async (userId: string, name: string) => {
+    if (!confirm(`Revoke application login account for ${name}? Their employment profile and project assignments remain preserved.`)) return;
+
+    try {
+      setActionLoading(true);
+      await axios.delete(`${API}/api/tenant/users/${userId}`, { withCredentials: true });
+      setFeedbackMsg({ type: "success", text: `User account removed for ${name}. Staff profile preserved.` });
+      fetchUsers();
+      fetchStaff();
+      fetchOverview();
+    } catch (err: any) {
+      setFeedbackMsg({ type: "error", text: err.response?.data?.error || "Failed to remove user account" });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleInviteUserSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inviteUserForm.name.trim() || !inviteUserForm.email.trim()) {
+      alert("Name and email are required");
+      return;
+    }
+
+    try {
+      setActionLoading(true);
+      const res = await axios.post(
+        `${API}/api/tenant/users/invite`,
+        inviteUserForm,
+        { withCredentials: true }
+      );
+
+      setShowInviteUserModal(false);
+      setFeedbackMsg({ type: "success", text: `User account invited successfully for ${inviteUserForm.email}` });
+
+      if (res.data?.tempPassword) {
+        setTempPasswordModal({
+          user: inviteUserForm.email,
+          pass: res.data.tempPassword
+        });
+      }
+
+      setInviteUserForm({
+        staffId: "",
+        name: "",
+        email: "",
+        role: "TENANT_SUB_ADMIN",
+        department: "Field Engineering",
+        permissions: { modules: ["leads", "crm", "projects", "surveys", "quotations"] }
+      });
+
+      fetchUsers();
+      fetchStaff();
+      fetchOverview();
+    } catch (err: any) {
+      setFeedbackMsg({ type: "error", text: err.response?.data?.error || "Failed to invite user" });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleSelectStaffForInvite = (staffId: string) => {
+    if (!staffId) {
+      setInviteUserForm(prev => ({ ...prev, staffId: "", name: "", email: "" }));
+      return;
+    }
+    const s = staffList.find(item => item.id === staffId);
+    if (s) {
+      setInviteUserForm(prev => ({
+        ...prev,
+        staffId: s.id,
+        name: s.name,
+        email: s.email || "",
+        department: s.department
+      }));
+    }
+  };
+
   // Export Staff Directory to CSV
   const handleExportCSV = () => {
     if (staffList.length === 0) {
@@ -799,6 +1029,23 @@ export default function StaffPage() {
     return "text-slate-700 bg-slate-100 border-slate-200";
   };
 
+  // Filtered Users for RBAC tab
+  const filteredUsers = useMemo(() => {
+    return usersList.filter(u => {
+      if (userRoleFilter !== "ALL" && u.role !== userRoleFilter) return false;
+      if (userSearch) {
+        return (
+          u.name.toLowerCase().includes(userSearch.toLowerCase()) ||
+          u.email.toLowerCase().includes(userSearch.toLowerCase())
+        );
+      }
+      return true;
+    });
+  }, [usersList, userRoleFilter, userSearch]);
+
+  const adminUsersCount = usersList.filter(u => u.role === "TENANT_ADMIN").length;
+  const subAdminUsersCount = usersList.filter(u => u.role === "TENANT_SUB_ADMIN").length;
+
   // Reset all active filters
   const resetFilters = () => {
     setSearch("");
@@ -836,7 +1083,7 @@ export default function StaffPage() {
             <div>
               <h1 className="text-2xl font-bold tracking-tight text-slate-900">Staff & Workforce Management</h1>
               <p className="text-sm text-slate-500 mt-0.5">
-                Unified workforce directory, field technician assignments, organizational hierarchy, and operational accountability.
+                Unified workforce directory, field technician assignments, organizational hierarchy, and RBAC permissions.
               </p>
             </div>
           </div>
@@ -844,11 +1091,11 @@ export default function StaffPage() {
 
         <div className="flex items-center gap-2.5 flex-wrap">
           <button
-            onClick={() => { fetchStaff(); fetchOverview(); }}
+            onClick={() => { fetchStaff(); fetchOverview(); fetchUsers(); }}
             className="p-2.5 text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 hover:text-slate-900 transition-colors shadow-sm"
             title="Refresh Data"
           >
-            <RefreshCw size={16} className={loading ? "animate-spin text-blue-600" : ""} />
+            <RefreshCw size={16} className={loading || usersLoading ? "animate-spin text-blue-600" : ""} />
           </button>
 
           <button
@@ -879,6 +1126,17 @@ export default function StaffPage() {
           }`}
         >
           <Users size={15} /> Staff Directory ({totalCount})
+        </button>
+
+        <button
+          onClick={() => setActiveTab("permissions")}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shrink-0 ${
+            activeTab === "permissions"
+              ? "bg-white text-purple-900 shadow-sm border border-purple-200"
+              : "text-slate-600 hover:text-slate-900 hover:bg-white/50"
+          }`}
+        >
+          <Shield size={15} className="text-purple-600" /> Users & RBAC Permissions ({usersList.length})
         </button>
 
         <button
@@ -926,6 +1184,191 @@ export default function StaffPage() {
         </button>
       </div>
 
+      {/* TAB: USERS & RBAC PERMISSIONS */}
+      {activeTab === "permissions" && (
+        <div className="space-y-6 animate-in fade-in duration-200">
+          {/* PERMISSIONS KPI CARDS */}
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Users</span>
+                <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+                  <UserCheck size={18} />
+                </div>
+              </div>
+              <p className="text-2xl font-bold text-slate-900">{usersList.length}</p>
+              <p className="text-xs text-slate-400 mt-1">Authorized system logins</p>
+            </div>
+
+            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Tenant Admins</span>
+                <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                  <Shield size={18} />
+                </div>
+              </div>
+              <p className="text-2xl font-bold text-emerald-600">{adminUsersCount}</p>
+              <p className="text-xs text-slate-400 mt-1">Global enterprise privileges</p>
+            </div>
+
+            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Sub-Admins</span>
+                <div className="w-8 h-8 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center">
+                  <Lock size={18} />
+                </div>
+              </div>
+              <p className="text-2xl font-bold text-purple-600">{subAdminUsersCount}</p>
+              <p className="text-xs text-slate-400 mt-1">Granular module-level control</p>
+            </div>
+
+            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Linked to Staff</span>
+                <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
+                  <Users size={18} />
+                </div>
+              </div>
+              <p className="text-2xl font-bold text-amber-600">{usersList.filter(u => u.staffProfile).length}</p>
+              <p className="text-xs text-slate-400 mt-1">Workforce identity linked</p>
+            </div>
+          </div>
+
+          {/* ACTION & SEARCH BAR */}
+          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+            <div className="p-4 border-b border-slate-100 flex flex-col md:flex-row gap-4 justify-between items-center bg-slate-50/50">
+              <div className="flex items-center gap-2 overflow-x-auto w-full md:w-auto">
+                {["ALL", "TENANT_ADMIN", "TENANT_SUB_ADMIN"].map((rf) => (
+                  <button
+                    key={rf}
+                    onClick={() => setUserRoleFilter(rf)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                      userRoleFilter === rf
+                        ? "bg-slate-900 text-white shadow-sm"
+                        : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
+                    }`}
+                  >
+                    {rf === "TENANT_ADMIN" ? "Admins" : rf === "TENANT_SUB_ADMIN" ? "Sub-Admins" : "All Accounts"}
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex items-center gap-3 w-full md:w-auto">
+                <div className="relative w-full md:w-72">
+                  <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Search users by name or email..."
+                    value={userSearch}
+                    onChange={e => setUserSearch(e.target.value)}
+                    className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-xs outline-none focus:border-slate-900 transition-colors"
+                  />
+                </div>
+
+                <button
+                  onClick={() => setShowInviteUserModal(true)}
+                  className="bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 shrink-0 shadow-sm"
+                >
+                  <UserPlus size={15} /> Invite User
+                </button>
+              </div>
+            </div>
+
+            {/* USERS LIST */}
+            <div className="divide-y divide-slate-100">
+              {usersLoading ? (
+                <div className="py-16 text-center space-y-3">
+                  <div className="inline-block animate-spin rounded-full h-8 w-8 border-2 border-slate-900 border-t-transparent" />
+                  <p className="text-xs font-bold text-slate-500">Loading user accounts...</p>
+                </div>
+              ) : filteredUsers.length === 0 ? (
+                <div className="py-16 text-center text-slate-400 text-xs font-medium">
+                  No user accounts found matching your query.
+                </div>
+              ) : (
+                filteredUsers.map((user) => (
+                  <div key={user.id} className="p-5 hover:bg-slate-50/80 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="space-y-1.5">
+                      <div className="flex items-center gap-2.5 flex-wrap">
+                        <span className="font-bold text-slate-900 text-sm">{user.name}</span>
+                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
+                          user.role === "TENANT_ADMIN"
+                            ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                            : "bg-purple-50 text-purple-800 border-purple-200"
+                        }`}>
+                          {user.role === "TENANT_ADMIN" ? "TENANT ADMIN" : "SUB-ADMIN"}
+                        </span>
+                        {user.staffProfile ? (
+                          <span className="text-[10px] font-mono font-bold bg-slate-100 text-slate-700 px-2 py-0.5 rounded border border-slate-200">
+                            {user.staffProfile.employeeId} • {user.staffProfile.department}
+                          </span>
+                        ) : (
+                          <span className="text-[10px] px-2 py-0.5 rounded bg-slate-100 text-slate-500">
+                            {user.department}
+                          </span>
+                        )}
+                        {user.status === "INVITED" && (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200">
+                            Pending Password Setup
+                          </span>
+                        )}
+                      </div>
+
+                      <p className="text-xs text-slate-500 font-mono">{user.email}</p>
+
+                      <div className="flex items-center gap-2 flex-wrap pt-0.5">
+                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Module Access:</span>
+                        {user.role === "TENANT_ADMIN" ? (
+                          <span className="text-xs text-emerald-700 font-semibold flex items-center gap-1">
+                            <ShieldCheck size={13} /> Full Global Access to All Modules
+                          </span>
+                        ) : user.permissions?.modules?.length ? (
+                          user.permissions.modules.map((m: string) => (
+                            <span key={m} className="text-[10px] font-bold bg-slate-100 text-slate-700 px-2 py-0.5 rounded border border-slate-200">
+                              {m}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-xs text-slate-400 italic">No module permissions assigned</span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                      {user.role !== "TENANT_ADMIN" && (
+                        <button
+                          onClick={() => handleOpenEditUserPerms(user)}
+                          className="px-3 py-1.5 text-xs font-bold text-slate-700 bg-white hover:bg-slate-100 border border-slate-200 rounded-xl flex items-center gap-1.5 shadow-xs transition-colors"
+                          title="Configure Module Access"
+                        >
+                          <Shield size={13} className="text-purple-600" /> Permissions
+                        </button>
+                      )}
+
+                      <button
+                        onClick={() => handleResetUserPasswordAction(user.id, user.email)}
+                        className="px-3 py-1.5 text-xs font-bold text-slate-700 bg-white hover:bg-slate-100 border border-slate-200 rounded-xl flex items-center gap-1.5 shadow-xs transition-colors"
+                        title="Generate New Temporary Password"
+                      >
+                        <Key size={13} className="text-amber-500" /> Reset Password
+                      </button>
+
+                      <button
+                        onClick={() => handleDeleteUserAccountAction(user.id, user.name)}
+                        className="p-2 text-slate-400 hover:text-rose-600 rounded-xl hover:bg-rose-50 transition-colors"
+                        title="Revoke User Access"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* TAB 1: WORKFORCE OVERVIEW */}
       {activeTab === "overview" && (
         <div className="space-y-6">
@@ -968,7 +1411,7 @@ export default function StaffPage() {
             </div>
 
             <div 
-              onClick={() => { setActiveTab("directory"); setFilterAccount("WITH_ACCOUNT"); }}
+              onClick={() => setActiveTab("permissions")}
               className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm hover:border-purple-300 transition-all cursor-pointer group"
             >
               <div className="flex items-center justify-between mb-3">
@@ -1689,6 +2132,242 @@ export default function StaffPage() {
         </div>
       )}
 
+      {/* EDIT USER PERMISSIONS MODAL */}
+      {editingUserPerms && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-200 p-6 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <h3 className="text-base font-bold text-slate-900">RBAC Permissions — {editingUserPerms.name}</h3>
+                <p className="text-xs text-slate-500">{editingUserPerms.email}</p>
+              </div>
+              <button onClick={() => setEditingUserPerms(null)} className="text-slate-400 hover:text-slate-700">
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveUserPermissions} className="space-y-4">
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">Access Role</label>
+                <select
+                  value={userPermsForm.role}
+                  onChange={e => setUserPermsForm({ ...userPermsForm, role: e.target.value as any })}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-800 bg-white"
+                >
+                  <option value="TENANT_SUB_ADMIN">Sub-Admin (Granular Module Access)</option>
+                  <option value="TENANT_ADMIN">Tenant Admin (Full Global System Access)</option>
+                </select>
+              </div>
+
+              {userPermsForm.role === "TENANT_SUB_ADMIN" ? (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">
+                      Accessible Modules ({userPermsForm.modules.length}):
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setUserPermsForm(prev => ({ ...prev, modules: AVAILABLE_MODULES.map(m => m.key) }))}
+                        className="text-[11px] font-bold text-blue-600 hover:text-blue-800"
+                      >
+                        Select All
+                      </button>
+                      <span className="text-slate-300">•</span>
+                      <button
+                        type="button"
+                        onClick={() => setUserPermsForm(prev => ({ ...prev, modules: [] }))}
+                        className="text-[11px] font-bold text-slate-500 hover:text-slate-700"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 bg-slate-50 p-3 rounded-2xl border border-slate-100 max-h-56 overflow-y-auto">
+                    {AVAILABLE_MODULES.map(m => {
+                      const checked = userPermsForm.modules.includes(m.key);
+                      return (
+                        <label
+                          key={m.key}
+                          onClick={() => handleToggleEditUserModule(m.key)}
+                          className={`flex items-center gap-2 p-2 rounded-xl text-xs font-semibold cursor-pointer border transition-colors ${
+                            checked ? "bg-emerald-50 text-emerald-800 border-emerald-200" : "bg-white text-slate-600 border-slate-200"
+                          }`}
+                        >
+                          <input type="checkbox" checked={checked} onChange={() => {}} className="rounded text-emerald-600" />
+                          <span>{m.label}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : (
+                <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-200 text-xs text-emerald-800 font-medium">
+                  Tenant Admins have unrestricted administrative rights across all modules, billing, settings, and team records.
+                </div>
+              )}
+
+              <div className="pt-2 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingUserPerms(null)}
+                  className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 rounded-xl font-bold text-xs text-slate-700"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={actionLoading}
+                  className="flex-1 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold text-xs shadow-sm flex items-center justify-center gap-1.5"
+                >
+                  Save Permissions
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* INVITE USER MODAL */}
+      {showInviteUserModal && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-200 p-6 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <h3 className="text-base font-bold text-slate-900">Invite System User</h3>
+                <p className="text-xs text-slate-500">Provision credentials and RBAC access</p>
+              </div>
+              <button onClick={() => setShowInviteUserModal(false)} className="text-slate-400 hover:text-slate-700">
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleInviteUserSubmit} className="space-y-4 max-h-[70vh] overflow-y-auto custom-scrollbar">
+              {/* Option to link existing staff */}
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">Select Staff Member (Optional)</label>
+                <select
+                  value={inviteUserForm.staffId}
+                  onChange={e => handleSelectStaffForInvite(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-800 bg-white"
+                >
+                  <option value="">-- Manual Account / Standalone User --</option>
+                  {staffList.filter(s => !s.userId).map(s => (
+                    <option key={s.id} value={s.id}>
+                      {s.name} ({s.employeeId}) • {s.department}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[11px] text-slate-400">Selecting a staff member auto-fills their details and links their profile.</p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-600">Full Name *</label>
+                  <input
+                    required
+                    type="text"
+                    value={inviteUserForm.name}
+                    onChange={e => setInviteUserForm({ ...inviteUserForm, name: e.target.value })}
+                    placeholder="e.g. Ramesh Kulkarni"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-medium text-slate-800"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-600">Email Address *</label>
+                  <input
+                    required
+                    type="email"
+                    value={inviteUserForm.email}
+                    onChange={e => setInviteUserForm({ ...inviteUserForm, email: e.target.value })}
+                    placeholder="ramesh@solarcompany.in"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-medium text-slate-800"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-600">Role</label>
+                  <select
+                    value={inviteUserForm.role}
+                    onChange={e => setInviteUserForm({ ...inviteUserForm, role: e.target.value as any })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-800 bg-white"
+                  >
+                    <option value="TENANT_SUB_ADMIN">Sub-Admin (Restricted)</option>
+                    <option value="TENANT_ADMIN">Tenant Admin (Full Access)</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-600">Department</label>
+                  <select
+                    value={inviteUserForm.department}
+                    onChange={e => setInviteUserForm({ ...inviteUserForm, department: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-medium text-slate-800 bg-white"
+                  >
+                    {departments.map(d => (
+                      <option key={d.id} value={d.name}>{d.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {inviteUserForm.role !== "TENANT_ADMIN" && (
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-600 uppercase tracking-wider block">
+                    Module Access Permissions
+                  </label>
+                  <div className="grid grid-cols-2 gap-2 bg-slate-50 p-3 rounded-2xl border border-slate-100">
+                    {AVAILABLE_MODULES.map(m => {
+                      const checked = inviteUserForm.permissions.modules.includes(m.key);
+                      return (
+                        <label
+                          key={m.key}
+                          onClick={() => {
+                            const cur = inviteUserForm.permissions.modules;
+                            const next = cur.includes(m.key) ? cur.filter(x => x !== m.key) : [...cur, m.key];
+                            setInviteUserForm(prev => ({
+                              ...prev,
+                              permissions: { modules: next }
+                            }));
+                          }}
+                          className={`flex items-center gap-2 p-2 rounded-xl text-xs font-semibold cursor-pointer border transition-colors ${
+                            checked ? "bg-emerald-50 text-emerald-800 border-emerald-200" : "bg-white text-slate-600 border-slate-200"
+                          }`}
+                        >
+                          <input type="checkbox" checked={checked} onChange={() => {}} className="rounded text-emerald-600" />
+                          <span>{m.label}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              <div className="pt-2 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowInviteUserModal(false)}
+                  className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 rounded-xl font-bold text-xs text-slate-700"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={actionLoading}
+                  className="flex-1 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold text-xs shadow-sm flex items-center justify-center gap-1.5"
+                >
+                  Send Invitation
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* ADD / EDIT STAFF MODAL */}
       {showAddModal && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
@@ -2368,7 +3047,7 @@ export default function StaffPage() {
                     value={deptForm.code}
                     onChange={e => setDeptForm({ ...deptForm, code: e.target.value })}
                     placeholder="e.g. QA"
-                    className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-800 uppercase"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-800 uppercase"
                   />
                 </div>
                 <div className="space-y-1">
