@@ -200,7 +200,7 @@ export default function SuperAdminLayout({ children }: { children: React.ReactNo
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         
         {/* HEADER */}
-        <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shadow-sm z-10 flex-shrink-0">
+        <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shadow-sm relative z-30 flex-shrink-0">
            
            <div className="flex items-center gap-4 flex-1">
               <button className="md:hidden text-slate-500"><Menu size={20} /></button>
@@ -228,7 +228,7 @@ export default function SuperAdminLayout({ children }: { children: React.ReactNo
              <div className="relative">
                <button 
                   onClick={() => setProfileOpen(!profileOpen)}
-                  className="flex items-center gap-2 focus:outline-none"
+                  className="flex items-center gap-2 focus:outline-none cursor-pointer"
                >
                  <div className="w-9 h-9 rounded-full bg-slate-900 border-2 border-white shadow-sm flex items-center justify-center text-xs font-bold text-white">
                    PO
@@ -237,20 +237,42 @@ export default function SuperAdminLayout({ children }: { children: React.ReactNo
                </button>
 
                {profileOpen && (
-                 <div className="absolute right-0 mt-3 w-56 bg-white rounded-xl shadow-xl border border-slate-100 py-2 z-50 animate-in fade-in slide-in-from-top-2">
-                   <div className="px-4 py-3 border-b border-slate-50 mb-2">
-                     <p className="text-sm font-semibold text-slate-900">platform@whereready.com</p>
+                 <>
+                   {/* Click-outside dismissal overlay */}
+                   <div 
+                     className="fixed inset-0 z-40" 
+                     onClick={() => setProfileOpen(false)} 
+                   />
+                   <div className="absolute right-0 mt-3 w-56 bg-white rounded-xl shadow-xl border border-slate-100 py-2 z-50 animate-in fade-in slide-in-from-top-2">
+                     <div className="px-4 py-3 border-b border-slate-100 mb-2">
+                       <p className="text-sm font-semibold text-slate-900">platform@whereready.com</p>
+                     </div>
+                     <Link 
+                       href="/super-admin/profile" 
+                       onClick={() => setProfileOpen(false)}
+                       className="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 hover:text-slate-900 font-medium transition-colors"
+                     >
+                       My Profile
+                     </Link>
+                     <Link 
+                       href="/super-admin/security" 
+                       onClick={() => setProfileOpen(false)}
+                       className="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 hover:text-slate-900 font-medium transition-colors"
+                     >
+                       Security & Login Activity
+                     </Link>
+                     <div className="h-px bg-slate-100 my-2"></div>
+                     <button 
+                       onClick={() => {
+                         setProfileOpen(false);
+                         handleLogout();
+                       }}
+                       className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 font-bold flex items-center gap-2 transition-colors cursor-pointer"
+                     >
+                       <LogOut size={16} /> Sign Out
+                     </button>
                    </div>
-                   <Link href="/super-admin/profile" className="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 hover:text-slate-900 font-medium transition-colors">My Profile</Link>
-                   <Link href="/super-admin/security" className="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 hover:text-slate-900 font-medium transition-colors">Security & Login Activity</Link>
-                   <div className="h-px bg-slate-100 my-2"></div>
-                   <button 
-                     onClick={handleLogout}
-                     className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 font-bold flex items-center gap-2 transition-colors"
-                   >
-                     <LogOut size={16} /> Sign Out
-                   </button>
-                 </div>
+                 </>
                )}
              </div>
            </div>
@@ -260,7 +282,7 @@ export default function SuperAdminLayout({ children }: { children: React.ReactNo
         <main className="flex-1 overflow-y-auto bg-white p-8 custom-scrollbar relative">
           {/* Engineering 32px Square Grid Background */}
           <div 
-            className="pointer-events-none absolute inset-0 z-0 opacity-70"
+            className="pointer-events-none absolute inset-0 opacity-70"
             style={{
               backgroundImage: `
                 linear-gradient(to right, rgba(15, 23, 42, 0.035) 1px, transparent 1px),
@@ -269,7 +291,7 @@ export default function SuperAdminLayout({ children }: { children: React.ReactNo
               backgroundSize: '32px 32px',
             }}
           />
-          <div className="relative z-10 max-w-7xl mx-auto">
+          <div className="relative max-w-7xl mx-auto">
             {children}
           </div>
         </main>

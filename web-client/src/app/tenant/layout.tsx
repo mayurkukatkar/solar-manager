@@ -468,7 +468,7 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
       <main className="flex-1 flex flex-col min-h-screen min-w-0 w-full relative bg-white overflow-x-hidden">
         {/* Engineering 32px Square Grid Background */}
         <div 
-          className="pointer-events-none absolute inset-0 z-0 opacity-70"
+          className="pointer-events-none absolute inset-0 opacity-70"
           style={{
             backgroundImage: `
               linear-gradient(to right, rgba(15, 23, 42, 0.035) 1px, transparent 1px),
@@ -477,7 +477,7 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
             backgroundSize: '32px 32px',
           }}
         />
-        <div className="relative z-10 p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full min-w-0">
+        <div className="relative p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full min-w-0">
           {children}
         </div>
       </main>

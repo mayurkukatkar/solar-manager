@@ -1058,7 +1058,7 @@ export function QuotationDetailModal({
 
       {/* REVISION REASON MODAL */}
       {showRevisionModal && (
-        <div className="fixed inset-0 z-60 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl border border-slate-200 p-6 max-w-md w-full space-y-4 shadow-2xl animate-in fade-in zoom-in-95">
             <div className="flex items-center justify-between">
               <h3 className="font-extrabold text-sm text-slate-900 flex items-center gap-2">
@@ -1102,7 +1102,7 @@ export function QuotationDetailModal({
 
       {/* WHATSAPP SHARE DRAWER / MODAL */}
       {showWhatsAppModal && (
-        <div className="fixed inset-0 z-60 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl border border-slate-200 p-6 max-w-lg w-full space-y-4 shadow-2xl animate-in fade-in zoom-in-95">
             <div className="flex items-center justify-between">
               <h3 className="font-extrabold text-sm text-slate-900 flex items-center gap-2">
