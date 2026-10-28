@@ -45,10 +45,32 @@ async function wouldCreateCycle(tenantId, staffId, candidateManagerId) {
   return false;
 }
 
+const requireStaffAccess = async (req, res, next) => {
+  if (req.user.role === 'TENANT_ADMIN' || req.user.role === 'SUPER_ADMIN') {
+    return next();
+  }
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.userId },
+      select: { permissions: true }
+    });
+    let perms = [];
+    if (Array.isArray(user?.permissions)) perms = user.permissions;
+    else if (user?.permissions?.modules && Array.isArray(user.permissions.modules)) perms = user.permissions.modules;
+    
+    if (perms.includes('*') || perms.includes('staff')) {
+      return next();
+    }
+    return res.status(403).json({ error: 'Forbidden: Insufficient permissions to access staff management' });
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to verify staff permissions' });
+  }
+};
+
 // ----------------------------------------------------
 // 1. STAFF OPERATIONAL OVERVIEW & METRICS
 // ----------------------------------------------------
-router.get('/api/tenant/staff/overview', requireTenantAuth, async (req, res) => {
+router.get('/api/tenant/staff/overview', requireTenantAuth, requireStaffAccess, async (req, res) => {
   try {
     const tenantId = req.user.tenantId;
 
@@ -159,7 +181,7 @@ router.get('/api/tenant/staff/overview', requireTenantAuth, async (req, res) => 
 // ----------------------------------------------------
 // 2. STAFF DIRECTORY (FILTERED, PAGINATED, SEARCHABLE)
 // ----------------------------------------------------
-router.get('/api/tenant/staff', requireTenantAuth, async (req, res) => {
+router.get('/api/tenant/staff', requireTenantAuth, requireStaffAccess, async (req, res) => {
   try {
     const tenantId = req.user.tenantId;
     const {
@@ -279,7 +301,7 @@ router.get('/api/tenant/staff', requireTenantAuth, async (req, res) => {
 // ----------------------------------------------------
 // 3. GET SINGLE STAFF MEMBER PROFILE
 // ----------------------------------------------------
-router.get('/api/tenant/staff/:id', requireTenantAuth, async (req, res) => {
+router.get('/api/tenant/staff/:id', requireTenantAuth, requireStaffAccess, async (req, res) => {
   try {
     const tenantId = req.user.tenantId;
     const { id } = req.params;
@@ -359,7 +381,7 @@ router.get('/api/tenant/staff/:id', requireTenantAuth, async (req, res) => {
 // ----------------------------------------------------
 // 4. CREATE NEW STAFF MEMBER (WITH OPTIONAL SYSTEM USER)
 // ----------------------------------------------------
-router.post('/api/tenant/staff', requireTenantAuth, async (req, res) => {
+router.post('/api/tenant/staff', requireTenantAuth, requireStaffAccess, async (req, res) => {
   try {
     const tenantId = req.user.tenantId;
 
@@ -538,7 +560,7 @@ router.post('/api/tenant/staff', requireTenantAuth, async (req, res) => {
 // ----------------------------------------------------
 // 5. UPDATE STAFF DETAILS
 // ----------------------------------------------------
-router.patch('/api/tenant/staff/:id', requireTenantAuth, async (req, res) => {
+router.patch('/api/tenant/staff/:id', requireTenantAuth, requireStaffAccess, async (req, res) => {
   try {
     const tenantId = req.user.tenantId;
     const { id } = req.params;
@@ -662,7 +684,7 @@ router.patch('/api/tenant/staff/:id', requireTenantAuth, async (req, res) => {
 // ----------------------------------------------------
 // 6. UPDATE STAFF STATUS (LIFECYCLE: ACTIVE / ON_LEAVE / INACTIVE / PROBATION / SUSPENDED)
 // ----------------------------------------------------
-router.patch('/api/tenant/staff/:id/status', requireTenantAuth, async (req, res) => {
+router.patch('/api/tenant/staff/:id/status', requireTenantAuth, requireStaffAccess, async (req, res) => {
   try {
     const tenantId = req.user.tenantId;
     const { id } = req.params;
@@ -739,7 +761,7 @@ router.patch('/api/tenant/staff/:id/status', requireTenantAuth, async (req, res)
 // ----------------------------------------------------
 // 6.1 EXPLICIT EMPLOYEE SUSPENSION (TENANT ADMIN AUTHORITY)
 // ----------------------------------------------------
-router.post('/api/tenant/staff/:id/suspend', requireTenantAuth, async (req, res) => {
+router.post('/api/tenant/staff/:id/suspend', requireTenantAuth, requireStaffAccess, async (req, res) => {
   try {
     const tenantId = req.user.tenantId;
     const { id } = req.params;
@@ -798,7 +820,7 @@ router.post('/api/tenant/staff/:id/suspend', requireTenantAuth, async (req, res)
 // ----------------------------------------------------
 // 6.2 EXPLICIT EMPLOYEE REACTIVATION (TENANT ADMIN AUTHORITY)
 // ----------------------------------------------------
-router.post('/api/tenant/staff/:id/reactivate', requireTenantAuth, async (req, res) => {
+router.post('/api/tenant/staff/:id/reactivate', requireTenantAuth, requireStaffAccess, async (req, res) => {
   try {
     const tenantId = req.user.tenantId;
     const { id } = req.params;
@@ -850,7 +872,7 @@ router.post('/api/tenant/staff/:id/reactivate', requireTenantAuth, async (req, r
 // ----------------------------------------------------
 // 6.3 RESEND LOGIN CREDENTIALS TO EMPLOYEE EMAIL
 // ----------------------------------------------------
-router.post('/api/tenant/staff/:id/resend-credentials', requireTenantAuth, async (req, res) => {
+router.post('/api/tenant/staff/:id/resend-credentials', requireTenantAuth, requireStaffAccess, async (req, res) => {
   try {
     const tenantId = req.user.tenantId;
     const { id } = req.params;
@@ -942,7 +964,7 @@ router.post('/api/tenant/staff/:id/resend-credentials', requireTenantAuth, async
 // ----------------------------------------------------
 // 7. CREATE / RESET USER ACCOUNT FOR EXISTING STAFF (WITH EMAIL)
 // ----------------------------------------------------
-router.post('/api/tenant/staff/:id/account', requireTenantAuth, async (req, res) => {
+router.post('/api/tenant/staff/:id/account', requireTenantAuth, requireStaffAccess, async (req, res) => {
   try {
     const tenantId = req.user.tenantId;
     const { id } = req.params;
@@ -1078,7 +1100,7 @@ router.post('/api/tenant/staff/:id/account', requireTenantAuth, async (req, res)
 // ----------------------------------------------------
 // 8. REVOKE SYSTEM LOGIN ACCOUNT (WITHOUT DELETING STAFF PROFILE)
 // ----------------------------------------------------
-router.delete('/api/tenant/staff/:id/account', requireTenantAuth, async (req, res) => {
+router.delete('/api/tenant/staff/:id/account', requireTenantAuth, requireStaffAccess, async (req, res) => {
   try {
     const tenantId = req.user.tenantId;
     const { id } = req.params;
@@ -1128,7 +1150,7 @@ router.delete('/api/tenant/staff/:id/account', requireTenantAuth, async (req, re
 // ----------------------------------------------------
 // 9. DELETE EMPLOYEE WITH FULL TENANT ADMIN AUTHORITY & REASSIGNMENT
 // ----------------------------------------------------
-router.delete('/api/tenant/staff/:id', requireTenantAuth, async (req, res) => {
+router.delete('/api/tenant/staff/:id', requireTenantAuth, requireStaffAccess, async (req, res) => {
   try {
     const tenantId = req.user.tenantId;
     const { id } = req.params;
@@ -1268,7 +1290,7 @@ router.delete('/api/tenant/staff/:id', requireTenantAuth, async (req, res) => {
 // ----------------------------------------------------
 // 9.1 EMPLOYEE ACTIVITY AUDIT & WORKFORCE VISIBILITY (TENANT ADMIN FULL CONTROL)
 // ----------------------------------------------------
-router.get('/api/tenant/staff/:id/activity', requireTenantAuth, async (req, res) => {
+router.get('/api/tenant/staff/:id/activity', requireTenantAuth, requireStaffAccess, async (req, res) => {
   try {
     const tenantId = req.user.tenantId;
     const { id } = req.params;
@@ -1454,7 +1476,7 @@ router.get('/api/tenant/departments', requireTenantAuth, async (req, res) => {
   }
 });
 
-router.post('/api/tenant/departments', requireTenantAuth, async (req, res) => {
+router.post('/api/tenant/departments', requireTenantAuth, requireStaffAccess, async (req, res) => {
   try {
     const tenantId = req.user.tenantId;
     const { name, code, description, color = 'blue', designations = [] } = req.body;

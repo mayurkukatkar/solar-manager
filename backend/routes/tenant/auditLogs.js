@@ -48,6 +48,10 @@ const SEED_AUDIT_LOGS = [
 // GET /api/tenant/audit-logs
 router.get('/api/tenant/audit-logs', requireTenantAuth, async (req, res) => {
   try {
+    if (req.user.role !== 'TENANT_ADMIN') {
+      return res.status(403).json({ error: 'Only Tenant Administrator can access audit logs' });
+    }
+
     const { entity, action, search, limit = 50, page = 1 } = req.query;
     const where = { tenantId: req.user.tenantId };
 

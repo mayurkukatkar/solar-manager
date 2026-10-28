@@ -122,7 +122,15 @@ const requirePermission = (...permissions) => {
         select: { permissions: true }
       });
 
-      const userPerms = Array.isArray(user?.permissions) ? user.permissions : [];
+      let userPerms = [];
+      if (Array.isArray(user?.permissions)) {
+        userPerms = user.permissions;
+      } else if (user?.permissions && Array.isArray(user.permissions.modules)) {
+        userPerms = user.permissions.modules;
+      }
+
+      if (userPerms.includes('*')) return next();
+
       const hasAll = permissions.every(p => userPerms.includes(p));
 
       if (!hasAll) {

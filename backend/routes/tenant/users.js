@@ -82,6 +82,10 @@ router.get('/api/tenant/users', requireTenantAuth, async (req, res) => {
 // Invite/create new team member
 router.post('/api/tenant/users/invite', requireTenantAuth, async (req, res) => {
   try {
+    if (req.user.role !== 'TENANT_ADMIN') {
+      return res.status(403).json({ error: 'Only Tenant Administrator can invite users' });
+    }
+
     const { name, email, role, department, permissions, staffId } = req.body;
 
     if (!name || !name.trim()) return res.status(400).json({ error: 'Name is required' });
@@ -183,6 +187,10 @@ router.post('/api/tenant/users/invite', requireTenantAuth, async (req, res) => {
 // Update user role and permissions
 router.patch('/api/tenant/users/:id/role', requireTenantAuth, async (req, res) => {
   try {
+    if (req.user.role !== 'TENANT_ADMIN') {
+      return res.status(403).json({ error: 'Only Tenant Administrator can modify roles and permissions' });
+    }
+
     const { role, permissions } = req.body;
     const { id } = req.params;
 
@@ -209,6 +217,10 @@ router.patch('/api/tenant/users/:id/role', requireTenantAuth, async (req, res) =
 // POST /api/tenant/users/:id/reset-password
 router.post('/api/tenant/users/:id/reset-password', requireTenantAuth, async (req, res) => {
   try {
+    if (req.user.role !== 'TENANT_ADMIN') {
+      return res.status(403).json({ error: 'Only Tenant Administrator can reset user passwords' });
+    }
+
     const { id } = req.params;
     const user = await prisma.user.findFirst({
       where: { id, tenantId: req.user.tenantId }

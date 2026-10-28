@@ -21,7 +21,7 @@ router.post('/login', async (req, res) => {
           select: { id: true, name: true, status: true }
         },
         staffProfile: {
-          select: { id: true, status: true }
+          select: { id: true, status: true, department: true, designation: true }
         }
       }
     });
@@ -64,8 +64,17 @@ router.post('/login', async (req, res) => {
       return res.json({ requiresPasswordReset: true, email: user.email });
     }
 
+    let effectivePermissions = [];
+    if (user.role === 'TENANT_ADMIN' || user.role === 'SUPER_ADMIN') {
+      effectivePermissions = ['*'];
+    } else if (Array.isArray(user.permissions)) {
+      effectivePermissions = user.permissions;
+    } else if (user.permissions && Array.isArray(user.permissions.modules)) {
+      effectivePermissions = user.permissions.modules;
+    }
+
     const token = jwt.sign(
-      { userId: user.id, role: user.role, tenantId: user.tenantId },
+      { userId: user.id, role: user.role, tenantId: user.tenantId, permissions: effectivePermissions },
       JWT_SECRET,
       { expiresIn: '1d' }
     );
@@ -78,7 +87,21 @@ router.post('/login', async (req, res) => {
       maxAge: 24 * 60 * 60 * 1000
     });
 
-    res.json({ message: 'Login successful', role: user.role, token });
+    res.json({
+      message: 'Login successful',
+      role: user.role,
+      token,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        permissions: effectivePermissions,
+        department: user.staffProfile?.department || null,
+        designation: user.staffProfile?.designation || null,
+        tenantName: user.tenant?.name || null
+      }
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Internal server error' });
@@ -132,6 +155,17 @@ router.get('/me', async (req, res) => {
         name: true,
         role: true,
         tenantId: true,
+        permissions: true,
+        mustChangePassword: true,
+        staffProfile: {
+          select: {
+            id: true,
+            employeeId: true,
+            department: true,
+            designation: true,
+            status: true
+          }
+        },
         tenant: {
           select: {
             id: true,
@@ -165,7 +199,30 @@ router.get('/me', async (req, res) => {
       });
     }
 
-    res.json({ user });
+    // ENFORCE EMPLOYEE SUSPENSION on profile validation
+    if (user.role === 'TENANT_SUB_ADMIN' && user.staffProfile && (user.staffProfile.status === 'SUSPENDED' || user.staffProfile.status === 'INACTIVE')) {
+      return res.status(403).json({
+        error: 'Account Suspended: Your staff access has been suspended by your organization administrator.',
+        code: 'EMPLOYEE_SUSPENDED',
+        isSuspended: true
+      });
+    }
+
+    let effectivePermissions = [];
+    if (user.role === 'TENANT_ADMIN' || user.role === 'SUPER_ADMIN') {
+      effectivePermissions = ['*'];
+    } else if (Array.isArray(user.permissions)) {
+      effectivePermissions = user.permissions;
+    } else if (user.permissions && Array.isArray(user.permissions.modules)) {
+      effectivePermissions = user.permissions.modules;
+    }
+
+    res.json({
+      user: {
+        ...user,
+        permissions: effectivePermissions
+      }
+    });
   } catch (err) {
     res.status(401).json({ error: 'Invalid session' });
   }

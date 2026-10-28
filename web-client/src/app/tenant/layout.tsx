@@ -10,7 +10,7 @@ import {
   ChevronDown, ChevronRight, Search, Users2, MapPin, FileText, HardHat, 
   Package, Truck, Receipt, Banknote, Landmark, FileBox, Wrench, ShieldCheck, 
   MessageSquare, UserPlus, Shield, BarChart2, Zap, Bell, History, Menu, 
-  X, CheckSquare, Layers
+  X, CheckSquare, Layers, ShieldAlert, ArrowRight
 } from 'lucide-react';
 
 interface MenuItem {
@@ -18,6 +18,8 @@ interface MenuItem {
   icon: React.ElementType;
   path: string;
   badge?: string;
+  permissionKey?: string | string[];
+  adminOnly?: boolean;
 }
 
 interface MenuGroup {
@@ -25,65 +27,66 @@ interface MenuGroup {
   items: MenuItem[];
 }
 
-// ALL 25 COMPLETE SOLAR ERP MODULES ORGANIZED BY OPERATIONAL DOMAIN
+// ALL 25 COMPLETE SOLAR ERP MODULES WITH GRANULAR RBAC ACCESS KEYS
 const MENU_GROUPS: MenuGroup[] = [
   {
     title: 'CORE PIPELINE',
     items: [
       { name: 'Dashboard', icon: LayoutDashboard, path: '/tenant/dashboard' },
-      { name: 'Leads', icon: Users, path: '/tenant/leads' },
-      { name: 'CRM Pipeline', icon: Users2, path: '/tenant/crm' },
-      { name: 'Site Surveys', icon: MapPin, path: '/tenant/surveys' },
-      { name: 'Quotations', icon: FileText, path: '/tenant/quotations' },
-      { name: 'Projects', icon: Briefcase, path: '/tenant/projects' },
+      { name: 'Leads', icon: Users, path: '/tenant/leads', permissionKey: 'leads' },
+      { name: 'CRM Pipeline', icon: Users2, path: '/tenant/crm', permissionKey: 'crm' },
+      { name: 'Site Surveys', icon: MapPin, path: '/tenant/surveys', permissionKey: 'surveys' },
+      { name: 'Quotations', icon: FileText, path: '/tenant/quotations', permissionKey: 'quotations' },
+      { name: 'Projects', icon: Briefcase, path: '/tenant/projects', permissionKey: 'projects' },
     ]
   },
   {
     title: 'OPERATIONS',
     items: [
-      { name: 'Tasks & Milestones', icon: CheckSquare, path: '/tenant/tasks' },
-      { name: 'Installation', icon: HardHat, path: '/tenant/installation' },
-      { name: 'Inventory', icon: Package, path: '/tenant/inventory' },
-      { name: 'Product Catalogue', icon: Layers, path: '/tenant/products' },
-      { name: 'Procurement & Vendors', icon: Truck, path: '/tenant/procurement' },
+      { name: 'Tasks & Milestones', icon: CheckSquare, path: '/tenant/tasks', permissionKey: ['tasks', 'projects'] },
+      { name: 'Installation', icon: HardHat, path: '/tenant/installation', permissionKey: ['installation', 'installations'] },
+      { name: 'Inventory', icon: Package, path: '/tenant/inventory', permissionKey: 'inventory' },
+      { name: 'Product Catalogue', icon: Layers, path: '/tenant/products', permissionKey: ['products', 'inventory'] },
+      { name: 'Procurement & Vendors', icon: Truck, path: '/tenant/procurement', permissionKey: ['procurement', 'inventory'] },
     ]
   },
   {
     title: 'FINANCE & SCHEMES',
     items: [
-      { name: 'Finance & Billing', icon: Receipt, path: '/tenant/finance' },
+      { name: 'Finance & Billing', icon: Receipt, path: '/tenant/finance', permissionKey: 'finance' },
       { 
         name: 'PM Surya Ghar Portal', 
         icon: Landmark, 
         path: '/tenant/subsidy',
-        badge: 'National'
+        badge: 'National',
+        permissionKey: ['subsidy', 'finance']
       },
-      { name: 'Solar Loans', icon: Banknote, path: '/tenant/loans' },
+      { name: 'Solar Loans', icon: Banknote, path: '/tenant/loans', permissionKey: ['loans', 'finance'] },
     ]
   },
   {
     title: 'CUSTOMER CARE',
     items: [
-      { name: 'Documents & KYC', icon: FileBox, path: '/tenant/documents' },
-      { name: 'Service & Tickets', icon: Wrench, path: '/tenant/service' },
-      { name: 'AMC & Warranty', icon: ShieldCheck, path: '/tenant/amc' },
-      { name: 'Communication', icon: MessageSquare, path: '/tenant/communication' },
+      { name: 'Documents & KYC', icon: FileBox, path: '/tenant/documents', permissionKey: ['documents', 'projects'] },
+      { name: 'Service & Tickets', icon: Wrench, path: '/tenant/service', permissionKey: 'service' },
+      { name: 'AMC & Warranty', icon: ShieldCheck, path: '/tenant/amc', permissionKey: ['amc', 'service'] },
+      { name: 'Communication', icon: MessageSquare, path: '/tenant/communication', permissionKey: ['communication', 'crm'] },
     ]
   },
   {
     title: 'MANAGEMENT',
     items: [
-      { name: 'Staff & Technicians', icon: UserPlus, path: '/tenant/staff' },
-      { name: 'Users & Permissions', icon: Shield, path: '/tenant/users' },
-      { name: 'Reports & Analytics', icon: BarChart2, path: '/tenant/reports' },
+      { name: 'Staff & Technicians', icon: UserPlus, path: '/tenant/staff', adminOnly: true, permissionKey: 'staff' },
+      { name: 'Users & Permissions', icon: Shield, path: '/tenant/users', adminOnly: true, permissionKey: 'users' },
+      { name: 'Reports & Analytics', icon: BarChart2, path: '/tenant/reports', permissionKey: 'reports' },
     ]
   },
   {
     title: 'SYSTEM',
     items: [
       { name: 'Notifications', icon: Bell, path: '/tenant/notifications' },
-      { name: 'Settings', icon: Settings, path: '/tenant/settings' },
-      { name: 'Audit Logs', icon: History, path: '/tenant/audit-logs' },
+      { name: 'Settings', icon: Settings, path: '/tenant/settings', adminOnly: true, permissionKey: 'settings' },
+      { name: 'Audit Logs', icon: History, path: '/tenant/audit-logs', adminOnly: true, permissionKey: 'audit-logs' },
     ]
   }
 ];
@@ -99,9 +102,13 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   
   const [currentUser, setCurrentUser] = useState<{
+    id?: string;
     name: string;
     email: string;
     role: string;
+    permissions: string[];
+    department?: string;
+    designation?: string;
     tenantName: string;
   } | null>(null);
 
@@ -161,11 +168,25 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
         );
         if (isMounted) {
           if (res.data?.user) {
+            const u = res.data.user;
+            let perms: string[] = [];
+            if (u.role === 'SUPER_ADMIN' || u.role === 'TENANT_ADMIN') {
+              perms = ['*'];
+            } else if (Array.isArray(u.permissions)) {
+              perms = u.permissions;
+            } else if (u.permissions && Array.isArray(u.permissions.modules)) {
+              perms = u.permissions.modules;
+            }
+
             setCurrentUser({
-              name: res.data.user.name || 'Solar Partner',
-              email: res.data.user.email || '',
-              role: res.data.user.role || 'Admin',
-              tenantName: res.data.user.tenant?.name || 'Workspace',
+              id: u.id,
+              name: u.name || 'Solar Partner',
+              email: u.email || '',
+              role: u.role || 'TENANT_SUB_ADMIN',
+              permissions: perms,
+              department: u.staffProfile?.department || '',
+              designation: u.staffProfile?.designation || '',
+              tenantName: u.tenant?.name || 'Workspace',
             });
           }
           if (res.data?.user?.tenant?.status === 'SUSPENDED') {
@@ -199,6 +220,71 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
       isMounted = false;
     };
   }, [pathname, router]);
+
+  // RBAC Permission Evaluator
+  const hasAccessToItem = (item: MenuItem): boolean => {
+    if (!currentUser) return false;
+    // Super Admin and Tenant Admin have unrestricted access
+    if (currentUser.role === 'SUPER_ADMIN' || currentUser.role === 'TENANT_ADMIN') {
+      return true;
+    }
+
+    // Admin-only modules are strictly restricted
+    if (item.adminOnly) {
+      if (!item.permissionKey) return false;
+      const adminKeys = Array.isArray(item.permissionKey) ? item.permissionKey : [item.permissionKey];
+      return adminKeys.some(k => currentUser.permissions?.includes(k));
+    }
+
+    // Common unrestricted items (Dashboard, Notifications)
+    if (!item.permissionKey) {
+      return true;
+    }
+
+    const perms = currentUser.permissions || [];
+    if (perms.includes('*')) return true;
+
+    if (Array.isArray(item.permissionKey)) {
+      return item.permissionKey.some(k => perms.includes(k));
+    }
+    return perms.includes(item.permissionKey);
+  };
+
+  // Route Guard Access Check
+  const checkCurrentPathAccess = (): { allowed: boolean; targetItem?: MenuItem } => {
+    if (!currentUser) return { allowed: true };
+    if (currentUser.role === 'SUPER_ADMIN' || currentUser.role === 'TENANT_ADMIN') {
+      return { allowed: true };
+    }
+
+    // Always allowed utility routes
+    if (
+      pathname === '/tenant/dashboard' || 
+      pathname.startsWith('/tenant/dashboard/') || 
+      pathname === '/tenant/notifications' || 
+      pathname.startsWith('/tenant/notifications/')
+    ) {
+      return { allowed: true };
+    }
+
+    for (const group of MENU_GROUPS) {
+      for (const item of group.items) {
+        if (pathname === item.path || pathname.startsWith(`${item.path}/`)) {
+          const allowed = hasAccessToItem(item);
+          return { allowed, targetItem: item };
+        }
+      }
+    }
+
+    return { allowed: true };
+  };
+
+  const pathAccess = checkCurrentPathAccess();
+
+  // All accessible modules for the user (for quick navigation and fallback)
+  const accessibleModules = MENU_GROUPS.flatMap(g => g.items).filter(item => 
+    item.path !== '/tenant/dashboard' && item.path !== '/tenant/notifications' && hasAccessToItem(item)
+  );
 
   // Auto-expand group containing current active path
   useEffect(() => {
@@ -350,18 +436,22 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
           </div>
         )}
 
-        {/* MENU NAVIGATION (ALL 25 MODULES ORGANIZED IN GROUPS) */}
+        {/* MENU NAVIGATION (ALL 25 MODULES ORGANIZED IN GROUPS WITH RBAC FILTERING) */}
         <div className={`flex-1 overflow-y-auto custom-scrollbar py-2 space-y-4 ${
           isCollapsed ? 'px-2 space-y-2' : 'px-3'
         }`}>
           {MENU_GROUPS.map((group, groupIdx) => {
+            // Filter group items by active permissions
+            const authorizedItems = group.items.filter(item => hasAccessToItem(item));
+
             const filteredItems = searchQuery
-              ? group.items.filter(item => 
+              ? authorizedItems.filter(item => 
                   item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                   group.title.toLowerCase().includes(searchQuery.toLowerCase())
                 )
-              : group.items;
+              : authorizedItems;
 
+            // Hide section entirely if no authorized items match
             if (filteredItems.length === 0) return null;
 
             const isOpen = searchQuery ? true : (openGroups[group.title] ?? true);
@@ -515,20 +605,22 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
                     {currentUser?.name || 'Solar Partner'}
                   </p>
                   <p className="text-xs text-slate-500 truncate font-medium mt-0.5">
-                    {currentUser?.role || 'Admin'} • {currentUser?.tenantName ? currentUser.tenantName : 'Workspace'}
+                    {currentUser?.designation || (currentUser?.role === 'TENANT_ADMIN' ? 'Tenant Admin' : 'Staff')} • {currentUser?.tenantName ? currentUser.tenantName : 'Workspace'}
                   </p>
                 </div>
               </div>
 
               <div className="flex items-center gap-1">
-                <Link
-                  href="/tenant/settings"
-                  title="Settings"
-                  onClick={() => { if (isMobile) setMobileMenuOpen(false); }}
-                  className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition"
-                >
-                  <Settings size={16} />
-                </Link>
+                {(currentUser?.role === 'TENANT_ADMIN' || currentUser?.role === 'SUPER_ADMIN' || currentUser?.permissions?.includes('settings')) && (
+                  <Link
+                    href="/tenant/settings"
+                    title="Settings"
+                    onClick={() => { if (isMobile) setMobileMenuOpen(false); }}
+                    className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition"
+                  >
+                    <Settings size={16} />
+                  </Link>
+                )}
 
                 <button
                   type="button"
@@ -619,7 +711,75 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
           }}
         />
         <div className="relative p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full min-w-0">
-          {children}
+          {!pathAccess.allowed && currentUser ? (
+            <div className="min-h-[70vh] flex items-center justify-center py-10 px-4">
+              <div className="w-full max-w-lg bg-white border border-slate-200 rounded-3xl p-8 sm:p-10 shadow-xl shadow-slate-100 text-center relative overflow-hidden">
+                <div className="w-16 h-16 rounded-2xl bg-rose-50 border border-rose-100 text-rose-600 flex items-center justify-center mx-auto mb-5 shadow-2xs">
+                  <ShieldAlert size={32} strokeWidth={2.2} />
+                </div>
+
+                <span className="inline-block text-[11px] font-bold uppercase tracking-wider text-rose-600 bg-rose-50 border border-rose-200 px-3 py-1 rounded-full mb-3">
+                  Access Restricted
+                </span>
+
+                <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight mb-2">
+                  {pathAccess.targetItem?.name || "Module"} Restricted
+                </h2>
+
+                <p className="text-xs sm:text-sm text-slate-600 max-w-md mx-auto mb-6 leading-relaxed">
+                  Your account (<span className="font-semibold text-slate-800">{currentUser.email}</span>) with role <strong className="text-slate-900 font-semibold">{currentUser.designation || currentUser.role}</strong> does not have permission to access this module.
+                </p>
+
+                {/* Permitted Modules */}
+                <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 mb-6 text-left">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2.5">
+                    Your Permitted Modules:
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {accessibleModules.length > 0 ? (
+                      accessibleModules.map(m => (
+                        <Link
+                          key={m.path}
+                          href={m.path}
+                          className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200/80 px-3 py-1.5 rounded-xl transition-all"
+                        >
+                          <m.icon size={13} />
+                          <span>{m.name}</span>
+                        </Link>
+                      ))
+                    ) : (
+                      <span className="text-xs text-slate-400 italic">Dashboard only</span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+                  <Link
+                    href="/tenant/dashboard"
+                    className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl shadow-xs transition"
+                  >
+                    <LayoutDashboard size={14} />
+                    <span>Return to Dashboard</span>
+                  </Link>
+                  {accessibleModules[0] && (
+                    <Link
+                      href={accessibleModules[0].path}
+                      className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-bold rounded-xl transition"
+                    >
+                      <span>Go to {accessibleModules[0].name}</span>
+                      <ChevronRight size={14} />
+                    </Link>
+                  )}
+                </div>
+
+                <p className="text-[11px] text-slate-400 mt-6 leading-normal">
+                  To request access to this module, please contact your organization administrator to update your RBAC permissions in Staff Management.
+                </p>
+              </div>
+            </div>
+          ) : (
+            children
+          )}
         </div>
       </main>
     </div>

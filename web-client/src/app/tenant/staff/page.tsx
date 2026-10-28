@@ -193,9 +193,18 @@ const AVAILABLE_MODULES = [
   { key: "surveys", label: "Site Surveys" },
   { key: "quotations", label: "Quotations & Proposals" },
   { key: "projects", label: "Projects & DISCOM Docs" },
+  { key: "tasks", label: "Tasks & Milestones" },
+  { key: "installation", label: "Installation & Execution" },
   { key: "inventory", label: "Inventory & Dispatch" },
+  { key: "procurement", label: "Procurement & Vendors" },
   { key: "finance", label: "Finance & Invoicing" },
-  { key: "service", label: "Service Tickets & AMC" }
+  { key: "subsidy", label: "PM Surya Ghar Subsidy" },
+  { key: "loans", label: "Solar Loans" },
+  { key: "documents", label: "Documents & KYC" },
+  { key: "service", label: "Service Tickets & AMC" },
+  { key: "communication", label: "Customer Communication" },
+  { key: "reports", label: "Reports & Analytics" },
+  { key: "staff", label: "Staff & Workforce" }
 ];
 
 export default function StaffPage() {
@@ -2341,6 +2350,45 @@ export default function StaffPage() {
                         Clear
                       </button>
                     </div>
+                  </div>
+
+                  {/* QUICK ROLE PRESETS */}
+                  <div className="flex flex-wrap gap-1.5 pt-0.5">
+                    <button
+                      type="button"
+                      onClick={() => setUserPermsForm(prev => ({ ...prev, modules: ["leads", "crm", "quotations"] }))}
+                      className="text-[10px] font-bold bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 px-2 py-0.5 rounded-lg transition"
+                    >
+                      + Sales & CRM
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setUserPermsForm(prev => ({ ...prev, modules: ["surveys", "projects", "tasks", "installation"] }))}
+                      className="text-[10px] font-bold bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 px-2 py-0.5 rounded-lg transition"
+                    >
+                      + Field Engineering
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setUserPermsForm(prev => ({ ...prev, modules: ["projects", "inventory", "procurement"] }))}
+                      className="text-[10px] font-bold bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200 px-2 py-0.5 rounded-lg transition"
+                    >
+                      + Operations
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setUserPermsForm(prev => ({ ...prev, modules: ["finance", "subsidy", "loans"] }))}
+                      className="text-[10px] font-bold bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200 px-2 py-0.5 rounded-lg transition"
+                    >
+                      + Finance
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setUserPermsForm(prev => ({ ...prev, modules: ["service", "communication", "documents"] }))}
+                      className="text-[10px] font-bold bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 px-2 py-0.5 rounded-lg transition"
+                    >
+                      + Support & AMC
+                    </button>
                   </div>
 
                   <div className="grid grid-cols-2 gap-2 bg-slate-50 p-3 rounded-2xl border border-slate-100 max-h-56 overflow-y-auto">

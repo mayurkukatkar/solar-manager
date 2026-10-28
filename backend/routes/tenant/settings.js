@@ -11,6 +11,10 @@ const { uploadFileBuffer } = require('../../services/storageService');
 // Get tenant profile / settings
 router.get('/api/tenant/settings', requireTenantAuth, async (req, res) => {
   try {
+    if (req.user.role !== 'TENANT_ADMIN') {
+      return res.status(403).json({ error: 'Only Tenant Admin can access settings' });
+    }
+
     const tenant = await prisma.tenant.findUnique({
       where: { id: req.user.tenantId },
       include: {
