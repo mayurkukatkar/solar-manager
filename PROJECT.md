@@ -59,12 +59,12 @@ WhereReady Solar OS is a multi-tenant enterprise software-as-a-service (SaaS) pl
 
 | # | Name | Scope | Dependencies | Status |
 |---|------|-------|-------------|--------|
-| **M1** | Documentation Baseline & Architecture Specs | Author complete `docs/product-audit.md`, `docs/module-inventory.md`, `docs/architecture-and-dependencies.md`, `docs/implementation-roadmap.md`, `docs/quality-and-regression-report.md`, and project root `PROJECT.md` | none | **COMPLETED** |
-| **M2** | Design System & Shared UI Components Foundation | Centralized UI primitives in `web-client/src/components/ui/`, token standardization, responsive layouts (320px–1920px), toast context replacing `alert()`, 404 dead link fixes | M1 | PLANNED |
-| **M3** | Security, Multi-Tenancy & Financial Precision Hardening | Backend child entity tenant isolation, JWT `req.user.id` normalization, OCR route auth, RBAC middleware, GST trade discount arithmetic in backend & web-client calculators | M1 | PLANNED |
-| **M4** | Commercial & Operations Module Workflows | Remove hardcoded mock leaks in project DISCOM generator and dashboard, Quotation-to-Project conversion, DISCOM 5-stage gating, PM Surya Ghar subsidy funnel | M2, M3 | PLANNED |
-| **M5** | Field Operations, Inventory & Mobile Parity | PO receiving stock automation, mobile barcode scanner & electrical QA sign-off, mobile PDF template parity fix, mobile touch Kanban | M3, M4 | PLANNED |
-| **M6** | Cross-Module E2E Validation & Regression Fixes | Complete Lead-to-Service lifecycle validation, verify 100% test passes across backend, mobile, and web-client, final evidence report | M4, M5 | PLANNED |
+| **M1** | Documentation Baseline & Architecture Specs | Author complete `docs/product-audit.md`, `docs/module-inventory.md`, `docs/architecture-and-dependencies.md`, `docs/implementation-roadmap.md`, `docs/quality-and-regression-report.md`, and project root `PROJECT.md` | none | **DONE** |
+| **M2** | Design System & Shared UI Components Foundation | Centralized UI primitives in `web-client/src/components/ui/`, token standardization, responsive layouts (320px–1920px), toast context replacing `alert()`, 404 dead link fixes | M1 | **DONE** |
+| **M3** | Security, Multi-Tenancy & Financial Precision Hardening | Backend child entity tenant isolation, JWT `req.user.id` normalization, OCR route auth, RBAC middleware, GST trade discount arithmetic in backend & web-client calculators | M1 | **DONE** |
+| **M4** | Commercial & Operations Module Workflows | Remove hardcoded mock leaks in project DISCOM generator and dashboard, Quotation-to-Project conversion, DISCOM 5-stage gating, PM Surya Ghar subsidy funnel | M2, M3 | **DONE** |
+| **M5** | Field Operations, Inventory & Mobile Parity | PO receiving stock automation, mobile barcode scanner & electrical QA sign-off, mobile PDF template parity fix, mobile touch Kanban | M3, M4 | **DONE** |
+| **M6** | Cross-Module E2E Validation & Regression Fixes | Complete Lead-to-Service lifecycle validation, verify 100% test passes across backend, mobile, and web-client, final evidence report | M4, M5 | **DONE** |
 
 ---
 

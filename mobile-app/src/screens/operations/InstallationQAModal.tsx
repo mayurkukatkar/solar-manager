@@ -61,18 +61,33 @@ export const InstallationQAModal: React.FC<InstallationQAModalProps> = ({
     );
   };
 
-  const isPit1Pass = (parseFloat(pit1Inverter) || 99) < 5.0;
-  const isPit2Pass = (parseFloat(pit2Structure) || 99) < 5.0;
-  const isPit3Pass = (parseFloat(pit3Lightning) || 99) < 5.0;
-  const isTripPass = (parseFloat(antiIslandingTripSec) || 99) < 2.0;
+  const numPit1 = parseFloat(pit1Inverter);
+  const numPit2 = parseFloat(pit2Structure);
+  const numPit3 = parseFloat(pit3Lightning);
+  const numTrip = parseFloat(antiIslandingTripSec);
+  const numInsulation = parseFloat(insulationMegaOhms);
 
-  const allTestsPass = isPit1Pass && isPit2Pass && isPit3Pass && isTripPass;
+  // Strict statutory thresholds per CEA Regulations & IEEE 1547 standards
+  const isPit1Pass = !isNaN(numPit1) && numPit1 >= 0 && numPit1 < 5.0;
+  const isPit2Pass = !isNaN(numPit2) && numPit2 >= 0 && numPit2 < 5.0;
+  const isPit3Pass = !isNaN(numPit3) && numPit3 >= 0 && numPit3 < 5.0;
+  const isTripPass = !isNaN(numTrip) && numTrip >= 0 && numTrip < 2.0;
+  const isInsulationPass = !isNaN(numInsulation) && numInsulation > 1.0;
+
+  const allTestsPass = isPit1Pass && isPit2Pass && isPit3Pass && isTripPass && isInsulationPass;
+
+  const failureReasons: string[] = [];
+  if (!isPit1Pass) failureReasons.push('Inverter Earth Pit 1 must be strictly < 5.0 Ω (CEA Regulations)');
+  if (!isPit2Pass) failureReasons.push('Structure Earth Pit 2 must be strictly < 5.0 Ω (CEA Regulations)');
+  if (!isPit3Pass) failureReasons.push('Lightning Arrestor Earth Pit 3 must be strictly < 5.0 Ω (CEA Regulations)');
+  if (!isTripPass) failureReasons.push('Anti-Islanding Grid Trip Time must be strictly < 2.0 s (IEEE 1547 / CEA Standards)');
+  if (!isInsulationPass) failureReasons.push('Inverter Insulation Resistance must be strictly > 1.0 MΩ (CEA Statutory Threshold)');
 
   const handleSubmitQA = async () => {
     if (!allTestsPass) {
       Alert.alert(
-        'Electrical Safety Alert',
-        'All earth pit resistances must be below 5.0 Ohms and anti-islanding trip time must be under 2.0 seconds to pass statutory DISCOM requirements.'
+        'Electrical Safety Gating Blocked',
+        `Cannot certify statutory QA sign-off due to safety threshold violations:\n\n• ${failureReasons.join('\n• ')}\n\nRectify earth pit ohmic values, trip time, or insulation before DISCOM inspection.`
       );
       return;
     }
@@ -215,7 +230,48 @@ export const InstallationQAModal: React.FC<InstallationQAModalProps> = ({
                 </Text>
               </View>
             </View>
+
+            <View style={styles.testRow}>
+              <View style={styles.testMeta}>
+                <Text style={styles.testName}>Inverter Insulation Resistance</Text>
+                <Text style={styles.testStandard}>Limit: &gt; 1.0 MΩ (CEA Regulations)</Text>
+              </View>
+              <View style={styles.testInputBox}>
+                <TextInput
+                  style={styles.testInput}
+                  value={insulationMegaOhms}
+                  onChangeText={setInsulationMegaOhms}
+                  keyboardType="decimal-pad"
+                  placeholder="2500"
+                />
+                <Text style={styles.testUnit}>MΩ</Text>
+              </View>
+              <View style={[styles.statusTag, isInsulationPass ? styles.tagPass : styles.tagFail]}>
+                <Text style={[styles.statusTagText, isInsulationPass ? styles.textPass : styles.textFail]}>
+                  {isInsulationPass ? 'PASS' : 'FAIL'}
+                </Text>
+              </View>
+            </View>
           </View>
+
+          {/* STATUTORY SAFETY GATING VIOLATION BANNER */}
+          {!allTestsPass && (
+            <View style={styles.safetyViolationBanner}>
+              <View style={styles.safetyViolationHeader}>
+                <AlertCircle size={18} color="#dc2626" />
+                <Text style={styles.safetyViolationTitle}>Statutory Electrical Safety Gating Blocked</Text>
+              </View>
+              <Text style={styles.safetyViolationSubtitle}>
+                QA sign-off is prevented until all values comply with CEA & IEEE thresholds:
+              </Text>
+              {failureReasons.map((reason, idx) => (
+                <View key={idx} style={styles.violationItem}>
+                  <Text style={styles.violationBullet}>•</Text>
+                  <Text style={styles.violationText}>{reason}</Text>
+                </View>
+              ))}
+            </View>
+          )}
 
           {/* SECTION 2: PHYSICAL QA CHECKLIST */}
           <View style={styles.card}>
@@ -248,7 +304,7 @@ export const InstallationQAModal: React.FC<InstallationQAModalProps> = ({
         {/* BOTTOM ACTION BAR */}
         <View style={styles.bottomBar}>
           <TouchableOpacity
-            style={styles.submitQaBtn}
+            style={[styles.submitQaBtn, !allTestsPass && styles.submitQaBtnDisabled]}
             onPress={handleSubmitQA}
             disabled={submitting}
             activeOpacity={0.85}
@@ -258,7 +314,9 @@ export const InstallationQAModal: React.FC<InstallationQAModalProps> = ({
             ) : (
               <>
                 <Award size={18} color="#ffffff" />
-                <Text style={styles.submitQaText}>Certify QA & Advance Project</Text>
+                <Text style={styles.submitQaText}>
+                  {allTestsPass ? 'Certify QA & Advance Project' : 'QA Sign-Off Blocked (Safety Gated)'}
+                </Text>
               </>
             )}
           </TouchableOpacity>
@@ -504,9 +562,56 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
   },
+  submitQaBtnDisabled: {
+    backgroundColor: '#94a3b8',
+  },
   submitQaText: {
     color: '#ffffff',
     fontSize: 14,
     fontWeight: '800',
+  },
+  safetyViolationBanner: {
+    backgroundColor: '#fef2f2',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 14,
+    borderWidth: 1.5,
+    borderColor: '#fca5a5',
+  },
+  safetyViolationHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 4,
+  },
+  safetyViolationTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#991b1b',
+  },
+  safetyViolationSubtitle: {
+    fontSize: 11,
+    color: '#7f1d1d',
+    marginBottom: 8,
+    fontWeight: '500',
+  },
+  violationItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+    marginBottom: 3,
+  },
+  violationBullet: {
+    fontSize: 12,
+    fontWeight: '900',
+    color: '#dc2626',
+    lineHeight: 16,
+  },
+  violationText: {
+    flex: 1,
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#b91c1c',
+    lineHeight: 16,
   },
 });

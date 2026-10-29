@@ -843,11 +843,18 @@ router.post('/api/tenant/finance/convert-quotation', requireTenantAuth, async (r
     const count = await prisma.invoice.count({ where: { tenantId: req.user.tenantId } });
     const currentYear = new Date().getFullYear();
 
+    let runningSum = 0;
     for (let i = 0; i < targetMilestones.length; i++) {
       const ms = targetMilestones[i];
       const invNumber = `INV-${currentYear}-${(count + 1 + i).toString().padStart(4, '0')}`;
       
-      const milestoneAmount = Math.round(totalSystemPrice * (ms.pct / 100));
+      let milestoneAmount;
+      if (i === targetMilestones.length - 1 && targetMilestones.length === milestones.length) {
+        milestoneAmount = totalSystemPrice - runningSum;
+      } else {
+        milestoneAmount = Math.round(totalSystemPrice * (ms.pct / 100));
+        runningSum += milestoneAmount;
+      }
       const taxableSubtotal = Math.round(milestoneAmount / 1.138);
       const taxAmount = milestoneAmount - taxableSubtotal;
 

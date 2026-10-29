@@ -49,3 +49,7 @@ Execute automated tests after each batch before proceeding; preserve existing fu
 - [ ] Batch-level tests run cleanly before proceeding to subsequent batches, with regressions investigated and fixed immediately.
 - [ ] Existing build, lint, type-check, and automated test commands pass with verified results; unverified or blocked items are explicitly marked.
 - [ ] A final evidence-based completion report is delivered covering overall audit metrics, module-by-module changes, design/technical improvements, test outcomes, remaining risks, and next steps.
+
+## 2026-10-29T16:15:47Z
+
+The quota window has reset and the server has restarted. Please resume execution from where you left off (Milestone M4 remediation — concurrency hardening and static string purges) and proceed through Milestones M5 and M6. Check the status of your subagents, revive or re-spawn as necessary, and continue the execution pipeline.

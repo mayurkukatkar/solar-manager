@@ -239,6 +239,7 @@ export function generateQuotationHtml(data: QuotationPdfProps): string {
         { item: 'State DISCOM Net-Metering Liasoning & Commissioning Coordination', status: 'INCLUDED' },
         { item: 'Civil Masonry Structural Alteration or Roof Waterproofing', status: 'EXCLUDED' },
         { item: 'Statutory DISCOM Net Meter Testing & Registration Deposit Fees (Actuals)', status: 'EXCLUDED' },
+        { item: 'PM Surya Ghar Muft Bijli Yojana National Portal Subsidy Processing & DBT Filing', status: 'INCLUDED' },
         { item: 'Additional AC Cabling Exceeding 25 Meters from Inverter to LT Panel', status: 'CHARGEABLE' },
       ];
 
@@ -805,7 +806,7 @@ export function generateQuotationHtml(data: QuotationPdfProps): string {
           <tr>
             <td><strong>Consumer Account Number</strong></td>
             <td><strong style="font-family: monospace;">${data.consumerNumber || 'To be updated'}</strong></td>
-            <td style="color: #64748b;">National Portal PM Surya Ghar DBT Synchronized</td>
+            <td style="color: #64748b;">National Portal PM Surya Ghar Muft Bijli Yojana DBT Synchronized</td>
           </tr>
           <tr>
             <td><strong>Sanctioned Load vs Plant</strong></td>
@@ -1099,7 +1100,7 @@ export function generateQuotationHtml(data: QuotationPdfProps): string {
           </div>
           <div style="font-size: 7.5pt; color: #cbd5e1; margin-top: 4px;">
             Gross Project Total: ₹${formatINR(gross)}
-            ${subsidy > 0 ? ` • <strong style="color: #4ade80;">Less Central Subsidy: ₹${formatINR(subsidy)}</strong>` : ''}
+            ${subsidy > 0 ? ` • <strong style="color: #4ade80;">Less Central Subsidy (PM Surya Ghar Muft Bijli Yojana): ₹${formatINR(subsidy)}</strong>` : ''}
           </div>
         </div>
         <div style="text-align: right;">
@@ -2819,7 +2820,7 @@ export function generateInvoiceHtml(data: InvoicePdfProps): string {
         <div class="bank-line" style="font-weight: 600;">UPI ID: ${data.bankDetails?.upiId || 'solar.epc@upi'}</div>
 
         <div class="dbt-callout">
-          <div class="dbt-callout-title">PM Surya Ghar DBT Note:</div>
+          <div class="dbt-callout-title">PM Surya Ghar Muft Bijli Yojana DBT Note:</div>
           <div class="dbt-callout-text">
             Central Govt subsidy of ₹78,000 will be credited directly to consumer Aadhaar-seeded bank account upon DISCOM net meter installation and CEIG inspection.
           </div>

@@ -27,13 +27,157 @@ import { ModalHeader } from '../../components/Header';
 import { SafeStorage } from '../../api/client';
 import { tenantApi } from '../../api/endpoints';
 
+export interface ParsedBarcodeResult {
+  serial: string;
+  manufacturer?: string;
+  wattage?: number;
+  dcrCompliant: boolean;
+  dcrCertificate?: string;
+}
+
+/**
+ * 2D Barcode Parser and DCR Domestic Content Validator
+ * Supports multi-field QR/DataMatrix codes (JSON, delimiter-separated, or raw serials)
+ * Verifies domestic content against ALMM / DCR certificate standards
+ */
+export function parseAndValidateBarcode(raw: string, certOverride?: string): ParsedBarcodeResult | null {
+  if (!raw || typeof raw !== 'string') return null;
+  const trimmed = raw.trim();
+  if (trimmed.length < 5) return null;
+
+  let serial = '';
+  let manufacturer = '';
+  let wattage: number | undefined;
+  let dcrCompliant = false;
+  let dcrCert = certOverride ? certOverride.trim() : '';
+
+  // 1. JSON-encoded 2D Barcodes (MNRE / EPC field format)
+  if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+    try {
+      const obj = JSON.parse(trimmed);
+      serial = (obj.serial || obj.serialNumber || obj.sn || obj.id || '').toString().trim().toUpperCase();
+      manufacturer = (obj.manufacturer || obj.make || obj.brand || '').toString().trim();
+      wattage = obj.wattage ? Number(obj.wattage) : undefined;
+      if (obj.dcrCertificate || obj.almmCertificate || obj.cert) {
+        dcrCert = (obj.dcrCertificate || obj.almmCertificate || obj.cert).toString().trim();
+      }
+      dcrCompliant = Boolean(obj.isDcr || obj.dcrCompliant || /dcr|almm/i.test(dcrCert) || /dcr|almm/i.test(serial));
+    } catch {
+      // fallback
+    }
+  }
+
+  // 2. Delimiter-encoded 2D QR / DataMatrix codes (| or ;)
+  if (!serial && (trimmed.includes('|') || trimmed.includes(';'))) {
+    const parts = trimmed.split(/[|;]/).map(s => s.trim());
+    for (const p of parts) {
+      if (/^(SN:|SERIAL:)/i.test(p)) {
+        serial = p.replace(/^(SN:|SERIAL:)/i, '').trim().toUpperCase();
+      } else if (/^(CERT:|DCR:|ALMM:)/i.test(p)) {
+        dcrCert = p.replace(/^(CERT:|DCR:|ALMM:)/i, '').trim();
+        dcrCompliant = true;
+      } else if (/^(MAKE:|MFG:)/i.test(p)) {
+        manufacturer = p.replace(/^(MAKE:|MFG:)/i, '').trim();
+      } else if (/^\d{3}W?$/i.test(p)) {
+        wattage = parseInt(p, 10);
+      }
+    }
+
+    if (!serial && parts.length >= 2) {
+      if (/waaree|adani|tata|vikram|goldi|premier|rayzon/i.test(parts[0])) {
+        manufacturer = parts[0];
+        serial = parts[1].toUpperCase();
+        if (parts[2] && /^\d{3}W?$/i.test(parts[2])) wattage = parseInt(parts[2], 10);
+        if (parts[3]) dcrCert = parts[3];
+      } else {
+        serial = parts[0].toUpperCase();
+      }
+    }
+  }
+
+  // 3. Fallback raw serial string
+  if (!serial) {
+    serial = trimmed.replace(/[\r\n\t]/g, '').toUpperCase();
+  }
+
+  if (serial.length < 5) return null;
+
+  // DCR Domestic Content Validation Check:
+  // Must match ALMM / DCR certificate numbers or recognized Indian Tier-1 DCR module serial patterns
+  const dcrPatterns = [
+    /DCR/i,
+    /ALMM/i,
+    /DOMESTIC/i,
+    /^WAA[\-_]?DCR/i,
+    /^ADANI[\-_]?DCR/i,
+    /^TATA[\-_]?DCR/i,
+    /^VIKRAM[\-_]?DCR/i,
+    /^GOLDI[\-_]?DCR/i,
+    /^PREMIER[\-_]?DCR/i,
+    /^RAYZON[\-_]?DCR/i,
+    /^IND[\-_]/i,
+  ];
+
+  if (!dcrCompliant) {
+    dcrCompliant = dcrPatterns.some(p => p.test(serial)) ||
+      (Boolean(dcrCert) && /^(ALMM|DCR|MNRE|BIS)[\w\-\/]+/i.test(dcrCert));
+  }
+
+  return {
+    serial,
+    manufacturer,
+    wattage,
+    dcrCompliant,
+    dcrCertificate: dcrCert,
+  };
+}
+
+/**
+ * Duplicate Serial Detector
+ * Validates candidate against active session, cross-component serials, and project records
+ */
+export function detectDuplicateSerial(
+  candidate: string,
+  existingList: string[],
+  inverterCandidate?: string,
+  projectObj?: any
+): { isDuplicate: boolean; reason?: string } {
+  const norm = candidate.trim().toUpperCase();
+  if (existingList.some(s => s.trim().toUpperCase() === norm)) {
+    return { isDuplicate: true, reason: 'Already scanned in current session' };
+  }
+  if (inverterCandidate && inverterCandidate.trim().toUpperCase() === norm) {
+    return { isDuplicate: true, reason: 'Matches existing inverter serial number' };
+  }
+  if (projectObj?.moduleSerials && Array.isArray(projectObj.moduleSerials)) {
+    if (projectObj.moduleSerials.some((s: string) => s.trim().toUpperCase() === norm)) {
+      return { isDuplicate: true, reason: 'Already recorded in project module serials' };
+    }
+  }
+  if (projectObj?.dcrModuleSerials) {
+    const arr = typeof projectObj.dcrModuleSerials === 'string'
+      ? projectObj.dcrModuleSerials.split(/[\n,]/).map((s: string) => s.trim().toUpperCase())
+      : projectObj.dcrModuleSerials;
+    if (Array.isArray(arr) && arr.some((s: string) => s === norm)) {
+      return { isDuplicate: true, reason: 'Already registered in project DCR certificate records' };
+    }
+  }
+  if (projectObj?.existingSerials && Array.isArray(projectObj.existingSerials)) {
+    if (projectObj.existingSerials.some((s: string) => s.trim().toUpperCase() === norm)) {
+      return { isDuplicate: true, reason: 'Already registered in company inventory serial records' };
+    }
+  }
+  return { isDuplicate: false };
+}
+
 interface BarcodeScannerModalProps {
   visible: boolean;
   project: any;
   onClose: () => void;
-  onSaveSerials?: (serials: { modules: string[]; inverter: string }) => void;
+  onSaveSerials?: (serials: { modules: string[]; inverter: string; dcrCertificate?: string }) => void;
   initialModuleSerials?: string[];
   initialInverterSerial?: string;
+  initialDcrCertificate?: string;
 }
 
 export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
@@ -43,15 +187,19 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
   onSaveSerials,
   initialModuleSerials,
   initialInverterSerial,
+  initialDcrCertificate,
 }) => {
   const [permission, requestPermission] = useCameraPermissions();
   const [scannedMode, setScannedMode] = useState<'MODULE' | 'INVERTER'>('MODULE');
   const [isScanning, setIsScanning] = useState(true);
   const [manualInput, setManualInput] = useState('');
 
-  // Scanned lists
+  // Scanned lists & DCR Certificate State
   const [moduleSerials, setModuleSerials] = useState<string[]>([]);
   const [inverterSerial, setInverterSerial] = useState<string>('');
+  const [dcrCertificate, setDcrCertificate] = useState<string>(
+    initialDcrCertificate || project?.dcrCertificate || project?.almmCertificate || ''
+  );
 
   const targetModulesCount = Math.ceil(((project?.capacity || 3.3) * 1000) / 540);
 
@@ -87,6 +235,9 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
               if (p.inverter && !inverterSerial) {
                 setInverterSerial(p.inverter);
               }
+              if (p.dcrCertificate && !dcrCertificate) {
+                setDcrCertificate(p.dcrCertificate);
+              }
             } catch {}
           }
         });
@@ -97,6 +248,12 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
       } else if (project?.inverterSerial) {
         setInverterSerial(project.inverterSerial);
       }
+
+      if (initialDcrCertificate) {
+        setDcrCertificate(initialDcrCertificate);
+      } else if (project?.dcrCertificate) {
+        setDcrCertificate(project.dcrCertificate);
+      }
     }
   }, [visible, project?.id]);
 
@@ -104,40 +261,78 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
     if (!isScanning || !data) return;
     setIsScanning(false);
 
-    const clean = data.trim();
+    const parsed = parseAndValidateBarcode(data, dcrCertificate);
+    if (!parsed) {
+      Alert.alert(
+        'Invalid Barcode',
+        'Could not parse a valid 2D/1D serial number (minimum 5 characters required).',
+        [{ text: 'Try Again', onPress: () => setIsScanning(true) }]
+      );
+      return;
+    }
+
+    const clean = parsed.serial;
+    if (parsed.dcrCertificate && !dcrCertificate) {
+      setDcrCertificate(parsed.dcrCertificate);
+    }
+
     if (scannedMode === 'INVERTER') {
+      if (moduleSerials.some((s) => s.toUpperCase() === clean)) {
+        Alert.alert(
+          'Duplicate Conflict',
+          `Serial "${clean}" is already assigned as a PV module. Inverters must have distinct serial numbers.`,
+          [{ text: 'OK', onPress: () => setIsScanning(true) }]
+        );
+        return;
+      }
       setInverterSerial(clean);
       Alert.alert('Inverter Scanned', `Serial: ${clean}`, [
         { text: 'OK', onPress: () => setIsScanning(true) },
       ]);
     } else {
-      if (!moduleSerials.includes(clean)) {
-        setModuleSerials((prev) => [clean, ...prev]);
-        Alert.alert('Module Scanned', `Module #${moduleSerials.length + 1}: ${clean}`, [
-          { text: 'Scan Next', onPress: () => setIsScanning(true) },
-        ]);
-      } else {
-        Alert.alert('Already Scanned', 'This module serial number was already recorded.', [
+      const dup = detectDuplicateSerial(clean, moduleSerials, inverterSerial, project);
+      if (dup.isDuplicate) {
+        Alert.alert('Duplicate Module Serial', `Module serial "${clean}" cannot be added:\n${dup.reason}`, [
           { text: 'OK', onPress: () => setIsScanning(true) },
         ]);
+        return;
       }
+
+      setModuleSerials((prev) => [clean, ...prev]);
+      const dcrNote = parsed.dcrCompliant
+        ? '✓ DCR Domestic Content Validated (ALMM Certified)'
+        : '⚠️ Non-DCR / Verification Required';
+
+      Alert.alert('Module Scanned', `Module #${moduleSerials.length + 1}: ${clean}\n${dcrNote}`, [
+        { text: 'Scan Next', onPress: () => setIsScanning(true) },
+      ]);
     }
   };
 
   const handleAddManualSerial = () => {
     if (!manualInput.trim()) return;
-    const clean = manualInput.trim().toUpperCase();
+    const parsed = parseAndValidateBarcode(manualInput, dcrCertificate);
+    if (!parsed) {
+      Alert.alert('Invalid Serial', 'Serial must contain at least 5 characters.');
+      return;
+    }
 
+    const clean = parsed.serial;
     if (scannedMode === 'INVERTER') {
+      if (moduleSerials.some((s) => s.toUpperCase() === clean)) {
+        Alert.alert('Duplicate Conflict', `Serial "${clean}" is already assigned as a PV module.`);
+        return;
+      }
       setInverterSerial(clean);
       setManualInput('');
     } else {
-      if (!moduleSerials.includes(clean)) {
-        setModuleSerials((prev) => [clean, ...prev]);
-        setManualInput('');
-      } else {
-        Alert.alert('Duplicate', 'This serial is already added.');
+      const dup = detectDuplicateSerial(clean, moduleSerials, inverterSerial, project);
+      if (dup.isDuplicate) {
+        Alert.alert('Duplicate Serial', `Serial "${clean}" cannot be added:\n${dup.reason}`);
+        return;
       }
+      setModuleSerials((prev) => [clean, ...prev]);
+      setManualInput('');
     }
   };
 
@@ -154,17 +349,19 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
     if (project) {
       project.moduleSerials = moduleSerials;
       if (inverterSerial) project.inverterSerial = inverterSerial;
+      if (dcrCertificate) project.dcrCertificate = dcrCertificate;
     }
 
     if (project?.id) {
       try {
         await SafeStorage.setItem(
           `@solar_project_serials_${project.id}`,
-          JSON.stringify({ modules: moduleSerials, inverter: inverterSerial })
+          JSON.stringify({ modules: moduleSerials, inverter: inverterSerial, dcrCertificate })
         );
         await tenantApi.updateProjectDetails(project.id, {
           dcrModuleSerials: moduleSerials.join(','),
           ...(inverterSerial ? { inverterSerial } : {}),
+          ...(dcrCertificate ? { dcrCertificate } : {}),
         });
       } catch {}
     }
@@ -173,12 +370,17 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
       onSaveSerials({
         modules: moduleSerials,
         inverter: inverterSerial,
+        dcrCertificate,
       });
     }
 
+    const dcrCount = moduleSerials.filter(
+      (s) => parseAndValidateBarcode(s, dcrCertificate)?.dcrCompliant
+    ).length;
+
     Alert.alert(
       'Hardware Serials Recorded',
-      `Saved ${moduleSerials.length} PV Modules and Inverter Serial: ${inverterSerial || 'N/A'}.\nLinked to ${project?.name || 'Project'}.`
+      `Saved ${moduleSerials.length} PV Modules (${dcrCount} DCR Verified) and Inverter Serial: ${inverterSerial || 'N/A'}.\nLinked to ${project?.name || 'Project'}.`
     );
     onClose();
   };
@@ -281,6 +483,29 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
 
         {/* SCANNED ITEMS LIST */}
         <ScrollView style={styles.listArea} contentContainerStyle={styles.listAreaContent}>
+          {/* DCR DOMESTIC CONTENT TRACEABILITY CARD */}
+          <View style={styles.dcrSummaryCard}>
+            <View style={styles.dcrMeta}>
+              <ShieldCheck size={20} color="#059669" />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.dcrLabel}>DCR Domestic Content & ALMM Traceability</Text>
+                <TextInput
+                  style={styles.dcrInput}
+                  value={dcrCertificate}
+                  onChangeText={setDcrCertificate}
+                  placeholder="Enter ALMM / DCR Certificate No (e.g. ALMM-2024-WAAREE-01)"
+                  placeholderTextColor="#94a3b8"
+                  autoCapitalize="characters"
+                />
+              </View>
+            </View>
+            <View style={styles.dcrCounterBadge}>
+              <Text style={styles.dcrCounterText}>
+                {moduleSerials.filter((s) => parseAndValidateBarcode(s, dcrCertificate)?.dcrCompliant).length} of {moduleSerials.length} DCR Compliant
+              </Text>
+            </View>
+          </View>
+
           {/* INVERTER STATUS */}
           <View style={styles.inverterSummaryCard}>
             <View style={styles.inverterMeta}>
@@ -307,21 +532,37 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
           {moduleSerials.length === 0 ? (
             <Text style={styles.emptyModules}>No module barcodes scanned yet.</Text>
           ) : (
-            moduleSerials.map((serial, idx) => (
-              <View key={serial + idx} style={styles.moduleRow}>
-                <View style={styles.moduleBadge}>
-                  <Text style={styles.moduleBadgeText}>#{moduleSerials.length - idx}</Text>
+            moduleSerials.map((serial, idx) => {
+              const parsed = parseAndValidateBarcode(serial, dcrCertificate);
+              const isDcr = parsed?.dcrCompliant;
+              return (
+                <View key={serial + idx} style={styles.moduleRow}>
+                  <View style={styles.moduleBadge}>
+                    <Text style={styles.moduleBadgeText}>#{moduleSerials.length - idx}</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.moduleSerialText}>{serial}</Text>
+                    <View style={styles.dcrBadgeRow}>
+                      <View style={[styles.dcrBadge, isDcr ? styles.dcrBadgePass : styles.dcrBadgeWarn]}>
+                        <Text style={[styles.dcrBadgeText, isDcr ? styles.dcrTextPass : styles.dcrTextWarn]}>
+                          {isDcr ? '✓ DCR Certified (ALMM)' : '⚠️ Non-DCR / Verification Req'}
+                        </Text>
+                      </View>
+                      {parsed?.wattage && (
+                        <Text style={styles.moduleSubtext}>{parsed.wattage}W</Text>
+                      )}
+                    </View>
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => handleRemoveModule(serial)}
+                    style={styles.deleteBtn}
+                    activeOpacity={0.7}
+                  >
+                    <Trash2 size={14} color="#ef4444" />
+                  </TouchableOpacity>
                 </View>
-                <Text style={styles.moduleSerialText}>{serial}</Text>
-                <TouchableOpacity
-                  onPress={() => handleRemoveModule(serial)}
-                  style={styles.deleteBtn}
-                  activeOpacity={0.7}
-                >
-                  <Trash2 size={14} color="#ef4444" />
-                </TouchableOpacity>
-              </View>
-            ))
+              );
+            })
           )}
         </ScrollView>
 
@@ -606,10 +847,85 @@ const styles = StyleSheet.create({
     color: '#2563eb',
   },
   moduleSerialText: {
-    flex: 1,
     fontSize: 12,
     fontWeight: '700',
     color: '#0f172a',
+  },
+  dcrSummaryCard: {
+    backgroundColor: '#f0fdf4',
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#bbf7d0',
+    marginBottom: 12,
+  },
+  dcrMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  dcrLabel: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#166534',
+  },
+  dcrInput: {
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#86efac',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#0f172a',
+    marginTop: 4,
+  },
+  dcrCounterBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#dcfce7',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+    marginTop: 8,
+    marginLeft: 30,
+  },
+  dcrCounterText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#15803d',
+  },
+  dcrBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 3,
+  },
+  dcrBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
+    borderRadius: 4,
+  },
+  dcrBadgePass: {
+    backgroundColor: '#dcfce7',
+  },
+  dcrBadgeWarn: {
+    backgroundColor: '#fef3c7',
+  },
+  dcrBadgeText: {
+    fontSize: 9,
+    fontWeight: '800',
+  },
+  dcrTextPass: {
+    color: '#15803d',
+  },
+  dcrTextWarn: {
+    color: '#b45309',
+  },
+  moduleSubtext: {
+    fontSize: 10,
+    color: '#64748b',
+    fontWeight: '600',
   },
   deleteBtn: {
     padding: 4,

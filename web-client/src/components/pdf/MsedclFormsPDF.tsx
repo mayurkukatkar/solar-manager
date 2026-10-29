@@ -353,17 +353,17 @@ export const PdfPage = ({
 // ============================================================================
 
 export const WorkCompletionReport = ({ data }: { data: any }) => {
-  const beneficiaryName = (data.beneficiaryName || data.customerName || "SHRI. SURENDRA RAMBHAU THAKRE").toUpperCase();
-  const appRef = data.applicationRefNo || data.nationalPortalAppNo || "NP-MHSED26-11317031";
-  const appDate = data.applicationDate || data.quotationDate || "08-04-2026";
-  const consumerNo = data.consumerNumber || data.consumerAccountNo || "410022120526";
-  const mobile = data.mobileNo || data.customerMobile || data.customerPhone || "8605849639";
-  const email = data.email || data.customerEmail || "thakresurendra933@gmail.com";
+  const beneficiaryName = (data.beneficiaryName || data.customerName || "").toUpperCase();
+  const appRef = data.applicationRefNo || data.nationalPortalAppNo || "";
+  const appDate = data.applicationDate || data.quotationDate || "";
+  const consumerNo = data.consumerNumber || data.consumerAccountNo || "";
+  const mobile = data.mobileNo || data.customerMobile || data.customerPhone || "";
+  const email = data.email || data.customerEmail || "";
   const category = data.category || "Residential";
-  const address = (data.address || data.installationAddress || "PLOT NO 87 NAVIN NAGAR LIKKLYAN HOUS. SOC. NAGPUR").toUpperCase();
-  const district = (data.district || data.city || "Nagpur").toUpperCase();
+  const address = (data.address || data.installationAddress || "").toUpperCase();
+  const district = (data.district || data.city || "").toUpperCase();
   const state = (data.state || "MAHARASHTRA").toUpperCase();
-  const pincode = data.pincode || "440008";
+  const pincode = data.pincode || "";
 
   const sanctionedLoad = data.sanctionedLoad ? Number(data.sanctionedLoad).toFixed(3) : "1.000";
   const appliedCap = data.appliedCapacity ? Number(data.appliedCapacity).toFixed(3) : Number(data.capacity || 3.3).toFixed(3);
@@ -375,7 +375,7 @@ export const WorkCompletionReport = ({ data }: { data: any }) => {
   const inverterCap = data.inverterCapacity || appliedCap;
   const inverterMake = data.inverterMake || "Grid-Tied";
   const earthing = data.earthingProtection || "Separate AC, DC & LA Earthing provided as per MNRE standards";
-  const vendorName = (data.vendorName || "M/S EKVARTA ENERGY SOLUTIONS").toUpperCase();
+  const vendorName = (data.vendorName || "").toUpperCase();
 
   return (
     <PdfPage className="text-[12px] leading-tight">
@@ -541,12 +541,12 @@ export const WorkCompletionReport = ({ data }: { data: any }) => {
 // ============================================================================
 
 export const CommissioningCertificate = ({ data }: { data: any }) => {
-  const beneficiaryName = (data.beneficiaryName || data.customerName || "SHRI. SURENDRA RAMBHAU THAKRE").toUpperCase();
-  const consumerNo = data.consumerNumber || data.consumerAccountNo || "410022120526";
-  const address = (data.address || data.installationAddress || "PLOT NO 87 NAVIN NAGAR LIKKLYAN HOUS. SOC. NAGPUR").toUpperCase();
-  const district = (data.district || data.city || "Nagpur").toUpperCase();
+  const beneficiaryName = (data.beneficiaryName || data.customerName || "").toUpperCase();
+  const consumerNo = data.consumerNumber || data.consumerAccountNo || "";
+  const address = (data.address || data.installationAddress || "").toUpperCase();
+  const district = (data.district || data.city || "").toUpperCase();
   const state = (data.state || "MAHARASHTRA").toUpperCase();
-  const pincode = data.pincode || "440008";
+  const pincode = data.pincode || "";
 
   const appliedCap = data.appliedCapacity ? Number(data.appliedCapacity).toFixed(3) : Number(data.capacity || 3.3).toFixed(3);
   const installedCap = data.installedCapacity ? Number(data.installedCapacity).toFixed(3) : (Number(appliedCap) * 0.97).toFixed(3);
@@ -557,8 +557,8 @@ export const CommissioningCertificate = ({ data }: { data: any }) => {
   const moduleMfr = (data.moduleManufacturer || "MUNDRA SOLAR PV LIMITED").toUpperCase();
   const inverterCap = data.inverterCapacity || appliedCap;
   const phase = data.phase || "Single Phase";
-  const commDate = data.commissioningDate || "09-10-2026";
-  const vendorName = (data.vendorName || "M/S EKVARTA ENERGY SOLUTIONS").toUpperCase();
+  const commDate = data.commissioningDate || "";
+  const vendorName = (data.vendorName || "").toUpperCase();
 
   return (
     <PdfPage className="text-[12px] leading-snug">
@@ -672,13 +672,13 @@ export const CommissioningCertificate = ({ data }: { data: any }) => {
 // ============================================================================
 
 export const DcrUndertaking = ({ data }: { data: any }) => {
-  const beneficiaryName = (data.beneficiaryName || data.customerName || "SHRI. SURENDRA RAMBHAU THAKRE").toUpperCase();
-  const address = (data.address || data.installationAddress || "PLOT NO 87 NAVIN NAGAR LIKKLYAN HOUS. SOC. NAGPUR").toUpperCase();
-  const district = (data.district || data.city || "Nagpur").toUpperCase();
+  const beneficiaryName = (data.beneficiaryName || data.customerName || "").toUpperCase();
+  const address = (data.address || data.installationAddress || "").toUpperCase();
+  const district = (data.district || data.city || "").toUpperCase();
   const state = (data.state || "MAHARASHTRA").toUpperCase();
-  const pincode = data.pincode || "440008";
-  const appRef = data.applicationRefNo || data.nationalPortalAppNo || "NP-MHSED26-11317031";
-  const commDate = data.commissioningDate || "09-10-2026";
+  const pincode = data.pincode || "";
+  const appRef = data.applicationRefNo || data.nationalPortalAppNo || "";
+  const commDate = data.commissioningDate || "";
 
   const appliedCap = data.appliedCapacity ? Number(data.appliedCapacity).toFixed(3) : Number(data.capacity || 3.3).toFixed(3);
   const installedCap = data.installedCapacity ? Number(data.installedCapacity).toFixed(3) : (Number(appliedCap) * 0.97).toFixed(3);
@@ -687,15 +687,12 @@ export const DcrUndertaking = ({ data }: { data: any }) => {
   const moduleMake = (data.moduleMake || "ADANI SOLAR").toUpperCase();
   const cellMfr = (data.cellManufacturer || "MUNDRA SOLAR PV LIMITED (ADANI SOLAR)").toUpperCase();
   const moduleMfr = (data.moduleManufacturer || "MUNDRA SOLAR PV LIMITED (ADANI SOLAR)").toUpperCase();
-  const vendorName = (data.vendorName || "M/S EKVARTA ENERGY SOLUTIONS").toUpperCase();
+  const vendorName = (data.vendorName || "").toUpperCase();
 
   // Dynamic Serial Numbers
   const serials: string[] = Array.isArray(data.moduleSerialNumbers) && data.moduleSerialNumbers.length > 0
     ? data.moduleSerialNumbers
-    : (data.dcrModuleSerials ? data.dcrModuleSerials.split(/[,\n]/).map((s:string) => s.trim()).filter(Boolean) : [
-        "MS2608211A3882", "MS2608211A3908", "MS2608211A4160", 
-        "MS2608211A4181", "MS2608211A4247", "MS2608211A4462"
-      ]);
+    : (data.dcrModuleSerials ? data.dcrModuleSerials.split(/[,\n]/).map((s:string) => s.trim()).filter(Boolean) : []);
 
   return (
     <PdfPage className="text-[11.5px] leading-snug">
@@ -846,19 +843,19 @@ export const WcrFullPack = ({ data }: { data: any }) => (
 // ============================================================================
 
 export const NetMeteringAgreement2019 = ({ data, includeStamp = true }: { data: any; includeStamp?: boolean }) => {
-  const beneficiaryName = (data.beneficiaryName || data.customerName || "SURENDRA RAMBHAU THAKRE").toUpperCase();
-  const address = (data.address || data.installationAddress || "PLOT NO 87 NAVIN NAGAR LIKKLYAN HOUS. SOC. NAGPUR").toUpperCase();
-  const district = (data.district || data.city || "Nagpur").toUpperCase();
-  const consumerNo = data.consumerNumber || "410022120526";
-  const capacity = data.appliedCapacity || data.capacity || "1.1";
-  const location = (data.agreementCity || data.city || "NAGPUR").toUpperCase();
-  const day = data.agreementDay || "10";
-  const month = (data.agreementMonth || "OCT").toUpperCase();
-  const year = data.agreementYear || "2026";
-  const subDivision = (data.subDivision || `${district} S/DN`).toUpperCase();
-  const vendorName = (data.vendorName || "EKVARTA ENERGY SOLUTIONS").toUpperCase();
+  const beneficiaryName = (data.beneficiaryName || data.customerName || "").toUpperCase();
+  const address = (data.address || data.installationAddress || "").toUpperCase();
+  const district = (data.district || data.city || "").toUpperCase();
+  const consumerNo = data.consumerNumber || "";
+  const capacity = data.appliedCapacity || data.capacity || "";
+  const location = (data.agreementCity || data.city || "").toUpperCase();
+  const day = data.agreementDay || "";
+  const month = (data.agreementMonth || "").toUpperCase();
+  const year = data.agreementYear || "";
+  const subDivision = (data.subDivision || (district ? `${district} S/DN` : "")).toUpperCase();
+  const vendorName = (data.vendorName || "").toUpperCase();
   const witness1 = (data.witness1 || beneficiaryName).toUpperCase();
-  const witness2 = (data.witness2 || data.customerFatherName || "RAMBHAU THAKRE").toUpperCase();
+  const witness2 = (data.witness2 || data.customerFatherName || "").toUpperCase();
 
   return (
     <div className="bg-white text-black text-[12px] leading-relaxed text-justify">
@@ -1122,19 +1119,19 @@ export const NetMeteringAgreement2019 = ({ data, includeStamp = true }: { data: 
 // ============================================================================
 
 export const Annexure2ConsumerVendorAgreement = ({ data, includeStamp = true }: { data: any; includeStamp?: boolean }) => {
-  const beneficiaryName = (data.beneficiaryName || data.customerName || "RAVI DODKUJI KAWALE").toUpperCase();
-  const address = (data.address || data.installationAddress || "TEMBHARI BUTIBORI").toUpperCase();
-  const district = (data.district || data.city || "Nagpur").toUpperCase();
+  const beneficiaryName = (data.beneficiaryName || data.customerName || "").toUpperCase();
+  const address = (data.address || data.installationAddress || "").toUpperCase();
+  const district = (data.district || data.city || "").toUpperCase();
   const state = (data.state || "MAHARASHTRA").toUpperCase();
-  const pincode = data.pincode || "440016";
-  const day = data.agreementDay || "12";
-  const month = data.agreementMonth || "10";
-  const year = data.agreementYear || "26";
-  const location = (data.agreementCity || data.city || "Nagpur").toUpperCase();
+  const pincode = data.pincode || "";
+  const day = data.agreementDay || "";
+  const month = data.agreementMonth || "";
+  const year = data.agreementYear || "";
+  const location = (data.agreementCity || data.city || "").toUpperCase();
 
-  const vendorName = (data.vendorName || "EKVARTA ENERGY SOLUTIONS").toUpperCase();
-  const vendorAddress = (data.vendorAddress || "PLOT NO 4 HOUSE NO 85, TAJ HOUSING SOCIETY, HUDKESHWAR ROAD, PIPLA FATA, Nagpur, Maharashtra").toUpperCase();
-  const vendorPincode = data.vendorPincode || "440034";
+  const vendorName = (data.vendorName || "").toUpperCase();
+  const vendorAddress = (data.vendorAddress || "").toUpperCase();
+  const vendorPincode = data.vendorPincode || "";
 
   return (
     <div className="bg-white text-black text-[12px] leading-relaxed text-justify">
@@ -1286,13 +1283,13 @@ export const Annexure2ConsumerVendorAgreement = ({ data, includeStamp = true }: 
 // ============================================================================
 
 export const StandardQuotationPDF = ({ data }: { data: any }) => {
-  const vendorName = data.company_name || data.vendorName || "Ekvarta Energy Solutions";
-  const gstin = data.gstin || "27DTXPM6427E1Z3";
-  const date = data.quotation_date || data.quotationDate || "12 /10/ 2026";
-  const qNumber = data.quotation_number || data.qNumber || "EES/2026/031";
+  const vendorName = data.company_name || data.vendorName || "";
+  const gstin = data.gstin || "";
+  const date = data.quotation_date || data.quotationDate || new Date().toLocaleDateString();
+  const qNumber = data.quotation_number || data.qNumber || "";
 
-  const customerName = (data.customer_name || data.customerName || "RAVI DODKUJI KAWALE").toUpperCase();
-  const consumerNumber = data.consumer_number || data.consumerNumber || "413472965142";
+  const customerName = (data.customer_name || data.customerName || "").toUpperCase();
+  const consumerNumber = data.consumer_number || data.consumerNumber || "";
 
   const panelBrand = data.panel_brand || data.panelBrand || "Adani";
   const panelWattage = data.panel_wattage || data.panelWattage || 550;

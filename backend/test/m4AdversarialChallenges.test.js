@@ -205,6 +205,7 @@ describe('Milestone M4: Adversarial Challenges & Empirical Stress Tests', () => 
   // =========================================================================
   describe('Concurrent Burst Idempotency Stress-Testing', () => {
     let raceLead = null;
+    let quoteLead = null;
     let raceQuote = null;
     let createdProjectIds = [];
 
@@ -223,12 +224,26 @@ describe('Milestone M4: Adversarial Challenges & Empirical Stress Tests', () => 
         }
       }));
 
+      // Create dedicated lead for quotation conversion race test so Test 1 does not pre-convert raceQuote
+      quoteLead = await withRetry(() => prisma.lead.create({
+        data: {
+          tenantId: TEST_FIXTURES.tenantA.id,
+          name: `Quote Race Lead ${testSuffix}`,
+          email: `quotelead${testSuffix}@solarops.test`,
+          mobile: `9701${testSuffix}`,
+          status: 'QUALIFIED',
+          estimatedCap: 5.5,
+          estimatedValue: 302500,
+          customerType: 'RESIDENTIAL'
+        }
+      }));
+
       // Create fresh quotation
       raceQuote = await withRetry(() => prisma.quotation.create({
         data: {
           tenantId: TEST_FIXTURES.tenantA.id,
           qNumber: `QT-RACE-${testSuffix}`,
-          leadId: raceLead.id,
+          leadId: quoteLead.id,
           systemCapacity: 5.5,
           panelBrand: 'Mono PERC 550W',
           panelWattage: 550,
@@ -269,6 +284,11 @@ describe('Milestone M4: Adversarial Challenges & Empirical Stress Tests', () => 
         await prisma.customer.deleteMany({ where: { leadId: raceLead.id } }).catch(() => {});
         await prisma.leadActivity.deleteMany({ where: { leadId: raceLead.id } }).catch(() => {});
         await prisma.lead.delete({ where: { id: raceLead.id } }).catch(() => {});
+      }
+      if (quoteLead) {
+        await prisma.customer.deleteMany({ where: { leadId: quoteLead.id } }).catch(() => {});
+        await prisma.leadActivity.deleteMany({ where: { leadId: quoteLead.id } }).catch(() => {});
+        await prisma.lead.delete({ where: { id: quoteLead.id } }).catch(() => {});
       }
     });
 
@@ -478,8 +498,8 @@ describe('Milestone M4: Adversarial Challenges & Empirical Stress Tests', () => 
       leaksFound.forEach(l => console.log('  [LEAK]:', l));
       console.log('----------------------------------------------');
 
-      // Document whether leaks exist
-      assert.ok(true, 'Leak audit executed and recorded');
+      // Enforce zero leaks
+      assert.equal(leaksFound.length, 0, `Expected 0 statutory leaks, found ${leaksFound.length}: ${leaksFound.join('; ')}`);
     });
   });
 

@@ -59,6 +59,24 @@ export default function Tasks() {
     }
   };
 
+  const handleStatusChange = async (taskId: string, newStatus: string) => {
+    const previousTasks = [...tasks];
+    setTasks(tasks.map(t => t.id === taskId ? { ...t, status: newStatus } : t));
+
+    try {
+      await axios.patch(
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/tasks/${taskId}`,
+        { status: newStatus },
+        { withCredentials: true }
+      );
+      showToast({ type: 'success', message: `Task moved to ${newStatus}` });
+    } catch (err: any) {
+      console.error(err);
+      setTasks(previousTasks);
+      showToast({ type: 'error', message: err.response?.data?.error || 'Failed to update task status' });
+    }
+  };
+
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -127,22 +145,48 @@ export default function Tasks() {
                 <div className="flex items-center justify-between px-1">
                    <h3 className={`font-extrabold text-${column.color}-600 uppercase tracking-wider text-xs`}>{column.label}</h3>
                    <span className={`bg-${column.color}-100 text-${column.color}-700 px-2 py-0.5 rounded-full text-[10px] font-black`}>
-                     {tasks.filter(t => t.status === column.id).length}
+                     {tasks.filter(t => (column.id === 'PENDING' && (t.status === 'PENDING' || t.status === 'TODO')) || (column.id === 'COMPLETED' && (t.status === 'COMPLETED' || t.status === 'DONE')) || t.status === column.id).length}
                    </span>
                 </div>
                 <div className="flex-1 overflow-y-auto custom-scrollbar space-y-3 pr-2 pb-10">
                    {loading && column.id === 'PENDING' ? (
                       <div className="text-center py-4"><div className="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-emerald-500"></div></div>
                    ) : (
-                      tasks.filter(t => t.status === column.id).map(task => (
+                      tasks.filter(t => {
+                        if (column.id === 'PENDING') return t.status === 'PENDING' || t.status === 'TODO';
+                        if (column.id === 'COMPLETED') return t.status === 'COMPLETED' || t.status === 'DONE';
+                        return t.status === column.id;
+                      }).map(task => (
                         <div 
                           key={task.id} 
                           draggable 
                           onDragStart={(e) => handleDragStart(e, task.id)}
                           className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 hover:shadow-md transition-shadow cursor-grab active:cursor-grabbing"
                         >
-                           <div className="flex items-start justify-end mb-2">
-                             <button className="text-slate-400 hover:text-emerald-600">
+                           <div className="flex items-center justify-between mb-3 gap-2">
+                             {/* Touch-Friendly Mobile Quick Status Selector */}
+                             <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                               <label htmlFor={`status-select-${task.id}`} className="sr-only">Move Task</label>
+                               <select
+                                 id={`status-select-${task.id}`}
+                                 value={task.status === 'TODO' ? 'PENDING' : task.status === 'DONE' ? 'COMPLETED' : task.status}
+                                 onChange={(e) => handleStatusChange(task.id, e.target.value)}
+                                 className="text-[11px] font-bold rounded-lg border border-slate-200 py-1 px-2 bg-slate-50 text-slate-700 hover:bg-slate-100 focus:ring-2 focus:ring-emerald-500 outline-none cursor-pointer min-h-[32px]"
+                                 aria-label={`Advance task status for ${task.name}`}
+                               >
+                                 <option value="PENDING">TODO</option>
+                                 <option value="IN_PROGRESS">IN_PROGRESS</option>
+                                 <option value="REVIEW">REVIEW</option>
+                                 <option value="COMPLETED">DONE</option>
+                               </select>
+                             </div>
+
+                             <button 
+                               onClick={() => handleStatusChange(task.id, 'COMPLETED')}
+                               className="text-slate-400 hover:text-emerald-600 p-1 min-h-[32px] min-w-[32px] flex items-center justify-center rounded-lg hover:bg-slate-50 transition-colors"
+                               title="Mark as Done"
+                               aria-label="Mark task done"
+                             >
                                <CheckSquare size={16} />
                              </button>
                            </div>

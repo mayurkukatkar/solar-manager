@@ -232,56 +232,127 @@ router.patch('/api/tenant/procurement/:id/status', requireTenantAuth, async (req
 
     if (!existingPO) return res.status(404).json({ error: 'Purchase Order not found' });
 
+    // Status regression guard: cannot change status away from RECEIVED
+    if (existingPO.status === 'RECEIVED' && status !== 'RECEIVED') {
+      return res.status(400).json({ error: 'Cannot change status of a Purchase Order that has already been received into inventory' });
+    }
+
     // If transitioning to RECEIVED for the first time, increment stock & record goods receipt
     if (status === 'RECEIVED' && existingPO.status !== 'RECEIVED') {
-      let warehouse = await prisma.warehouse.findFirst({
-        where: { tenantId: req.user.tenantId }
-      });
-      if (!warehouse) {
-        try {
-          warehouse = await prisma.warehouse.create({
+      const updated = await prisma.$transaction(async (tx) => {
+        // Atomic status check-and-lock inside transaction
+        const updateCount = await tx.purchaseOrder.updateMany({
+          where: { id, tenantId: req.user.tenantId, status: { not: 'RECEIVED' } },
+          data: { status: 'RECEIVED' }
+        });
+        if (updateCount.count === 0) {
+          const err = new Error('Purchase Order has already been received');
+          err.statusCode = 400;
+          throw err;
+        }
+
+        let warehouse = null;
+        if (req.body.warehouseId) {
+          warehouse = await tx.warehouse.findFirst({
+            where: { id: req.body.warehouseId, tenantId: req.user.tenantId }
+          });
+        }
+        if (!warehouse) {
+          warehouse = await tx.warehouse.findFirst({
+            where: { tenantId: req.user.tenantId }
+          });
+        }
+        if (!warehouse) {
+          warehouse = await tx.warehouse.create({
             data: {
               tenantId: req.user.tenantId,
               name: 'Main Central Hub',
               location: 'Headquarters'
             }
           });
-        } catch (e) {
-          // ignore
         }
-      }
 
-      for (const item of existingPO.items) {
-        // Increment product stock
-        await prisma.product.update({
-          where: { id: item.productId },
-          data: { currentStock: { increment: Math.round(item.quantity) } }
-        }).catch(err => console.warn('Product stock increment error:', err));
+        for (const item of existingPO.items) {
+          // Increment product aggregate currentStock
+          const updatedProduct = await tx.product.update({
+            where: { id: item.productId },
+            data: { currentStock: { increment: Math.round(item.quantity) } }
+          });
 
-        // Update received quantity
-        await prisma.purchaseOrderItem.update({
-          where: { id: item.id },
-          data: { receivedQty: item.quantity }
-        }).catch(err => console.warn('PO item receivedQty update error:', err));
+          // Update received quantity on PO item
+          await tx.purchaseOrderItem.update({
+            where: { id: item.id },
+            data: { receivedQty: item.quantity }
+          });
 
-        // Record stock ledger entry
-        if (warehouse) {
-          await prisma.stockLedger.create({
+          // Upsert StockBalance in the warehouse (quantity on hand & available)
+          await tx.stockBalance.upsert({
+            where: {
+              productId_warehouseId: {
+                productId: item.productId,
+                warehouseId: warehouse.id
+              }
+            },
+            update: {
+              quantity: { increment: item.quantity },
+              availableQuantity: { increment: item.quantity }
+            },
+            create: {
+              productId: item.productId,
+              warehouseId: warehouse.id,
+              quantity: item.quantity,
+              availableQuantity: item.quantity,
+              reservedQuantity: 0,
+              averageCost: item.unitPrice || 0
+            }
+          });
+
+          // Insert StockLedger audit entry
+          await tx.stockLedger.create({
             data: {
               tenantId: req.user.tenantId,
               warehouseId: warehouse.id,
               productId: item.productId,
               movementType: 'RECEIPT',
               quantity: item.quantity,
-              quantityBefore: item.product?.currentStock || 0,
-              quantityAfter: (item.product?.currentStock || 0) + item.quantity,
+              quantityBefore: item.product?.currentStock || (updatedProduct.currentStock - item.quantity),
+              quantityAfter: updatedProduct.currentStock,
               referenceType: 'PO',
               referenceId: existingPO.id,
-              notes: `Received from PO: ${existingPO.poNumber} (${existingPO.vendor})`
+              userId: req.user.id || req.user.userId || null,
+              notes: `Received from PO: ${existingPO.poNumber} (${existingPO.vendor}) - Item ${item.id}`
             }
-          }).catch(err => console.warn('Stock ledger entry error:', err));
+          });
         }
-      }
+
+        const poUpdated = await tx.purchaseOrder.findUnique({
+          where: { id },
+          include: { items: { include: { product: true } } }
+        });
+
+        // Record audit log entry
+        await tx.auditLog.create({
+          data: {
+            actorId: req.user.id,
+            tenantId: req.user.tenantId,
+            action: 'RECEIVE_PURCHASE_ORDER',
+            entity: 'PurchaseOrder',
+            entityId: id,
+            details: {
+              poNumber: poUpdated.poNumber,
+              oldStatus: existingPO.status,
+              newStatus: 'RECEIVED',
+              warehouseId: warehouse.id,
+              itemsReceived: existingPO.items.length
+            },
+            ipAddress: req.ip || '127.0.0.1'
+          }
+        }).catch(() => null);
+
+        return poUpdated;
+      }, { timeout: 30000, maxWait: 10000 });
+
+      return res.json({ message: 'Purchase Order marked as RECEIVED and inventory restocked', purchaseOrder: updated });
     }
 
     const updated = await prisma.purchaseOrder.update({
@@ -306,7 +377,139 @@ router.patch('/api/tenant/procurement/:id/status', requireTenantAuth, async (req
     res.json({ message: `Purchase Order marked as ${status}`, purchaseOrder: updated });
   } catch (error) {
     console.error('Error updating PO status:', error);
-    res.status(500).json({ error: 'Failed to update Purchase Order status' });
+    res.status(error.statusCode || 500).json({ error: error.message || 'Failed to update Purchase Order status' });
+  }
+});
+
+// POST /api/tenant/procurement/:id/receive
+// Explicit PO receive endpoint for restocking warehouse inventory
+router.post('/api/tenant/procurement/:id/receive', requireTenantAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { warehouseId } = req.body;
+
+    const existingPO = await prisma.purchaseOrder.findFirst({
+      where: { id, tenantId: req.user.tenantId },
+      include: { items: { include: { product: true } } }
+    });
+
+    if (!existingPO) return res.status(404).json({ error: 'Purchase Order not found' });
+    if (existingPO.status === 'RECEIVED') {
+      return res.status(400).json({ error: 'Purchase Order has already been received' });
+    }
+
+    const updated = await prisma.$transaction(async (tx) => {
+      // Atomic status check-and-lock inside transaction
+      const updateCount = await tx.purchaseOrder.updateMany({
+        where: { id, tenantId: req.user.tenantId, status: { not: 'RECEIVED' } },
+        data: { status: 'RECEIVED' }
+      });
+      if (updateCount.count === 0) {
+        const err = new Error('Purchase Order has already been received');
+        err.statusCode = 400;
+        throw err;
+      }
+
+      let warehouse = null;
+      if (warehouseId) {
+        warehouse = await tx.warehouse.findFirst({
+          where: { id: warehouseId, tenantId: req.user.tenantId }
+        });
+      }
+      if (!warehouse) {
+        warehouse = await tx.warehouse.findFirst({
+          where: { tenantId: req.user.tenantId }
+        });
+      }
+      if (!warehouse) {
+        warehouse = await tx.warehouse.create({
+          data: {
+            tenantId: req.user.tenantId,
+            name: 'Main Central Hub',
+            location: 'Headquarters'
+          }
+        });
+      }
+
+      for (const item of existingPO.items) {
+        const updatedProduct = await tx.product.update({
+          where: { id: item.productId },
+          data: { currentStock: { increment: Math.round(item.quantity) } }
+        });
+
+        await tx.purchaseOrderItem.update({
+          where: { id: item.id },
+          data: { receivedQty: item.quantity }
+        });
+
+        await tx.stockBalance.upsert({
+          where: {
+            productId_warehouseId: {
+              productId: item.productId,
+              warehouseId: warehouse.id
+            }
+          },
+          update: {
+            quantity: { increment: item.quantity },
+            availableQuantity: { increment: item.quantity }
+          },
+          create: {
+            productId: item.productId,
+            warehouseId: warehouse.id,
+            quantity: item.quantity,
+            availableQuantity: item.quantity,
+            reservedQuantity: 0,
+            averageCost: item.unitPrice || 0
+          }
+        });
+
+        await tx.stockLedger.create({
+          data: {
+            tenantId: req.user.tenantId,
+            warehouseId: warehouse.id,
+            productId: item.productId,
+            movementType: 'RECEIPT',
+            quantity: item.quantity,
+            quantityBefore: item.product?.currentStock || (updatedProduct.currentStock - item.quantity),
+            quantityAfter: updatedProduct.currentStock,
+            referenceType: 'PO',
+            referenceId: existingPO.id,
+            userId: req.user.id || req.user.userId || null,
+            notes: `Received from PO: ${existingPO.poNumber} (${existingPO.vendor}) - Item ${item.id}`
+          }
+        });
+      }
+
+      const poUpdated = await tx.purchaseOrder.findUnique({
+        where: { id },
+        include: { items: { include: { product: true } } }
+      });
+
+      await tx.auditLog.create({
+        data: {
+          actorId: req.user.id,
+          tenantId: req.user.tenantId,
+          action: 'RECEIVE_PURCHASE_ORDER',
+          entity: 'PurchaseOrder',
+          entityId: id,
+          details: {
+            poNumber: poUpdated.poNumber,
+            oldStatus: existingPO.status,
+            newStatus: 'RECEIVED',
+            warehouseId: warehouse.id,
+            itemsReceived: existingPO.items.length
+          },
+          ipAddress: req.ip || '127.0.0.1'
+        }
+      }).catch(() => null);
+
+      return poUpdated;
+    }, { timeout: 30000, maxWait: 10000 });
+
+    res.json({ message: 'Purchase Order received successfully and inventory restocked', purchaseOrder: updated });
+  } catch (error) {
+    console.error('Error receiving PO:', error);
+    res.status(error.statusCode || 500).json({ error: error.message || 'Failed to receive Purchase Order' });
   }
 });
 

@@ -956,12 +956,12 @@ export function QuotationDetailModal({
                   <div id="detail-modal-standard-quote-content" className="w-full max-w-[210mm] shadow-2xl rounded-sm overflow-hidden bg-white">
                     <StandardQuotationPDF 
                       data={{
-                        company_name: tenantInfo?.legalName || tenantInfo?.name || "Ekvarta Energy Solutions",
-                        gstin: tenantInfo?.gstin || "27DTXPM6427E1Z3",
+                        company_name: tenantInfo?.legalName || tenantInfo?.name || "",
+                        gstin: tenantInfo?.gstin || "",
                         quotation_date: quotation.date ? new Date(quotation.date).toLocaleDateString() : new Date().toLocaleDateString(),
-                        quotation_number: quotation.qNumber || "EES/2026/031",
-                        customer_name: (quotation.customer?.name || quotation.lead?.name || "RAVI DODKUJI KAWALE").toUpperCase(),
-                        consumer_number: quotation.consumerNumber || quotation.customer?.consumerNumber || "413472965142",
+                        quotation_number: quotation.qNumber || "",
+                        customer_name: (quotation.customer?.name || quotation.lead?.name || "").toUpperCase(),
+                        consumer_number: quotation.consumerNumber || quotation.customer?.consumerNumber || "",
                         panel_brand: quotation.panelBrand || "Adani",
                         panel_wattage: quotation.panelWattage || 550,
                         panel_quantity: quotation.panelQuantity || 8,

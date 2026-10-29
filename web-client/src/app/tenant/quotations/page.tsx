@@ -217,12 +217,12 @@ export default function QuotationsPage() {
     try {
       setDownloadingQuoteId(quote.id + '_standard');
       const standardData = {
-        company_name: tenantInfo?.legalName || tenantInfo?.name || "Ekvarta Energy Solutions",
-        gstin: tenantInfo?.gstin || "27DTXPM6427E1Z3",
+        company_name: tenantInfo?.legalName || tenantInfo?.name || "",
+        gstin: tenantInfo?.gstin || "",
         quotation_date: quote.date ? new Date(quote.date).toLocaleDateString() : new Date().toLocaleDateString(),
-        quotation_number: quote.qNumber || "EES/2026/031",
-        customer_name: (quote.customer?.name || quote.lead?.name || "RAVI DODKUJI KAWALE").toUpperCase(),
-        consumer_number: quote.consumerNumber || quote.customer?.consumerNumber || "413472965142",
+        quotation_number: quote.qNumber || "",
+        customer_name: (quote.customer?.name || quote.lead?.name || "").toUpperCase(),
+        consumer_number: quote.consumerNumber || quote.customer?.consumerNumber || "",
         panel_brand: quote.panelBrand || "Adani",
         panel_wattage: quote.panelWattage || 550,
         panel_quantity: quote.panelQuantity || 8,

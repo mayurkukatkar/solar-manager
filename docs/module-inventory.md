@@ -11,22 +11,22 @@
 
 | # | Module Name | Primary Domain | Web Routes | Backend Routes | Primary Models | Implementation Status |
 |---|---|---|---|---|---|---|
-| 1 | **CRM & Leads** | Sales pipeline, prospect sizing, OCR intake | 2 | `routes/tenant/crm.js` | `Lead`, `LeadFollowUp`, `LeadNote`, `LeadActivity` | Operational |
-| 2 | **Customer Directory** | Client master records, 360 dossiers | 2 | `routes/tenant/crm.js` | `Customer` | Operational |
-| 3 | **Site Surveys & Engineering** | Feasibility audit, shading, roof layout | 2 | `routes/tenant/surveys.js` | `SiteSurvey`, `Document` | Operational |
-| 4 | **Quotations & Sizing Engine** | 60-second wizard, composite GST, templates | 2 | `routes/tenant/quotations.js`, `templates.js` | `Quotation`, `QuotationItem`, `ProposalTemplate` | Operational |
-| 5 | **EPC Projects & Operations** | Project master, BOM, stage gating, tasks | 4 | `routes/tenant/crm.js`, `discom.js` | `Project`, `ProjectTask`, `ProjectMilestone`, `ProjectMaterialRequirement` | Operational |
-| 6 | **Inventory & Warehouses** | Stock ledger, multi-warehouse, serialized stock | 6 | `routes/tenant/crm.js` | `Product`, `Warehouse`, `StockLedger`, `StockBalance`, `SerialNumber`, `GoodsReceipt`, `MaterialDispatch`, `StockTransfer` | Operational |
-| 7 | **Procurement & Vendors** | Hardware POs, supplier status, auto-stocking | 1 | `routes/tenant/procurement.js` | `PurchaseOrder`, `PurchaseOrderItem` | Operational |
-| 8 | **Field Installation** | Work orders, on-site checklists, photo QA | 3 | `routes/tenant/installations.js` | `InstallationJob`, `InstallationChecklistItem`, `InstallationPhoto`, `CompletionCertificate` | Operational / 404 links |
-| 9 | **Workforce & Staff** | Team members, departments, granular RBAC | 2 | `routes/tenant/staff.js`, `users.js` | `Staff`, `Department`, `User`, `ProjectStaffAssignment` | Operational |
-| 10 | **Finance, Invoices & Loans** | Milestone billing (20/60/15/5%), receipts, loans | 2 | `routes/tenant/finance.js`, `loans.js` | `Invoice`, `Payment`, `LoanApplication` | Operational |
-| 11 | **Statutory DISCOM & Subsidy** | PM Surya Ghar DBT, MSEDCL 5-stage gating | 1 | `routes/tenant/subsidy.js`, `discom.js` | `SubsidyApplication`, `DiscomApplication` | Operational |
-| 12 | **Service, Warranty & AMC** | Post-sales tickets, service visits, AMC contracts | 2 | `routes/tenant/service.js`, `amc.js` | `SupportTicket`, `ServiceVisit`, `AMC` | Operational |
-| 13 | **System, Reports & Settings** | Company profile, GSTIN/PAN, bank UPI, audit | 5 | `routes/tenant/settings.js`, `auditLogs.js`, `notifications.js`, `communication.js`, `automation.js` | `Tenant`, `TenantNotification`, `CommunicationLog`, `AutomationRule` | Operational |
-| 14 | **Super-Admin Platform** | Multi-tenant governance, plans, suspension | 12 | `routes/admin/superAdmin.js` | `Tenant`, `Plan`, `Subscription`, `PlatformLead`, `Announcement` | Operational |
-| 15 | **Mobile Field Engineering** | QR barcode scanning, earthing QA, stamp paper | 8 screens | Backend `/api/tenant/*` | Local drafts (`AsyncStorage`), Project Serials | Operational |
-| 16 | **Public Marketing & Portals** | Marketing landing, solar storytelling, demo request | 10 | `/api/demo-request`, `routes/auth.js` | `PlatformLead`, `User` | Operational |
+| 1 | **CRM & Leads** | Sales pipeline, prospect sizing, OCR intake | 2 | `routes/tenant/crm.js` | `Lead`, `LeadFollowUp`, `LeadNote`, `LeadActivity` | VERIFIED |
+| 2 | **Customer Directory** | Client master records, 360 dossiers | 2 | `routes/tenant/crm.js` | `Customer` | VERIFIED |
+| 3 | **Site Surveys & Engineering** | Feasibility audit, shading, roof layout | 2 | `routes/tenant/surveys.js` | `SiteSurvey`, `Document` | VERIFIED |
+| 4 | **Quotations & Sizing Engine** | 60-second wizard, composite GST, templates | 2 | `routes/tenant/quotations.js`, `templates.js` | `Quotation`, `QuotationItem`, `ProposalTemplate` | VERIFIED |
+| 5 | **EPC Projects & Operations** | Project master, BOM, stage gating, tasks | 4 | `routes/tenant/crm.js`, `discom.js` | `Project`, `ProjectTask`, `ProjectMilestone`, `ProjectMaterialRequirement` | VERIFIED |
+| 6 | **Inventory & Warehouses** | Stock ledger, multi-warehouse, serialized stock | 6 | `routes/tenant/crm.js` | `Product`, `Warehouse`, `StockLedger`, `StockBalance`, `SerialNumber`, `GoodsReceipt`, `MaterialDispatch`, `StockTransfer` | VERIFIED |
+| 7 | **Procurement & Vendors** | Hardware POs, supplier status, auto-stocking | 1 | `routes/tenant/procurement.js` | `PurchaseOrder`, `PurchaseOrderItem` | VERIFIED |
+| 8 | **Field Installation** | Work orders, on-site checklists, photo QA | 3 | `routes/tenant/installations.js` | `InstallationJob`, `InstallationChecklistItem`, `InstallationPhoto`, `CompletionCertificate` | VERIFIED |
+| 9 | **Workforce & Staff** | Team members, departments, granular RBAC | 2 | `routes/tenant/staff.js`, `users.js` | `Staff`, `Department`, `User`, `ProjectStaffAssignment` | VERIFIED |
+| 10 | **Finance, Invoices & Loans** | Milestone billing (20/60/15/5%), receipts, loans | 2 | `routes/tenant/finance.js`, `loans.js` | `Invoice`, `Payment`, `LoanApplication` | VERIFIED |
+| 11 | **Statutory DISCOM & Subsidy** | PM Surya Ghar DBT, MSEDCL 5-stage gating | 1 | `routes/tenant/subsidy.js`, `discom.js` | `SubsidyApplication`, `DiscomApplication` | VERIFIED |
+| 12 | **Service, Warranty & AMC** | Post-sales tickets, service visits, AMC contracts | 2 | `routes/tenant/service.js`, `amc.js` | `SupportTicket`, `ServiceVisit`, `AMC` | VERIFIED |
+| 13 | **System, Reports & Settings** | Company profile, GSTIN/PAN, bank UPI, audit | 5 | `routes/tenant/settings.js`, `auditLogs.js`, `notifications.js`, `communication.js`, `automation.js` | `Tenant`, `TenantNotification`, `CommunicationLog`, `AutomationRule` | VERIFIED |
+| 14 | **Super-Admin Platform** | Multi-tenant governance, plans, suspension | 12 | `routes/admin/superAdmin.js` | `Tenant`, `Plan`, `Subscription`, `PlatformLead`, `Announcement` | VERIFIED |
+| 15 | **Mobile Field Engineering** | QR barcode scanning, earthing QA, stamp paper | 8 screens | Backend `/api/tenant/*` | Local drafts (`AsyncStorage`), Project Serials | VERIFIED |
+| 16 | **Public Marketing & Portals** | Marketing landing, solar storytelling, demo request | 10 | `/api/demo-request`, `routes/auth.js` | `PlatformLead`, `User` | VERIFIED |
 
 ---
 

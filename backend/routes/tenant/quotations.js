@@ -869,12 +869,30 @@ router.post('/api/tenant/quotations/:id/convert', requireTenantAuth, async (req,
     }
 
     // Check if project was already created for this quotation (idempotent 1-click check)
-    const existingProject = await prisma.project.findFirst({
+    let existingProject = await prisma.project.findFirst({
       where: { quotationId: id, tenantId },
       include: { customer: true, lead: true, quotation: true, discomApplication: true, subsidies: true, Document: true }
     });
 
     if (existingProject) {
+      if (quotation.items && quotation.items.length > 0) {
+        const existingBomCount = await prisma.projectMaterialRequirement.count({
+          where: { projectId: existingProject.id }
+        });
+        if (existingBomCount === 0) {
+          for (const item of quotation.items) {
+            await prisma.projectMaterialRequirement.create({
+              data: {
+                projectId: existingProject.id,
+                productId: item.productId || null,
+                description: item.description,
+                quantity: item.quantity || 1,
+                status: 'Required'
+              }
+            }).catch(() => {});
+          }
+        }
+      }
       return res.status(200).json({
         success: true,
         message: 'Quotation already converted to project',
@@ -883,7 +901,50 @@ router.post('/api/tenant/quotations/:id/convert', requireTenantAuth, async (req,
       });
     }
 
-    // Wrap conversion operations atomically in prisma.$transaction
+    // Atomic conditional check-and-lock: Only ONE request can transition isLocked from false to true
+    const lockResult = await prisma.quotation.updateMany({
+      where: { id, tenantId, isLocked: false },
+      data: {
+        isLocked: true,
+        status: 'ACCEPTED',
+        acceptedAt: quotation.acceptedAt || new Date()
+      }
+    });
+
+    if (lockResult.count === 0) {
+      // Another concurrent request won the lock or quotation was already converted.
+      // Poll briefly for the concurrent transaction to commit the project.
+      for (let attempt = 0; attempt < 25; attempt++) {
+        existingProject = await prisma.project.findFirst({
+          where: { quotationId: id, tenantId },
+          include: { customer: true, lead: true, quotation: true, discomApplication: true, subsidies: true, Document: true }
+        });
+        if (existingProject) {
+          return res.status(200).json({
+            success: true,
+            message: 'Quotation already converted to project',
+            project: existingProject,
+            quotation
+          });
+        }
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+
+      existingProject = await prisma.project.findFirst({
+        where: { quotationId: id, tenantId },
+        include: { customer: true, lead: true, quotation: true, discomApplication: true, subsidies: true, Document: true }
+      });
+      if (existingProject) {
+        return res.status(200).json({
+          success: true,
+          message: 'Quotation already converted to project',
+          project: existingProject,
+          quotation
+        });
+      }
+    }
+
+    // Wrap conversion operations atomically in prisma.$transaction with explicit timeout options
     const result = await prisma.$transaction(async (tx) => {
       // Re-verify existing project inside transaction
       const txExistingProject = await tx.project.findFirst({
@@ -1107,7 +1168,7 @@ router.post('/api/tenant/quotations/:id/convert', requireTenantAuth, async (req,
         project: createdProject,
         quotation: updatedQuotation
       };
-    });
+    }, { timeout: 30000, maxWait: 10000 });
 
     res.status(200).json({
       success: true,
@@ -1117,6 +1178,20 @@ router.post('/api/tenant/quotations/:id/convert', requireTenantAuth, async (req,
     });
   } catch (error) {
     console.error('Error converting quotation to project:', error);
+    try {
+      const fallbackProject = await prisma.project.findFirst({
+        where: { quotationId: req.params.id, tenantId: req.user.tenantId },
+        include: { customer: true, lead: true, quotation: true, discomApplication: true, subsidies: true, Document: true }
+      });
+      if (fallbackProject) {
+        return res.status(200).json({
+          success: true,
+          message: 'Quotation already converted to project',
+          project: fallbackProject
+        });
+      }
+    } catch (_) {}
+
     res.status(500).json({ 
       error: error.message || 'Failed to convert quotation to project', 
       details: error.message 

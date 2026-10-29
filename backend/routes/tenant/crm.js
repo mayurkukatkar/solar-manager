@@ -248,7 +248,7 @@ router.post('/api/tenant/leads/:id/convert', requireTenantAuth, async (req, res)
     }
 
     // Check if Project was ALREADY created for this lead (Idempotent check prevents duplicates)
-    const existingProject = await prisma.project.findFirst({
+    let existingProject = await prisma.project.findFirst({
       where: { leadId: id, tenantId },
       include: {
         customer: true,
@@ -279,6 +279,57 @@ router.post('/api/tenant/leads/:id/convert', requireTenantAuth, async (req, res)
         customer: existingProject.customer,
         project: existingProject
       });
+    }
+
+    // Atomic conditional check-and-lock: Only ONE request can transition status from not 'WON' to 'WON'
+    const lockResult = await prisma.lead.updateMany({
+      where: { id, tenantId, status: { not: 'WON' } },
+      data: { status: 'WON' }
+    });
+
+    if (lockResult.count === 0) {
+      // Another concurrent request won the lock or lead was already WON.
+      // Poll briefly for the concurrent transaction to commit the project.
+      for (let attempt = 0; attempt < 25; attempt++) {
+        existingProject = await prisma.project.findFirst({
+          where: { leadId: id, tenantId },
+          include: {
+            customer: true,
+            lead: true,
+            quotation: true,
+            discomApplication: true,
+            subsidies: true,
+            Document: true
+          }
+        });
+        if (existingProject && existingProject.customer) {
+          return res.status(200).json({
+            lead: existingProject.lead || existingLead,
+            customer: existingProject.customer,
+            project: existingProject
+          });
+        }
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+
+      existingProject = await prisma.project.findFirst({
+        where: { leadId: id, tenantId },
+        include: {
+          customer: true,
+          lead: true,
+          quotation: true,
+          discomApplication: true,
+          subsidies: true,
+          Document: true
+        }
+      });
+      if (existingProject) {
+        return res.status(200).json({
+          lead: existingProject.lead || existingLead,
+          customer: existingProject.customer,
+          project: existingProject
+        });
+      }
     }
 
     // If lead is already WON, check if customer already exists
@@ -354,6 +405,7 @@ router.post('/api/tenant/leads/:id/convert', requireTenantAuth, async (req, res)
       // Auto-link latest quotation if any exists for this lead
       const latestQuote = await tx.quotation.findFirst({
         where: { leadId: id, tenantId },
+        include: { items: true },
         orderBy: { createdAt: 'desc' }
       });
 
@@ -417,6 +469,25 @@ router.post('/api/tenant/leads/:id/convert', requireTenantAuth, async (req, res)
           createdBy: userId
         }
       });
+
+      // Auto-create BOM (ProjectMaterialRequirement) entries from quotation if linked
+      if (latestQuote && latestQuote.items && latestQuote.items.length > 0) {
+        for (const item of latestQuote.items) {
+          try {
+            await tx.projectMaterialRequirement.create({
+              data: {
+                projectId: project.id,
+                productId: item.productId || null,
+                description: item.description,
+                quantity: item.quantity || 1,
+                status: 'Required'
+              }
+            });
+          } catch (e) {
+            console.warn('BOM item skipped in lead conversion:', e.message);
+          }
+        }
+      }
 
       const defaultSubsidy = capacityVal >= 3 ? 78000 : capacityVal >= 2 ? 60000 : 30000;
       await tx.projectTask.create({
@@ -485,7 +556,7 @@ router.post('/api/tenant/leads/:id/convert', requireTenantAuth, async (req, res)
       };
 
       return { lead: updatedLead, customer, project: fullProject };
-    });
+    }, { timeout: 30000, maxWait: 10000 });
 
     return res.status(200).json(result);
   } catch (error) {
@@ -493,7 +564,28 @@ router.post('/api/tenant/leads/:id/convert', requireTenantAuth, async (req, res)
       return res.status(404).json({ error: error.message });
     }
     console.error('Lead conversion error:', error);
-    res.status(500).json({ error: error.message || 'Failed to convert lead' });
+    try {
+      const fallbackProject = await prisma.project.findFirst({
+        where: { leadId: req.params.id, tenantId: req.user.tenantId },
+        include: {
+          customer: true,
+          lead: true,
+          quotation: true,
+          discomApplication: true,
+          subsidies: true,
+          Document: true
+        }
+      });
+      if (fallbackProject && fallbackProject.customer) {
+        return res.status(200).json({
+          lead: fallbackProject.lead,
+          customer: fallbackProject.customer,
+          project: fallbackProject
+        });
+      }
+    } catch (_) {}
+
+    res.status(error.statusCode || 500).json({ error: error.message || 'Failed to convert lead', code: error.code });
   }
 });
 
