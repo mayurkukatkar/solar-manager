@@ -2,8 +2,10 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { CheckSquare, Plus, Clock, User, Briefcase, Filter } from 'lucide-react';
+import { useToast } from '@/context/ToastContext';
 
 export default function Tasks() {
+  const { showToast } = useToast();
   const [tasks, setTasks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -69,10 +71,11 @@ export default function Tasks() {
 
       await axios.post(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/tasks`, payload, { withCredentials: true });
       setShowModal(false);
+      showToast({ type: 'success', message: 'Task created successfully!' });
       fetchData();
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert('Failed to create task');
+      showToast({ type: 'error', message: err.response?.data?.error || 'Failed to create task' });
     }
   };
 

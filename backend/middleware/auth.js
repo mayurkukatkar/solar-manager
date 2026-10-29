@@ -10,7 +10,7 @@ const requireSuperAdmin = (req, res, next) => {
   try {
     const payload = jwt.verify(token, JWT_SECRET);
     if (payload.role !== 'SUPER_ADMIN') return res.status(403).json({ error: 'Forbidden: Super Admin only' });
-    req.user = payload;
+    req.user = { id: payload.userId || payload.id, userId: payload.userId || payload.id, ...payload };
     next();
   } catch (err) {
     res.status(401).json({ error: 'Invalid or expired session' });
@@ -101,7 +101,7 @@ const requireTenantAuth = async (req, res, next) => {
       }
     }
 
-    req.user = payload;
+    req.user = { id: payload.userId || payload.id, userId: payload.userId || payload.id, ...payload };
     next();
   } catch (err) {
     res.status(401).json({ error: 'Invalid or expired session' });
@@ -116,17 +116,25 @@ const requirePermission = (...permissions) => {
       // TENANT_ADMIN has implicit full access to their tenant
       if (req.user.role === 'TENANT_ADMIN') return next();
 
-      // TENANT_SUB_ADMIN — fetch permissions from DB
-      const user = await prisma.user.findUnique({
-        where: { id: req.user.userId },
-        select: { permissions: true }
-      });
-
+      // Check permissions from token first, or fetch from DB
       let userPerms = [];
-      if (Array.isArray(user?.permissions)) {
-        userPerms = user.permissions;
-      } else if (user?.permissions && Array.isArray(user.permissions.modules)) {
-        userPerms = user.permissions.modules;
+      if (Array.isArray(req.user?.permissions)) {
+        userPerms = req.user.permissions;
+      } else if (req.user?.permissions && Array.isArray(req.user.permissions.modules)) {
+        userPerms = req.user.permissions.modules;
+      }
+
+      if (userPerms.length === 0 && (req.user.id || req.user.userId)) {
+        const user = await prisma.user.findUnique({
+          where: { id: req.user.id || req.user.userId },
+          select: { permissions: true }
+        });
+
+        if (Array.isArray(user?.permissions)) {
+          userPerms = user.permissions;
+        } else if (user?.permissions && Array.isArray(user.permissions.modules)) {
+          userPerms = user.permissions.modules;
+        }
       }
 
       if (userPerms.includes('*')) return next();

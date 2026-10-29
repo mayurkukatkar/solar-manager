@@ -80,6 +80,13 @@ router.patch('/api/tenant/tickets/:id/status', requireTenantAuth, async (req, re
 // Add Service Visit (Manual Triage)
 router.post('/api/tenant/tickets/:id/visits', requireTenantAuth, async (req, res) => {
   try {
+    const ticket = await prisma.supportTicket.findFirst({
+      where: { id: req.params.id, tenantId: req.user.tenantId }
+    });
+    if (!ticket) {
+      return res.status(404).json({ error: 'Ticket not found or access denied' });
+    }
+
     const { notes } = req.body;
     const visit = await prisma.serviceVisit.create({
       data: {

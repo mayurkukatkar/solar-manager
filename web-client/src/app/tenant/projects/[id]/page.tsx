@@ -22,8 +22,10 @@ import {
   printHtmlElement,
   toIndianWords
 } from '@/components/pdf/MsedclFormsPDF';
+import { useToast } from '@/context/ToastContext';
 
 export default function ProjectDetails() {
+  const { showToast } = useToast();
   const params = useParams();
   const router = useRouter();
   const [project, setProject] = useState<any>(null);
@@ -62,86 +64,160 @@ export default function ProjectDetails() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [showDiscomModal]);
 
+  const LEGACY_STAGE_MAP: Record<string, string> = {
+    'Planning': 'SURVEY_COMPLETED',
+    'Design': 'STRUCTURE_APPROVED',
+    'Procurement': 'MATERIAL_DISPATCHED',
+    'Installation': 'INSTALLATION_STARTED',
+    'Testing': 'TESTING_COMPLETED',
+    'Handover': 'NET_METER_APPLIED',
+    'Completed': 'COMMISSIONED'
+  };
+
   const STAGES = [
-    { id: 'Planning', label: 'Planning', percent: 15, desc: 'Roof survey & permits' },
-    { id: 'Design', label: 'Design', percent: 30, desc: 'SLD & 3D layout' },
-    { id: 'Procurement', label: 'Procurement', percent: 50, desc: 'BOM & Purchase Orders' },
-    { id: 'Installation', label: 'Installation', percent: 75, desc: 'Mounting & DC/AC wiring' },
-    { id: 'Testing', label: 'Testing & QA', percent: 90, desc: 'Inverter check & test report' },
-    { id: 'Handover', label: 'Handover', percent: 95, desc: 'MSEDCL synchronization' },
-    { id: 'Completed', label: 'Completed', percent: 100, desc: 'Commissioned & AMC active' }
+    { id: 'SURVEY_COMPLETED', label: 'Survey Completed', percent: 15, desc: 'Feasibility & Permits' },
+    { id: 'STRUCTURE_APPROVED', label: 'Structure Approved', percent: 30, desc: 'SLD & Structure Design' },
+    { id: 'MATERIAL_DISPATCHED', label: 'Material Dispatched', percent: 50, desc: 'BOM & Logistics' },
+    { id: 'INSTALLATION_STARTED', label: 'Installation Started', percent: 75, desc: 'Mounting & Wiring' },
+    { id: 'TESTING_COMPLETED', label: 'Testing Completed', percent: 90, desc: 'QA & Electrical Test' },
+    { id: 'NET_METER_APPLIED', label: 'Net Meter Applied', percent: 95, desc: 'DISCOM Net Metering' },
+    { id: 'COMMISSIONED', label: 'Commissioned', percent: 100, desc: 'Grid Sync & Commissioning' }
   ];
+
+  // Helper to extract genuine component serial numbers
+  const getModuleSerialNumbers = (): string[] => {
+    if (discomCustomOverrides?.moduleSerialNumbers && Array.isArray(discomCustomOverrides.moduleSerialNumbers) && discomCustomOverrides.moduleSerialNumbers.length > 0) {
+      return discomCustomOverrides.moduleSerialNumbers;
+    }
+    if (project?.moduleSerialNumbers && Array.isArray(project.moduleSerialNumbers) && project.moduleSerialNumbers.length > 0) {
+      return project.moduleSerialNumbers;
+    }
+    if (project?.subsidies?.[0]?.dcrModuleSerials) {
+      const raw = project.subsidies[0].dcrModuleSerials;
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch {}
+      const parts = raw.split(',').map((s: string) => s.trim()).filter(Boolean);
+      if (parts.length > 0) return parts;
+    }
+    if (project?.InstallationJob) {
+      const jobs = Array.isArray(project.InstallationJob) ? project.InstallationJob : [project.InstallationJob];
+      const collected: string[] = [];
+      for (const j of jobs) {
+        if (j?.consumptions && Array.isArray(j.consumptions)) {
+          for (const c of j.consumptions) {
+            if (c.serialNumbers && Array.isArray(c.serialNumbers)) {
+              collected.push(...c.serialNumbers);
+            }
+          }
+        }
+      }
+      if (collected.length > 0) return collected;
+    }
+    return [];
+  };
+
+  // Helper to identify missing required fields for statutory DISCOM submissions
+  const getMissingStatutoryFields = () => {
+    const cust = project?.customer || project?.lead;
+    const tenant = project?.tenant;
+    const missing: Array<{ field: string; section: 'Organization' | 'Customer' | 'Technical'; actionUrl?: string }> = [];
+
+    if (!tenant?.legalName && !tenant?.name) {
+      missing.push({ field: 'Company / Vendor Legal Name', section: 'Organization', actionUrl: '/tenant/settings' });
+    }
+    if (!tenant?.gstin) {
+      missing.push({ field: 'Company GSTIN', section: 'Organization', actionUrl: '/tenant/settings' });
+    }
+    if (!tenant?.address) {
+      missing.push({ field: 'Company Registered Address', section: 'Organization', actionUrl: '/tenant/settings' });
+    }
+    if (!cust?.name) {
+      missing.push({ field: 'Customer / Beneficiary Name', section: 'Customer' });
+    }
+    const consumerNo = cust?.consumerNumber || cust?.caNumber || project?.consumerNumber || project?.discomApplication?.consumerNumber;
+    if (!consumerNo) {
+      missing.push({ field: 'DISCOM Consumer / CA Number', section: 'Customer' });
+    }
+    const address = project?.installationAddress || cust?.address;
+    if (!address) {
+      missing.push({ field: 'Installation Site Address', section: 'Customer' });
+    }
+
+    return missing;
+  };
 
   const getDiscomFormData = (overrides: any = {}) => {
     const cust = project?.customer || project?.lead;
     const quote = project?.quotation;
     const tenant = project?.tenant;
-    const cap = project?.capacity || quote?.systemCapacity || 3.3;
-    const appliedCap = Number(cap).toFixed(3);
+    const cap = project?.capacity || quote?.systemCapacity || 0;
+    const appliedCap = cap ? Number(cap).toFixed(3) : "0.000";
     const moduleWatt = quote?.panelWattage || 535;
-    const moduleQty = quote?.panelQuantity || Math.ceil((Number(cap) * 1000) / moduleWatt);
+    const moduleQty = quote?.panelQuantity || (cap ? Math.ceil((Number(cap) * 1000) / moduleWatt) : 0);
     const installedCap = ((moduleQty * moduleWatt) / 1000).toFixed(3);
-    const totalAmount = quote?.total || project?.estimatedValue || 245000;
+    const totalAmount = quote?.total || project?.estimatedValue || 0;
+    const consumerNo = cust?.consumerNumber || cust?.caNumber || project?.consumerNumber || project?.discomApplication?.consumerNumber || "";
+    const moduleSerials = getModuleSerialNumbers();
 
     return {
-      beneficiaryName: cust?.name || "SHRI. SURENDRA RAMBHAU THAKRE",
-      customerName: cust?.name || "SHRI. SURENDRA RAMBHAU THAKRE",
-      consumerNumber: cust?.consumerNumber || cust?.caNumber || project?.consumerNumber || "410022120526",
-      consumerAccountNo: cust?.consumerNumber || cust?.caNumber || project?.consumerNumber || "410022120526",
-      applicationRefNo: project?.subsidies?.[0]?.nationalPortalAppNo || project?.discomApplication?.applicationNo || "NP-MHSED26-11317031",
-      nationalPortalAppNo: project?.subsidies?.[0]?.nationalPortalAppNo || "NP-MHSED26-11317031",
-      applicationDate: project?.startDate ? new Date(project.startDate).toLocaleDateString() : "08-04-2026",
-      commissioningDate: project?.actualCompletionDate ? new Date(project.actualCompletionDate).toLocaleDateString() : "09-10-2026",
+      beneficiaryName: cust?.name || "",
+      customerName: cust?.name || "",
+      consumerNumber: consumerNo,
+      consumerAccountNo: consumerNo,
+      applicationRefNo: project?.subsidies?.[0]?.nationalPortalAppNo || project?.discomApplication?.applicationNo || "",
+      nationalPortalAppNo: project?.subsidies?.[0]?.nationalPortalAppNo || project?.discomApplication?.applicationNo || "",
+      applicationDate: project?.startDate ? new Date(project.startDate).toLocaleDateString() : (project?.createdAt ? new Date(project.createdAt).toLocaleDateString() : new Date().toLocaleDateString()),
+      commissioningDate: project?.actualCompletionDate ? new Date(project.actualCompletionDate).toLocaleDateString() : (project?.expectedCompletionDate ? new Date(project.expectedCompletionDate).toLocaleDateString() : ""),
       agreementDay: String(new Date().getDate()).padStart(2, '0'),
       agreementMonth: new Date().toLocaleString('default', { month: 'short' }).toUpperCase(),
       agreementYear: String(new Date().getFullYear()),
-      agreementCity: project?.city || "NAGPUR",
-      mobileNo: cust?.mobile || cust?.phone || "8605849639",
-      customerMobile: cust?.mobile || cust?.phone || "8605849639",
-      email: cust?.email || "thakresurendra933@gmail.com",
+      agreementCity: project?.city || tenant?.city || cust?.city || "",
+      mobileNo: cust?.mobile || cust?.phone || "",
+      customerMobile: cust?.mobile || cust?.phone || "",
+      email: cust?.email || "",
       category: cust?.customerType || "Residential",
-      address: project?.installationAddress || cust?.address || "PLOT NO 87 NAVIN NAGAR LIKKLYAN HOUS. SOC. NAGPUR",
-      city: project?.city || "Nagpur",
-      district: project?.city || "Nagpur",
-      state: project?.state || "MAHARASHTRA",
-      pincode: project?.pincode || "440008",
-      sanctionedLoad: "1.000",
+      address: project?.installationAddress || cust?.address || "",
+      city: project?.city || cust?.city || "",
+      district: project?.city || cust?.city || "",
+      state: project?.state || cust?.state || tenant?.state || "MAHARASHTRA",
+      pincode: project?.pincode || cust?.pincode || "",
+      sanctionedLoad: cust?.sanctionedLoadKw ? String(cust.sanctionedLoadKw) : (quote?.sanctionedLoad ? String(quote.sanctionedLoad) : (cap ? String(cap) : "1.000")),
       appliedCapacity: appliedCap,
       capacity: cap,
       installedCapacity: installedCap,
-      systemType: quote?.systemType || "Grid-Tied Rooftop Solar PV System",
-      moduleMake: quote?.panelBrand || "ADANI SOLAR",
-      moduleManufacturer: "MUNDRA SOLAR PV LIMITED (ADANI SOLAR)",
-      cellManufacturer: "MUNDRA SOLAR PV LIMITED (ADANI SOLAR)",
+      systemType: quote?.systemType || project?.systemType || "Grid-Tied Rooftop Solar PV System",
+      moduleMake: quote?.panelBrand || project?.panelBrand || "",
+      moduleManufacturer: quote?.panelBrand || "",
+      cellManufacturer: quote?.panelBrand || "",
       moduleWattage: moduleWatt,
       moduleQuantity: moduleQty,
-      inverterMake: quote?.inverterBrand || "Grid-Tied",
-      inverterCapacity: quote?.inverterCapacity || appliedCap,
-      inverterBrand: quote?.inverterBrand || "Polycab",
+      inverterMake: quote?.inverterBrand || project?.inverterBrand || "Grid-Tied",
+      inverterCapacity: quote?.inverterCapacity ? String(quote.inverterCapacity) : appliedCap,
+      inverterBrand: quote?.inverterBrand || project?.inverterBrand || "",
       inverterQuantity: quote?.inverterQuantity || 1,
       phase: quote?.phase || "Single Phase",
       structureBrand: quote?.structureBrand || "GI Structure",
       earthingProtection: "Separate AC, DC & LA Earthing provided as per MNRE standards",
-      vendorName: tenant?.legalName || tenant?.name || "EKVARTA ENERGY SOLUTIONS",
-      vendorAddress: tenant?.address || "PLOT NO 4 HOUSE NO 85, TAJ HOUSING SOCIETY, HUDKESHWAR ROAD, PIPLA FATA",
-      vendorCity: tenant?.city || "Nagpur",
-      vendorState: tenant?.state || "Maharashtra",
-      vendorPincode: tenant?.pincode || "440034",
-      gstin: tenant?.gstin || "27DTXPM6427E1Z3",
-      quotationNumber: quote?.qNumber || `EES/${new Date().getFullYear()}/${project?.projectNumber || '031'}`,
-      quotationDate: quote?.date ? new Date(quote.date).toLocaleDateString() : new Date().toLocaleDateString(),
+      vendorName: tenant?.legalName || tenant?.name || "",
+      vendorAddress: tenant?.address || "",
+      vendorCity: tenant?.city || "",
+      vendorState: tenant?.state || "",
+      vendorPincode: tenant?.pincode || "",
+      gstin: tenant?.gstin || "",
+      discomName: tenant?.commercialDefaults?.defaultDiscom || tenant?.settings?.discomName || "MSEDCL",
+      quotationNumber: quote?.qNumber || (project?.projectNumber ? `Q-${project.projectNumber}` : ""),
+      quotationDate: quote?.date ? new Date(quote.date).toLocaleDateString() : (project?.createdAt ? new Date(project.createdAt).toLocaleDateString() : new Date().toLocaleDateString()),
       total: totalAmount,
       grand_total: totalAmount,
-      amount_in_words_custom: toIndianWords(totalAmount),
-      signatureUrl: tenant?.signatureUrl,
-      customerSignature: project?.customerSignatureUrl,
-      subDivision: `${project?.city || 'NAGPUR'} S/DN`,
-      witness1: cust?.name || "SURENDRA RAMBHAU THAKRE",
-      witness2: "RAMBHAU THAKRE",
-      moduleSerialNumbers: [
-        "MS2608211A3882", "MS2608211A3908", "MS2608211A4160",
-        "MS2608211A4181", "MS2608211A4247", "MS2608211A4462"
-      ],
+      amount_in_words_custom: totalAmount ? toIndianWords(totalAmount) : "Zero Rupees",
+      signatureUrl: tenant?.signatureUrl || "",
+      customerSignature: project?.customerSignatureUrl || "",
+      subDivision: project?.city ? `${project.city} S/DN` : (tenant?.city ? `${tenant.city} S/DN` : ""),
+      witness1: cust?.name || "",
+      witness2: tenant?.signatoryName || "",
+      moduleSerialNumbers: moduleSerials,
       ...overrides
     };
   };
@@ -158,7 +234,7 @@ export default function ProjectDetails() {
         await generateDiscomPDF(`discom-${formType}`, `${project?.projectNumber || 'Project'}_${formType}.pdf`);
       } catch (err) {
         console.error(err);
-        alert('Failed to generate PDF');
+        showToast({ type: 'error', message: 'Failed to generate PDF' });
       } finally {
         setIsGeneratingPDF(false);
         setSelectedForm(null);
@@ -208,7 +284,7 @@ export default function ProjectDetails() {
       fetchProject();
     } catch (err: any) {
       console.error(err);
-      alert(err.response?.data?.error || 'Failed to upload document');
+      showToast({ type: 'error', message: err.response?.data?.error || 'Failed to upload document' });
     } finally {
       setDocUploading(false);
     }
@@ -272,7 +348,10 @@ export default function ProjectDetails() {
     try {
       await axios.post(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/projects/${params.id}/discom`, {}, { withCredentials: true });
       fetchRegulatoryData();
-    } catch (err) { alert('Failed to initialize DISCOM tracking'); }
+      showToast({ type: 'success', message: 'DISCOM tracking initialized successfully!' });
+    } catch (err) { 
+      showToast({ type: 'error', message: 'Failed to initialize DISCOM tracking' }); 
+    }
   };
 
   const handleUpdateDiscomStage = async (status: string, documentType?: string, file?: File) => {
@@ -287,8 +366,9 @@ export default function ProjectDetails() {
       }
       await axios.patch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/projects/${params.id}/discom/stage`, { status, documentType, documentUrl }, { withCredentials: true });
       fetchRegulatoryData();
+      showToast({ type: 'success', message: `DISCOM stage updated to ${status}` });
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to update DISCOM stage');
+      showToast({ type: 'error', message: err.response?.data?.error || 'Failed to update DISCOM stage' });
     } finally {
       setUploadingDoc(false);
     }
@@ -296,10 +376,16 @@ export default function ProjectDetails() {
 
   const handleCreateSubsidy = async () => {
     try {
-      if(!project.customerId) return alert("Customer must be assigned to create a subsidy.");
+      if(!project.customerId) {
+        showToast({ type: 'warning', message: 'Customer must be assigned to create a subsidy.' });
+        return;
+      }
       await axios.post(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/subsidies`, { projectId: params.id, customerId: project.customerId }, { withCredentials: true });
       fetchRegulatoryData();
-    } catch (err) { alert('Failed to initialize Subsidy tracking'); }
+      showToast({ type: 'success', message: 'Subsidy tracking initialized successfully!' });
+    } catch (err) { 
+      showToast({ type: 'error', message: 'Failed to initialize Subsidy tracking' }); 
+    }
   };
 
   const handleUpdateSubsidyStage = async (status: string, documentType?: string, file?: File) => {
@@ -314,8 +400,9 @@ export default function ProjectDetails() {
       }
       await axios.patch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/subsidies/${subsidy.id}`, { status, documentType, documentUrl }, { withCredentials: true });
       fetchRegulatoryData();
+      showToast({ type: 'success', message: `Subsidy stage updated to ${status}` });
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to update Subsidy stage');
+      showToast({ type: 'error', message: err.response?.data?.error || 'Failed to update Subsidy stage' });
     } finally {
       setUploadingDoc(false);
     }
@@ -326,8 +413,10 @@ export default function ProjectDetails() {
     try {
       await axios.patch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/tenant/projects/${params.id}/stage`, { newStage, comment: `Stage updated to ${newStage}` }, { withCredentials: true });
       fetchProject();
+      showToast({ type: 'success', message: `Stage updated to ${newStage}` });
     } catch (err) {
       console.error(err);
+      showToast({ type: 'error', message: 'Failed to update project stage' });
     }
   };
 
@@ -341,8 +430,9 @@ export default function ProjectDetails() {
         { withCredentials: true }
       );
       await fetchProject();
+      showToast({ type: 'success', message: `Project stage advanced to ${targetStage}` });
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to update project stage');
+      showToast({ type: 'error', message: err.response?.data?.error || 'Failed to update project stage' });
     } finally {
       setAdvancingStage(false);
     }
@@ -433,8 +523,9 @@ export default function ProjectDetails() {
       setShowTicketModal(false);
       setNewTicket({ subject: '', description: '', priority: 'MEDIUM' });
       fetchTickets();
+      showToast({ type: 'success', message: 'Support ticket created successfully!' });
     } catch (err) {
-      alert("Failed to create ticket.");
+      showToast({ type: 'error', message: 'Failed to create ticket.' });
     }
   };
 
@@ -455,9 +546,11 @@ export default function ProjectDetails() {
     </div>
   );
 
-  const currentStageIndex = STAGES.findIndex(s => s.id === project.currentStage);
+  const normalizedCurrentStage = LEGACY_STAGE_MAP[project?.currentStage] || project?.currentStage || 'SURVEY_COMPLETED';
+  const currentStageIndex = STAGES.findIndex(s => s.id === normalizedCurrentStage);
   const activeIndex = currentStageIndex === -1 ? 0 : currentStageIndex;
   const nextStage = activeIndex < STAGES.length - 1 ? STAGES[activeIndex + 1] : null;
+  const missingStatutoryFields = getMissingStatutoryFields();
 
   return (
     <div className="max-w-7xl mx-auto space-y-6 pb-16 w-full min-w-0">
@@ -571,7 +664,7 @@ export default function ProjectDetails() {
               <div className="flex-1">
                 <label className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block mb-1">Current Stage</label>
                 <select 
-                  value={project.currentStage}
+                  value={normalizedCurrentStage}
                   onChange={handleStageChange}
                   disabled={advancingStage}
                   className="w-full px-3 py-1.5 rounded-lg border border-white/20 focus:ring-2 focus:ring-emerald-400 outline-none text-xs font-bold bg-slate-900/80 text-white"
@@ -1486,6 +1579,39 @@ export default function ProjectDetails() {
                 </div>
               </div>
 
+              {missingStatutoryFields.length > 0 && (
+                <div className="mx-6 mt-6 p-4 rounded-2xl bg-amber-50 border border-amber-200/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                  <div className="flex items-start gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
+                      <AlertTriangle size={18} />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold text-amber-900">
+                        Action Required: Complete Organization &amp; Customer Profile Before Statutory Submission
+                      </h4>
+                      <p className="text-[11px] text-amber-700 mt-0.5">
+                        The following mandatory statutory credentials are empty and will cause DISCOM form rejection:
+                      </p>
+                      <div className="flex flex-wrap gap-1.5 mt-2">
+                        {missingStatutoryFields.map((f, i) => (
+                          <span key={i} className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 border border-amber-300">
+                            {f.section}: {f.field}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Link
+                      href="/tenant/settings"
+                      className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs transition shadow-xs"
+                    >
+                      Complete Tenant Settings
+                    </Link>
+                  </div>
+                </div>
+              )}
+
               <div className="p-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                   {[
@@ -2048,6 +2174,20 @@ export default function ProjectDetails() {
               </div>
             </div>
 
+            {missingStatutoryFields.length > 0 && (
+              <div className="p-3 bg-amber-50 border-b border-amber-200 flex flex-wrap items-center justify-between text-xs text-amber-800 font-medium px-6 gap-2">
+                <span className="flex items-center gap-2">
+                  <AlertTriangle size={15} className="text-amber-600 shrink-0" />
+                  <span>
+                    <strong>Missing Profile Credentials:</strong> {missingStatutoryFields.map(m => m.field).join(', ')}. Please complete these in settings for official statutory submission.
+                  </span>
+                </span>
+                <Link href="/tenant/settings" className="font-bold underline text-amber-900 hover:text-amber-950 shrink-0">
+                  Tenant Settings &rarr;
+                </Link>
+              </div>
+            )}
+
             {/* Modal Body: Left Controls + Right Live Preview */}
             <div className="flex-1 flex flex-col lg:flex-row overflow-hidden bg-slate-100">
               {/* Left Controls Column */}
@@ -2193,7 +2333,8 @@ export default function ProjectDetails() {
                         type="button"
                         onClick={() => {
                           const count = discomCustomOverrides.moduleQuantity || getDiscomFormData().moduleQuantity || 6;
-                          const generated = Array.from({ length: count }).map((_, i) => `MS2608211A${3882 + i * 26}`);
+                          const pfx = (project?.projectNumber || 'PRJ').replace(/[^a-zA-Z0-9]/g, '').slice(-6).toUpperCase();
+                          const generated = Array.from({ length: count }).map((_, i) => `${pfx}-PV-${String(i + 1).padStart(4, '0')}`);
                           setDiscomCustomOverrides({ ...discomCustomOverrides, moduleSerialNumbers: generated });
                         }}
                         className="text-[10px] text-emerald-600 hover:text-emerald-700 font-bold underline"

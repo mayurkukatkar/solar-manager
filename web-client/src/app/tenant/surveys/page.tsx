@@ -9,6 +9,7 @@ import {
   Sun, ShieldCheck, Filter, Compass, Layers, CheckCircle, RefreshCw,
   ExternalLink, Building, HelpCircle, FileCheck
 } from 'lucide-react';
+import { useToast } from '@/context/ToastContext';
 
 interface Survey {
   id: string;
@@ -53,6 +54,7 @@ interface Metrics {
 }
 
 export default function SiteSurveysPage() {
+  const { showToast } = useToast();
   const [surveys, setSurveys] = useState<Survey[]>([]);
   const [metrics, setMetrics] = useState<Metrics>({
     totalSurveys: 0,
@@ -159,7 +161,7 @@ export default function SiteSurveysPage() {
   const handleCreateSurvey = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.customerName.trim() && !formData.customerId) {
-      alert('Please select or specify a Customer Name');
+      showToast({ type: 'warning', message: 'Please select or specify a Customer Name' });
       return;
     }
     try {
@@ -167,6 +169,7 @@ export default function SiteSurveysPage() {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
       await axios.post(`${apiUrl}/api/tenant/surveys`, formData, { withCredentials: true });
       setShowScheduleModal(false);
+      showToast({ type: 'success', message: 'Site survey scheduled successfully!' });
       // Reset form
       setFormData({
         customerId: '',
@@ -191,7 +194,7 @@ export default function SiteSurveysPage() {
       fetchSurveysData();
     } catch (err: any) {
       console.error(err);
-      alert(err.response?.data?.error || 'Failed to schedule site survey');
+      showToast({ type: 'error', message: err.response?.data?.error || 'Failed to schedule site survey' });
     } finally {
       setSubmitting(false);
     }
@@ -203,11 +206,11 @@ export default function SiteSurveysPage() {
       setQuoteConvertingId(surveyId);
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
       const res = await axios.post(`${apiUrl}/api/tenant/surveys/${surveyId}/convert-to-quote`, {}, { withCredentials: true });
-      alert(`Quotation ${res.data.quotation?.qNumber || ''} created successfully from Survey!`);
+      showToast({ type: 'success', message: `Quotation ${res.data.quotation?.qNumber || ''} created successfully from Survey!` });
       fetchSurveysData();
     } catch (err: any) {
       console.error(err);
-      alert(err.response?.data?.error || 'Failed to generate quotation');
+      showToast({ type: 'error', message: err.response?.data?.error || 'Failed to generate quotation' });
     } finally {
       setQuoteConvertingId(null);
     }

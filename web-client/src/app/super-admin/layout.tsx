@@ -10,6 +10,7 @@ import {
   LogOut, Search, Bell, HelpCircle, ChevronDown, ChevronRight, Menu,
   Flame, Sparkles
 } from 'lucide-react';
+import { ToastProvider } from '@/context/ToastContext';
 
 const MENU_GROUPS: { title: string; icon?: React.ElementType; items: { name: string; path: string; icon?: React.ElementType; badge?: string }[] }[] = [
   {
@@ -92,7 +93,8 @@ export default function SuperAdminLayout({ children }: { children: React.ReactNo
   };
 
   return (
-    <div className="flex h-screen bg-slate-50 font-sans overflow-hidden selection:bg-blue-100 selection:text-blue-900">
+    <ToastProvider>
+      <div className="flex h-screen bg-slate-50 font-sans overflow-hidden selection:bg-blue-100 selection:text-blue-900">
       
       {/* SIDEBAR - CLEAN WHITE PREMIUM UI WITH UPGRADED TYPOGRAPHY */}
       <aside className="w-72 bg-white text-slate-800 flex flex-col z-20 flex-shrink-0 border-r border-slate-200 shadow-sm relative overflow-hidden">
@@ -297,5 +299,6 @@ export default function SuperAdminLayout({ children }: { children: React.ReactNo
         </main>
       </div>
     </div>
+    </ToastProvider>
   );
 }

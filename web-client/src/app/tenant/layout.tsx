@@ -12,6 +12,7 @@ import {
   MessageSquare, UserPlus, Shield, BarChart2, Zap, Bell, History, Menu, 
   X, CheckSquare, Layers, ShieldAlert, ArrowRight
 } from 'lucide-react';
+import { ToastProvider } from '@/context/ToastContext';
 
 interface MenuItem {
   name: string;
@@ -641,7 +642,8 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
   };
 
   return (
-    <div className="h-screen w-full flex flex-col lg:flex-row bg-slate-50 font-sans selection:bg-blue-100 selection:text-blue-900 overflow-hidden">
+    <ToastProvider>
+      <div className="h-screen w-full flex flex-col lg:flex-row bg-slate-50 font-sans selection:bg-blue-100 selection:text-blue-900 overflow-hidden">
       
       {/* MOBILE TOPBAR (< lg) */}
       <header className="lg:hidden sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 px-4 py-3 flex items-center justify-between shadow-xs shrink-0">
@@ -783,5 +785,6 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
         </div>
       </main>
     </div>
+    </ToastProvider>
   );
 }

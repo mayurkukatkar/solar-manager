@@ -64,6 +64,29 @@
   --color-red-100: #fee2e2;
   --color-red-500: #ef4444;
   --color-red-700: #b91c1c;
+
+  /* WhereReady Semantic Branding Tokens */
+  --color-primary: #10b981;
+  --color-primary-hover: #059669;
+  --color-primary-light: #ecfdf5;
+  --color-primary-dark: #047857;
+  --color-primary-foreground: #ffffff;
+
+  --color-accent: #c5a059;
+  --color-accent-hover: #b89745;
+  --color-accent-light: #faf8f5;
+  --color-accent-dark: #8c6d2d;
+  --color-accent-foreground: #ffffff;
+
+  --color-status-success: #10b981;
+  --color-status-warning: #f59e0b;
+  --color-status-danger: #ef4444;
+  --color-status-info: #3b82f6;
+
+  --font-sans: 'Plus Jakarta Sans', var(--font-geist-sans), system-ui, -apple-system, sans-serif;
+  --font-heading: 'Manrope', var(--font-geist-sans), sans-serif;
+  --font-display: 'Playfair Display', Georgia, serif;
+  --font-mono: var(--font-geist-mono), 'Space Grotesk', monospace;
 }
 
 /* Custom Scrollbar for Sidebar and main canvas */

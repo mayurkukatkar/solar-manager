@@ -1,0 +1,24 @@
+# Challenger 2 Progress & Liveness Heartbeat
+
+- **Last visited**: 2026-10-29T11:48:00Z
+- **Current Status**: Empirically stress-testing claims and compiling Challenge Report.
+- **Completed Steps**:
+  - [x] Initialized DISPATCH.md, BRIEFING.md, and progress.md.
+  - [x] Read ORIGINAL_REQUEST.md, DISPATCH.md, and worker_m1_docs/handoff.md.
+  - [x] Ran TypeScript typecheck on `web-client` (`node web-client/node_modules/typescript/bin/tsc --noEmit -p web-client/tsconfig.json` -> 0 errors, exit code 0).
+  - [x] Ran TypeScript typecheck on `mobile-app` (`node mobile-app/node_modules/typescript/bin/tsc --noEmit -p mobile-app/tsconfig.json` -> 0 errors, exit code 0).
+  - [x] Empirically confirmed all 7 reported 404 dead links:
+    - `/tenant/installation/schedule` (referenced in `tenant/installation/page.tsx:38` and `tenant/installation/jobs/page.tsx:52`)
+    - `/tenant/installation/calendar` (referenced in `tenant/installation/page.tsx:95`)
+    - `/tenant/installation/checklists` (referenced in `tenant/installation/page.tsx:103`)
+    - `/tenant/inventory/products/new` (referenced in `tenant/inventory/page.tsx:44` and `tenant/inventory/products/page.tsx:43`)
+    - `/tenant/quotations/new` (referenced in `tenant/projects/[id]/page.tsx:992`)
+  - [x] Empirically confirmed hardcoded vendor and customer fallback data in `tenant/projects/[id]/page.tsx:87-144` ("EKVARTA ENERGY SOLUTIONS", "SHRI. SURENDRA RAMBHAU THAKRE", GSTIN "27DTXPM6427E1Z3", CA "410022120526", etc.).
+  - [x] Empirically proved trade discount GST bug in `solarCalculator.js` / `solarCalculator.ts` (charges GST on pre-discount subtotal while taxable base is discounted, leading to tax overcharge, e.g. 22.5% effective GST instead of 18%).
+  - [x] Empirically proved milestone rounding drift in `solarCalculator.js` / `solarCalculator.ts` (35% of amounts in 100,000–101,000 range deviate by ±₹1 from total).
+  - [x] Empirically ran backend test suite: 14 passed, 1 failed (`unifiedTemplateParity.test.js:49` missing "PM Surya Ghar Muft Bijli Yojana" in mobile `pdfService.ts`).
+  - [x] Empirically ran mobile perspectives test suite: 23 passed, 0 failed.
+- **In Progress**:
+  - [ ] Compiling comprehensive Challenger 2 Handoff Report (`handoff.md`).
+  - [ ] Updating BRIEFING.md.
+  - [ ] Sending notification message to orchestrator.

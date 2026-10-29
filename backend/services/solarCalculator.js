@@ -132,6 +132,16 @@ function calculateIndicativeSubsidy({ capacityKw = 5.0, connectionType = 'Reside
   }
 
   const cap = Number(capacityKw) || 0;
+  if (!cap || cap <= 0) {
+    return {
+      indicativeSubsidy: 0,
+      isEligible: false,
+      breakdown: 'Invalid capacity',
+      netPayableEstimate: 0,
+      disclaimer: 'Capacity must be greater than 0 kW.'
+    };
+  }
+
   let subsidy = 0;
   if (cap >= 3) {
     subsidy = 78000;
@@ -281,26 +291,20 @@ function calculateCommercialPricing({
   taxRatePercent = 13.8
 }) {
   let subtotal = 0;
-  let totalTax = 0;
 
-  const calculatedItems = (items || []).map((item, idx) => {
+  // 1. Calculate raw un-discounted base amount for each line item
+  const rawItems = (items || []).map((item, idx) => {
     const qty = Math.max(0, Number(item.quantity) || 1);
     const unitPrice = Math.max(0, Number(item.unitPrice) || 0);
     const discount = Math.max(0, Number(item.discount) || 0);
-    const baseAmount = Math.max(0, (qty * unitPrice) - discount);
+    const rawBase = Math.max(0, (qty * unitPrice) - discount);
 
     let taxRate = Number(item.taxRate);
     if (isNaN(taxRate) || taxRate === null || taxRate === undefined) {
       taxRate = useCompositeSolarGST ? 13.8 : 12.0;
     }
 
-    const itemTax = useCompositeSolarGST ? 0 : Math.round(baseAmount * (taxRate / 100));
-    const itemTotal = baseAmount + itemTax;
-
-    subtotal += baseAmount;
-    if (!useCompositeSolarGST) {
-      totalTax += itemTax;
-    }
+    subtotal += rawBase;
 
     return {
       id: item.id || `item-${idx + 1}`,
@@ -312,23 +316,73 @@ function calculateCommercialPricing({
       purchaseCost: Number(item.purchaseCost) || 0,
       unitPrice,
       discount,
-      baseAmount,
-      taxRate,
-      taxAmount: itemTax,
-      total: itemTotal
+      rawBase,
+      taxRate
     };
   });
 
+  // 2. Commercial overall discount & taxable amount
   const discountAmount = Math.max(0, Math.min(subtotal, Number(overallDiscount) || 0));
   const taxableAmount = Math.max(0, subtotal - discountAmount);
 
+  // 3. Proportionally scale item taxable amounts under Section 15(3) CGST Act
+  const discountScale = subtotal > 0 ? (subtotal - discountAmount) / subtotal : 0;
+
+  let runningBaseSum = 0;
+  const calculatedItems = rawItems.map((item, idx) => {
+    let itemBase;
+    if (discountAmount > 0 && subtotal > 0) {
+      if (idx === rawItems.length - 1) {
+        // Last item absorbs any rounding discrepancy so sum strictly matches taxableAmount
+        itemBase = Math.max(0, taxableAmount - runningBaseSum);
+      } else {
+        itemBase = Math.round(item.rawBase * discountScale);
+        runningBaseSum += itemBase;
+      }
+    } else {
+      itemBase = item.rawBase;
+    }
+
+    return {
+      id: item.id,
+      productId: item.productId,
+      category: item.category,
+      description: item.description,
+      quantity: item.quantity,
+      unit: item.unit,
+      purchaseCost: item.purchaseCost,
+      unitPrice: item.unitPrice,
+      discount: item.discount,
+      baseAmount: itemBase,
+      taxRate: item.taxRate,
+      taxAmount: 0,
+      total: itemBase
+    };
+  });
+
+  // 4. Calculate Taxes on discounted bases
+  let totalTax = 0;
   if (useCompositeSolarGST) {
     // 13.8% composite solar GST (70% material @ 12% + 30% service @ 18%)
-    totalTax = Math.round(taxableAmount * 0.138);
+    totalTax = Math.round(taxableAmount * (Number(taxRatePercent) || 13.8) / 100);
+    // Line items retain itemBase and taxAmount = 0 (composite GST applied at order/invoice level)
+    calculatedItems.forEach(item => {
+      item.taxAmount = 0;
+      item.total = item.baseAmount;
+    });
+  } else {
+    // Individual item GST rates on discounted taxable base
+    let runningTaxSum = 0;
+    calculatedItems.forEach((item, idx) => {
+      const itemTax = Math.round(item.baseAmount * (item.taxRate / 100));
+      item.taxAmount = itemTax;
+      item.total = item.baseAmount + itemTax;
+      runningTaxSum += itemTax;
+    });
+    totalTax = runningTaxSum;
   }
 
   const grandTotal = taxableAmount + totalTax;
-
   const cgst = Math.round(totalTax / 2);
   const sgst = totalTax - cgst;
 
@@ -336,13 +390,16 @@ function calculateCommercialPricing({
     items: calculatedItems,
     subtotal,
     discount: discountAmount,
+    overallDiscount: discountAmount,
     taxableAmount,
     tax: totalTax,
+    totalTax,
     cgst,
     sgst,
     igst: totalTax,
     grandTotal,
-    amountInWords: toIndianWords(grandTotal)
+    amountInWords: toIndianWords(grandTotal),
+    milestones: generateMilestones(grandTotal)
   };
 }
 
@@ -360,7 +417,7 @@ function generateMilestones(grandTotal, customMilestones) {
         { percentage: 5, description: 'Upon MSEDCL Net Metering commissioning & project handover' }
       ];
 
-  return milestones.map((m, index) => {
+  const result = milestones.map((m, index) => {
     const pct = Number(m.percentage) || 0;
     const amount = Math.round(total * (pct / 100));
     return {
@@ -370,6 +427,13 @@ function generateMilestones(grandTotal, customMilestones) {
       description: m.description
     };
   });
+
+  if (result.length > 1) {
+    const milestoneSum = result.slice(0, result.length - 1).reduce((sum, m) => sum + m.amount, 0);
+    result[result.length - 1].amount = total - milestoneSum;
+  }
+
+  return result;
 }
 
 module.exports = {

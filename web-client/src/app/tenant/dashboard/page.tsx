@@ -12,6 +12,7 @@ import {
   Globe, Award, Check, X, Search, Flame,
   Calendar, CalendarDays, Filter
 } from 'lucide-react';
+import { EmptyState } from '@/components/ui/EmptyState';
 
 import {
   ResponsiveContainer,
@@ -156,78 +157,44 @@ export default function TenantDashboard() {
         revenue: isFinanceAuthorized ? m.revenue : 0,
         projects: m.clients
       }))
-    : [
-        { month: 'Nov', capacity: 18.5, revenue: isFinanceAuthorized ? 8.4 : 0, projects: 4 },
-        { month: 'Dec', capacity: 25.2, revenue: isFinanceAuthorized ? 11.2 : 0, projects: 6 },
-        { month: 'Jan', capacity: 33.8, revenue: isFinanceAuthorized ? 14.8 : 0, projects: 8 },
-        { month: 'Feb', capacity: 28.4, revenue: isFinanceAuthorized ? 12.6 : 0, projects: 7 },
-        { month: 'Mar', capacity: 44.0, revenue: isFinanceAuthorized ? 20.2 : 0, projects: 10 },
-        { month: 'Apr', capacity: 37.1, revenue: isFinanceAuthorized ? 66.7 : 0, projects: 11 },
-      ];
+    : [];
 
   // ----------------------------------------------------
-  // PERIOD HORIZON DATASETS (MONTHLY / QUARTERLY / HALF-ANNUAL / ANNUAL)
+  // PERIOD HORIZON METADATA (MONTHLY / QUARTERLY / HALF-ANNUAL / ANNUAL)
   // ----------------------------------------------------
-  const fallbackHorizonDataMap: Record<HorizonType, {
+  const horizonMetadata: Record<HorizonType, {
     label: string;
     sublabel: string;
-    data: HorizonItem[];
   }> = {
     monthly: {
       label: isFinanceAuthorized ? 'Monthly Client & Revenue Trajectory' : 'Monthly Client & System Capacity Trajectory',
       sublabel: isFinanceAuthorized ? 'Month-over-month performance across energized clients and collected revenue' : 'Month-over-month rooftop solar capacity (kWp) energized across clients',
-      data: [
-        { period: 'Nov', clients: 4, revenue: isFinanceAuthorized ? 8.4 : 0, capacity: 18.5, avgDeal: isFinanceAuthorized ? '₹2.10L' : '4.6 kWp/Site', growth: '+14% MoM', status: 'On Target' },
-        { period: 'Dec', clients: 6, revenue: isFinanceAuthorized ? 11.2 : 0, capacity: 25.2, avgDeal: isFinanceAuthorized ? '₹1.87L' : '4.2 kWp/Site', growth: '+33% MoM', status: 'Expanding' },
-        { period: 'Jan', clients: 8, revenue: isFinanceAuthorized ? 14.8 : 0, capacity: 33.8, avgDeal: isFinanceAuthorized ? '₹1.85L' : '4.2 kWp/Site', growth: '+32% MoM', status: 'Surge' },
-        { period: 'Feb', clients: 7, revenue: isFinanceAuthorized ? 12.6 : 0, capacity: 28.4, avgDeal: isFinanceAuthorized ? '₹1.80L' : '4.1 kWp/Site', growth: '-15% MoM', status: 'Stable' },
-        { period: 'Mar', clients: 10, revenue: isFinanceAuthorized ? 20.2 : 0, capacity: 44.0, avgDeal: isFinanceAuthorized ? '₹2.02L' : '4.4 kWp/Site', growth: '+60% MoM', status: 'Record High' },
-        { period: 'Apr', clients: 11, revenue: isFinanceAuthorized ? 66.7 : 0, capacity: 37.1, avgDeal: isFinanceAuthorized ? '₹6.06L' : '3.4 kWp/Site', growth: '+28% MoM', status: 'Current Peak' },
-      ]
     },
     quarterly: {
       label: isFinanceAuthorized ? 'Quarterly Client & Revenue Velocity (Q1–Q4)' : 'Quarterly Client & Capacity Velocity (Q1–Q4)',
       sublabel: isFinanceAuthorized ? 'Fiscal quarters comparing customer rooftop acquisition and financial execution' : 'Fiscal quarters comparing energized solar rooftop installations and total kWp',
-      data: [
-        { period: 'Q1 (Apr–Jun)', clients: 22, revenue: isFinanceAuthorized ? 44.8 : 0, capacity: 94.6, avgDeal: isFinanceAuthorized ? '₹2.04L' : '4.3 kWp/Site', growth: '+18% YoY', status: 'Stable' },
-        { period: 'Q2 (Jul–Sep)', clients: 18, revenue: isFinanceAuthorized ? 36.2 : 0, capacity: 78.2, avgDeal: isFinanceAuthorized ? '₹2.01L' : '4.3 kWp/Site', growth: '+22% YoY', status: 'Monsoon Cycle' },
-        { period: 'Q3 (Oct–Dec)', clients: 29, revenue: isFinanceAuthorized ? 59.5 : 0, capacity: 126.4, avgDeal: isFinanceAuthorized ? '₹2.05L' : '4.4 kWp/Site', growth: '+41% YoY', status: 'Festive Surge' },
-        { period: 'Q4 (Jan–Mar)', clients: 38, revenue: isFinanceAuthorized ? 78.4 : 0, capacity: 168.0, avgDeal: isFinanceAuthorized ? '₹2.06L' : '4.4 kWp/Site', growth: '+54% YoY', status: 'Year-End High' },
-      ]
     },
     halfAnnual: {
       label: isFinanceAuthorized ? 'Half-Annual Solar Performance Comparison (H1 vs H2)' : 'Half-Annual Solar Installation Comparison (H1 vs H2)',
       sublabel: isFinanceAuthorized ? 'Pre-monsoon installation cycle vs post-monsoon PM Surya Ghar rooftop boom' : 'Pre-monsoon installation cycle vs post-monsoon rooftop deployment surge',
-      data: [
-        { period: 'H1 FY25 (Apr–Sep)', clients: 32, revenue: isFinanceAuthorized ? 64.0 : 0, capacity: 138.0, avgDeal: isFinanceAuthorized ? '₹2.00L' : '4.3 kWp/Site', growth: '+28% YoY', status: 'Baseline' },
-        { period: 'H2 FY25 (Oct–Mar)', clients: 51, revenue: isFinanceAuthorized ? 104.2 : 0, capacity: 224.5, avgDeal: isFinanceAuthorized ? '₹2.04L' : '4.4 kWp/Site', growth: '+62% YoY', status: 'Strong Surge' },
-        { period: 'H1 FY26 (Apr–Sep)', clients: 40, revenue: isFinanceAuthorized ? 81.0 : 0, capacity: 172.8, avgDeal: isFinanceAuthorized ? '₹2.03L' : '4.3 kWp/Site', growth: '+26% YoY', status: 'Expanded' },
-        { period: 'H2 FY26 (Oct–Mar)', clients: 67, revenue: isFinanceAuthorized ? 137.9 : 0, capacity: 294.4, avgDeal: isFinanceAuthorized ? '₹2.06L' : '4.4 kWp/Site', growth: '+70% YoY', status: 'All-Time Record' },
-      ]
     },
     annual: {
       label: isFinanceAuthorized ? 'Annual Multi-Year Growth & Client Expansion (YoY)' : 'Annual Solar Capacity & Fleet Scaling (YoY)',
       sublabel: isFinanceAuthorized ? 'Year-over-year enterprise scaling across energized clients, capacity, and revenue' : 'Year-over-year growth across energized rooftop clients and commissioned kWp',
-      data: [
-        { period: 'FY 2023–24', clients: 48, revenue: isFinanceAuthorized ? 98.5 : 0, capacity: 208.0, avgDeal: isFinanceAuthorized ? '₹2.05L' : '4.3 kWp/Site', growth: 'Baseline Year', status: 'Early Growth' },
-        { period: 'FY 2024–25', clients: 76, revenue: isFinanceAuthorized ? 154.2 : 0, capacity: 332.0, avgDeal: isFinanceAuthorized ? '₹2.03L' : '4.4 kWp/Site', growth: '+56.5% YoY', status: 'Scaling' },
-        { period: 'FY 2025–26 (Current)', clients: 107, revenue: isFinanceAuthorized ? 218.9 : 0, capacity: 467.2, avgDeal: isFinanceAuthorized ? '₹2.05L' : '4.4 kWp/Site', growth: '+42.0% YoY', status: 'Market Leader' },
-        { period: 'FY 2026–27 (Target)', clients: 160, revenue: isFinanceAuthorized ? 340.0 : 0, capacity: 720.0, avgDeal: isFinanceAuthorized ? '₹2.12L' : '4.5 kWp/Site', growth: '+55.3% Projected', status: 'Target Goal' },
-      ]
     }
   };
 
-  const activeHorizonConfig = fallbackHorizonDataMap[periodHorizon];
+  const activeHorizonConfig = horizonMetadata[periodHorizon];
   const rawHorizonData: HorizonItem[] = (data.horizonAnalytics && data.horizonAnalytics[periodHorizon] && data.horizonAnalytics[periodHorizon].length > 0)
     ? data.horizonAnalytics[periodHorizon]
-    : activeHorizonConfig.data;
+    : [];
 
   const activeHorizonData: HorizonItem[] = isFinanceAuthorized
     ? rawHorizonData
     : rawHorizonData.map(item => ({
         ...item,
         revenue: 0,
-        avgDeal: `${(item.capacity / (item.clients || 1)).toFixed(1)} kWp/Site`
+        avgDeal: item.clients ? `${(item.capacity / item.clients).toFixed(1)} kWp/Site` : '0 kWp/Site'
       }));
 
   // Aggregate stats for the currently selected horizon
@@ -237,52 +204,28 @@ export default function TenantDashboard() {
     : '0';
   const totalHorizonCapacity = activeHorizonData.reduce((acc, curr) => acc + curr.capacity, 0).toFixed(1);
   const avgHorizonDeal = isFinanceAuthorized
-    ? (Number(totalHorizonRevenue) / (totalHorizonClients || 1)).toFixed(2)
-    : (Number(totalHorizonCapacity) / (totalHorizonClients || 1)).toFixed(1);
+    ? (totalHorizonClients > 0 ? (Number(totalHorizonRevenue) / totalHorizonClients).toFixed(2) : '0.00')
+    : (totalHorizonClients > 0 ? (Number(totalHorizonCapacity) / totalHorizonClients).toFixed(1) : '0.0');
 
-  // Real System Segmentation Donut
-  const fallbackSegmentationData = [
-    { name: 'PM Surya Ghar (1-3 kW)', value: 46, color: '#0284c7', count: '46%' },
-    { name: 'Residential (3-10 kW)', value: 28, color: '#f59e0b', count: '28%' },
-    { name: 'Commercial & Ind. (>10 kW)', value: 18, color: '#6366f1', count: '18%' },
-    { name: 'Off-Grid / Storage', value: 8, color: '#10b981', count: '8%' },
-  ];
+  // Real System Segmentation Donut (Zero fallback)
   const segmentationData = (data.segmentationData && data.segmentationData.length > 0)
     ? data.segmentationData
-    : fallbackSegmentationData;
+    : [];
 
-  // Real Lead Acquisition Channels Data
-  const fallbackLeadSourceData = [
-    { source: 'WhatsApp Inbound', share: 42, volume: '38 Leads', winRate: '64%', color: 'bg-emerald-500' },
-    { source: 'Website & Quotation Tool', share: 28, volume: '25 Leads', winRate: '48%', color: 'bg-blue-500' },
-    { source: 'Customer Referrals', share: 18, volume: '16 Leads', winRate: '72%', color: 'bg-amber-500' },
-    { source: 'DISCOM Camp & Promoters', share: 12, volume: '11 Leads', winRate: '38%', color: 'bg-indigo-500' },
-  ];
+  // Real Lead Acquisition Channels Data (Zero fallback)
   const leadSourceData = (data.leadSources && data.leadSources.length > 0)
     ? data.leadSources
-    : fallbackLeadSourceData;
+    : [];
 
-  // Real Hardware Supply Chain Stock Runway
-  const fallbackInventoryRunway = [
-    { item: '550W Mono PERC Solar Panels (DCR)', stock: '184 Panels (~101 kWp)', runway: 19, status: 'Healthy', unit: 'Days', badge: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-    { item: 'On-Grid Inverters (3kW, 5kW, 10kW)', stock: '14 Units In Stock', runway: 11, status: 'Reorder Soon', unit: 'Days', badge: 'bg-amber-50 text-amber-700 border-amber-200' },
-    { item: 'Elevated HDGI & Aluminium Rails', stock: '480 Running Meters', runway: 24, status: 'Healthy', unit: 'Days', badge: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-    { item: 'Solar DC 4mm² UV Cables & ACDB', stock: '1,200 Meters + 16 Boxes', runway: 28, status: 'Adequate', unit: 'Days', badge: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-  ];
+  // Real Hardware Supply Chain Stock Runway (Zero fallback)
   const inventoryRunway = (data.inventoryRunway && data.inventoryRunway.length > 0)
     ? data.inventoryRunway
-    : fallbackInventoryRunway;
+    : [];
 
-  // Real PM Surya Ghar Direct Benefit Transfer (DBT) Milestones
-  const fallbackSubsidyFunnel = [
-    { step: '01', title: 'DISCOM Feasibility Approved', count: 24, amount: isFinanceAuthorized ? '₹18.7 Lakhs' : '108 kWp Approved', status: 'Feasibility Sanctioned' },
-    { step: '02', title: 'Vendor Work Order & Install', count: 18, amount: isFinanceAuthorized ? '₹14.0 Lakhs' : '81 kWp In-Flight', status: 'Work Order Active' },
-    { step: '03', title: 'Joint Inspection Report (JIR)', count: 12, amount: isFinanceAuthorized ? '₹9.3 Lakhs' : '54 kWp Inspected', status: 'Uploaded to Portal' },
-    { step: '04', title: 'Direct Subsidy Credited (DBT)', count: 9, amount: isFinanceAuthorized ? '₹7.02 Lakhs' : '40.5 kWp Energized', status: 'Credited to Customer' },
-  ];
+  // Real PM Surya Ghar Direct Benefit Transfer (DBT) Milestones (Zero fallback)
   const subsidyFunnel = (data.subsidyFunnel && data.subsidyFunnel.length > 0)
     ? data.subsidyFunnel
-    : fallbackSubsidyFunnel;
+    : [];
 
   const totalCapacityKWp = data.totalCapacity > 0
     ? data.totalCapacity.toFixed(1)
@@ -290,11 +233,11 @@ export default function TenantDashboard() {
 
   const totalRevenueLakhs = isFinanceAuthorized && data.totalRevenue > 0
     ? Number((data.totalRevenue / 100000).toFixed(1))
-    : (isFinanceAuthorized ? 84.6 : 0);
+    : 0;
 
   const totalCollectedLakhs = isFinanceAuthorized && data.totalCollected > 0
     ? Number((data.totalCollected / 100000).toFixed(1))
-    : (isFinanceAuthorized ? Number((totalRevenueLakhs * 0.65).toFixed(1)) : 0);
+    : 0;
 
   const outstandingLakhs = isFinanceAuthorized && data.outstanding > 0
     ? Number((data.outstanding / 100000).toFixed(1))
@@ -379,11 +322,11 @@ export default function TenantDashboard() {
               <p className="text-xs sm:text-sm text-slate-800 mt-1 font-semibold leading-relaxed">
                 {isFinanceAuthorized ? (
                   <>
-                    <strong>{data.totalLeads || 3} rooftop proposals</strong> awaiting follow-up, <strong>{data.totalProjects || 2} active installations</strong> on schedule, and <strong>₹{outstandingLakhs}L milestone receivables</strong> maturing this cycle.
+                    <strong>{data.totalLeads || 0} rooftop proposals</strong> awaiting follow-up, <strong>{data.totalProjects || 0} active installations</strong> on schedule, and <strong>₹{outstandingLakhs}L milestone receivables</strong> maturing this cycle.
                   </>
                 ) : (
                   <>
-                    <strong>{data.totalLeads || 3} rooftop proposals</strong> awaiting follow-up, <strong>{data.totalProjects || 2} active installations</strong> on schedule, and <strong>{data.openSurveys || data.totalCustomers || 4} site surveys</strong> queued for technician dispatch.
+                    <strong>{data.totalLeads || 0} rooftop proposals</strong> awaiting follow-up, <strong>{data.totalProjects || 0} active installations</strong> on schedule, and <strong>{data.openSurveys || data.totalCustomers || 0} site surveys</strong> queued for technician dispatch.
                   </>
                 )}
               </p>
@@ -434,7 +377,7 @@ export default function TenantDashboard() {
         <ExecutiveTickerCard 
           label="Energized Fleet Size"
           value={`${totalCapacityKWp} kWp`}
-          change={`${data.totalProjects || 11} Sites Commissioned`}
+          change={`${data.totalProjects || 0} Sites Commissioned`}
           isPositive={true}
           icon={Sun}
           accent="amber"
@@ -443,7 +386,7 @@ export default function TenantDashboard() {
         {isFinanceAuthorized ? (
           <ExecutiveTickerCard 
             label="DBT Subsidy Disbursed"
-            value={subsidyFunnel[3]?.amount || "₹24.8 Lakhs"}
+            value={subsidyFunnel[3]?.amount || (subsidyFunnel.length > 0 ? subsidyFunnel[subsidyFunnel.length - 1]?.amount : "₹0")}
             change="PM Surya Ghar Scheme"
             isPositive={true}
             icon={Landmark}
@@ -784,7 +727,7 @@ export default function TenantDashboard() {
                     Active Project Pipeline
                   </p>
                   <p className="text-2xl sm:text-3xl font-black text-sky-950 mt-0.5">
-                    {data.totalProjects || 11} Active Sites
+                    {data.totalProjects || 0} Active Sites
                   </p>
                   <span className="text-[10px] font-bold text-sky-700 mt-1 inline-flex items-center gap-1">
                     <HardHat size={11} /> Field Work On-Schedule
@@ -799,131 +742,145 @@ export default function TenantDashboard() {
 
           {/* Primary Visual Chart: Clients (Bars) + Revenue (Curve) */}
           <div className="bg-slate-50/60 rounded-2xl p-4 sm:p-6 border border-slate-100">
-            <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
-              <div className="flex items-center gap-6 text-xs font-bold">
-                {(horizonMetricFocus === 'both' || horizonMetricFocus === 'clients') && (
-                  <span className="flex items-center gap-2 text-slate-800">
-                    <span className="w-3.5 h-3.5 rounded-md bg-blue-600" />
-                    Successful Clients (Count on Left Y-Axis)
-                  </span>
-                )}
-                {(horizonMetricFocus === 'both' || horizonMetricFocus === 'revenue') && (
-                  <span className="flex items-center gap-2 text-slate-800">
-                    <span className={`w-3.5 h-3.5 rounded-md ${isFinanceAuthorized ? 'bg-emerald-500' : 'bg-indigo-600'}`} />
-                    {isFinanceAuthorized 
-                      ? "Revenue Inflow (₹ Lakhs on Right Y-Axis)" 
-                      : "Capacity Energized (kWp on Right Y-Axis)"}
-                  </span>
-                )}
-              </div>
-
-              <span className="text-[11px] text-slate-500 font-medium">
-                Showing {activeHorizonData.length} sequential periods
-              </span>
-            </div>
-
-            <div className="h-[310px] w-full">
-              {mounted ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={activeHorizonData} margin={{ top: 15, right: 15, left: -10, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                    <XAxis 
-                      dataKey="period" 
-                      axisLine={false} 
-                      tickLine={false} 
-                      tick={{ fill: '#475569', fontSize: 11, fontWeight: 700 }}
-                    />
-                    <YAxis 
-                      yAxisId="left"
-                      orientation="left"
-                      axisLine={false} 
-                      tickLine={false} 
-                      tick={{ fill: '#0284c7', fontSize: 11, fontWeight: 700 }}
-                    />
-                    <YAxis 
-                      yAxisId="right"
-                      orientation="right"
-                      axisLine={false} 
-                      tickLine={false} 
-                      tick={{ fill: isFinanceAuthorized ? '#10b981' : '#6366f1', fontSize: 11, fontWeight: 700 }}
-                    />
-                    <Tooltip content={<HorizonChartTooltip isFinanceAuthorized={isFinanceAuthorized} />} />
-
+            {activeHorizonData.length > 0 ? (
+              <>
+                <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
+                  <div className="flex items-center gap-6 text-xs font-bold">
                     {(horizonMetricFocus === 'both' || horizonMetricFocus === 'clients') && (
-                      <Bar 
-                        yAxisId="left"
-                        dataKey="clients" 
-                        name="clients"
-                        fill="#0284c7" 
-                        radius={[6, 6, 0, 0]}
-                        barSize={34}
-                      />
+                      <span className="flex items-center gap-2 text-slate-800">
+                        <span className="w-3.5 h-3.5 rounded-md bg-blue-600" />
+                        Successful Clients (Count on Left Y-Axis)
+                      </span>
                     )}
-
                     {(horizonMetricFocus === 'both' || horizonMetricFocus === 'revenue') && (
-                      <Line 
-                        yAxisId="right"
-                        type="monotone" 
-                        dataKey={isFinanceAuthorized ? "revenue" : "capacity"} 
-                        name={isFinanceAuthorized ? "revenue" : "capacity"} 
-                        stroke={isFinanceAuthorized ? "#10b981" : "#6366f1"} 
-                        strokeWidth={3}
-                        dot={{ r: 5, fill: isFinanceAuthorized ? '#10b981' : '#6366f1', strokeWidth: 2, stroke: '#ffffff' }}
-                        activeDot={{ r: 7, fill: isFinanceAuthorized ? '#10b981' : '#6366f1', strokeWidth: 2, stroke: '#ffffff' }}
-                      />
+                      <span className="flex items-center gap-2 text-slate-800">
+                        <span className={`w-3.5 h-3.5 rounded-md ${isFinanceAuthorized ? 'bg-emerald-500' : 'bg-indigo-600'}`} />
+                        {isFinanceAuthorized 
+                          ? "Revenue Inflow (₹ Lakhs on Right Y-Axis)" 
+                          : "Capacity Energized (kWp on Right Y-Axis)"}
+                      </span>
                     )}
-                  </ComposedChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-slate-400 text-xs">
-                  Loading horizon graphics...
-                </div>
-              )}
-            </div>
-          </div>
+                  </div>
 
-          {/* Breakdown Table for the Selected Horizon */}
-          <div className="mt-6 overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="border-b border-slate-200 text-[11px] font-extrabold text-slate-500 uppercase tracking-wider">
-                  <th className="py-3 px-3">Horizon Period</th>
-                  <th className="py-3 px-3">Successful Clients</th>
-                  {isFinanceAuthorized && <th className="py-3 px-3">Realized Revenue</th>}
-                  <th className="py-3 px-3">Capacity (kWp)</th>
-                  <th className="py-3 px-3">{isFinanceAuthorized ? "Avg Ticket Size" : "Avg System Size"}</th>
-                  <th className="py-3 px-3">Growth Velocity</th>
-                  <th className="py-3 px-3 text-right">Operational Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 text-xs font-semibold text-slate-800">
-                {activeHorizonData.map((row) => (
-                  <tr key={row.period} className="hover:bg-slate-50/80 transition-colors">
-                    <td className="py-3.5 px-3 font-extrabold text-slate-900">{row.period}</td>
-                    <td className="py-3.5 px-3">
-                      <span className="font-black text-blue-700 bg-blue-50 px-2 py-0.5 rounded-lg border border-blue-200/60">
-                        {row.clients} Clients
-                      </span>
-                    </td>
-                    {isFinanceAuthorized && (
-                      <td className="py-3.5 px-3 font-black text-emerald-600">₹{row.revenue} Lakhs</td>
-                    )}
-                    <td className="py-3.5 px-3 text-slate-600 font-bold">{row.capacity} kWp</td>
-                    <td className="py-3.5 px-3 text-slate-600">{row.avgDeal}</td>
-                    <td className="py-3.5 px-3">
-                      <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
-                        {row.growth}
-                      </span>
-                    </td>
-                    <td className="py-3.5 px-3 text-right">
-                      <span className="text-[10px] font-bold text-slate-700 bg-slate-100 px-2.5 py-1 rounded-full border border-slate-200">
-                        {row.status || 'Active'}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                  <span className="text-[11px] text-slate-500 font-medium">
+                    Showing {activeHorizonData.length} sequential periods
+                  </span>
+                </div>
+
+                <div className="h-[310px] w-full">
+                  {mounted ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <ComposedChart data={activeHorizonData} margin={{ top: 15, right: 15, left: -10, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                        <XAxis 
+                          dataKey="period" 
+                          axisLine={false} 
+                          tickLine={false} 
+                          tick={{ fill: '#475569', fontSize: 11, fontWeight: 700 }}
+                        />
+                        <YAxis 
+                          yAxisId="left"
+                          orientation="left"
+                          axisLine={false} 
+                          tickLine={false} 
+                          tick={{ fill: '#0284c7', fontSize: 11, fontWeight: 700 }}
+                        />
+                        <YAxis 
+                          yAxisId="right"
+                          orientation="right"
+                          axisLine={false} 
+                          tickLine={false} 
+                          tick={{ fill: isFinanceAuthorized ? '#10b981' : '#6366f1', fontSize: 11, fontWeight: 700 }}
+                        />
+                        <Tooltip content={<HorizonChartTooltip isFinanceAuthorized={isFinanceAuthorized} />} />
+
+                        {(horizonMetricFocus === 'both' || horizonMetricFocus === 'clients') && (
+                          <Bar 
+                            yAxisId="left"
+                            dataKey="clients" 
+                            name="clients"
+                            fill="#0284c7" 
+                            radius={[6, 6, 0, 0]}
+                            barSize={34}
+                          />
+                        )}
+
+                        {(horizonMetricFocus === 'both' || horizonMetricFocus === 'revenue') && (
+                          <Line 
+                            yAxisId="right"
+                            type="monotone" 
+                            dataKey={isFinanceAuthorized ? "revenue" : "capacity"} 
+                            name={isFinanceAuthorized ? "revenue" : "capacity"} 
+                            stroke={isFinanceAuthorized ? "#10b981" : "#6366f1"} 
+                            strokeWidth={3}
+                            dot={{ r: 5, fill: isFinanceAuthorized ? '#10b981' : '#6366f1', strokeWidth: 2, stroke: '#ffffff' }}
+                            activeDot={{ r: 7, fill: isFinanceAuthorized ? '#10b981' : '#6366f1', strokeWidth: 2, stroke: '#ffffff' }}
+                          />
+                        )}
+                      </ComposedChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-slate-400 text-xs">
+                      Loading horizon graphics...
+                    </div>
+                  )}
+                </div>
+
+                {/* Breakdown Table for the Selected Horizon */}
+                <div className="mt-6 overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="border-b border-slate-200 text-[11px] font-extrabold text-slate-500 uppercase tracking-wider">
+                        <th className="py-3 px-3">Horizon Period</th>
+                        <th className="py-3 px-3">Successful Clients</th>
+                        {isFinanceAuthorized && <th className="py-3 px-3">Realized Revenue</th>}
+                        <th className="py-3 px-3">Capacity (kWp)</th>
+                        <th className="py-3 px-3">{isFinanceAuthorized ? "Avg Ticket Size" : "Avg System Size"}</th>
+                        <th className="py-3 px-3">Growth Velocity</th>
+                        <th className="py-3 px-3 text-right">Operational Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 text-xs font-semibold text-slate-800">
+                      {activeHorizonData.map((row) => (
+                        <tr key={row.period} className="hover:bg-slate-50/80 transition-colors">
+                          <td className="py-3.5 px-3 font-extrabold text-slate-900">{row.period}</td>
+                          <td className="py-3.5 px-3">
+                            <span className="font-black text-blue-700 bg-blue-50 px-2 py-0.5 rounded-lg border border-blue-200/60">
+                              {row.clients} Clients
+                            </span>
+                          </td>
+                          {isFinanceAuthorized && (
+                            <td className="py-3.5 px-3 font-black text-emerald-600">₹{row.revenue} Lakhs</td>
+                          )}
+                          <td className="py-3.5 px-3 text-slate-600 font-bold">{row.capacity} kWp</td>
+                          <td className="py-3.5 px-3 text-slate-600">{row.avgDeal}</td>
+                          <td className="py-3.5 px-3">
+                            <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
+                              {row.growth}
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-3 text-right">
+                            <span className="text-[10px] font-bold text-slate-700 bg-slate-100 px-2.5 py-1 rounded-full border border-slate-200">
+                              {row.status || 'Active'}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            ) : (
+              <EmptyState
+                icon={Calendar}
+                title="No Horizon Trend Data Available"
+                description="Complete client project installations and billings to view your commercial and capacity velocity metrics over time."
+                action={{
+                  label: "Create First Lead",
+                  href: "/tenant/leads"
+                }}
+              />
+            )}
           </div>
         </div>
       )}
@@ -1086,60 +1043,73 @@ export default function TenantDashboard() {
               {/* Recharts Area Canvas */}
               <div className="h-[280px] w-full pt-2">
                 {mounted ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={monthlyTrends} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
-                      <defs>
-                        <linearGradient id="capacityGradient" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#0284c7" stopOpacity={0.35} />
-                          <stop offset="95%" stopColor="#0284c7" stopOpacity={0.0} />
-                        </linearGradient>
-                        <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.35} />
-                          <stop offset="95%" stopColor="#f59e0b" stopOpacity={0.0} />
-                        </linearGradient>
-                      </defs>
+                  monthlyTrends.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={monthlyTrends} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
+                        <defs>
+                          <linearGradient id="capacityGradient" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#0284c7" stopOpacity={0.35} />
+                            <stop offset="95%" stopColor="#0284c7" stopOpacity={0.0} />
+                          </linearGradient>
+                          <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.35} />
+                            <stop offset="95%" stopColor="#f59e0b" stopOpacity={0.0} />
+                          </linearGradient>
+                        </defs>
 
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                      <XAxis 
-                        dataKey="month" 
-                        axisLine={false} 
-                        tickLine={false} 
-                        tick={{ fill: '#64748b', fontSize: 11, fontWeight: 600 }}
-                      />
-                      <YAxis 
-                        axisLine={false} 
-                        tickLine={false} 
-                        tick={{ fill: '#64748b', fontSize: 11 }}
-                      />
-                      <Tooltip content={<CustomChartTooltip isFinanceAuthorized={isFinanceAuthorized} />} />
-
-                      {(activeMetric === 'both' || activeMetric === 'capacity') && (
-                        <Area 
-                          type="monotone" 
-                          dataKey="capacity" 
-                          stroke="#0284c7" 
-                          strokeWidth={2.5} 
-                          fillOpacity={1} 
-                          fill="url(#capacityGradient)" 
-                          dot={{ r: 4, fill: '#0284c7', strokeWidth: 2, stroke: '#ffffff' }}
-                          activeDot={{ r: 6, fill: '#0284c7', strokeWidth: 2, stroke: '#ffffff' }}
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                        <XAxis 
+                          dataKey="month" 
+                          axisLine={false} 
+                          tickLine={false} 
+                          tick={{ fill: '#64748b', fontSize: 11, fontWeight: 600 }}
                         />
-                      )}
-
-                      {(activeMetric === 'both' || activeMetric === 'revenue') && (
-                        <Area 
-                          type="monotone" 
-                          dataKey="revenue" 
-                          stroke="#f59e0b" 
-                          strokeWidth={2.5} 
-                          fillOpacity={1} 
-                          fill="url(#revenueGradient)" 
-                          dot={{ r: 4, fill: '#f59e0b', strokeWidth: 2, stroke: '#ffffff' }}
-                          activeDot={{ r: 6, fill: '#f59e0b', strokeWidth: 2, stroke: '#ffffff' }}
+                        <YAxis 
+                          axisLine={false} 
+                          tickLine={false} 
+                          tick={{ fill: '#64748b', fontSize: 11 }}
                         />
-                      )}
-                    </AreaChart>
-                  </ResponsiveContainer>
+                        <Tooltip content={<CustomChartTooltip isFinanceAuthorized={isFinanceAuthorized} />} />
+
+                        {(activeMetric === 'both' || activeMetric === 'capacity') && (
+                          <Area 
+                            type="monotone" 
+                            dataKey="capacity" 
+                            stroke="#0284c7" 
+                            strokeWidth={2.5} 
+                            fillOpacity={1} 
+                            fill="url(#capacityGradient)" 
+                            dot={{ r: 4, fill: '#0284c7', strokeWidth: 2, stroke: '#ffffff' }}
+                            activeDot={{ r: 6, fill: '#0284c7', strokeWidth: 2, stroke: '#ffffff' }}
+                          />
+                        )}
+
+                        {(activeMetric === 'both' || activeMetric === 'revenue') && (
+                          <Area 
+                            type="monotone" 
+                            dataKey="revenue" 
+                            stroke="#f59e0b" 
+                            strokeWidth={2.5} 
+                            fillOpacity={1} 
+                            fill="url(#revenueGradient)" 
+                            dot={{ r: 4, fill: '#f59e0b', strokeWidth: 2, stroke: '#ffffff' }}
+                            activeDot={{ r: 6, fill: '#f59e0b', strokeWidth: 2, stroke: '#ffffff' }}
+                          />
+                        )}
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <EmptyState
+                      icon={TrendingUp}
+                      title="No Monthly Trend Data Available"
+                      description="Monthly solar capacity and revenue generation trajectory will appear once project installations and invoices mature."
+                      action={{
+                        label: "View Projects",
+                        href: "/tenant/projects"
+                      }}
+                      className="py-6"
+                    />
+                  )
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-slate-400 text-xs">
                     Loading graphics...
@@ -1213,10 +1183,10 @@ export default function TenantDashboard() {
                 <div className="p-3 rounded-2xl bg-slate-50/70 border border-slate-100">
                   <div className="flex items-center justify-between text-xs mb-1.5">
                     <span className="font-bold text-slate-700">National DBT Subsidy Clearing</span>
-                    <span className="font-black text-blue-600">{subsidyFunnel[3]?.amount || '₹7.02 Lakhs'}</span>
+                    <span className="font-black text-blue-600">{subsidyFunnel[3]?.amount || '₹0'}</span>
                   </div>
                   <div className="w-full bg-slate-200/70 rounded-full h-2 overflow-hidden">
-                    <div className="bg-blue-500 h-2 rounded-full" style={{ width: `${Math.min(100, Math.round((Number(subsidyFunnel[3]?.count || 1) / Math.max(1, Number(subsidyFunnel[0]?.count || 1))) * 100))}%` }} />
+                    <div className="bg-blue-500 h-2 rounded-full" style={{ width: `${subsidyFunnel.length > 3 && subsidyFunnel[0]?.count ? Math.min(100, Math.round((Number(subsidyFunnel[3]?.count || 0) / Math.max(1, Number(subsidyFunnel[0]?.count || 1))) * 100)) : 0}%` }} />
                   </div>
                 </div>
               </div>
@@ -1229,17 +1199,17 @@ export default function TenantDashboard() {
                 <div className="grid grid-cols-3 gap-2">
                   <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 text-center">
                     <p className="text-[10px] font-bold text-slate-400">&lt; 15 Days</p>
-                    <p className="text-xs font-black text-slate-800 mt-0.5">₹{data.aging ? (data.aging.under15 / 100000).toFixed(1) : "11.2"}L</p>
+                    <p className="text-xs font-black text-slate-800 mt-0.5">₹{data.aging ? (data.aging.under15 / 100000).toFixed(1) : "0.0"}L</p>
                     <span className="text-[9px] font-semibold text-emerald-600">On Track</span>
                   </div>
                   <div className="p-2.5 rounded-xl bg-amber-50/60 border border-amber-100 text-center">
                     <p className="text-[10px] font-bold text-amber-700">15–30 Days</p>
-                    <p className="text-xs font-black text-amber-900 mt-0.5">₹{data.aging ? (data.aging.under30 / 100000).toFixed(1) : "5.4"}L</p>
+                    <p className="text-xs font-black text-amber-900 mt-0.5">₹{data.aging ? (data.aging.under30 / 100000).toFixed(1) : "0.0"}L</p>
                     <span className="text-[9px] font-semibold text-amber-700">Follow-up</span>
                   </div>
                   <div className="p-2.5 rounded-xl bg-red-50/60 border border-red-100 text-center">
                     <p className="text-[10px] font-bold text-red-700">&gt; 30 Days</p>
-                    <p className="text-xs font-black text-red-900 mt-0.5">₹{data.aging ? (data.aging.over30 / 100000).toFixed(1) : "2.0"}L</p>
+                    <p className="text-xs font-black text-red-900 mt-0.5">₹{data.aging ? (data.aging.over30 / 100000).toFixed(1) : "0.0"}L</p>
                     <span className="text-[9px] font-semibold text-red-700">Action Due</span>
                   </div>
                 </div>
@@ -1317,41 +1287,54 @@ export default function TenantDashboard() {
               {/* Recharts Area Canvas */}
               <div className="h-[280px] w-full pt-2">
                 {mounted ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={monthlyTrends} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
-                      <defs>
-                        <linearGradient id="capacityGradientAlt" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#0284c7" stopOpacity={0.35} />
-                          <stop offset="95%" stopColor="#0284c7" stopOpacity={0.0} />
-                        </linearGradient>
-                      </defs>
+                  monthlyTrends.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={monthlyTrends} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
+                        <defs>
+                          <linearGradient id="capacityGradientAlt" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#0284c7" stopOpacity={0.35} />
+                            <stop offset="95%" stopColor="#0284c7" stopOpacity={0.0} />
+                          </linearGradient>
+                        </defs>
 
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                      <XAxis 
-                        dataKey="month" 
-                        axisLine={false} 
-                        tickLine={false} 
-                        tick={{ fill: '#64748b', fontSize: 11, fontWeight: 600 }}
-                      />
-                      <YAxis 
-                        axisLine={false} 
-                        tickLine={false} 
-                        tick={{ fill: '#64748b', fontSize: 11 }}
-                      />
-                      <Tooltip content={<CustomChartTooltip isFinanceAuthorized={false} />} />
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                        <XAxis 
+                          dataKey="month" 
+                          axisLine={false} 
+                          tickLine={false} 
+                          tick={{ fill: '#64748b', fontSize: 11, fontWeight: 600 }}
+                        />
+                        <YAxis 
+                          axisLine={false} 
+                          tickLine={false} 
+                          tick={{ fill: '#64748b', fontSize: 11 }}
+                        />
+                        <Tooltip content={<CustomChartTooltip isFinanceAuthorized={false} />} />
 
-                      <Area 
-                        type="monotone" 
-                        dataKey="capacity" 
-                        stroke="#0284c7" 
-                        strokeWidth={2.5} 
-                        fillOpacity={1} 
-                        fill="url(#capacityGradientAlt)" 
-                        dot={{ r: 4, fill: '#0284c7', strokeWidth: 2, stroke: '#ffffff' }}
-                        activeDot={{ r: 6, fill: '#0284c7', strokeWidth: 2, stroke: '#ffffff' }}
-                      />
-                    </AreaChart>
-                  </ResponsiveContainer>
+                        <Area 
+                          type="monotone" 
+                          dataKey="capacity" 
+                          stroke="#0284c7" 
+                          strokeWidth={2.5} 
+                          fillOpacity={1} 
+                          fill="url(#capacityGradientAlt)" 
+                          dot={{ r: 4, fill: '#0284c7', strokeWidth: 2, stroke: '#ffffff' }}
+                          activeDot={{ r: 6, fill: '#0284c7', strokeWidth: 2, stroke: '#ffffff' }}
+                        />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <EmptyState
+                      icon={TrendingUp}
+                      title="No Monthly Installation Trends"
+                      description="Monthly solar capacity energized will populate once field installation work orders are completed."
+                      action={{
+                        label: "View Projects",
+                        href: "/tenant/projects"
+                      }}
+                      className="py-6"
+                    />
+                  )
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-slate-400 text-xs">
                     Loading graphics...
@@ -1396,7 +1379,7 @@ export default function TenantDashboard() {
                   </div>
                 </div>
                 <span className="text-[10px] font-extrabold text-slate-800 bg-slate-100 px-2.5 py-1 rounded-full border border-slate-200">
-                  {data.totalProjects || 14} Sites In-Flight
+                  {data.totalProjects || 0} Sites In-Flight
                 </span>
               </div>
 
@@ -1488,7 +1471,7 @@ export default function TenantDashboard() {
                   </div>
                 </div>
                 <span className="text-[10px] font-bold text-amber-800 bg-amber-50 border border-amber-200/80 px-2.5 py-0.5 rounded-full">
-                  {data.totalProjects || 14} Sites Live
+                  {data.totalProjects || 0} Sites Live
                 </span>
               </div>
 
@@ -1560,21 +1543,34 @@ export default function TenantDashboard() {
               </div>
 
               <div className="space-y-3 my-2">
-                {inventoryRunway.map((item) => (
-                  <div key={item.item} className="p-3 rounded-2xl bg-slate-50/70 border border-slate-200/70 hover:bg-slate-50 transition-colors">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="text-xs font-bold text-slate-900 truncate">{item.item}</p>
-                        <p className="text-[11px] text-slate-500 mt-0.5">{item.stock}</p>
-                      </div>
-                      <div className="text-right shrink-0">
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${item.badge}`}>
-                          {item.runway} {item.unit} Runway
-                        </span>
+                {inventoryRunway.length > 0 ? (
+                  inventoryRunway.map((item) => (
+                    <div key={item.item} className="p-3 rounded-2xl bg-slate-50/70 border border-slate-200/70 hover:bg-slate-50 transition-colors">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-slate-900 truncate">{item.item}</p>
+                          <p className="text-[11px] text-slate-500 mt-0.5">{item.stock}</p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${item.badge}`}>
+                            {item.runway} {item.unit} Runway
+                          </span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  ))
+                ) : (
+                  <EmptyState
+                    icon={Truck}
+                    title="No Hardware Runway Recorded"
+                    description="Add products and record stock receipts to monitor critical hardware runway and reorder levels."
+                    action={{
+                      label: "Manage Inventory",
+                      href: "/tenant/inventory"
+                    }}
+                    className="py-6"
+                  />
+                )}
               </div>
             </div>
 
@@ -1611,52 +1607,67 @@ export default function TenantDashboard() {
                 </div>
               </div>
 
-              {/* Donut Container with Center Label */}
-              <div className="relative h-[200px] w-full flex items-center justify-center">
-                {mounted ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={segmentationData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={56}
-                        outerRadius={82}
-                        paddingAngle={4}
-                        dataKey="value"
-                      >
-                        {segmentationData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip content={<DonutTooltip />} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                ) : null}
+              {segmentationData.length > 0 ? (
+                <>
+                  {/* Donut Container with Center Label */}
+                  <div className="relative h-[200px] w-full flex items-center justify-center">
+                    {mounted ? (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={segmentationData}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={56}
+                            outerRadius={82}
+                            paddingAngle={4}
+                            dataKey="value"
+                          >
+                            {segmentationData.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={entry.color} />
+                            ))}
+                          </Pie>
+                          <Tooltip content={<DonutTooltip />} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    ) : null}
 
-                {/* Center Donut Text */}
-                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                  <span className="text-2xl font-black text-slate-900 tracking-tight leading-none">
-                    {totalCapacityKWp}
-                  </span>
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
-                    kWp Live
-                  </span>
-                </div>
-              </div>
-
-              {/* Custom Legend */}
-              <div className="space-y-1.5 mt-2">
-                {segmentationData.map(item => (
-                  <div key={item.name} className="flex items-center justify-between text-xs py-1">
-                    <span className="flex items-center gap-2 text-slate-600 font-medium">
-                      <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
-                      <span className="truncate max-w-[170px]">{item.name}</span>
-                    </span>
-                    <span className="font-extrabold text-slate-900">{item.count}</span>
+                    {/* Center Donut Text */}
+                    <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                      <span className="text-2xl font-black text-slate-900 tracking-tight leading-none">
+                        {totalCapacityKWp}
+                      </span>
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
+                        kWp Live
+                      </span>
+                    </div>
                   </div>
-                ))}
-              </div>
+
+                  {/* Custom Legend */}
+                  <div className="space-y-1.5 mt-2">
+                    {segmentationData.map(item => (
+                      <div key={item.name} className="flex items-center justify-between text-xs py-1">
+                        <span className="flex items-center gap-2 text-slate-600 font-medium">
+                          <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+                          <span className="truncate max-w-[170px]">{item.name}</span>
+                        </span>
+                        <span className="font-extrabold text-slate-900">{item.count}</span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <EmptyState
+                  icon={PieIcon}
+                  title="No Project Segmentation Data"
+                  description="Create and categorize solar projects to view your system capacity portfolio mix."
+                  action={{
+                    label: "Create Project",
+                    href: "/tenant/projects/new"
+                  }}
+                  className="py-6"
+                />
+              )}
             </div>
 
             <div className="mt-4 pt-3 border-t border-slate-100">
@@ -1695,23 +1706,36 @@ export default function TenantDashboard() {
 
               {/* 4-Step Subsidy Pipeline Visual */}
               <div className="space-y-3 my-2">
-                {subsidyFunnel.map((item) => (
-                  <div key={item.step} className="p-3 rounded-2xl bg-slate-50/80 border border-slate-200/70 hover:bg-slate-50 transition-colors flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                      <span className="w-7 h-7 rounded-xl bg-emerald-600 text-white font-extrabold text-xs flex items-center justify-center shrink-0 shadow-2xs">
-                        {item.step}
-                      </span>
-                      <div>
-                        <p className="text-xs font-bold text-slate-900">{item.title}</p>
-                        <p className="text-[11px] text-slate-500">{item.status}</p>
+                {subsidyFunnel.length > 0 ? (
+                  subsidyFunnel.map((item) => (
+                    <div key={item.step} className="p-3 rounded-2xl bg-slate-50/80 border border-slate-200/70 hover:bg-slate-50 transition-colors flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <span className="w-7 h-7 rounded-xl bg-emerald-600 text-white font-extrabold text-xs flex items-center justify-center shrink-0 shadow-2xs">
+                          {item.step}
+                        </span>
+                        <div>
+                          <p className="text-xs font-bold text-slate-900">{item.title}</p>
+                          <p className="text-[11px] text-slate-500">{item.status}</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xs font-black text-slate-900">{item.count} Consumers</p>
+                        <p className="text-[11px] font-bold text-emerald-600">{item.amount}</p>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <p className="text-xs font-black text-slate-900">{item.count} Consumers</p>
-                      <p className="text-[11px] font-bold text-emerald-600">{item.amount}</p>
-                    </div>
-                  </div>
-                ))}
+                  ))
+                ) : (
+                  <EmptyState
+                    icon={Landmark}
+                    title="No Subsidy Claims Active"
+                    description="Submit PM Surya Ghar subsidy applications for your consumers to track DBT disbursals."
+                    action={{
+                      label: "Manage Subsidies",
+                      href: "/tenant/subsidy"
+                    }}
+                    className="py-6"
+                  />
+                )}
               </div>
             </div>
 
@@ -1748,25 +1772,38 @@ export default function TenantDashboard() {
                 </div>
               </div>
               <span className="text-[10px] font-bold text-slate-600 bg-slate-100 px-2.5 py-0.5 rounded-full">
-                90 Leads / Mo
+                {leadSourceData.reduce((acc, s) => acc + (parseInt(s.volume) || 0), 0) || 0} Leads / Mo
               </span>
             </div>
 
             <div className="space-y-3.5 my-2">
-              {leadSourceData.map((src) => (
-                <div key={src.source} className="p-3 rounded-2xl bg-slate-50/70 border border-slate-100 space-y-1.5">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-bold text-slate-800">{src.source}</span>
-                    <div className="flex items-center gap-3">
-                      <span className="text-[11px] text-slate-500">{src.volume}</span>
-                      <span className="font-black text-slate-900 w-10 text-right">{src.share}%</span>
+              {leadSourceData.length > 0 ? (
+                leadSourceData.map((src) => (
+                  <div key={src.source} className="p-3 rounded-2xl bg-slate-50/70 border border-slate-100 space-y-1.5">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-bold text-slate-800">{src.source}</span>
+                      <div className="flex items-center gap-3">
+                        <span className="text-[11px] text-slate-500">{src.volume}</span>
+                        <span className="font-black text-slate-900 w-10 text-right">{src.share}%</span>
+                      </div>
+                    </div>
+                    <div className="w-full bg-slate-200/70 rounded-full h-2 overflow-hidden">
+                      <div className={`h-2 rounded-full ${src.color}`} style={{ width: `${src.share}%` }} />
                     </div>
                   </div>
-                  <div className="w-full bg-slate-200/70 rounded-full h-2 overflow-hidden">
-                    <div className={`h-2 rounded-full ${src.color}`} style={{ width: `${src.share}%` }} />
-                  </div>
-                </div>
-              ))}
+                ))
+              ) : (
+                <EmptyState
+                  icon={BarChart3}
+                  title="No Lead Acquisition Data"
+                  description="Create your first lead to view conversion metrics and channel efficiency."
+                  action={{
+                    label: "Create First Lead",
+                    href: "/tenant/leads"
+                  }}
+                  className="py-6"
+                />
+              )}
             </div>
           </div>
 

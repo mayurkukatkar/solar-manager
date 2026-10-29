@@ -795,7 +795,7 @@ export default function LeadsList() {
                 </div>
               )}
               
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-slate-700">Full Name *</label>
                   <input 
@@ -820,7 +820,7 @@ export default function LeadsList() {
                 </div>
               </div>
               
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-slate-700">Email Address</label>
                   <input 
@@ -851,7 +851,7 @@ export default function LeadsList() {
                 <span className="text-xs font-black text-emerald-800 uppercase tracking-wider block">
                   ⚡ Solar Plant Sizing & Roof Specs
                 </span>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className="text-xs font-bold text-slate-700">Est. System Capacity (kWp)</label>
                     <input 
@@ -876,7 +876,7 @@ export default function LeadsList() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className="text-xs font-bold text-slate-700">Roof Structure</label>
                     <select 
@@ -908,7 +908,7 @@ export default function LeadsList() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-slate-700">City</label>
                   <input 
@@ -1021,7 +1021,7 @@ export default function LeadsList() {
             </div>
 
             <form onSubmit={handleScheduleFollowup} className="p-5 space-y-3.5">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-slate-700">Follow-up Type</label>
                   <select 

@@ -7,10 +7,12 @@ import {
   TrendingUp, ShieldCheck, Filter, MessageSquare, Share2, Printer, 
   Building2, Sparkles, Layers, Send, Eye, Check, AlertTriangle, ArrowRight
 } from 'lucide-react';
+import { useToast } from '@/context/ToastContext';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
 export default function Finance() {
+  const { showToast } = useToast();
   const [invoices, setInvoices] = useState<any[]>([]);
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -195,7 +197,7 @@ export default function Finance() {
       fetchData();
     } catch (err: any) {
       console.error(err);
-      alert(err.response?.data?.error || 'Failed to generate tax invoice');
+      showToast({ type: 'error', message: err.response?.data?.error || 'Failed to generate tax invoice' });
     }
   };
 
@@ -224,7 +226,7 @@ export default function Finance() {
       fetchData();
     } catch (err: any) {
       console.error(err);
-      alert(err.response?.data?.error || 'Failed to record payment');
+      showToast({ type: 'error', message: err.response?.data?.error || 'Failed to record payment' });
     } finally {
       setRecordingPayment(false);
     }
@@ -250,7 +252,7 @@ export default function Finance() {
       }
     } catch (err) {
       console.error('Failed to dispatch WhatsApp:', err);
-      alert('Could not generate WhatsApp reminder.');
+      showToast({ type: 'error', message: 'Could not generate WhatsApp reminder.' });
     }
   };
 
@@ -272,7 +274,7 @@ export default function Finance() {
       await html2pdf().set(opt).from(element).save();
     } catch (err: any) {
       console.error(err);
-      alert('Failed to generate PDF: ' + (err.message || 'Unknown error'));
+      showToast({ type: 'error', message: 'Failed to generate PDF: ' + (err.message || 'Unknown error') });
     }
     setGeneratingPdf(null);
   };

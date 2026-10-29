@@ -3,7 +3,7 @@ const router = express.Router();
 const { validate } = require('../../middleware/validate');
 const { createLeadSchema, createProductSchema } = require('../validations');
 const prisma = require('../../db');
-const { requireTenantAuth } = require('../../middleware/auth');
+const { requireTenantAuth, requirePermission } = require('../../middleware/auth');
 
 // TENANT ADMIN - PHASE 1: SALES & CRM
 // ----------------------------------------------------
@@ -26,7 +26,7 @@ router.get('/api/tenant/leads/dashboard', requireTenantAuth, async (req, res) =>
     res.status(500).json({ error: 'Failed to fetch dashboard metrics' });
   }
 });
-router.get('/api/tenant/leads', requireTenantAuth, async (req, res) => {
+router.get('/api/tenant/leads', requireTenantAuth, requirePermission('leads.view'), async (req, res) => {
   try {
     const { source, status, assigneeId, search, all } = req.query;
     let where = { tenantId: req.user.tenantId };
@@ -78,7 +78,7 @@ router.get('/api/tenant/leads', requireTenantAuth, async (req, res) => {
   }
 });
 
-router.delete('/api/tenant/leads/:id', requireTenantAuth, async (req, res) => {
+router.delete('/api/tenant/leads/:id', requireTenantAuth, requirePermission('leads.delete'), async (req, res) => {
   try {
     const { id } = req.params;
     const tenantId = req.user.tenantId;
@@ -127,7 +127,7 @@ router.get('/api/tenant/leads/:id', requireTenantAuth, async (req, res) => {
   }
 });
 
-router.post('/api/tenant/leads', requireTenantAuth, validate(createLeadSchema), async (req, res) => {
+router.post('/api/tenant/leads', requireTenantAuth, requirePermission('leads.create'), validate(createLeadSchema), async (req, res) => {
   try {
     const { mobile, email, forceCreate, name, ...rest } = req.body;
     
@@ -188,7 +188,7 @@ router.post('/api/tenant/leads', requireTenantAuth, validate(createLeadSchema), 
   }
 });
 
-router.patch('/api/tenant/leads/:id', requireTenantAuth, async (req, res) => {
+router.patch('/api/tenant/leads/:id', requireTenantAuth, requirePermission('leads.edit'), async (req, res) => {
   try {
     const lead = await prisma.lead.update({
       where: { id: req.params.id, tenantId: req.user.tenantId },
@@ -239,17 +239,15 @@ router.post('/api/tenant/leads/:id/convert', requireTenantAuth, async (req, res)
     const { id } = req.params;
     const tenantId = req.user.tenantId;
     const userId = req.user.userId || req.user.id;
+    const body = req.body || {};
 
-    const lead = await prisma.lead.findUnique({ where: { id, tenantId } });
-    if (!lead) return res.status(404).json({ error: 'Lead not found' });
+    // Check existing target entity / status idempotently first
+    const existingLead = await prisma.lead.findUnique({ where: { id, tenantId } });
+    if (!existingLead) {
+      return res.status(404).json({ error: 'Lead not found' });
+    }
 
-    // Mark Lead as WON
-    const updatedLead = await prisma.lead.update({
-      where: { id, tenantId },
-      data: { status: 'WON' }
-    });
-
-    // Check if Project was ALREADY created for this lead (Idempotent check prevents duplicates & timeouts)
+    // Check if Project was ALREADY created for this lead (Idempotent check prevents duplicates)
     const existingProject = await prisma.project.findFirst({
       where: { leadId: id, tenantId },
       include: {
@@ -263,109 +261,165 @@ router.post('/api/tenant/leads/:id/convert', requireTenantAuth, async (req, res)
     });
 
     if (existingProject) {
-      if (req.body.customerName || req.body.mobile || req.body.address) {
-        await prisma.customer.update({
-          where: { id: existingProject.customerId },
+      if (body.customerName || body.mobile || body.address) {
+        if (existingProject.customerId) {
+          await prisma.customer.update({
+            where: { id: existingProject.customerId },
+            data: {
+              name: body.customerName || undefined,
+              mobile: body.mobile || undefined,
+              address: body.address || undefined,
+              city: body.city || undefined,
+            }
+          }).catch(() => {});
+        }
+      }
+      return res.status(200).json({
+        lead: existingLead,
+        customer: existingProject.customer,
+        project: existingProject
+      });
+    }
+
+    // If lead is already WON, check if customer already exists
+    if (existingLead.status === 'WON') {
+      const existingCustomer = await prisma.customer.findFirst({
+        where: { leadId: id, tenantId }
+      });
+      if (existingCustomer) {
+        const prj = await prisma.project.findFirst({
+          where: { customerId: existingCustomer.id, tenantId },
+          include: { customer: true, lead: true, quotation: true, discomApplication: true, subsidies: true, Document: true }
+        });
+        if (prj) {
+          return res.status(200).json({ lead: existingLead, customer: existingCustomer, project: prj });
+        }
+      }
+    }
+
+    // Wrap the entire conversion in prisma.$transaction
+    const result = await prisma.$transaction(async (tx) => {
+      // Re-check inside transaction to eliminate race conditions
+      const lead = await tx.lead.findUnique({ where: { id, tenantId } });
+      if (!lead) {
+        const err = new Error('Lead not found');
+        err.statusCode = 404;
+        throw err;
+      }
+
+      const txExistingProject = await tx.project.findFirst({
+        where: { leadId: id, tenantId },
+        include: {
+          customer: true,
+          lead: true,
+          quotation: true,
+          discomApplication: true,
+          subsidies: true,
+          Document: true
+        }
+      });
+
+      if (txExistingProject) {
+        return {
+          lead,
+          customer: txExistingProject.customer,
+          project: txExistingProject
+        };
+      }
+
+      // Mark Lead as WON
+      const updatedLead = await tx.lead.update({
+        where: { id, tenantId },
+        data: { status: 'WON' }
+      });
+
+      // Get or Create Customer
+      let customer = await tx.customer.findFirst({ where: { leadId: id, tenantId } });
+      if (!customer) {
+        customer = await tx.customer.create({
           data: {
-            name: req.body.customerName || undefined,
-            mobile: req.body.mobile || undefined,
-            address: req.body.address || undefined,
-            city: req.body.city || undefined,
+            tenantId,
+            leadId: id,
+            name: body.customerName || lead.name,
+            email: body.email || lead.email,
+            mobile: body.mobile || lead.mobile,
+            company: lead.company,
+            address: body.address || lead.address,
+            city: body.city || lead.city || 'Pune',
+            customerType: body.customerType || lead.customerType || 'RESIDENTIAL'
           }
+        });
+      }
+
+      // Auto-link latest quotation if any exists for this lead
+      const latestQuote = await tx.quotation.findFirst({
+        where: { leadId: id, tenantId },
+        orderBy: { createdAt: 'desc' }
+      });
+
+      if (latestQuote) {
+        await tx.quotation.update({
+          where: { id: latestQuote.id },
+          data: { status: 'ACCEPTED', customerId: customer.id, isLocked: true }
         }).catch(() => {});
       }
-      return res.json({ lead: updatedLead, customer: existingProject.customer, project: existingProject });
-    }
 
-    // Get or Create Customer
-    let customer = await prisma.customer.findFirst({ where: { leadId: id, tenantId } });
-    if (!customer) {
-      customer = await prisma.customer.create({
-        data: {
-          tenantId,
-          leadId: id,
-          name: req.body.customerName || lead.name,
-          email: req.body.email || lead.email,
-          mobile: req.body.mobile || lead.mobile,
-          company: lead.company,
-          address: req.body.address || lead.address,
-          city: req.body.city || lead.city || 'Pune',
-          customerType: req.body.customerType || lead.customerType || 'RESIDENTIAL'
-        }
+      // Auto-Initialize Site Survey
+      const surveyDate = new Date();
+      surveyDate.setDate(surveyDate.getDate() + 3);
+
+      let survey = await tx.siteSurvey.findFirst({
+        where: { leadId: id, tenantId }
       });
-    }
+      if (!survey) {
+        survey = await tx.siteSurvey.create({
+          data: {
+            tenantId,
+            customerId: customer.id,
+            leadId: id,
+            surveyDate,
+            status: 'SCHEDULED'
+          }
+        });
+      }
 
-    // Auto-link latest quotation if any exists for this lead
-    const latestQuote = await prisma.quotation.findFirst({
-      where: { leadId: id, tenantId },
-      orderBy: { createdAt: 'desc' }
-    });
+      // Generate unique project number
+      const projectNumber = `PRJ-${Date.now().toString().slice(-5)}`;
 
-    if (latestQuote) {
-      await prisma.quotation.update({
-        where: { id: latestQuote.id },
-        data: { status: 'ACCEPTED', customerId: customer.id, isLocked: true }
-      }).catch(() => {});
-    }
+      const capacityVal = parseFloat(body.capacity) || (latestQuote ? latestQuote.systemCapacity : null) || lead.estimatedCap || 3.3;
+      const systemTypeVal = body.systemType || (latestQuote ? latestQuote.systemType : null) || lead.systemType || 'On-Grid';
+      const estimatedValueVal = parseFloat(body.estimatedValue) || (latestQuote ? latestQuote.total : null) || lead.estimatedValue || Math.round(capacityVal * 55000);
+      const estimatedCostVal = Math.round(estimatedValueVal * 0.72);
 
-    // Auto-Initialize Site Survey
-    const surveyDate = new Date();
-    surveyDate.setDate(surveyDate.getDate() + 3);
-
-    let survey = await prisma.siteSurvey.findFirst({
-      where: { leadId: id, tenantId }
-    });
-    if (!survey) {
-      survey = await prisma.siteSurvey.create({
+      const project = await tx.project.create({
         data: {
           tenantId,
+          projectNumber,
           customerId: customer.id,
           leadId: id,
-          surveyDate,
-          status: 'SCHEDULED'
+          surveyId: survey.id,
+          quotationId: latestQuote ? latestQuote.id : null,
+          name: body.projectName || `${projectNumber}: ${lead.name} (${capacityVal} kWp)`,
+          capacity: capacityVal,
+          capacityUnit: 'kWp',
+          systemType: systemTypeVal,
+          projectType: body.projectType || lead.customerType || 'Residential',
+          installationAddress: body.address || lead.address || 'Site Roof',
+          city: body.city || lead.city || 'Pune',
+          state: body.state || lead.state || 'Maharashtra',
+          pincode: body.pincode || lead.pincode || '411001',
+          currentStage: body.currentStage || 'Planning',
+          status: 'In Progress',
+          progressPercent: 15,
+          estimatedValue: estimatedValueVal,
+          estimatedCost: estimatedCostVal,
+          startDate: new Date(),
+          createdBy: userId
         }
       });
-    }
 
-    // Generate unique project number
-    const projectNumber = `PRJ-${Date.now().toString().slice(-5)}`;
-
-    const capacityVal = parseFloat(req.body.capacity) || (latestQuote ? latestQuote.systemCapacity : null) || lead.estimatedCap || 3.3;
-    const systemTypeVal = req.body.systemType || (latestQuote ? latestQuote.systemType : null) || lead.systemType || 'On-Grid';
-    const estimatedValueVal = parseFloat(req.body.estimatedValue) || (latestQuote ? latestQuote.total : null) || lead.estimatedValue || Math.round(capacityVal * 55000);
-    const estimatedCostVal = Math.round(estimatedValueVal * 0.72);
-
-    const project = await prisma.project.create({
-      data: {
-        tenantId,
-        projectNumber,
-        customerId: customer.id,
-        leadId: id,
-        surveyId: survey.id,
-        quotationId: latestQuote ? latestQuote.id : null,
-        name: req.body.projectName || `${projectNumber}: ${lead.name} (${capacityVal} kWp)`,
-        capacity: capacityVal,
-        capacityUnit: 'kWp',
-        systemType: systemTypeVal,
-        projectType: req.body.projectType || lead.customerType || 'Residential',
-        installationAddress: req.body.address || lead.address || 'Site Roof',
-        city: req.body.city || lead.city || 'Pune',
-        state: req.body.state || lead.state || 'Maharashtra',
-        pincode: req.body.pincode || lead.pincode || '411001',
-        currentStage: 'Planning',
-        status: 'In Progress',
-        progressPercent: 15,
-        estimatedValue: estimatedValueVal,
-        estimatedCost: estimatedCostVal,
-        startDate: new Date(),
-        createdBy: userId
-      }
-    });
-
-    // Run auxiliary initializations concurrently in background (non-blocking)
-    const defaultSubsidy = capacityVal >= 3 ? 78000 : capacityVal >= 2 ? 60000 : 30000;
-    Promise.allSettled([
-      prisma.projectTask.create({
+      const defaultSubsidy = capacityVal >= 3 ? 78000 : capacityVal >= 2 ? 60000 : 30000;
+      await tx.projectTask.create({
         data: {
           projectId: project.id,
           name: 'Initial Site Survey',
@@ -373,33 +427,36 @@ router.post('/api/tenant/leads/:id/convert', requireTenantAuth, async (req, res)
           priority: 'High',
           status: 'To Do',
         }
-      }),
-      prisma.discomApplication.create({
+      });
+
+      await tx.discomApplication.create({
         data: {
           tenantId,
           projectId: project.id,
           status: 'FEASIBILITY_PENDING'
         }
-      }),
-      prisma.subsidyApplication.create({
+      });
+
+      await tx.subsidyApplication.create({
         data: {
           tenantId,
           projectId: project.id,
           customerId: customer.id,
-          consumerNumber: req.body.consumerNumber || lead.electricityConnection || '410022120526',
-          discomName: req.body.discomName || 'MSEDCL',
+          consumerNumber: body.consumerNumber || lead.electricityConnection || null,
+          discomName: body.discomName || 'MSEDCL',
           proposedCapacity: capacityVal,
           centralSubsidyAmount: defaultSubsidy,
           amount: defaultSubsidy,
-          bankName: req.body.bankName || null,
-          accountNumber: req.body.accountNumber || null,
-          ifscCode: req.body.ifscCode || null,
-          accountHolderName: req.body.accountHolderName || lead.name || null,
+          bankName: body.bankName || null,
+          accountNumber: body.accountNumber || null,
+          ifscCode: body.ifscCode || null,
+          accountHolderName: body.accountHolderName || lead.name || null,
           status: 'APPLICATION_SUBMITTED',
           portalStage: 'CONSUMER_SELECTION'
         }
-      }),
-      prisma.projectTimelineEvent.create({
+      });
+
+      await tx.projectTimelineEvent.create({
         data: {
           projectId: project.id,
           title: 'Project Created',
@@ -407,29 +464,34 @@ router.post('/api/tenant/leads/:id/convert', requireTenantAuth, async (req, res)
           eventType: 'STATUS_UPDATE',
           createdBy: userId
         }
-      }),
-      prisma.leadActivity.create({
+      });
+
+      await tx.leadActivity.create({
         data: {
           leadId: lead.id,
           type: 'STATUS_CHANGE',
           description: `Lead won and converted to Customer & Project: ${project.name}`,
           performedBy: userId
         }
-      })
-    ]).catch(() => {});
+      });
 
-    // Return populated project immediately (< 300ms response time)
-    const fullProject = {
-      ...project,
-      customer,
-      lead: updatedLead,
-      quotation: latestQuote,
-      subsidies: [],
-      Document: []
-    };
+      const fullProject = {
+        ...project,
+        customer,
+        lead: updatedLead,
+        quotation: latestQuote,
+        subsidies: [],
+        Document: []
+      };
 
-    res.json({ lead: updatedLead, customer, project: fullProject });
+      return { lead: updatedLead, customer, project: fullProject };
+    });
+
+    return res.status(200).json(result);
   } catch (error) {
+    if (error.statusCode === 404) {
+      return res.status(404).json({ error: error.message });
+    }
     console.error('Lead conversion error:', error);
     res.status(500).json({ error: error.message || 'Failed to convert lead' });
   }
@@ -511,33 +573,6 @@ router.post('/api/tenant/leads/:id/quotations', requireTenantAuth, async (req, r
   }
 });
 
-router.patch('/api/tenant/quotations/:id', requireTenantAuth, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { status } = req.body;
-
-    const quotation = await prisma.quotation.update({
-      where: { id, tenantId: req.user.tenantId },
-      data: { status }
-    });
-
-    if (quotation.leadId) {
-       await prisma.leadActivity.create({
-         data: {
-           leadId: quotation.leadId,
-           type: 'STATUS_CHANGE',
-           description: `Quotation status updated to ${status}`,
-           performedBy: req.user.id
-         }
-       });
-    }
-
-    res.json({ quotation });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Failed to update quotation' });
-  }
-});
 
 // PRODUCTS
 router.get('/api/tenant/products', requireTenantAuth, async (req, res) => {
@@ -773,7 +808,7 @@ router.get('/api/tenant/inventory/serial-numbers', requireTenantAuth, async (req
 });
 
 // DISPATCH LOGIC
-router.post('/api/tenant/inventory/dispatch', requireTenantAuth, async (req, res) => {
+router.post('/api/tenant/inventory/dispatch', requireTenantAuth, requirePermission('inventory.dispatch'), async (req, res) => {
   try {
     const { projectId, warehouseId, items, receiverName, notes } = req.body;
     
@@ -1303,12 +1338,58 @@ router.patch('/api/tenant/projects/:id', requireTenantAuth, async (req, res) => 
 router.patch('/api/tenant/projects/:id/stage', requireTenantAuth, async (req, res) => {
   try {
     const { newStage, comment } = req.body;
+    if (!newStage) return res.status(400).json({ error: 'newStage is required' });
+
     const project = await prisma.project.findUnique({ where: { id: req.params.id, tenantId: req.user.tenantId } });
-    
     if (!project) return res.status(404).json({ error: 'Project not found' });
-    if (project.currentStage === newStage) return res.status(400).json({ error: 'Already in this stage' });
+
+    const STAGE_ORDER = [
+      'SURVEY_COMPLETED',
+      'STRUCTURE_APPROVED',
+      'MATERIAL_DISPATCHED',
+      'INSTALLATION_STARTED',
+      'TESTING_COMPLETED',
+      'NET_METER_APPLIED',
+      'COMMISSIONED'
+    ];
+
+    const LEGACY_STAGE_MAP = {
+      'Planning': 'SURVEY_COMPLETED',
+      'Design': 'STRUCTURE_APPROVED',
+      'Procurement': 'MATERIAL_DISPATCHED',
+      'Installation': 'INSTALLATION_STARTED',
+      'Testing': 'TESTING_COMPLETED',
+      'Handover': 'NET_METER_APPLIED',
+      'Completed': 'COMMISSIONED'
+    };
+
+    const currentCanonical = LEGACY_STAGE_MAP[project.currentStage] || project.currentStage;
+    const newCanonical = LEGACY_STAGE_MAP[newStage] || newStage;
+
+    if (project.currentStage === newStage || currentCanonical === newCanonical) {
+      return res.status(400).json({ error: 'Already in this stage' });
+    }
+
+    const nextIdx = STAGE_ORDER.indexOf(newCanonical);
+    if (nextIdx === -1) {
+      return res.status(400).json({ error: `Invalid stage: ${newStage}` });
+    }
+
+    const currentIdx = STAGE_ORDER.indexOf(currentCanonical);
+    if (currentIdx !== -1 && nextIdx > currentIdx + 1) {
+      return res.status(400).json({
+        error: `Invalid stage transition: cannot jump from ${project.currentStage} to ${newStage}`
+      });
+    }
 
     const STAGE_PROGRESS = {
+      'SURVEY_COMPLETED': 15,
+      'STRUCTURE_APPROVED': 30,
+      'MATERIAL_DISPATCHED': 50,
+      'INSTALLATION_STARTED': 75,
+      'TESTING_COMPLETED': 90,
+      'NET_METER_APPLIED': 95,
+      'COMMISSIONED': 100,
       'Planning': 15,
       'Design': 30,
       'Procurement': 50,
@@ -1317,19 +1398,24 @@ router.patch('/api/tenant/projects/:id/stage', requireTenantAuth, async (req, re
       'Handover': 95,
       'Completed': 100
     };
-    const progressPercent = STAGE_PROGRESS[newStage] !== undefined ? STAGE_PROGRESS[newStage] : (project.progressPercent || 0);
+    const progressPercent = STAGE_PROGRESS[newStage] !== undefined 
+      ? STAGE_PROGRESS[newStage] 
+      : (STAGE_PROGRESS[newCanonical] !== undefined ? STAGE_PROGRESS[newCanonical] : (project.progressPercent || 0));
+
+    const isCommissioned = newCanonical === 'COMMISSIONED' || newStage === 'Completed';
+    const isMaterialDispatched = newCanonical === 'MATERIAL_DISPATCHED' || newStage === 'Procurement';
 
     const updateData = {
       currentStage: newStage,
       progressPercent
     };
-    if (newStage === 'Completed') {
+    if (isCommissioned) {
       updateData.status = 'Completed';
       updateData.actualCompletionDate = new Date();
     }
 
     const updatedProject = await prisma.project.update({
-      where: { id: req.params.id },
+      where: { id: req.params.id, tenantId: req.user.tenantId },
       data: updateData
     });
 
@@ -1354,15 +1440,15 @@ router.patch('/api/tenant/projects/:id/stage', requireTenantAuth, async (req, re
     });
 
     // Phase 2 Sync: Material Procurement Sync
-    if (newStage === 'Procurement') {
+    if (isMaterialDispatched) {
       await prisma.projectMaterialRequirement.updateMany({
-        where: { projectId: project.id, tenantId: req.user.tenantId },
+        where: { projectId: project.id },
         data: { status: 'Required' }
       });
 
       // Phase 7 Sync: Auto-draft Purchase Order
       const reqs = await prisma.projectMaterialRequirement.findMany({
-        where: { projectId: project.id, tenantId: req.user.tenantId, productId: { not: null } }
+        where: { projectId: project.id, productId: { not: null } }
       });
 
       if (reqs.length > 0) {
@@ -1386,7 +1472,7 @@ router.patch('/api/tenant/projects/:id/stage', requireTenantAuth, async (req, re
     }
 
     // Phase 3 Sync: Auto-create AMC on Completion
-    if (newStage === 'Completed') {
+    if (isCommissioned) {
       const existingAmc = await prisma.aMC.findFirst({
         where: { projectId: project.id, tenantId: req.user.tenantId }
       });
@@ -1531,6 +1617,11 @@ router.delete('/api/tenant/projects/:id', requireTenantAuth, async (req, res) =>
 // TASKS
 router.post('/api/tenant/projects/:id/tasks', requireTenantAuth, async (req, res) => {
   try {
+    const project = await prisma.project.findFirst({
+      where: { id: req.params.id, tenantId: req.user.tenantId }
+    });
+    if (!project) return res.status(404).json({ error: 'Project not found' });
+
     const { name, description, priority, dueDate, assigneeId } = req.body;
     
     const task = await prisma.projectTask.create({
@@ -1553,6 +1644,11 @@ router.post('/api/tenant/projects/:id/tasks', requireTenantAuth, async (req, res
 
 router.patch('/api/tenant/tasks/:id', requireTenantAuth, async (req, res) => {
   try {
+    const existingTask = await prisma.projectTask.findFirst({
+      where: { id: req.params.id, project: { tenantId: req.user.tenantId } }
+    });
+    if (!existingTask) return res.status(404).json({ error: 'Task not found or access denied' });
+
     const { status, progress } = req.body;
     const task = await prisma.projectTask.update({
       where: { id: req.params.id },
@@ -1571,6 +1667,11 @@ router.patch('/api/tenant/tasks/:id', requireTenantAuth, async (req, res) => {
 // MILESTONES
 router.post('/api/tenant/projects/:id/milestones', requireTenantAuth, async (req, res) => {
   try {
+    const project = await prisma.project.findFirst({
+      where: { id: req.params.id, tenantId: req.user.tenantId }
+    });
+    if (!project) return res.status(404).json({ error: 'Project not found' });
+
     const { name, description, targetDate, responsibleId } = req.body;
     
     const milestone = await prisma.projectMilestone.create({
@@ -1591,6 +1692,11 @@ router.post('/api/tenant/projects/:id/milestones', requireTenantAuth, async (req
 
 router.patch('/api/tenant/milestones/:id', requireTenantAuth, async (req, res) => {
   try {
+    const existingMilestone = await prisma.projectMilestone.findFirst({
+      where: { id: req.params.id, project: { tenantId: req.user.tenantId } }
+    });
+    if (!existingMilestone) return res.status(404).json({ error: 'Milestone not found or access denied' });
+
     const { status, actualDate } = req.body;
     const milestone = await prisma.projectMilestone.update({
       where: { id: req.params.id },
@@ -1608,6 +1714,11 @@ router.patch('/api/tenant/milestones/:id', requireTenantAuth, async (req, res) =
 // MATERIAL REQS
 router.post('/api/tenant/projects/:id/materials', requireTenantAuth, async (req, res) => {
   try {
+    const project = await prisma.project.findFirst({
+      where: { id: req.params.id, tenantId: req.user.tenantId }
+    });
+    if (!project) return res.status(404).json({ error: 'Project not found' });
+
     const { productId, description, quantity } = req.body;
     
     const material = await prisma.projectMaterialRequirement.create({
@@ -1628,6 +1739,11 @@ router.post('/api/tenant/projects/:id/materials', requireTenantAuth, async (req,
 
 router.patch('/api/tenant/materials/:id', requireTenantAuth, async (req, res) => {
   try {
+    const existingMaterial = await prisma.projectMaterialRequirement.findFirst({
+      where: { id: req.params.id, project: { tenantId: req.user.tenantId } }
+    });
+    if (!existingMaterial) return res.status(404).json({ error: 'Material requirement not found or access denied' });
+
     const { status, quantity } = req.body;
     const material = await prisma.projectMaterialRequirement.update({
       where: { id: req.params.id },

@@ -269,7 +269,7 @@ router.post('/api/tenant/users/:id/reset-password', requireTenantAuth, async (re
 router.delete('/api/tenant/users/:id', requireTenantAuth, async (req, res) => {
   try {
     const { id } = req.params;
-    if (id === req.user.id) {
+    if (id === req.user.id || id === req.user.userId) {
       return res.status(400).json({ error: 'Cannot delete your own user account' });
     }
 

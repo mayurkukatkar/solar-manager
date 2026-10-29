@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const { requireTenantAuth } = require('../../middleware/auth');
 
 function cleanString(str) {
   if (!str) return '';
@@ -307,7 +308,7 @@ function parseIndianElectricityBillText(rawText = '', filename = '') {
  * POST /api/tenant/ocr/scan-bill
  * Real OCR engine with ZERO hardcoded data replacements
  */
-router.post('/api/tenant/ocr/scan-bill', async (req, res) => {
+router.post('/api/tenant/ocr/scan-bill', requireTenantAuth, async (req, res) => {
   try {
     const { fileBase64, rawText, filename = 'bill_document' } = req.body || {};
     let fullExtractedText = rawText || '';
@@ -356,7 +357,7 @@ router.post('/api/tenant/ocr/scan-bill', async (req, res) => {
  * POST /api/tenant/ocr/fetch-consumer
  * Instant DISCOM Consumer Lookup & Bill Fetch (Zero OCR failure, 100% precision)
  */
-router.post('/api/tenant/ocr/fetch-consumer', async (req, res) => {
+router.post('/api/tenant/ocr/fetch-consumer', requireTenantAuth, async (req, res) => {
   try {
     const { consumerNumber, bu } = req.body || {};
     const cleanNo = String(consumerNumber || '').replace(/[^0-9]/g, '');

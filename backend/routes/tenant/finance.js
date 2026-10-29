@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const prisma = require('../../db');
-const { requireTenantAuth } = require('../../middleware/auth');
+const { requireTenantAuth, requirePermission } = require('../../middleware/auth');
 
 // TENANT - FINANCE, PAYMENTS, SERVICE, PROCUREMENT, WAREHOUSES
 // ============================================================
@@ -697,7 +697,7 @@ router.get('/api/tenant/invoices/:id/pdf', requireTenantAuth, async (req, res) =
 });
 
 // 4. Create Milestone / GST Tax Invoice
-router.post('/api/tenant/finance', requireTenantAuth, async (req, res) => {
+router.post('/api/tenant/finance', requireTenantAuth, requirePermission('finance.create_invoice'), async (req, res) => {
   try {
     const { 
       customerId, 
@@ -1093,7 +1093,7 @@ router.get('/api/tenant/invoices/:id/payments', requireTenantAuth, async (req, r
 });
 
 // 8. Record Payment with Receipt Number & Auto Status Progression
-router.post('/api/tenant/invoices/:id/payments', requireTenantAuth, async (req, res) => {
+router.post('/api/tenant/invoices/:id/payments', requireTenantAuth, requirePermission('finance.record_payment'), async (req, res) => {
   try {
     const { amount, mode = 'UPI', reference, date, notes } = req.body;
     const parsedAmount = parseFloat(amount);
@@ -1447,6 +1447,13 @@ router.delete('/api/tenant/service/:id', requireTenantAuth, async (req, res) => 
 // SERVICE VISITS
 router.post('/api/tenant/service/:id/visits', requireTenantAuth, async (req, res) => {
   try {
+    const ticket = await prisma.supportTicket.findFirst({
+      where: { id: req.params.id, tenantId: req.user.tenantId }
+    });
+    if (!ticket) {
+      return res.status(404).json({ error: 'Ticket not found or access denied' });
+    }
+
     const visit = await prisma.serviceVisit.create({
       data: {
         ticketId: req.params.id,
