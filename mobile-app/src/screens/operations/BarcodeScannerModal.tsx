@@ -10,6 +10,7 @@ import {
   Alert,
   ActivityIndicator,
   Platform,
+  Linking,
 } from 'react-native';
 import {
   X,
@@ -26,6 +27,7 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import { ModalHeader } from '../../components/Header';
 import { SafeStorage } from '../../api/client';
 import { tenantApi } from '../../api/endpoints';
+import { haptics } from '../../utils/haptics';
 
 export interface ParsedBarcodeResult {
   serial: string;
@@ -192,6 +194,8 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
   const [permission, requestPermission] = useCameraPermissions();
   const [scannedMode, setScannedMode] = useState<'MODULE' | 'INVERTER'>('MODULE');
   const [isScanning, setIsScanning] = useState(true);
+  const [continuousScan, setContinuousScan] = useState(false);
+  const [torchOn, setTorchOn] = useState(false);
   const [manualInput, setManualInput] = useState('');
 
   // Scanned lists & DCR Certificate State
@@ -263,6 +267,7 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
 
     const parsed = parseAndValidateBarcode(data, dcrCertificate);
     if (!parsed) {
+      haptics.notificationError();
       Alert.alert(
         'Invalid Barcode',
         'Could not parse a valid 2D/1D serial number (minimum 5 characters required).',
@@ -278,6 +283,7 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
 
     if (scannedMode === 'INVERTER') {
       if (moduleSerials.some((s) => s.toUpperCase() === clean)) {
+        haptics.notificationWarning();
         Alert.alert(
           'Duplicate Conflict',
           `Serial "${clean}" is already assigned as a PV module. Inverters must have distinct serial numbers.`,
@@ -286,12 +292,14 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
         return;
       }
       setInverterSerial(clean);
+      haptics.notificationSuccess();
       Alert.alert('Inverter Scanned', `Serial: ${clean}`, [
         { text: 'OK', onPress: () => setIsScanning(true) },
       ]);
     } else {
       const dup = detectDuplicateSerial(clean, moduleSerials, inverterSerial, project);
       if (dup.isDuplicate) {
+        haptics.notificationWarning();
         Alert.alert('Duplicate Module Serial', `Module serial "${clean}" cannot be added:\n${dup.reason}`, [
           { text: 'OK', onPress: () => setIsScanning(true) },
         ]);
@@ -299,9 +307,15 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
       }
 
       setModuleSerials((prev) => [clean, ...prev]);
+      haptics.notificationSuccess();
       const dcrNote = parsed.dcrCompliant
         ? '✓ DCR Domestic Content Validated (ALMM Certified)'
         : '⚠️ Non-DCR / Verification Required';
+
+      if (continuousScan) {
+        setTimeout(() => setIsScanning(true), 1200);
+        return;
+      }
 
       Alert.alert('Module Scanned', `Module #${moduleSerials.length + 1}: ${clean}\n${dcrNote}`, [
         { text: 'Scan Next', onPress: () => setIsScanning(true) },
@@ -313,6 +327,7 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
     if (!manualInput.trim()) return;
     const parsed = parseAndValidateBarcode(manualInput, dcrCertificate);
     if (!parsed) {
+      haptics.notificationError();
       Alert.alert('Invalid Serial', 'Serial must contain at least 5 characters.');
       return;
     }
@@ -320,18 +335,22 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
     const clean = parsed.serial;
     if (scannedMode === 'INVERTER') {
       if (moduleSerials.some((s) => s.toUpperCase() === clean)) {
+        haptics.notificationWarning();
         Alert.alert('Duplicate Conflict', `Serial "${clean}" is already assigned as a PV module.`);
         return;
       }
       setInverterSerial(clean);
+      haptics.notificationSuccess();
       setManualInput('');
     } else {
       const dup = detectDuplicateSerial(clean, moduleSerials, inverterSerial, project);
       if (dup.isDuplicate) {
+        haptics.notificationWarning();
         Alert.alert('Duplicate Serial', `Serial "${clean}" cannot be added:\n${dup.reason}`);
         return;
       }
       setModuleSerials((prev) => [clean, ...prev]);
+      haptics.notificationSuccess();
       setManualInput('');
     }
   };
@@ -400,6 +419,7 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
           <TouchableOpacity
             style={[styles.modeTab, scannedMode === 'MODULE' && styles.modeTabActive]}
             onPress={() => {
+              haptics.selection();
               setScannedMode('MODULE');
               setIsScanning(true);
             }}
@@ -414,6 +434,7 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
           <TouchableOpacity
             style={[styles.modeTab, scannedMode === 'INVERTER' && styles.modeTabActive]}
             onPress={() => {
+              haptics.selection();
               setScannedMode('INVERTER');
               setIsScanning(true);
             }}
@@ -426,12 +447,58 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
           </TouchableOpacity>
         </View>
 
+        {/* SCANNER CONTROLS BAR: TORCH & CONTINUOUS SCAN */}
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#ffffff', paddingHorizontal: 16, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#e2e8f0' }}>
+          <Text style={{ fontSize: 12, fontWeight: '700', color: '#334155' }}>
+            Progress: {moduleSerials.length}/{targetModulesCount} ({Math.min(100, Math.round((moduleSerials.length / (targetModulesCount || 1)) * 100))}%)
+          </Text>
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <TouchableOpacity
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 4,
+                backgroundColor: torchOn ? '#fef3c7' : '#f1f5f9',
+                paddingHorizontal: 8,
+                paddingVertical: 4,
+                borderRadius: 6,
+              }}
+              onPress={() => setTorchOn(!torchOn)}
+              activeOpacity={0.7}
+            >
+              <Zap size={13} color={torchOn ? '#d97706' : '#64748b'} />
+              <Text style={{ fontSize: 11, fontWeight: '700', color: torchOn ? '#d97706' : '#64748b' }}>
+                Torch {torchOn ? 'ON' : 'OFF'}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 4,
+                backgroundColor: continuousScan ? '#dcfce7' : '#f1f5f9',
+                paddingHorizontal: 8,
+                paddingVertical: 4,
+                borderRadius: 6,
+              }}
+              onPress={() => setContinuousScan(!continuousScan)}
+              activeOpacity={0.7}
+            >
+              <Text style={{ fontSize: 11, fontWeight: '700', color: continuousScan ? '#15803d' : '#64748b' }}>
+                Continuous: {continuousScan ? 'ON' : 'OFF'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
         {/* CAMERA VIEWPORT */}
         <View style={styles.cameraBox}>
           {permission?.granted ? (
             <CameraView
               style={StyleSheet.absoluteFill}
               facing="back"
+              enableTorch={torchOn}
               barcodeScannerSettings={{
                 barcodeTypes: ['qr', 'code128', 'code39', 'datamatrix', 'ean13'],
               }}
@@ -453,9 +520,18 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
           ) : (
             <View style={styles.noPermissionBox}>
               <Camera size={36} color="#94a3b8" />
-              <Text style={styles.noPermissionText}>Camera permission needed to scan barcodes</Text>
-              <TouchableOpacity style={styles.grantBtn} onPress={requestPermission}>
-                <Text style={styles.grantBtnText}>Grant Camera Access</Text>
+              <Text style={styles.noPermissionText}>
+                {permission && !permission.canAskAgain
+                  ? 'Camera permission disabled in Android Settings. Tap below to enable.'
+                  : 'Camera permission needed to scan barcodes'}
+              </Text>
+              <TouchableOpacity
+                style={styles.grantBtn}
+                onPress={permission && !permission.canAskAgain ? () => Linking.openSettings() : requestPermission}
+              >
+                <Text style={styles.grantBtnText}>
+                  {permission && !permission.canAskAgain ? 'Open Android Settings' : 'Grant Camera Access'}
+                </Text>
               </TouchableOpacity>
             </View>
           )}

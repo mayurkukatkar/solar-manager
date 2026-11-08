@@ -211,9 +211,9 @@ export const ProposalPreviewModal: React.FC<ProposalPreviewModalProps> = ({
                 <Text style={styles.coverCardHeaderLabel}>PREPARED EXCLUSIVELY FOR</Text>
                 <Text style={styles.coverClientName}>{data.customerName}</Text>
                 <Text style={styles.coverClientAddress}>
-                  📍 {data.customerAddress}
-                  {'\n'}📞 Phone: {data.customerPhone}
-                  {data.consumerNumber ? `\n🏛️ DISCOM A/C: ${data.consumerNumber} (${data.discomName || 'DISCOM'})` : ''}
+                  {data.customerAddress}
+                  {'\n'}Phone: {data.customerPhone}
+                  {data.consumerNumber ? `\nDISCOM A/C: ${data.consumerNumber} (${data.discomName || 'DISCOM'})` : ''}
                 </Text>
               </View>
             </View>
@@ -461,7 +461,7 @@ export const ProposalPreviewModal: React.FC<ProposalPreviewModalProps> = ({
             {data.subsidyAmount > 0 && !isCommercial && (
               <View style={styles.subsidyCalloutBox}>
                 <Text style={styles.subsidyCalloutTitle}>
-                  🏛️ PM Surya Ghar Muft Bijli Yojana Central Subsidy: -₹{subsidy}
+                  PM Surya Ghar Muft Bijli Yojana Central Subsidy: -₹{subsidy}
                 </Text>
                 <Text style={styles.subsidyCalloutText}>
                   Direct Benefit Transfer (DBT): Credited directly by MNRE into consumer bank account post-commissioning.
@@ -472,7 +472,7 @@ export const ProposalPreviewModal: React.FC<ProposalPreviewModalProps> = ({
             {isCommercial && (
               <View style={[styles.subsidyCalloutBox, { backgroundColor: '#eff6ff', borderColor: '#bfdbfe' }]}>
                 <Text style={[styles.subsidyCalloutTitle, { color: '#1e40af' }]}>
-                  🏢 Commercial Section 32 Accelerated Depreciation Tax Benefit
+                  Commercial Section 32 Accelerated Depreciation Tax Benefit
                 </Text>
                 <Text style={[styles.subsidyCalloutText, { color: '#2563eb' }]}>
                   40% Accelerated Depreciation claimable in Year 1 on solar rooftop capital investments.
@@ -482,10 +482,10 @@ export const ProposalPreviewModal: React.FC<ProposalPreviewModalProps> = ({
 
             <View style={styles.loanCalloutBox}>
               <Text style={styles.loanCalloutTitle}>
-                💳 5-Year Solar Loan EMI: ₹{approxMonthlyEmi.toLocaleString('en-IN')}/mo vs Savings: ₹{monthlySavings}/mo
+                5-Year Solar Loan EMI: ₹{approxMonthlyEmi.toLocaleString('en-IN')}/mo vs Savings: ₹{monthlySavings}/mo
               </Text>
               <Text style={styles.loanCalloutText}>
-                💡 Customer gains net surplus ₹{Math.max(0, data.monthlySavings - approxMonthlyEmi).toLocaleString('en-IN')}/month in hand from Month 1!
+                Customer gains net surplus ₹{Math.max(0, data.monthlySavings - approxMonthlyEmi).toLocaleString('en-IN')}/month in hand from Month 1.
               </Text>
             </View>
 

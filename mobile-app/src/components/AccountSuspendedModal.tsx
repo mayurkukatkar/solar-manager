@@ -40,7 +40,15 @@ export const AccountSuspendedModal: React.FC<AccountSuspendedModalProps> = ({
   };
 
   return (
-    <Modal visible={visible} transparent animationType="fade" statusBarTranslucent>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      statusBarTranslucent
+      onRequestClose={() => {
+        // Enforce non-dismissible: Android hardware back cannot dismiss
+      }}
+    >
       <View style={styles.overlay}>
         <View style={styles.card}>
           {/* ICON BADGE */}

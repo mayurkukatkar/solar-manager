@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -12,6 +12,7 @@ import {
   RefreshControl,
   ActivityIndicator,
   Platform,
+  FlatList,
 } from 'react-native';
 import {
   ShieldCheck,
@@ -26,15 +27,37 @@ import {
   MapPin,
   Clock,
   Layers,
+  User,
+  Zap,
+  ArrowRight,
+  Sparkles,
 } from 'lucide-react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { Header } from '../../components/Header';
 import { installationsApi, tenantApi } from '../../api/endpoints';
 import { InstallationJob } from '../../types';
+import { BarcodeScannerModal } from './BarcodeScannerModal';
+import { PermissionRationaleModal } from '../../components/common/PermissionRationaleModal';
+import { haptics } from '../../utils/haptics';
+import { offlineSyncService } from '../../services/offlineSyncService';
+import { useTheme } from '../../theme';
+import { EmptyState, SkeletonLoader } from '../../components/common';
+
+export const FIELD_TECHNICIANS = [
+  { id: 'tech-1', name: 'Ramesh Patil', role: 'Lead Electrician (Master Tech)', phone: '+91 98220 11223' },
+  { id: 'tech-2', name: 'Sachin Kulkarni', role: 'CEA Inspection Specialist', phone: '+91 98220 44556' },
+  { id: 'tech-3', name: 'Pooja Shinde', role: 'Safety & Earthing Engineer', phone: '+91 98220 77889' },
+  { id: 'tech-4', name: 'Amit Deshmukh', role: 'Rooftop Erection Tech', phone: '+91 98220 99001' },
+];
 
 export const OperationsScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
+  const { colors, isDark } = useTheme();
   const [jobs, setJobs] = useState<InstallationJob[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [scheduleFilter, setScheduleFilter] = useState<'ALL' | 'SCHEDULED' | 'IN_PROGRESS' | 'COMPLETED'>('ALL');
+  const [assignModalVisible, setAssignModalVisible] = useState(false);
+  const [jobToAssign, setJobToAssign] = useState<InstallationJob | null>(null);
   const [dashboardKpis, setDashboardKpis] = useState({
     scheduledToday: 0,
     inProgress: 0,
@@ -50,7 +73,7 @@ export const OperationsScreen: React.FC<{ navigation?: any }> = ({ navigation })
   // Interactive Technical Checklist
   const [checklist, setChecklist] = useState([
     { id: 'chk-1', title: 'Mounting Structure: Bolted with anti-corrosion coating & South orientation', completed: true },
-    { id: 'chk-2', title: 'PV Modules: Clamped tightly without micro-cracks (Adani 535Wp)', completed: true },
+    { id: 'chk-2', title: 'PV Modules: Clamped tightly without micro-cracks (ALMM TopCon 550Wp)', completed: true },
     { id: 'chk-3', title: 'DC Cabling: 4 sq.mm UV-resistant Solar Cable with MC4 crimped', completed: true },
     { id: 'chk-4', title: 'Inverter: Mounted at eye level in shaded area with heatsink clearance', completed: false },
     { id: 'chk-5', title: 'AC Distribution Box: Equipped with MCB, Type-II SPD & Rotary Isolator', completed: false },
@@ -59,23 +82,22 @@ export const OperationsScreen: React.FC<{ navigation?: any }> = ({ navigation })
   ]);
 
   // Barcode Serial Numbers scanned on roof
-  const [scannedSerials, setScannedSerials] = useState<string[]>([
-    'MS2608211A3882',
-    'MS2608211A3908',
-    'MS2608211A4160',
-  ]);
+  const [scannedSerials, setScannedSerials] = useState<string[]>([]);
   const [manualSerialInput, setManualSerialInput] = useState('');
+  const [barcodeModalVisible, setBarcodeModalVisible] = useState(false);
 
   // 5 PM Surya Ghar Mandatory Inspection Geo-Photos
   const [geoPhotos, setGeoPhotos] = useState([
-    { slot: 1, name: 'Photo 1: PV Array South View', category: 'ROOF', captured: true, lat: 21.1458, lng: 79.0882, time: '10:45 AM' },
-    { slot: 2, name: 'Photo 2: Inverter LCD & Serial', category: 'INVERTER', captured: true, lat: 21.1458, lng: 79.0882, time: '11:12 AM' },
-    { slot: 3, name: 'Photo 3: Dual Bi-directional Net Meter', category: 'PANELS', captured: false, lat: null, lng: null, time: null },
-    { slot: 4, name: 'Photo 4: Chemical Earthing Pit Chamber', category: 'EARTHING', captured: false, lat: null, lng: null, time: null },
-    { slot: 5, name: 'Photo 5: Customer Handover & Sign', category: 'HANDOVER', captured: true, lat: 21.1458, lng: 79.0882, time: '11:30 AM' },
+    { slot: 1, name: 'Photo 1: PV Array South View', category: 'ROOF', captured: false, time: null as string | null, uri: null as string | null },
+    { slot: 2, name: 'Photo 2: Inverter LCD & Serial', category: 'INVERTER', captured: false, time: null as string | null, uri: null as string | null },
+    { slot: 3, name: 'Photo 3: Dual Bi-directional Net Meter', category: 'PANELS', captured: false, time: null as string | null, uri: null as string | null },
+    { slot: 4, name: 'Photo 4: Chemical Earthing Pit Chamber', category: 'EARTHING', captured: false, time: null as string | null, uri: null as string | null },
+    { slot: 5, name: 'Photo 5: Customer Handover & Sign', category: 'HANDOVER', captured: false, time: null as string | null, uri: null as string | null },
   ]);
 
   const [customerSigned, setCustomerSigned] = useState(false);
+  const [signOffTime, setSignOffTime] = useState<string | null>(null);
+  const [cameraRationaleVisible, setCameraRationaleVisible] = useState(false);
 
   useEffect(() => {
     fetchOperations();
@@ -83,20 +105,31 @@ export const OperationsScreen: React.FC<{ navigation?: any }> = ({ navigation })
 
   const fetchOperations = async () => {
     try {
+      const cached = await offlineSyncService.getCachedResponse<any>('installations');
+      if (cached?.data && jobs.length === 0) {
+        if (cached.data.kpis) setDashboardKpis(cached.data.kpis);
+        if (cached.data.jobs) setJobs(cached.data.jobs);
+        setLoading(false);
+      }
+
       const [kpis, instData, prjData] = await Promise.all([
         installationsApi.getDashboard().catch(() => null),
         installationsApi.getInstallations().catch(() => null),
         tenantApi.getProjects().catch(() => null),
       ]);
 
+      let finalKpis = dashboardKpis;
+      let finalJobs = jobs;
+
       if (kpis) {
-        setDashboardKpis({
+        finalKpis = {
           scheduledToday: kpis.scheduledToday || 0,
           inProgress: kpis.inProgress || 0,
           pendingReview: kpis.pendingReview || 0,
           delayed: kpis.delayed || 0,
           completedToday: kpis.completedToday || 0,
-        });
+        };
+        setDashboardKpis(finalKpis);
       }
 
       if (instData && Array.isArray(instData.installations) && instData.installations.length > 0) {
@@ -119,6 +152,7 @@ export const OperationsScreen: React.FC<{ navigation?: any }> = ({ navigation })
           progressPercent: item.progressPercent || 0,
           priority: item.priority || 'NORMAL',
         }));
+        finalJobs = mapped;
         setJobs(mapped);
       } else if (prjData && Array.isArray(prjData.projects) && prjData.projects.length > 0) {
         const mappedFromProjects: InstallationJob[] = prjData.projects.map((p: any, idx: number) => {
@@ -134,7 +168,7 @@ export const OperationsScreen: React.FC<{ navigation?: any }> = ({ navigation })
             customerName: p.customer?.name || p.lead?.name || 'Solar Customer',
             phone: p.customer?.mobile || p.customer?.phone || p.lead?.mobile || '',
             address: p.address || p.customer?.address || 'Site Address',
-            city: p.city || p.customer?.city || 'Pune',
+            city: p.city || p.customer?.city || 'Site Location',
             capacityKw: isNaN(cap) ? 3.3 : cap,
             panelBrand: p.panelBrand || 'Tier-1 Mono Perc 550Wp',
             inverterBrand: p.inverterBrand || 'Grid-Tie Inverter 3.3kW',
@@ -147,19 +181,27 @@ export const OperationsScreen: React.FC<{ navigation?: any }> = ({ navigation })
             priority: 'NORMAL',
           };
         });
+        finalJobs = mappedFromProjects;
         setJobs(mappedFromProjects);
-        setDashboardKpis({
+        finalKpis = {
           scheduledToday: mappedFromProjects.length,
           inProgress: mappedFromProjects.filter((j) => j.status === 'IN_PROGRESS').length,
           pendingReview: 1,
           delayed: 0,
           completedToday: mappedFromProjects.filter((j) => j.status === 'COMPLETED').length,
-        });
+        };
+        setDashboardKpis(finalKpis);
       } else {
         setJobs([]);
       }
+      await offlineSyncService.setCachedResponse('installations', { kpis: finalKpis, jobs: finalJobs });
     } catch (err: any) {
       console.warn('Operations fetch error:', err.message);
+      const cached = await offlineSyncService.getCachedResponse<any>('installations');
+      if (cached?.data) {
+        if (cached.data.kpis) setDashboardKpis(cached.data.kpis);
+        if (cached.data.jobs) setJobs(cached.data.jobs);
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -172,38 +214,108 @@ export const OperationsScreen: React.FC<{ navigation?: any }> = ({ navigation })
   };
 
   const toggleChecklist = (id: string) => {
+    haptics.selection();
     setChecklist((prev) =>
       prev.map((item) => (item.id === id ? { ...item, completed: !item.completed } : item))
     );
   };
 
-  const handleSimulateScan = () => {
-    const nextSerial = `MS2608211A${4500 + Math.floor(Math.random() * 500)}`;
-    setScannedSerials((prev) => [...prev, nextSerial]);
-    Alert.alert('Barcode Scanned', `Scanned Module Serial: ${nextSerial}\nAuto-linked to DCR table.`);
+  const handleOpenBarcodeScanner = () => {
+    setBarcodeModalVisible(true);
   };
 
-  const handleCapturePhoto = (slot: number) => {
-    const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const handleCapturePhoto = async (slot: number) => {
+    try {
+      const { status, canAskAgain } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== 'granted') {
+        haptics.notificationWarning();
+        if (!canAskAgain) {
+          setCameraRationaleVisible(true);
+        } else {
+          Alert.alert(
+            'Camera Permission Required',
+            'Camera access is required to capture on-site inspection photos. Pick from photo gallery instead?',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              {
+                text: 'Choose from Gallery',
+                onPress: async () => {
+                  const libRes = await ImagePicker.launchImageLibraryAsync({
+                    mediaTypes: ['images'],
+                    quality: 0.8,
+                  });
+                  if (!libRes.canceled && libRes.assets && libRes.assets.length > 0) {
+                    applyCapturedPhoto(slot, libRes.assets[0].uri);
+                  }
+                },
+              },
+            ]
+          );
+        }
+        return;
+      }
+
+      const res = await ImagePicker.launchCameraAsync({
+        mediaTypes: ['images'],
+        quality: 0.8,
+      });
+
+      if (!res.canceled && res.assets && res.assets.length > 0) {
+        applyCapturedPhoto(slot, res.assets[0].uri);
+      }
+    } catch (err: any) {
+      Alert.alert('Camera Error', err.message || 'Could not launch camera');
+    }
+  };
+
+  const applyCapturedPhoto = (slot: number, uri: string) => {
+    haptics.notificationSuccess();
+    const timestamp = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
     setGeoPhotos((prev) =>
       prev.map((p) =>
         p.slot === slot
           ? {
-              ...p,
-              captured: true,
-              lat: null,
-              lng: null,
-              time: timestamp as any,
-            }
+            ...p,
+            captured: true,
+            time: timestamp,
+            uri,
+          }
           : p
       )
     );
-    Alert.alert('Inspection Photo Recorded', `Slot ${slot} photo recorded with timestamp ${timestamp}.`);
+    Alert.alert('Inspection Photo Recorded', `Slot ${slot} photo recorded at ${timestamp}.`);
+  };
+
+  const handleSiteCheckIn = async (job: InstallationJob) => {
+    haptics.notificationSuccess();
+    const timestamp = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+    const locationName = [job.address, job.city].filter(Boolean).join(', ') || 'Customer Site';
+    setJobs((prev) =>
+      prev.map((j) =>
+        j.id === job.id
+          ? { ...j, status: 'IN_PROGRESS', progressPercent: Math.max(j.progressPercent || 0, 50) }
+          : j
+      )
+    );
+    try {
+      await installationsApi.updateJobStatus(job.id || job.jobId || '', 'IN_PROGRESS').catch(() => null);
+    } catch (_) {
+      await offlineSyncService.enqueueMutation('UPDATE_JOB_STATUS', {
+        jobId: job.id || job.jobId,
+        status: 'IN_PROGRESS',
+        timestamp,
+      });
+    }
+    Alert.alert(
+      'Site Arrival Recorded',
+      `Check-in logged at ${timestamp} for ${locationName}.\nStatus updated to ON-SITE / IN PROGRESS.`
+    );
   };
 
   const handleUpdateStatus = async (jobId: string, newStatus: string) => {
     try {
       await installationsApi.updateJobStatus(jobId, newStatus);
+      haptics.notificationSuccess();
       setJobs((prev) =>
         prev.map((j) => (j.id === jobId ? { ...j, status: newStatus as any } : j))
       );
@@ -212,6 +324,13 @@ export const OperationsScreen: React.FC<{ navigation?: any }> = ({ navigation })
       }
       Alert.alert('Status Updated', `Installation job marked as "${newStatus}".`);
     } catch (err: any) {
+      try {
+        await offlineSyncService.enqueueMutation('UPDATE_JOB_STATUS', {
+          jobId,
+          status: newStatus,
+        });
+        haptics.notificationSuccess();
+      } catch (_) { }
       setJobs((prev) =>
         prev.map((j) => (j.id === jobId ? { ...j, status: newStatus as any } : j))
       );
@@ -219,338 +338,838 @@ export const OperationsScreen: React.FC<{ navigation?: any }> = ({ navigation })
     }
   };
 
-  return (
-    <View style={styles.container}>
-      <Header
-        variant={navigation?.canGoBack?.() ? 'detail' : 'main'}
-        title="Field Operations & Commissioning"
-        subtitle="Checklists, barcode scanning & net-metering"
-        onBack={navigation?.canGoBack?.() ? () => navigation.goBack() : undefined}
-      />
+  const handleOpenAssignModal = (job: InstallationJob) => {
+    setJobToAssign(job);
+    setAssignModalVisible(true);
+  };
 
-      {/* KPIS ROW */}
-      <View style={styles.kpiRow}>
-        <View style={styles.kpiCard}>
-          <Text style={styles.kpiVal}>{dashboardKpis.scheduledToday || jobs.length}</Text>
-          <Text style={styles.kpiLbl}>Scheduled</Text>
-        </View>
-        <View style={styles.kpiCard}>
-          <Text style={[styles.kpiVal, { color: '#d97706' }]}>{dashboardKpis.inProgress}</Text>
-          <Text style={styles.kpiLbl}>In Progress</Text>
-        </View>
-        <View style={styles.kpiCard}>
-          <Text style={[styles.kpiVal, { color: '#059669' }]}>{dashboardKpis.completedToday}</Text>
-          <Text style={styles.kpiLbl}>Completed</Text>
-        </View>
-      </View>
+  const handleAssignTechnician = (tech: (typeof FIELD_TECHNICIANS)[0]) => {
+    if (!jobToAssign) return;
+    setJobs((prev) =>
+      prev.map((j) =>
+        j.id === jobToAssign.id
+          ? ({
+            ...j,
+            status: (j.status === 'SCHEDULED' ? 'ASSIGNED' : j.status) as any,
+            technicianName: tech.name,
+            technicianPhone: tech.phone,
+          } as any)
+          : j
+      )
+    );
+    Alert.alert('Technician Dispatched', `${tech.name} (${tech.role}) assigned to ${jobToAssign.customerName}.`);
+    setAssignModalVisible(false);
+    setJobToAssign(null);
+  };
 
-      {/* JOBS LIST */}
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-      >
-        <View style={styles.sectionTitleRow}>
-          <Text style={styles.sectionTitle}>INSTALLATION QUEUE ({jobs.length})</Text>
-        </View>
+  const filteredJobs = useMemo(() => {
+    return jobs.filter((j) => {
+      if (scheduleFilter === 'SCHEDULED') return j.status === 'SCHEDULED' || j.status === 'ASSIGNED';
+      if (scheduleFilter === 'IN_PROGRESS') return j.status === 'IN_PROGRESS' || j.status === 'ON_SITE';
+      if (scheduleFilter === 'COMPLETED') return j.status === 'COMPLETED';
+      return true;
+    });
+  }, [jobs, scheduleFilter]);
 
-        {loading ? (
-          <ActivityIndicator size="small" color="#059669" style={{ marginVertical: 30 }} />
-        ) : jobs.length === 0 ? (
-          <View style={styles.emptyCard}>
-            <ShieldCheck size={32} color="#94a3b8" />
-            <Text style={styles.emptyTitle}>No Scheduled Installations</Text>
-            <Text style={styles.emptyText}>
-              On-site jobs will be dispatched here once solar projects reach the installation stage.
-            </Text>
-          </View>
-        ) : (
-          jobs.map((job) => (
-            <View key={job.id} style={styles.jobCard}>
-              <View style={styles.jobHeader}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.jobId}>{job.jobId || 'INS-2026'}</Text>
-                  <Text style={styles.customerName}>{job.customerName}</Text>
-                  <View style={styles.addressRow}>
-                    <MapPin size={12} color="#94a3b8" />
-                    <Text style={styles.addressText}>{job.address}, {job.city}</Text>
-                  </View>
+  const getItemLayout = useCallback(
+    (_: any, index: number) => ({
+      length: 220,
+      offset: 220 * index,
+      index,
+    }),
+    []
+  );
+
+  const keyExtractor = useCallback((item: InstallationJob) => item.id || item.jobId || String(Math.random()), []);
+
+  const renderJobItem = useCallback(
+    ({ item: job }: { item: InstallationJob }) => {
+      const isCompleted = job.status === 'COMPLETED';
+      const isOnSite = job.status === 'IN_PROGRESS' || job.status === 'ON_SITE';
+
+      return (
+        <View
+          key={job.id}
+          style={[
+            styles.jobCard,
+            {
+              backgroundColor: colors.surface,
+              borderColor: colors.borderSubtle,
+            },
+          ]}
+        >
+          {/* HEADER: JOB ID, STATUS PILL */}
+          <View style={styles.jobHeader}>
+            <View style={{ flex: 1 }}>
+              <View style={styles.jobIdRow}>
+                <View
+                  style={[
+                    styles.jobIdBadge,
+                    {
+                      backgroundColor: isDark ? '#1E293B' : '#F1F5F9',
+                      borderColor: colors.borderSubtle,
+                    },
+                  ]}
+                >
+                  <Text style={[styles.jobIdText, { color: colors.textSecondary }]}>
+                    {job.jobId || 'INS-2026'}
+                  </Text>
                 </View>
+
                 <View
                   style={[
                     styles.statusPill,
-                    job.status === 'IN_PROGRESS' || job.status === 'ON_SITE'
-                      ? styles.statusOnSite
-                      : styles.statusAssigned,
+                    {
+                      backgroundColor: isCompleted
+                        ? (isDark ? 'rgba(16, 185, 129, 0.15)' : '#ECFDF5')
+                        : isOnSite
+                          ? (isDark ? 'rgba(245, 158, 11, 0.15)' : '#FFFBEB')
+                          : (isDark ? 'rgba(0, 102, 255, 0.12)' : '#EFF6FF'),
+                      borderColor: isCompleted
+                        ? '#10B981'
+                        : isOnSite
+                          ? '#F59E0B'
+                          : '#0066FF',
+                    },
                   ]}
                 >
-                  <Text style={styles.statusPillText}>{job.status}</Text>
+                  <Text
+                    style={[
+                      styles.statusPillText,
+                      {
+                        color: isCompleted
+                          ? '#10B981'
+                          : isOnSite
+                            ? '#D97706'
+                            : '#0066FF',
+                      },
+                    ]}
+                  >
+                    {job.status}
+                  </Text>
                 </View>
               </View>
 
-              <View style={styles.specBox}>
-                <View style={styles.specItem}>
-                  <Text style={styles.specLabel}>Capacity</Text>
-                  <Text style={styles.specVal}>{job.capacityKw} kWp</Text>
-                </View>
-                <View style={styles.specItem}>
-                  <Text style={styles.specLabel}>Panels</Text>
-                  <Text style={styles.specVal}>{job.panelBrand.split(' ')[0]}</Text>
-                </View>
-                <View style={styles.specItem}>
-                  <Text style={styles.specLabel}>Inverter</Text>
-                  <Text style={styles.specVal}>{job.inverterBrand.split(' ')[0]}</Text>
-                </View>
-              </View>
+              <Text style={[styles.customerName, { color: colors.text }]} numberOfLines={1}>
+                {job.customerName}
+              </Text>
 
-              <View style={styles.buttonRow}>
-                <View style={styles.contactButtons}>
-                  <TouchableOpacity
-                    style={styles.iconCircleBtn}
-                    onPress={() => Linking.openURL(`tel:${job.phone}`)}
-                    activeOpacity={0.8}
-                  >
-                    <Phone size={15} color="#0f172a" strokeWidth={2.2} />
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={styles.iconCircleBtn}
-                    onPress={() =>
-                      Linking.openURL(`https://maps.google.com/?q=${encodeURIComponent(job.address)}`)
-                    }
-                    activeOpacity={0.8}
-                  >
-                    <Navigation size={15} color="#0f172a" strokeWidth={2.2} />
-                  </TouchableOpacity>
-                </View>
-
-                <TouchableOpacity
-                  style={styles.executeBtn}
-                  onPress={() => {
-                    setActiveJob(job);
-                    setActiveTab('CHECKLIST');
-                  }}
-                  activeOpacity={0.85}
-                >
-                  <ClipboardCheck size={15} color="#ffffff" style={{ marginRight: 6 }} />
-                  <Text style={styles.executeBtnText}>QA Dossier</Text>
-                </TouchableOpacity>
+              <View style={styles.addressRow}>
+                <MapPin size={11} color={colors.textMuted} />
+                <Text style={[styles.addressText, { color: colors.textSecondary }]} numberOfLines={1}>
+                  {job.address}, {job.city}
+                </Text>
               </View>
             </View>
-          ))
-        )}
+          </View>
 
-        {/* FIELD EXECUTION & DOSSIER MODAL */}
-        {activeJob && (
-          <Modal visible={!!activeJob} animationType="slide">
-            <View style={styles.modalContainer}>
-              <View style={styles.modalHeader}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.modalJobId}>{activeJob.jobId || 'INS-2026'}</Text>
-                  <Text style={styles.modalCustomer}>{activeJob.customerName}</Text>
-                </View>
-                <TouchableOpacity
-                  style={styles.modalCloseBtn}
-                  onPress={() => setActiveJob(null)}
+          {/* HARDWARE SPECS BOX */}
+          <View
+            style={[
+              styles.specBox,
+              {
+                backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
+                borderColor: colors.borderSubtle,
+              },
+            ]}
+          >
+            <View style={styles.specItem}>
+              <Text style={[styles.specLabel, { color: colors.textMuted }]}>CAPACITY</Text>
+              <Text style={[styles.specVal, { color: colors.text }]}>{job.capacityKw} kWp</Text>
+            </View>
+            <View style={styles.specItem}>
+              <Text style={[styles.specLabel, { color: colors.textMuted }]}>MODULES</Text>
+              <Text style={[styles.specVal, { color: colors.text }]} numberOfLines={1}>
+                {job.panelBrand.split(' ')[0]}
+              </Text>
+            </View>
+            <View style={styles.specItem}>
+              <Text style={[styles.specLabel, { color: colors.textMuted }]}>INVERTER</Text>
+              <Text style={[styles.specVal, { color: colors.text }]} numberOfLines={1}>
+                {job.inverterBrand.split(' ')[0]}
+              </Text>
+            </View>
+          </View>
+
+          {/* TECHNICIAN DISPATCH CHIP */}
+          <View style={styles.technicianRow}>
+            <TouchableOpacity
+              style={[
+                styles.techBadgeBtn,
+                {
+                  backgroundColor: isDark ? '#1E293B' : '#EFF6FF',
+                  borderColor: isDark ? '#1E3A8A' : '#BFDBFE',
+                },
+              ]}
+              onPress={() => handleOpenAssignModal(job)}
+              activeOpacity={0.8}
+            >
+              <User size={12} color="#0066FF" />
+              <Text style={styles.techBadgeText}>
+                {(job as any).technicianName
+                  ? `Lead Tech: ${(job as any).technicianName}`
+                  : '+ Assign Field Engineer'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* ACTION BUTTONS ROW */}
+          <View style={[styles.buttonRow, { borderTopColor: colors.borderSubtle }]}>
+            <View style={styles.contactButtons}>
+              <TouchableOpacity
+                style={[
+                  styles.iconCircleBtn,
+                  {
+                    backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
+                    borderColor: colors.borderSubtle,
+                  },
+                ]}
+                onPress={() => Linking.openURL(`tel:${job.phone}`)}
+                activeOpacity={0.8}
+                accessibilityLabel="Call Customer"
+              >
+                <Phone size={14} color="#0066FF" strokeWidth={2.4} />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.iconCircleBtn,
+                  {
+                    backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
+                    borderColor: colors.borderSubtle,
+                  },
+                ]}
+                onPress={() =>
+                  Linking.openURL(`https://maps.google.com/?q=${encodeURIComponent(job.address)}`)
+                }
+                activeOpacity={0.8}
+                accessibilityLabel="Navigate"
+              >
+                <Navigation size={14} color="#10B981" strokeWidth={2.4} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.rightActionsRow}>
+              <TouchableOpacity
+                style={styles.checkInBtn}
+                onPress={() => handleSiteCheckIn(job)}
+                activeOpacity={0.85}
+              >
+                <MapPin size={13} color="#FFFFFF" />
+                <Text style={styles.checkInBtnText}>Check In</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.executeBtn}
+                onPress={() => {
+                  setActiveJob(job);
+                  setActiveTab('CHECKLIST');
+                }}
+                activeOpacity={0.85}
+              >
+                <ClipboardCheck size={13} color="#FFFFFF" />
+                <Text style={styles.executeBtnText}>QA Dossier</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      );
+    },
+    [colors, isDark]
+  );
+
+  return (
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      {/* GLOBAL HEADER */}
+      <Header
+        variant={navigation?.canGoBack?.() ? 'detail' : 'main'}
+        title="Field Operations"
+        subtitle="Live site execution, 2D serials, 5-geo proofs & CEA sign-off"
+        onBack={navigation?.canGoBack?.() ? () => navigation.goBack() : undefined}
+      />
+
+      {/* OPERATIONAL RADAR PULSE CARDS */}
+      <View
+        style={[
+          styles.kpiBar,
+          {
+            backgroundColor: colors.surface,
+            borderColor: colors.borderSubtle,
+          },
+        ]}
+      >
+        <View style={styles.kpiItem}>
+          <Text style={[styles.kpiVal, { color: colors.text }]}>
+            {dashboardKpis.scheduledToday || jobs.length}
+          </Text>
+          <Text style={[styles.kpiLbl, { color: colors.textMuted }]}>Scheduled</Text>
+        </View>
+
+        <View style={[styles.kpiDivider, { backgroundColor: colors.borderSubtle }]} />
+
+        <View style={styles.kpiItem}>
+          <Text style={[styles.kpiVal, { color: '#F59E0B' }]}>{dashboardKpis.inProgress}</Text>
+          <Text style={[styles.kpiLbl, { color: colors.textMuted }]}>On-Site</Text>
+        </View>
+
+        <View style={[styles.kpiDivider, { backgroundColor: colors.borderSubtle }]} />
+
+        <View style={styles.kpiItem}>
+          <Text style={[styles.kpiVal, { color: '#10B981' }]}>
+            {dashboardKpis.completedToday}
+          </Text>
+          <Text style={[styles.kpiLbl, { color: colors.textMuted }]}>Commissioned</Text>
+        </View>
+      </View>
+
+      {/* DISPATCH SCHEDULE FILTER BAR */}
+      <View style={styles.scheduleFilterBar}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.scheduleFilterContent}
+        >
+          {(['ALL', 'SCHEDULED', 'IN_PROGRESS', 'COMPLETED'] as const).map((sf) => {
+            const isActive = scheduleFilter === sf;
+            return (
+              <TouchableOpacity
+                key={sf}
+                style={[
+                  styles.scheduleFilterChip,
+                  {
+                    backgroundColor: isActive ? '#0066FF' : colors.surface,
+                    borderColor: isActive ? '#0066FF' : colors.borderSubtle,
+                  },
+                ]}
+                onPress={() => setScheduleFilter(sf)}
+                activeOpacity={0.7}
+              >
+                <Text
+                  style={[
+                    styles.scheduleFilterText,
+                    {
+                      color: isActive ? '#FFFFFF' : colors.textSecondary,
+                      fontWeight: isActive ? '700' : '600',
+                    },
+                  ]}
                 >
-                  <X size={18} color="#0f172a" />
-                </TouchableOpacity>
+                  {sf === 'ALL'
+                    ? `All Jobs (${jobs.length})`
+                    : sf === 'SCHEDULED'
+                      ? 'Scheduled'
+                      : sf === 'IN_PROGRESS'
+                        ? 'On-Site'
+                        : 'Commissioned'}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      </View>
+
+      {/* JOBS LIST VIRTUALIZED */}
+      <FlatList
+        data={filteredJobs}
+        keyExtractor={keyExtractor}
+        renderItem={renderJobItem}
+        getItemLayout={getItemLayout}
+        windowSize={7}
+        maxToRenderPerBatch={10}
+        initialNumToRender={8}
+        removeClippedSubviews={Platform.OS === 'android'}
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.primary}
+          />
+        }
+        showsVerticalScrollIndicator={false}
+        ListEmptyComponent={
+          loading ? (
+            <View style={styles.skeletonContainer}>
+              <SkeletonLoader.Card />
+              <SkeletonLoader.Card />
+            </View>
+          ) : (
+            <EmptyState
+              icon={<ShieldCheck size={36} color={colors.textMuted} />}
+              title="No Scheduled Installations"
+              description="On-site jobs will be dispatched here once solar projects advance to the installation stage."
+              actionTitle="View Field Projects"
+              onActionPress={() => navigation?.navigate('Projects')}
+            />
+          )
+        }
+      />
+
+      {/* CAMERA PERMISSION RATIONALE MODAL */}
+      <PermissionRationaleModal
+        visible={cameraRationaleVisible}
+        permissionType="camera"
+        isPermanentlyDenied={true}
+        title="Camera Access Required"
+        description="Statutory guidelines under PM Surya Ghar require high-resolution geotagged photos of the solar PV array, inverter, earthing pit, and net-metering setup for DBT subsidy clearance."
+        onDismiss={() => setCameraRationaleVisible(false)}
+        onRequestNativePermission={() => {
+          setCameraRationaleVisible(false);
+          Linking.openSettings();
+        }}
+      />
+
+      {/* FIELD EXECUTION & DOSSIER MODAL */}
+      {activeJob && (
+        <Modal
+          visible={!!activeJob}
+          animationType="slide"
+          onRequestClose={() => setActiveJob(null)}
+        >
+          <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
+            <View
+              style={[
+                styles.modalHeader,
+                {
+                  backgroundColor: colors.surface,
+                  borderBottomColor: colors.borderSubtle,
+                },
+              ]}
+            >
+              <View style={{ flex: 1 }}>
+                <Text style={styles.modalJobId}>{activeJob.jobId || 'INS-2026'}</Text>
+                <Text style={[styles.modalCustomer, { color: colors.text }]}>
+                  {activeJob.customerName}
+                </Text>
               </View>
+              <TouchableOpacity
+                style={[
+                  styles.modalCloseBtn,
+                  { backgroundColor: isDark ? '#1E293B' : '#F1F5F9' },
+                ]}
+                onPress={() => setActiveJob(null)}
+              >
+                <X size={16} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
 
-              {/* TABS */}
-              <View style={styles.tabsRow}>
-                <TouchableOpacity
-                  style={[styles.tabBtn, activeTab === 'CHECKLIST' && styles.tabBtnActive]}
-                  onPress={() => setActiveTab('CHECKLIST')}
+            {/* MODAL TABS */}
+            <View
+              style={[
+                styles.tabsRow,
+                {
+                  backgroundColor: colors.surface,
+                  borderBottomColor: colors.borderSubtle,
+                },
+              ]}
+            >
+              <TouchableOpacity
+                style={[styles.tabBtn, activeTab === 'CHECKLIST' && styles.tabBtnActive]}
+                onPress={() => setActiveTab('CHECKLIST')}
+              >
+                <Text
+                  style={[
+                    styles.tabBtnText,
+                    { color: activeTab === 'CHECKLIST' ? '#0066FF' : colors.textSecondary },
+                  ]}
                 >
-                  <Text style={[styles.tabBtnText, activeTab === 'CHECKLIST' && styles.tabBtnTextActive]}>
-                    Checklist
-                  </Text>
-                </TouchableOpacity>
+                  Checklist
+                </Text>
+              </TouchableOpacity>
 
-                <TouchableOpacity
-                  style={[styles.tabBtn, activeTab === 'BARCODES' && styles.tabBtnActive]}
-                  onPress={() => setActiveTab('BARCODES')}
+              <TouchableOpacity
+                style={[styles.tabBtn, activeTab === 'BARCODES' && styles.tabBtnActive]}
+                onPress={() => setActiveTab('BARCODES')}
+              >
+                <Text
+                  style={[
+                    styles.tabBtnText,
+                    { color: activeTab === 'BARCODES' ? '#0066FF' : colors.textSecondary },
+                  ]}
                 >
-                  <Text style={[styles.tabBtnText, activeTab === 'BARCODES' && styles.tabBtnTextActive]}>
-                    Barcodes ({scannedSerials.length})
-                  </Text>
-                </TouchableOpacity>
+                  Barcodes ({scannedSerials.length})
+                </Text>
+              </TouchableOpacity>
 
-                <TouchableOpacity
-                  style={[styles.tabBtn, activeTab === 'PHOTOS' && styles.tabBtnActive]}
-                  onPress={() => setActiveTab('PHOTOS')}
+              <TouchableOpacity
+                style={[styles.tabBtn, activeTab === 'PHOTOS' && styles.tabBtnActive]}
+                onPress={() => setActiveTab('PHOTOS')}
+              >
+                <Text
+                  style={[
+                    styles.tabBtnText,
+                    { color: activeTab === 'PHOTOS' ? '#0066FF' : colors.textSecondary },
+                  ]}
                 >
-                  <Text style={[styles.tabBtnText, activeTab === 'PHOTOS' && styles.tabBtnTextActive]}>
-                    5-Geo Photos
-                  </Text>
-                </TouchableOpacity>
+                  5-Geo Photos
+                </Text>
+              </TouchableOpacity>
 
-                <TouchableOpacity
-                  style={[styles.tabBtn, activeTab === 'SIGNOFF' && styles.tabBtnActive]}
-                  onPress={() => setActiveTab('SIGNOFF')}
+              <TouchableOpacity
+                style={[styles.tabBtn, activeTab === 'SIGNOFF' && styles.tabBtnActive]}
+                onPress={() => setActiveTab('SIGNOFF')}
+              >
+                <Text
+                  style={[
+                    styles.tabBtnText,
+                    { color: activeTab === 'SIGNOFF' ? '#0066FF' : colors.textSecondary },
+                  ]}
                 >
-                  <Text style={[styles.tabBtnText, activeTab === 'SIGNOFF' && styles.tabBtnTextActive]}>
-                    Sign-Off
+                  Sign-Off
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={{ flex: 1, padding: 16 }} showsVerticalScrollIndicator={false}>
+              {/* 1. CHECKLIST */}
+              {activeTab === 'CHECKLIST' && (
+                <View>
+                  <Text style={[styles.tabSectionTitle, { color: colors.text }]}>
+                    Technical Quality & Safety Checklist
                   </Text>
-                </TouchableOpacity>
-              </View>
+                  <Text style={[styles.tabSectionSub, { color: colors.textSecondary }]}>
+                    Must be 100% verified before grid energization and net-metering.
+                  </Text>
 
-              <ScrollView style={{ flex: 1, padding: 20 }}>
-                {/* 1. CHECKLIST */}
-                {activeTab === 'CHECKLIST' && (
-                  <View>
-                    <Text style={styles.tabSectionTitle}>Technical Quality & Safety Checklist</Text>
-                    <Text style={styles.tabSectionSub}>
-                      Must be 100% completed before inverter grid synchronization.
-                    </Text>
-
-                    {checklist.map((item) => (
-                      <TouchableOpacity
-                        key={item.id}
-                        style={[styles.checklistItem, item.completed && styles.checklistItemDone]}
-                        onPress={() => toggleChecklist(item.id)}
-                        activeOpacity={0.8}
+                  {checklist.map((item) => (
+                    <TouchableOpacity
+                      key={item.id}
+                      style={[
+                        styles.checklistItem,
+                        {
+                          backgroundColor: item.completed
+                            ? (isDark ? 'rgba(16, 185, 129, 0.12)' : '#ECFDF5')
+                            : colors.surface,
+                          borderColor: item.completed
+                            ? (isDark ? '#065F46' : '#A7F3D0')
+                            : colors.borderSubtle,
+                        },
+                      ]}
+                      onPress={() => toggleChecklist(item.id)}
+                      activeOpacity={0.8}
+                    >
+                      <View
+                        style={[
+                          styles.checkCircle,
+                          item.completed && {
+                            backgroundColor: '#10B981',
+                            borderColor: '#10B981',
+                          },
+                        ]}
                       >
-                        <View style={[styles.checkCircle, item.completed && styles.checkCircleDone]}>
-                          {item.completed && <Check size={12} color="#ffffff" strokeWidth={3} />}
-                        </View>
-                        <Text style={[styles.checklistText, item.completed && styles.checklistTextDone]}>
-                          {item.title}
+                        {item.completed && <Check size={11} color="#FFFFFF" strokeWidth={3} />}
+                      </View>
+                      <Text
+                        style={[
+                          styles.checklistText,
+                          {
+                            color: item.completed
+                              ? (isDark ? '#34D399' : '#047857')
+                              : colors.text,
+                          },
+                        ]}
+                      >
+                        {item.title}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+
+              {/* 2. BARCODES */}
+              {activeTab === 'BARCODES' && (
+                <View>
+                  <Text style={[styles.tabSectionTitle, { color: colors.text }]}>
+                    PV Module Barcode / QR Scanner
+                  </Text>
+                  <Text style={[styles.tabSectionSub, { color: colors.textSecondary }]}>
+                    Scanned serial numbers are auto-submitted for DCR & PM Surya Ghar Subsidy Verification.
+                  </Text>
+
+                  <TouchableOpacity
+                    style={styles.scanBtn}
+                    onPress={handleOpenBarcodeScanner}
+                    activeOpacity={0.85}
+                  >
+                    <QrCode size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
+                    <Text style={styles.scanBtnText}>Scan PV Module QR Code (Camera)</Text>
+                  </TouchableOpacity>
+
+                  <View style={styles.manualSerialRow}>
+                    <TextInput
+                      style={[
+                        styles.manualInput,
+                        {
+                          backgroundColor: colors.surface,
+                          borderColor: colors.borderSubtle,
+                          color: colors.text,
+                        },
+                      ]}
+                      placeholder="Or enter serial number..."
+                      placeholderTextColor={colors.textMuted}
+                      value={manualSerialInput}
+                      onChangeText={setManualSerialInput}
+                    />
+                    <TouchableOpacity
+                      style={styles.addSerialBtn}
+                      onPress={() => {
+                        const clean = manualSerialInput.trim().toUpperCase();
+                        if (!clean) return;
+                        if (clean.length < 5) {
+                          Alert.alert('Invalid Serial', 'Serial number must be at least 5 characters long.');
+                          return;
+                        }
+                        if (scannedSerials.includes(clean)) {
+                          Alert.alert('Duplicate Serial', `Serial "${clean}" is already recorded.`);
+                          return;
+                        }
+                        setScannedSerials((prev) => [...prev, clean]);
+                        setManualSerialInput('');
+                      }}
+                    >
+                      <Text style={styles.addSerialText}>Add</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  <Text style={[styles.inputLabel, { color: colors.textMuted, marginTop: 14 }]}>
+                    SCANNED MODULE SERIALS ({scannedSerials.length})
+                  </Text>
+                  {scannedSerials.map((s, idx) => (
+                    <View
+                      key={idx}
+                      style={[
+                        styles.serialBadge,
+                        {
+                          backgroundColor: colors.surface,
+                          borderColor: colors.borderSubtle,
+                        },
+                      ]}
+                    >
+                      <Text style={[styles.serialIndex, { color: colors.textMuted }]}>#{idx + 1}</Text>
+                      <Text style={[styles.serialCode, { color: colors.text }]}>{s}</Text>
+                      <Text style={styles.serialVerified}>✓ DCR Linked</Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+
+              {/* 3. 5-GEO PHOTOS */}
+              {activeTab === 'PHOTOS' && (
+                <View>
+                  <Text style={[styles.tabSectionTitle, { color: colors.text }]}>
+                    PM Surya Ghar 5 Mandatory Photos
+                  </Text>
+                  <Text style={[styles.tabSectionSub, { color: colors.textSecondary }]}>
+                    DISCOM net-metering portal requires geo-tagged rooftop photos for DBT release.
+                  </Text>
+
+                  {geoPhotos.map((photo) => (
+                    <View
+                      key={photo.slot}
+                      style={[
+                        styles.photoCard,
+                        {
+                          backgroundColor: colors.surface,
+                          borderColor: colors.borderSubtle,
+                        },
+                      ]}
+                    >
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.photoName, { color: colors.text }]}>{photo.name}</Text>
+                        {photo.captured ? (
+                          <Text style={styles.geoTag}>✓ Recorded at {photo.time}</Text>
+                        ) : (
+                          <Text style={styles.geoPending}>⏳ Pending capture</Text>
+                        )}
+                      </View>
+                      <TouchableOpacity
+                        style={[styles.captureBtn, photo.captured && styles.recaptureBtn]}
+                        onPress={() => handleCapturePhoto(photo.slot)}
+                        activeOpacity={0.85}
+                      >
+                        <Camera size={13} color="#FFFFFF" style={{ marginRight: 5 }} />
+                        <Text style={styles.captureBtnText}>
+                          {photo.captured ? 'Retake' : 'Capture'}
                         </Text>
                       </TouchableOpacity>
-                    ))}
-                  </View>
-                )}
+                    </View>
+                  ))}
+                </View>
+              )}
 
-                {/* 2. BARCODES */}
-                {activeTab === 'BARCODES' && (
-                  <View>
-                    <Text style={styles.tabSectionTitle}>PV Module Barcode / QR Scanner</Text>
-                    <Text style={styles.tabSectionSub}>
-                      Scanned serial numbers are auto-submitted for DCR & PM Surya Ghar Subsidy Verification.
-                    </Text>
+              {/* 4. SIGNOFF */}
+              {activeTab === 'SIGNOFF' && (
+                <View>
+                  <Text style={[styles.tabSectionTitle, { color: colors.text }]}>
+                    Customer Digital Sign-Off
+                  </Text>
+                  <Text style={[styles.tabSectionSub, { color: colors.textSecondary }]}>
+                    Verify client satisfaction on-site before grid energization.
+                  </Text>
 
-                    <TouchableOpacity style={styles.scanBtn} onPress={handleSimulateScan} activeOpacity={0.85}>
-                      <QrCode size={18} color="#ffffff" style={{ marginRight: 8 }} />
-                      <Text style={styles.scanBtnText}>Scan PV Module QR Code</Text>
-                    </TouchableOpacity>
-
-                    <View style={styles.manualSerialRow}>
-                      <TextInput
-                        style={styles.manualInput}
-                        placeholder="Or enter serial number..."
-                        placeholderTextColor="#94a3b8"
-                        value={manualSerialInput}
-                        onChangeText={setManualSerialInput}
-                      />
+                  <View
+                    style={[
+                      styles.signatureBox,
+                      {
+                        backgroundColor: colors.surface,
+                        borderColor: colors.borderSubtle,
+                      },
+                    ]}
+                  >
+                    {!customerSigned ? (
                       <TouchableOpacity
-                        style={styles.addSerialBtn}
+                        style={styles.touchSignArea}
                         onPress={() => {
-                          if (manualSerialInput.trim()) {
-                            setScannedSerials([...scannedSerials, manualSerialInput.trim().toUpperCase()]);
-                            setManualSerialInput('');
-                          }
+                          const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                          setSignOffTime(now);
+                          setCustomerSigned(true);
+                          Alert.alert('Digital Sign-Off Recorded', `Handover signed by ${activeJob.customerName} at ${now}.`);
                         }}
                       >
-                        <Text style={styles.addSerialText}>Add</Text>
+                        <Text style={[styles.touchSignPrompt, { color: colors.textSecondary }]}>
+                          ✍️ Tap to Sign Customer Handover
+                        </Text>
                       </TouchableOpacity>
-                    </View>
-
-                    <Text style={[styles.inputLabel, { marginTop: 16 }]}>
-                      SCANNED MODULE SERIALS ({scannedSerials.length})
-                    </Text>
-                    {scannedSerials.map((s, idx) => (
-                      <View key={idx} style={styles.serialBadge}>
-                        <Text style={styles.serialIndex}>#{idx + 1}</Text>
-                        <Text style={styles.serialCode}>{s}</Text>
-                        <Text style={styles.serialVerified}>✓ DCR Linked</Text>
+                    ) : (
+                      <View style={styles.signedContent}>
+                        <CheckCircle2 size={32} color="#10B981" />
+                        <Text style={[styles.signedName, { color: colors.text }]}>
+                          {activeJob.customerName}
+                        </Text>
+                        <Text style={[styles.signedTime, { color: colors.textSecondary }]}>
+                          Signed at {signOffTime || new Date().toLocaleTimeString()}
+                        </Text>
+                        <Text style={[styles.signedHash, { color: colors.textMuted }]}>
+                          Digital Handover Confirmed • Job #{activeJob.jobId}
+                        </Text>
                       </View>
-                    ))}
+                    )}
                   </View>
-                )}
 
-                {/* 3. 5-GEO PHOTOS */}
-                {activeTab === 'PHOTOS' && (
-                  <View>
-                    <Text style={styles.tabSectionTitle}>PM Surya Ghar 5 Mandatory Photos</Text>
-                    <Text style={styles.tabSectionSub}>
-                      DISCOM net-metering portal requires geo-tagged & timestamped roof proofs.
-                    </Text>
+                  <TouchableOpacity
+                    style={styles.completeJobBtn}
+                    onPress={() => {
+                      handleUpdateStatus(activeJob.id, 'COMPLETED');
+                      setActiveJob(null);
+                    }}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={styles.completeJobBtnText}>Complete & Submit Handover Dossier</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </ScrollView>
+          </View>
+        </Modal>
+      )}
 
-                    {geoPhotos.map((photo) => (
-                      <View key={photo.slot} style={styles.photoCard}>
-                        <View style={{ flex: 1 }}>
-                          <Text style={styles.photoName}>{photo.name}</Text>
-                          {photo.captured ? (
-                            <Text style={styles.geoTag}>
-                              ✓ Recorded at {photo.time}
-                            </Text>
-                          ) : (
-                            <Text style={styles.geoPending}>⏳ Pending capture</Text>
-                          )}
-                        </View>
-                        <TouchableOpacity
-                          style={[styles.captureBtn, photo.captured && styles.recaptureBtn]}
-                          onPress={() => handleCapturePhoto(photo.slot)}
-                          activeOpacity={0.85}
-                        >
-                          <Camera size={14} color="#ffffff" style={{ marginRight: 6 }} />
-                          <Text style={styles.captureBtnText}>
-                            {photo.captured ? 'Retake' : 'Capture'}
-                          </Text>
-                        </TouchableOpacity>
-                      </View>
-                    ))}
-                  </View>
-                )}
+      {/* 2D CAMERA BARCODE SCANNER MODAL */}
+      {activeJob && (
+        <BarcodeScannerModal
+          visible={barcodeModalVisible}
+          project={{
+            id: activeJob.id,
+            name: activeJob.customerName || (activeJob as any).projectNumber || 'Active Job',
+            capacity: activeJob.capacityKw || 3.3,
+          }}
+          initialModuleSerials={scannedSerials}
+          onClose={() => setBarcodeModalVisible(false)}
+          onSaveSerials={({ modules, inverter }) => {
+            setScannedSerials(modules);
+            setJobs((prev) =>
+              prev.map((j) =>
+                j.id === activeJob.id
+                  ? { ...j, moduleSerialNumbers: modules, inverterSerial: inverter }
+                  : j
+              )
+            );
+            setActiveJob((prev) =>
+              prev ? { ...prev, moduleSerialNumbers: modules, inverterSerial: inverter } : null
+            );
+            setBarcodeModalVisible(false);
+          }}
+        />
+      )}
 
-                {/* 4. SIGNOFF */}
-                {activeTab === 'SIGNOFF' && (
-                  <View>
-                    <Text style={styles.tabSectionTitle}>Customer Digital Sign-Off</Text>
-                    <Text style={styles.tabSectionSub}>
-                      Verify client satisfaction on-site before grid energization.
-                    </Text>
+      {/* TECHNICIAN DISPATCH & ASSIGNMENT MODAL */}
+      {jobToAssign && (
+        <Modal
+          visible={assignModalVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setAssignModalVisible(false)}
+        >
+          <View style={styles.assignModalBackdrop}>
+            <View
+              style={[
+                styles.assignCard,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: colors.borderSubtle,
+                },
+              ]}
+            >
+              <View style={styles.assignHeader}>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.assignTitle, { color: colors.text }]}>
+                    Assign Field Engineer
+                  </Text>
+                  <Text style={[styles.assignSub, { color: colors.textMuted }]} numberOfLines={1}>
+                    {jobToAssign.customerName} • {jobToAssign.capacityKw} kWp
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => setAssignModalVisible(false)}
+                  style={[styles.closeModalBtn, { backgroundColor: isDark ? '#1E293B' : '#F1F5F9' }]}
+                >
+                  <X size={16} color={colors.textSecondary} />
+                </TouchableOpacity>
+              </View>
 
-                    <View style={styles.signatureBox}>
-                      {!customerSigned ? (
-                        <TouchableOpacity
-                          style={styles.touchSignArea}
-                          onPress={() => {
-                            setCustomerSigned(true);
-                            Alert.alert('Signed', 'Customer digital sign-off verified.');
-                          }}
-                        >
-                          <Text style={styles.touchSignPrompt}>✍️ Tap to Sign Customer Handover</Text>
-                        </TouchableOpacity>
-                      ) : (
-                        <View style={styles.signedContent}>
-                          <CheckCircle2 size={32} color="#059669" />
-                          <Text style={styles.signedName}>{activeJob.customerName}</Text>
-                          <Text style={styles.signedTime}>Signed at {new Date().toLocaleTimeString()}</Text>
-                          <Text style={styles.signedHash}>SHA256: 8f9b...3c1a (Verified)</Text>
-                        </View>
-                      )}
-                    </View>
-
-                    <TouchableOpacity
-                      style={styles.completeJobBtn}
-                      onPress={() => {
-                        handleUpdateStatus(activeJob.id, 'COMPLETED');
-                        setActiveJob(null);
-                      }}
-                      activeOpacity={0.85}
+              <Text style={[styles.assignSectionTitle, { color: colors.textSecondary }]}>
+                CERTIFIED FIELD ENGINEERS
+              </Text>
+              <View style={{ gap: 8, marginTop: 8 }}>
+                {FIELD_TECHNICIANS.map((tech) => (
+                  <TouchableOpacity
+                    key={tech.id}
+                    style={[
+                      styles.techCard,
+                      {
+                        backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
+                        borderColor: colors.borderSubtle,
+                      },
+                    ]}
+                    onPress={() => handleAssignTechnician(tech)}
+                    activeOpacity={0.8}
+                  >
+                    <View
+                      style={[
+                        styles.techIconCircle,
+                        { backgroundColor: isDark ? 'rgba(0, 102, 255, 0.15)' : '#EFF6FF' },
+                      ]}
                     >
-                      <Text style={styles.completeJobBtnText}>Complete & Submit Handover Dossier</Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
-              </ScrollView>
+                      <User size={15} color="#0066FF" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.techName, { color: colors.text }]}>{tech.name}</Text>
+                      <Text style={[styles.techRole, { color: colors.textSecondary }]}>
+                        {tech.role}
+                      </Text>
+                      <Text style={[styles.techPhone, { color: colors.textMuted }]}>
+                        {tech.phone}
+                      </Text>
+                    </View>
+                    <View style={styles.assignActionBadge}>
+                      <Text style={styles.assignActionText}>Assign</Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
             </View>
-          </Modal>
-        )}
-      </ScrollView>
+          </View>
+        </Modal>
+      )}
     </View>
   );
 };
@@ -558,460 +1177,584 @@ export const OperationsScreen: React.FC<{ navigation?: any }> = ({ navigation })
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
   },
-  kpiRow: {
+  // OPERATIONAL RADAR PULSE BAR
+  kpiBar: {
     flexDirection: 'row',
-    backgroundColor: '#ffffff',
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    gap: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
-  },
-  kpiCard: {
-    flex: 1,
-    backgroundColor: '#f8fafc',
-    borderRadius: 14,
-    padding: 12,
     alignItems: 'center',
+    marginHorizontal: 16,
+    marginTop: 10,
+    marginBottom: 8,
+    borderRadius: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  kpiItem: {
+    flex: 1,
+    alignItems: 'center',
   },
   kpiVal: {
-    fontSize: 20,
-    fontWeight: '900',
-    color: '#0f172a',
+    fontSize: 16,
+    fontWeight: '800',
+    fontVariant: ['tabular-nums'],
+    letterSpacing: -0.3,
   },
   kpiLbl: {
-    fontSize: 11,
-    color: '#64748b',
-    fontWeight: '600',
+    fontSize: 9,
+    fontWeight: '700',
+    textTransform: 'uppercase',
     marginTop: 2,
+    letterSpacing: 0.4,
   },
+  kpiDivider: {
+    width: 1,
+    height: 24,
+  },
+
+  // DISPATCH QUEUE FILTER
+  scheduleFilterBar: {
+    marginBottom: 6,
+  },
+  scheduleFilterContent: {
+    paddingHorizontal: 16,
+    gap: 8,
+    paddingVertical: 4,
+  },
+  scheduleFilterChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  scheduleFilterText: {
+    fontSize: 12,
+  },
+
+  // LIST & CARDS
   scroll: {
     flex: 1,
   },
   scrollContent: {
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingTop: 4,
     paddingBottom: Platform.OS === 'ios' ? 120 : 100,
   },
-  sectionTitleRow: {
-    marginBottom: 12,
-  },
-  sectionTitle: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#94a3b8',
-    letterSpacing: 0.8,
+  skeletonContainer: {
+    paddingVertical: 12,
+    gap: 12,
   },
   jobCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 20,
-    padding: 18,
+    borderRadius: 18,
+    padding: 14,
+    marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#f1f5f9',
-    marginBottom: 14,
-    shadowColor: '#0f172a',
+    shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.02,
-    shadowRadius: 6,
-    elevation: 1,
+    shadowOpacity: 0.03,
+    shadowRadius: 8,
+    elevation: 2,
   },
   jobHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 12,
+    marginBottom: 10,
   },
-  jobId: {
-    fontSize: 11,
+  jobIdRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 4,
+  },
+  jobIdBadge: {
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  jobIdText: {
+    fontSize: 10,
     fontWeight: '800',
-    color: '#059669',
-    letterSpacing: 0.5,
+    fontVariant: ['tabular-nums'],
+  },
+  statusPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  statusPillText: {
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.4,
   },
   customerName: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '800',
-    color: '#0f172a',
-    marginTop: 2,
+    letterSpacing: -0.2,
   },
   addressRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 4,
     gap: 4,
+    marginTop: 3,
   },
   addressText: {
-    fontSize: 12,
-    color: '#64748b',
+    fontSize: 11,
     fontWeight: '500',
   },
-  statusPill: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
-  statusOnSite: {
-    backgroundColor: '#fffbeb',
-  },
-  statusAssigned: {
-    backgroundColor: '#eff6ff',
-  },
-  statusPillText: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#0f172a',
-  },
+
+  // SPECS BOX
   specBox: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    backgroundColor: '#f8fafc',
     borderRadius: 12,
-    padding: 12,
-    marginVertical: 12,
+    padding: 10,
+    marginBottom: 10,
+    borderWidth: 1,
   },
   specItem: {
     flex: 1,
+    alignItems: 'center',
   },
   specLabel: {
-    fontSize: 10,
-    color: '#94a3b8',
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    fontSize: 8,
+    fontWeight: '800',
+    letterSpacing: 0.4,
   },
   specVal: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '800',
-    color: '#0f172a',
     marginTop: 2,
+    fontVariant: ['tabular-nums'],
   },
+
+  // TECH ROW
+  technicianRow: {
+    marginBottom: 10,
+  },
+  techBadgeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    alignSelf: 'flex-start',
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+  },
+  techBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#0066FF',
+  },
+
+  // BUTTON ROW
   buttonRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    paddingTop: 10,
+    borderTopWidth: 1,
+    gap: 8,
   },
   contactButtons: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 6,
   },
   iconCircleBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#f8fafc',
+    width: 38,
+    height: 38,
+    borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  rightActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  checkInBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#10B981',
+    paddingHorizontal: 12,
+    height: 38,
+    borderRadius: 10,
+    shadowColor: '#10B981',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  checkInBtnText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#FFFFFF',
   },
   executeBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#0f172a',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 12,
+    gap: 4,
+    backgroundColor: '#0066FF',
+    paddingHorizontal: 12,
+    height: 38,
+    borderRadius: 10,
+    shadowColor: '#0066FF',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3,
+    elevation: 2,
   },
   executeBtnText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#ffffff',
-  },
-  emptyCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 20,
-    padding: 30,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#f1f5f9',
-    marginTop: 10,
-  },
-  emptyTitle: {
-    fontSize: 15,
+    fontSize: 11,
     fontWeight: '800',
-    color: '#0f172a',
-    marginTop: 10,
-    marginBottom: 4,
+    color: '#FFFFFF',
   },
-  emptyText: {
-    fontSize: 12,
-    color: '#64748b',
-    textAlign: 'center',
-    lineHeight: 18,
-  },
+
+  // MODAL
   modalContainer: {
     flex: 1,
-    backgroundColor: '#f8fafc',
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 20,
-    backgroundColor: '#ffffff',
+    paddingHorizontal: 20,
+    paddingTop: Platform.OS === 'ios' ? 54 : 20,
+    paddingBottom: 14,
     borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
   },
   modalJobId: {
     fontSize: 11,
     fontWeight: '800',
-    color: '#059669',
+    color: '#0066FF',
     letterSpacing: 0.5,
   },
   modalCustomer: {
     fontSize: 16,
     fontWeight: '800',
-    color: '#0f172a',
     marginTop: 2,
+    letterSpacing: -0.2,
   },
   modalCloseBtn: {
-    padding: 6,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   tabsRow: {
     flexDirection: 'row',
-    backgroundColor: '#ffffff',
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
   },
   tabBtn: {
     paddingVertical: 12,
-    marginRight: 16,
+    paddingHorizontal: 8,
+    marginRight: 8,
     borderBottomWidth: 2,
     borderBottomColor: 'transparent',
   },
   tabBtnActive: {
-    borderBottomColor: '#059669',
+    borderBottomColor: '#0066FF',
   },
   tabBtnText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#64748b',
-  },
-  tabBtnTextActive: {
-    color: '#059669',
-    fontWeight: '800',
+    fontSize: 12,
+    fontWeight: '700',
   },
   tabSectionTitle: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '800',
-    color: '#0f172a',
     marginBottom: 4,
   },
   tabSectionSub: {
-    fontSize: 12,
-    color: '#64748b',
-    marginBottom: 16,
+    fontSize: 11,
     lineHeight: 16,
+    marginBottom: 14,
   },
   checklistItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#ffffff',
-    padding: 14,
-    borderRadius: 14,
+    padding: 12,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#f1f5f9',
-    marginBottom: 10,
-  },
-  checklistItemDone: {
-    backgroundColor: '#ecfdf5',
-    borderColor: '#a7f3d0',
+    marginBottom: 8,
   },
   checkCircle: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
     borderWidth: 2,
-    borderColor: '#cbd5e1',
+    borderColor: '#94A3B8',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
-  },
-  checkCircleDone: {
-    backgroundColor: '#059669',
-    borderColor: '#059669',
+    marginRight: 10,
   },
   checklistText: {
     flex: 1,
-    fontSize: 13,
-    fontWeight: '500',
-    color: '#334155',
-  },
-  checklistTextDone: {
-    color: '#047857',
+    fontSize: 12,
     fontWeight: '600',
   },
   scanBtn: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#059669',
-    paddingVertical: 14,
-    borderRadius: 14,
-    marginBottom: 16,
+    backgroundColor: '#0066FF',
+    paddingVertical: 12,
+    borderRadius: 12,
+    marginBottom: 12,
+    shadowColor: '#0066FF',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3,
+    elevation: 2,
   },
   scanBtnText: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '700',
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '800',
   },
   manualSerialRow: {
     flexDirection: 'row',
     gap: 8,
-    marginBottom: 16,
+    marginBottom: 12,
   },
   manualInput: {
     flex: 1,
-    backgroundColor: '#ffffff',
     borderWidth: 1,
-    borderColor: '#e2e8f0',
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
     fontSize: 13,
-    color: '#0f172a',
   },
   addSerialBtn: {
-    backgroundColor: '#0f172a',
-    paddingHorizontal: 18,
-    borderRadius: 12,
+    backgroundColor: '#0066FF',
+    paddingHorizontal: 16,
+    borderRadius: 10,
     justifyContent: 'center',
   },
   addSerialText: {
-    color: '#ffffff',
-    fontWeight: '700',
-    fontSize: 13,
+    color: '#FFFFFF',
+    fontWeight: '800',
+    fontSize: 12,
   },
   inputLabel: {
     fontSize: 10,
     fontWeight: '800',
-    color: '#94a3b8',
     letterSpacing: 0.5,
     marginBottom: 8,
   },
   serialBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
-    borderRadius: 12,
-    backgroundColor: '#ffffff',
-    marginBottom: 8,
+    padding: 10,
+    borderRadius: 10,
+    marginBottom: 6,
     borderWidth: 1,
-    borderColor: '#f1f5f9',
   },
   serialIndex: {
     fontSize: 11,
     fontWeight: '800',
-    color: '#94a3b8',
-    width: 32,
+    width: 28,
   },
   serialCode: {
     flex: 1,
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '700',
-    color: '#0f172a',
+    fontVariant: ['tabular-nums'],
   },
   serialVerified: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#059669',
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#10B981',
   },
   photoCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 14,
-    borderRadius: 14,
-    backgroundColor: '#ffffff',
-    marginBottom: 10,
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 8,
     borderWidth: 1,
-    borderColor: '#f1f5f9',
   },
   photoName: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#0f172a',
+    fontSize: 12,
+    fontWeight: '800',
   },
   geoTag: {
     fontSize: 11,
-    color: '#059669',
+    color: '#10B981',
     fontWeight: '600',
     marginTop: 2,
   },
   geoPending: {
     fontSize: 11,
-    color: '#d97706',
+    color: '#F59E0B',
     fontWeight: '600',
     marginTop: 2,
   },
   captureBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#0f172a',
-    paddingHorizontal: 14,
+    backgroundColor: '#0066FF',
+    paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: 10,
+    borderRadius: 8,
   },
   recaptureBtn: {
-    backgroundColor: '#059669',
+    backgroundColor: '#10B981',
   },
   captureBtnText: {
-    color: '#ffffff',
+    color: '#FFFFFF',
     fontSize: 11,
-    fontWeight: '700',
+    fontWeight: '800',
   },
   signatureBox: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
+    borderRadius: 14,
     borderWidth: 1.5,
     borderStyle: 'dashed',
-    borderColor: '#cbd5e1',
-    minHeight: 160,
+    minHeight: 140,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    padding: 16,
     marginBottom: 16,
   },
   touchSignArea: {
     alignItems: 'center',
   },
   touchSignPrompt: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '700',
-    color: '#64748b',
   },
   signedContent: {
     alignItems: 'center',
   },
   signedName: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '800',
-    color: '#0f172a',
     marginTop: 6,
   },
   signedTime: {
     fontSize: 11,
-    color: '#64748b',
     marginTop: 2,
   },
   signedHash: {
     fontSize: 10,
-    color: '#94a3b8',
     marginTop: 4,
   },
   completeJobBtn: {
-    backgroundColor: '#059669',
-    paddingVertical: 14,
-    borderRadius: 14,
+    backgroundColor: '#10B981',
+    paddingVertical: 13,
+    borderRadius: 12,
     alignItems: 'center',
-    marginTop: 10,
+    marginTop: 6,
     marginBottom: 40,
+    shadowColor: '#10B981',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3,
+    elevation: 2,
   },
   completeJobBtnText: {
-    color: '#ffffff',
-    fontSize: 14,
+    color: '#FFFFFF',
+    fontSize: 13,
     fontWeight: '800',
+  },
+
+  // ASSIGN MODAL
+  assignModalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.65)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  assignCard: {
+    borderRadius: 22,
+    borderWidth: 1,
+    padding: 20,
+    width: '100%',
+    maxWidth: 440,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.2,
+    shadowRadius: 14,
+    elevation: 8,
+  },
+  assignHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  assignTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    letterSpacing: -0.3,
+  },
+  assignSub: {
+    fontSize: 11,
+    marginTop: 2,
+    fontWeight: '500',
+  },
+  closeModalBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  assignSectionTitle: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+    marginTop: 6,
+    marginBottom: 4,
+  },
+  techCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderWidth: 1,
+    padding: 12,
+    borderRadius: 12,
+  },
+  techIconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  techName: {
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  techRole: {
+    fontSize: 11,
+    marginTop: 1,
+  },
+  techPhone: {
+    fontSize: 10,
+    marginTop: 1,
+  },
+  assignActionBadge: {
+    backgroundColor: '#0066FF',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  assignActionText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#FFFFFF',
   },
 });

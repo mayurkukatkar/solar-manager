@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { AppState } from 'react-native';
 import { UserProfile, BackendConnectionStatus } from '../types';
 import {
   SafeStorage,
@@ -7,8 +8,10 @@ import {
   checkBackendHealth,
   setUnauthorizedHandler,
   setSuspendedHandler,
+  addNetworkStatusListener,
 } from '../api/client';
 import { authApi } from '../api/endpoints';
+import { offlineSyncService } from '../services/offlineSyncService';
 
 export interface LoginResult {
   success: boolean;
@@ -51,11 +54,11 @@ const AuthContext = createContext<AuthContextType>({
   backendStatus: { isOnline: true, serverUrl: 'https://solar-manager-three.vercel.app' },
   login: async () => ({ success: false }),
   forceResetPassword: async () => ({ success: false }),
-  logout: async () => {},
+  logout: async () => { },
   updateServerUrl: async () => ({ isOnline: false, serverUrl: '' }),
   checkServerConnection: async () => ({ isOnline: false, serverUrl: '' }),
-  clearSessionExpired: () => {},
-  clearAccountSuspended: () => {},
+  clearSessionExpired: () => { },
+  clearAccountSuspended: () => { },
 });
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -91,8 +94,48 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Register global interceptor handlers
     setUnauthorizedHandler(handleSessionExpiry);
     setSuspendedHandler(handleAccountSuspended);
+
+    const removeNetListener = addNetworkStatusListener((isOnline) => {
+      setBackendStatus((prev) => ({
+        ...prev,
+        isOnline,
+        lastChecked: new Date().toLocaleTimeString(),
+      }));
+      if (isOnline) {
+        offlineSyncService.syncQueue({ tenantId: user?.tenantId || undefined }).catch(() => { });
+      }
+    });
+
+    // AppState auto-recovery: re-verify connection when user switches back to app
+    const appStateSub = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState === 'active') {
+        checkBackendHealth().then((st) => {
+          setBackendStatus(st);
+          if (st.isOnline) {
+            offlineSyncService.syncQueue({ tenantId: user?.tenantId || undefined }).catch(() => {});
+          }
+        }).catch(() => {});
+      }
+    });
+
+    // Auto-recovery polling interval (checks every 12s if offline, 45s if online)
+    const heartbeatTimer = setInterval(() => {
+      checkBackendHealth().then((st) => {
+        setBackendStatus(st);
+        if (st.isOnline) {
+          offlineSyncService.syncQueue({ tenantId: user?.tenantId || undefined }).catch(() => {});
+        }
+      }).catch(() => {});
+    }, backendStatus.isOnline ? 45000 : 12000);
+
     initSession();
-  }, [handleSessionExpiry, handleAccountSuspended]);
+
+    return () => {
+      removeNetListener();
+      appStateSub.remove();
+      clearInterval(heartbeatTimer);
+    };
+  }, [handleSessionExpiry, handleAccountSuspended, user?.tenantId, backendStatus.isOnline]);
 
   const initSession = async () => {
     try {
@@ -123,6 +166,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               tenantName: meData.user.tenant?.name || 'Solar Solutions',
               tenantId: meData.user.tenantId,
               tenant: meData.user.tenant,
+              permissions: meData.user.permissions || (['SUPER_ADMIN', 'TENANT_ADMIN'].includes(meData.user.role) ? ['*'] : []),
+              department: meData.user.staffProfile?.department || null,
+              designation: meData.user.staffProfile?.designation || null,
             };
             setUser(verifiedProfile);
             setToken(storedToken);
@@ -138,8 +184,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (
             meErr.response?.status === 403 &&
             (meErr.response?.data?.code === 'TENANT_SUSPENDED' ||
-             meErr.response?.data?.isSuspended ||
-             errMsg.toLowerCase().includes('suspended'))
+              meErr.response?.data?.isSuspended ||
+              errMsg.toLowerCase().includes('suspended'))
           ) {
             await handleAccountSuspended(errMsg || 'Account Suspended: Your organization account has been suspended.');
             return;
@@ -170,6 +216,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const checkServerConnection = async (): Promise<BackendConnectionStatus> => {
     const status = await checkBackendHealth();
     setBackendStatus(status);
+    if (status.isOnline) {
+      offlineSyncService.syncQueue({ tenantId: user?.tenantId || undefined }).catch(() => {});
+    }
     return status;
   };
 
@@ -219,6 +268,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         let tenantName = 'Solar Solutions';
         let tenantId = null;
         let tenantObj: any = null;
+        let effectivePermissions: any = res.user?.permissions || res.permissions || null;
+        let department: string | null = res.user?.department || null;
+        let designation: string | null = res.user?.designation || null;
+        let resolvedRole: string = res.user?.role || res.role || 'TENANT_ADMIN';
+        let resolvedId: string = res.user?.id || res.userId || 'usr-live';
 
         try {
           const meData = await authApi.getMe();
@@ -235,23 +289,40 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             tenantName = meData.user.tenant?.name || tenantName;
             tenantId = meData.user.tenantId;
             tenantObj = meData.user.tenant;
+            resolvedRole = meData.user.role || resolvedRole;
+            resolvedId = meData.user.id || resolvedId;
+            if (meData.user.permissions) {
+              effectivePermissions = meData.user.permissions;
+            }
+            if (meData.user.staffProfile) {
+              department = meData.user.staffProfile.department || department;
+              designation = meData.user.staffProfile.designation || designation;
+            }
           }
         } catch {
           // meData optional
         }
 
+        if (!effectivePermissions && (resolvedRole === 'SUPER_ADMIN' || resolvedRole === 'TENANT_ADMIN')) {
+          effectivePermissions = ['*'];
+        }
+
         const profile: UserProfile = {
-          id: res.userId || 'usr-live',
+          id: resolvedId,
           name: profileName,
           email: email.trim().toLowerCase(),
-          role: res.role || 'TENANT_ADMIN',
+          role: resolvedRole,
           tenantName,
           tenantId,
           tenant: tenantObj,
+          permissions: effectivePermissions,
+          department,
+          designation,
         };
 
         setUser(profile);
         await SafeStorage.setItem(STORAGE_USER_PROFILE_KEY, JSON.stringify(profile));
+        offlineSyncService.syncQueue({ tenantId: profile.tenantId || undefined }).catch(() => { });
         setIsLoading(false);
         return { success: true };
       }
@@ -263,8 +334,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const isSuspended =
         err.response?.status === 403 &&
         (err.response?.data?.code === 'TENANT_SUSPENDED' ||
-         err.response?.data?.isSuspended ||
-         String(err.message || '').toLowerCase().includes('suspended'));
+          err.response?.data?.isSuspended ||
+          String(err.message || '').toLowerCase().includes('suspended'));
 
       if (isSuspended) {
         const suspendMsg =

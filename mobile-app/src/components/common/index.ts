@@ -4,3 +4,7 @@ export * from './Badge';
 export * from './Input';
 export * from './EmptyState';
 export * from './SkeletonLoader';
+export * from './KeyboardAvoidingContainer';
+export * from './ModalHeader';
+export * from './PermissionRationaleModal';
+export * from './GridBackground';

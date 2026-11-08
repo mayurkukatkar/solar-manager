@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -21,8 +21,11 @@ import {
   FileCheck,
   Award,
 } from 'lucide-react-native';
-import { ModalHeader } from '../../components/Header';
+import { ModalHeader, useDirtyFormWarning } from '../../components/common/ModalHeader';
 import { tenantApi } from '../../api/endpoints';
+import { SafeStorage } from '../../api/client';
+import { haptics } from '../../utils/haptics';
+import { offlineSyncService } from '../../services/offlineSyncService';
 
 interface InstallationQAModalProps {
   visible: boolean;
@@ -46,6 +49,31 @@ export const InstallationQAModal: React.FC<InstallationQAModalProps> = ({
   const [antiIslandingTripSec, setAntiIslandingTripSec] = useState('0.18');
   const [insulationMegaOhms, setInsulationMegaOhms] = useState('2500');
 
+  useEffect(() => {
+    if (!visible || !project?.id) return;
+    const loadSavedQA = async () => {
+      try {
+        const stored = await SafeStorage.getItem(`@solar_qa_${project.id}`);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed.pit1Inverter) setPit1Inverter(String(parsed.pit1Inverter));
+          if (parsed.pit2Structure) setPit2Structure(String(parsed.pit2Structure));
+          if (parsed.pit3Lightning) setPit3Lightning(String(parsed.pit3Lightning));
+          if (parsed.antiIslandingTripSec) setAntiIslandingTripSec(String(parsed.antiIslandingTripSec));
+          if (parsed.insulationMegaOhms) setInsulationMegaOhms(String(parsed.insulationMegaOhms));
+        } else if (project?.qaReadings) {
+          const r = project.qaReadings;
+          if (r.pit1Inverter) setPit1Inverter(String(r.pit1Inverter));
+          if (r.pit2Structure) setPit2Structure(String(r.pit2Structure));
+          if (r.pit3Lightning) setPit3Lightning(String(r.pit3Lightning));
+          if (r.antiIslandingTripSec) setAntiIslandingTripSec(String(r.antiIslandingTripSec));
+          if (r.insulationMegaOhms) setInsulationMegaOhms(String(r.insulationMegaOhms));
+        }
+      } catch (_) {}
+    };
+    loadSavedQA();
+  }, [visible, project?.id]);
+
   // Checklist items
   const [checklist, setChecklist] = useState([
     { id: '1', title: 'Mounting Structure Torque Check', desc: 'All mid/end clamps torqued to 12-14 Nm', done: true },
@@ -56,35 +84,67 @@ export const InstallationQAModal: React.FC<InstallationQAModalProps> = ({
   ]);
 
   const toggleItem = (id: string) => {
+    haptics.selection();
     setChecklist((prev) =>
       prev.map((item) => (item.id === id ? { ...item, done: !item.done } : item))
     );
   };
 
-  const numPit1 = parseFloat(pit1Inverter);
-  const numPit2 = parseFloat(pit2Structure);
-  const numPit3 = parseFloat(pit3Lightning);
-  const numTrip = parseFloat(antiIslandingTripSec);
-  const numInsulation = parseFloat(insulationMegaOhms);
+  const {
+    numPit1,
+    numPit2,
+    numPit3,
+    numTrip,
+    numInsulation,
+    isPit1Pass,
+    isPit2Pass,
+    isPit3Pass,
+    isTripPass,
+    isInsulationPass,
+    allTestsPass,
+    failureReasons,
+  } = useMemo(() => {
+    const p1 = parseFloat(pit1Inverter);
+    const p2 = parseFloat(pit2Structure);
+    const p3 = parseFloat(pit3Lightning);
+    const trip = parseFloat(antiIslandingTripSec);
+    const ins = parseFloat(insulationMegaOhms);
 
-  // Strict statutory thresholds per CEA Regulations & IEEE 1547 standards
-  const isPit1Pass = !isNaN(numPit1) && numPit1 >= 0 && numPit1 < 5.0;
-  const isPit2Pass = !isNaN(numPit2) && numPit2 >= 0 && numPit2 < 5.0;
-  const isPit3Pass = !isNaN(numPit3) && numPit3 >= 0 && numPit3 < 5.0;
-  const isTripPass = !isNaN(numTrip) && numTrip >= 0 && numTrip < 2.0;
-  const isInsulationPass = !isNaN(numInsulation) && numInsulation > 1.0;
+    // Strict statutory thresholds per CEA Regulations & IEEE 1547 standards
+    const passP1 = !isNaN(p1) && p1 >= 0 && p1 < 5.0;
+    const passP2 = !isNaN(p2) && p2 >= 0 && p2 < 5.0;
+    const passP3 = !isNaN(p3) && p3 >= 0 && p3 < 5.0;
+    const passTrip = !isNaN(trip) && trip >= 0 && trip < 2.0;
+    const passIns = !isNaN(ins) && ins > 1.0;
 
-  const allTestsPass = isPit1Pass && isPit2Pass && isPit3Pass && isTripPass && isInsulationPass;
+    const allPass = passP1 && passP2 && passP3 && passTrip && passIns;
 
-  const failureReasons: string[] = [];
-  if (!isPit1Pass) failureReasons.push('Inverter Earth Pit 1 must be strictly < 5.0 Ω (CEA Regulations)');
-  if (!isPit2Pass) failureReasons.push('Structure Earth Pit 2 must be strictly < 5.0 Ω (CEA Regulations)');
-  if (!isPit3Pass) failureReasons.push('Lightning Arrestor Earth Pit 3 must be strictly < 5.0 Ω (CEA Regulations)');
-  if (!isTripPass) failureReasons.push('Anti-Islanding Grid Trip Time must be strictly < 2.0 s (IEEE 1547 / CEA Standards)');
-  if (!isInsulationPass) failureReasons.push('Inverter Insulation Resistance must be strictly > 1.0 MΩ (CEA Statutory Threshold)');
+    const reasons: string[] = [];
+    if (!passP1) reasons.push('Inverter Earth Pit 1 must be strictly < 5.0 Ω (CEA Regulations)');
+    if (!passP2) reasons.push('Structure Earth Pit 2 must be strictly < 5.0 Ω (CEA Regulations)');
+    if (!passP3) reasons.push('Lightning Arrestor Earth Pit 3 must be strictly < 5.0 Ω (CEA Regulations)');
+    if (!passTrip) reasons.push('Anti-Islanding Grid Trip Time must be strictly < 2.0 s (IEEE 1547 / CEA Standards)');
+    if (!passIns) reasons.push('Inverter Insulation Resistance must be strictly > 1.0 MΩ (CEA Statutory Threshold)');
+
+    return {
+      numPit1: p1,
+      numPit2: p2,
+      numPit3: p3,
+      numTrip: trip,
+      numInsulation: ins,
+      isPit1Pass: passP1,
+      isPit2Pass: passP2,
+      isPit3Pass: passP3,
+      isTripPass: passTrip,
+      isInsulationPass: passIns,
+      allTestsPass: allPass,
+      failureReasons: reasons,
+    };
+  }, [pit1Inverter, pit2Structure, pit3Lightning, antiIslandingTripSec, insulationMegaOhms]);
 
   const handleSubmitQA = async () => {
     if (!allTestsPass) {
+      haptics.notificationError();
       Alert.alert(
         'Electrical Safety Gating Blocked',
         `Cannot certify statutory QA sign-off due to safety threshold violations:\n\n• ${failureReasons.join('\n• ')}\n\nRectify earth pit ohmic values, trip time, or insulation before DISCOM inspection.`
@@ -92,12 +152,27 @@ export const InstallationQAModal: React.FC<InstallationQAModalProps> = ({
       return;
     }
 
+    const qaPayload = {
+      pit1Inverter: pit1Inverter.trim(),
+      pit2Structure: pit2Structure.trim(),
+      pit3Lightning: pit3Lightning.trim(),
+      antiIslandingTripSec: antiIslandingTripSec.trim(),
+      insulationMegaOhms: insulationMegaOhms.trim(),
+      certifiedAt: new Date().toISOString(),
+      checklistPassed: checklist.every((c) => c.done),
+      passed: true,
+    };
+
     setSubmitting(true);
     try {
       if (project?.id) {
+        await SafeStorage.setItem(`@solar_qa_${project.id}`, JSON.stringify(qaPayload));
+        project.qaReadings = qaPayload;
+        project.qaPassed = true;
         await tenantApi.advanceProjectStage(project.id, 'Testing', 'Electrical Testing & QA Completed via Mobile Field OS');
       }
 
+      haptics.notificationSuccess();
       Alert.alert(
         'QA Testing Passed & Certified',
         `Project "${project?.name || 'Solar Project'}" has successfully passed electrical earthing and safety QA.\n\nWork Completion Report (WCR) is ready for statutory submission.`
@@ -106,6 +181,22 @@ export const InstallationQAModal: React.FC<InstallationQAModalProps> = ({
       if (onSuccess) onSuccess();
       onClose();
     } catch (err: any) {
+      if (project?.id) {
+        try {
+          await SafeStorage.setItem(`@solar_qa_${project.id}`, JSON.stringify(qaPayload));
+          project.qaReadings = qaPayload;
+          project.qaPassed = true;
+          await offlineSyncService.enqueueMutation({
+            type: 'RECORD_QA_READINGS',
+            endpoint: `/api/tenant/projects/${project.id}/stage`,
+            method: 'PATCH',
+            payload: { stage: 'Testing', qaReadings: qaPayload, note: 'CEA Testing Certified (Offline)' },
+            entityId: project.id,
+            entityType: 'project',
+          });
+        } catch (_) {}
+      }
+      haptics.notificationSuccess();
       Alert.alert('Notice', 'QA record saved locally.');
       if (onSuccess) onSuccess();
       onClose();
@@ -114,14 +205,29 @@ export const InstallationQAModal: React.FC<InstallationQAModalProps> = ({
     }
   };
 
+  const isDirty = (
+    pit1Inverter !== '2.1' ||
+    pit2Structure !== '1.8' ||
+    pit3Lightning !== '2.4' ||
+    antiIslandingTripSec !== '0.18' ||
+    insulationMegaOhms !== '2500'
+  );
+
+  const handleGuardedClose = useDirtyFormWarning(
+    isDirty,
+    onClose,
+    'Discard Electrical Readings?',
+    'You have modified electrical test readings. Are you sure you want to discard unsaved measurements?'
+  );
+
   return (
-    <Modal visible={visible} animationType="slide" transparent={false} onRequestClose={onClose}>
+    <Modal visible={visible} animationType="slide" transparent={false} onRequestClose={handleGuardedClose}>
       <View style={styles.container}>
-        {/* STANDARDIZED MODAL HEADER */}
+        {/* STANDARDIZED MODAL HEADER WITH DIRTY GUARD */}
         <ModalHeader
           title="Installation QA & Testing"
           subtitle="Statutory Electrical Testing & Quality Sign-Off"
-          onClose={onClose}
+          onClose={handleGuardedClose}
         />
 
         <ScrollView style={styles.body} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>

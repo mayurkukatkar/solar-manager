@@ -230,6 +230,9 @@ model Lead {
   activities LeadActivity[]
   followUps  LeadFollowUp[]
   leadNotes  LeadNote[]
+  @@index([tenantId, createdAt])
+  @@index([tenantId, status])
+  @@index([tenantId, mobile])
 }
 
 model LeadActivity {
@@ -294,6 +297,8 @@ model Customer {
   InstallationJob InstallationJob[]
   Document        Document[]
   DocumentRequest DocumentRequest[]
+  @@index([tenantId, createdAt])
+  @@index([tenantId, mobile])
 }
 
 model SiteSurvey {
@@ -378,6 +383,8 @@ model SiteSurvey {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  @@index([tenantId, createdAt])
+  @@index([leadId])
 }
 
 model Quotation {
@@ -489,6 +496,9 @@ model Quotation {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  @@index([tenantId, createdAt])
+  @@index([leadId])
+  @@index([customerId])
 }
 
 model ProposalTemplate {
@@ -883,6 +893,9 @@ model Project {
   Document              Document[]
   DocumentRequest       DocumentRequest[]
   staffAssignments      ProjectStaffAssignment[]
+  @@index([tenantId, createdAt])
+  @@index([tenantId, status])
+  @@index([tenantId, currentStage])
 }
 
 model ProjectStageHistory {
@@ -1103,6 +1116,10 @@ model Invoice {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  @@index([tenantId, createdAt])
+  @@index([tenantId, status])
+  @@index([customerId])
+  @@index([projectId])
 }
 
 model Payment {

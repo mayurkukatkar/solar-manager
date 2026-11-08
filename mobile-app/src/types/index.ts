@@ -10,6 +10,9 @@ export interface UserProfile {
   avatarUrl?: string;
   backendRole?: string;
   tenant?: any;
+  permissions?: string[] | { modules?: string[] } | any;
+  department?: string | null;
+  designation?: string | null;
 }
 
 export interface HorizonItem {

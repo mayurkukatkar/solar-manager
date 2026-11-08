@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -12,35 +12,29 @@ import {
   Modal,
 } from 'react-native';
 import {
-  Calculator,
   Zap,
   Sparkles,
-  FileText,
   MessageCircle,
-  Share2,
-  TrendingDown,
-  Percent,
   Eye,
   CheckCircle2,
   Send,
   ChevronRight,
   ChevronLeft,
   Check,
-  Layers,
-  ShieldCheck,
-  Building,
   Plus,
-  Edit3,
-  Sliders,
   X,
-  Tag,
+  AlertTriangle,
+  IndianRupee,
+  Layers,
+  ArrowRight,
 } from 'lucide-react-native';
 import { Header } from '../../components/Header';
-import { generateQuotationHtml, sharePdfFile, printDirectly, QuotationPdfProps } from '../../services/pdfService';
+import { generateQuotationHtml, sharePdfFile, QuotationPdfProps } from '../../services/pdfService';
 import { openWhatsAppWithPitch } from '../../services/whatsappService';
 import { quotationsApi } from '../../api/endpoints';
 import { ProposalPreviewModal } from '../../components/ProposalPreviewModal';
 import { SafeStorage } from '../../api/client';
+import { useTheme } from '../../theme';
 
 export interface DynamicGearItem {
   id: string;
@@ -101,14 +95,6 @@ export const DEFAULT_PANEL_OPTIONS: DynamicGearItem[] = [
     subtitle: 'DCR Cell & Module • High Temp Coefficient',
     tag: 'DCR Compliant',
   },
-  {
-    id: 'rayzon_545',
-    name: 'Rayzon 545W Mono PERC Bifacial',
-    brand: 'Rayzon Solar',
-    wattage: 545,
-    subtitle: 'MNRE / ALMM Approved • Indian Manufacturing',
-    tag: 'ALMM Listed',
-  },
 ];
 
 export const DEFAULT_INVERTER_OPTIONS: DynamicGearItem[] = [
@@ -147,27 +133,14 @@ export const DEFAULT_INVERTER_OPTIONS: DynamicGearItem[] = [
     subtitle: 'IP65 Water Resistant • Built-in Surge Protection Type II',
     tag: 'Type II SPD',
   },
-  {
-    id: 'deye_grid',
-    name: 'Deye On-Grid High Efficiency Inverter',
-    brand: 'Deye',
-    subtitle: 'Dual MPPT • LCD Screen Display & App Control',
-    tag: 'Smart Display',
-  },
-  {
-    id: 'havells_enviro',
-    name: 'Havells Enviro Grid-Tied Inverter',
-    brand: 'Havells',
-    subtitle: '10 Years Replacement Warranty • Native Indian Grid Ready',
-    tag: '10-Yr Warranty',
-  },
 ];
 
 export const QuickQuoteScreen: React.FC<{ navigation?: any; route?: any }> = ({ navigation, route }) => {
+  const { colors, isDark } = useTheme();
   const initialParams = route?.params || {};
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
   const [panelBrand, setPanelBrand] = useState('Waaree 540W Mono PERC Bifacial');
-  const [inverterBrand, setInverterBrand] = useState('Solis Dual MPPT On-Grid');
+  const [inverterBrand, setInverterBrand] = useState('Solis Dual MPPT Smart Inverter');
   const [structureType, setStructureType] = useState('Elevated HDG Structure');
   const [customPanels, setCustomPanels] = useState<DynamicGearItem[]>([]);
   const [customInverters, setCustomInverters] = useState<DynamicGearItem[]>([]);
@@ -179,9 +152,14 @@ export const QuickQuoteScreen: React.FC<{ navigation?: any; route?: any }> = ({ 
   const [customGearTag, setCustomGearTag] = useState('');
   const [prospectName, setProspectName] = useState(initialParams.prospectName || initialParams.lead?.name || '');
   const [prospectPhone, setProspectPhone] = useState(initialParams.prospectPhone || initialParams.lead?.mobile || '');
-  const [monthlyBill, setMonthlyBill] = useState(initialParams.monthlyBill || (initialParams.lead?.monthlyBill ? String(initialParams.lead.monthlyBill) : '3500'));
+  const [monthlyBill, setMonthlyBill] = useState(
+    initialParams.monthlyBill || (initialParams.lead?.monthlyBill ? String(initialParams.lead.monthlyBill) : '3500')
+  );
   const defaultCap = initialParams.capacityKw || (initialParams.lead?.estimatedCap ? String(initialParams.lead.estimatedCap) : '3.3');
   const [capacityKw, setCapacityKw] = useState(defaultCap);
+  const [sanctionedLoad, setSanctionedLoad] = useState(
+    initialParams.sanctionedLoad || (initialParams.lead?.sanctionedLoad ? String(initialParams.lead.sanctionedLoad) : '5.0')
+  );
   const initialCapNum = parseFloat(defaultCap) || 3.3;
   const [systemCost, setSystemCost] = useState(
     initialParams.systemCost || String(Math.round(initialCapNum * 58000))
@@ -189,7 +167,6 @@ export const QuickQuoteScreen: React.FC<{ navigation?: any; route?: any }> = ({ 
   const [showVisualPreview, setShowVisualPreview] = useState(false);
   const [sharingWhatsAppPdf, setSharingWhatsAppPdf] = useState(false);
   const [sendingPitchText, setSendingPitchText] = useState(false);
-  const [sharingPdf, setSharingPdf] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [syncedQuote, setSyncedQuote] = useState<any>(null);
 
@@ -289,35 +266,65 @@ export const QuickQuoteScreen: React.FC<{ navigation?: any; route?: any }> = ({ 
     setGearModalVisible(false);
   };
 
-  // Calculations: Single input drives turnkey pricing (All GST Included)
-  const cap = parseFloat(capacityKw) || 3.3;
-  const gross = parseFloat(systemCost) || Math.round(cap * 58000);
+  // Calculations
+  const {
+    cap,
+    gross,
+    subsidy,
+    net,
+    monthlyUnits,
+    annualUnits,
+    monthlySavings,
+    lifetimeSavings,
+    paybackYears,
+  } = useMemo(() => {
+    const c = parseFloat(capacityKw) || 3.3;
+    const g = parseFloat(systemCost) || Math.round(c * 58000);
 
-  const computeSubsidy = (kw: number): number => {
-    if (kw <= 0) return 0;
-    if (kw <= 1) return 30000;
-    if (kw <= 2) return 60000;
-    return 78000;
+    let sub = 0;
+    if (c > 0) {
+      if (c <= 1) sub = 30000;
+      else if (c <= 2) sub = 60000;
+      else sub = 78000;
+    }
+
+    const n = Math.max(0, g - sub);
+    const mUnits = Math.round(c * 120);
+    const aUnits = Math.round(c * 1460);
+    const mSavings = Math.round(mUnits * 8.5);
+    const lSavings = Math.round(aUnits * 25 * 8.5 * 0.92);
+    const pYears = mSavings > 0 ? Number((n / (mSavings * 12)).toFixed(1)) : 0;
+
+    return {
+      cap: c,
+      gross: g,
+      subsidy: sub,
+      net: n,
+      monthlyUnits: mUnits,
+      annualUnits: aUnits,
+      monthlySavings: mSavings,
+      lifetimeSavings: lSavings,
+      paybackYears: pYears,
+    };
+  }, [capacityKw, systemCost]);
+
+  const getBenchmarkRatePerKw = (kw: number) => {
+    if (kw <= 2) return 62000;
+    if (kw <= 3.3) return 58000;
+    if (kw <= 5) return 53000;
+    if (kw <= 10) return 48000;
+    return 44000;
   };
 
-  const subsidy = computeSubsidy(cap);
-  const net = Math.max(0, gross - subsidy);
-
-  const monthlyUnits = Math.round(cap * 120);
-  const annualUnits = Math.round(cap * 1460);
-  const monthlySavings = Math.round(monthlyUnits * 8.5);
-  const lifetimeSavings = Math.round(annualUnits * 25 * 8.5 * 0.92);
-  const paybackYears = Number((net / (monthlySavings * 12)).toFixed(1));
-
-  // Auto-adjust capacity & suggested system cost when bill changes
   const handleBillChange = (val: string) => {
     setMonthlyBill(val);
     const billNum = parseFloat(val);
     if (!isNaN(billNum) && billNum > 0) {
-      const rec = Math.max(1, Math.min(25, (billNum / 8.5) / 120));
+      const rec = Math.max(1, Math.min(25, billNum / 8.5 / 120));
       const formattedCap = rec.toFixed(1);
       setCapacityKw(formattedCap);
-      setSystemCost(String(Math.round(parseFloat(formattedCap) * 58000)));
+      const kwVal = parseFloat(formattedCap);
+      setSystemCost(String(Math.round(kwVal * getBenchmarkRatePerKw(kwVal))));
     }
   };
 
@@ -325,7 +332,7 @@ export const QuickQuoteScreen: React.FC<{ navigation?: any; route?: any }> = ({ 
     setCapacityKw(val);
     const cNum = parseFloat(val);
     if (!isNaN(cNum) && cNum > 0) {
-      setSystemCost(String(Math.round(cNum * 58000)));
+      setSystemCost(String(Math.round(cNum * getBenchmarkRatePerKw(cNum))));
     }
   };
 
@@ -344,8 +351,8 @@ export const QuickQuoteScreen: React.FC<{ navigation?: any; route?: any }> = ({ 
       quotationDate: new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
       validUntil: new Date(Date.now() + 15 * 86400000).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
       templateType: 'quick_quote',
-      primaryColor: '#0284c7',
-      accentColor: '#059669',
+      primaryColor: '#0066FF',
+      accentColor: '#10B981',
       companyName: 'WhereReady Solar OS',
       companyLegalName: 'WhereReady Solar Technologies Pvt Ltd',
       companyAddress: 'Corporate Tower, MIDC Tech Park, Pune 411038',
@@ -399,11 +406,13 @@ export const QuickQuoteScreen: React.FC<{ navigation?: any; route?: any }> = ({ 
       const res = await quotationsApi.createQuotation({
         leadId: initialParams.lead?.id,
         customerId: initialParams.lead?.customerId,
-        newCustomer: (!initialParams.lead?.id && !initialParams.lead?.customerId) ? {
-          name: prospectName.trim(),
-          mobile: prospectPhone.trim(),
-          address: initialParams.lead?.address || 'Site Location, Maharashtra',
-        } : undefined,
+        newCustomer: !initialParams.lead?.id && !initialParams.lead?.customerId
+          ? {
+            name: prospectName.trim(),
+            mobile: prospectPhone.trim(),
+            address: initialParams.lead?.address || 'Site Location, Maharashtra',
+          }
+          : undefined,
         customerName: prospectName.trim(),
         customerPhone: prospectPhone.trim(),
         systemCapacity: cap,
@@ -436,7 +445,7 @@ export const QuickQuoteScreen: React.FC<{ navigation?: any; route?: any }> = ({ 
       return;
     }
     if (!syncedQuote) {
-      syncToBackend('VIEWED').catch(() => {});
+      syncToBackend('VIEWED').catch(() => { });
     }
     setShowVisualPreview(true);
   };
@@ -491,29 +500,9 @@ export const QuickQuoteScreen: React.FC<{ navigation?: any; route?: any }> = ({ 
     }
   };
 
-  const handleSharePdfFile = async () => {
-    if (!prospectName.trim()) {
-      Alert.alert('Customer Name', 'Please enter a prospect name for the proposal');
-      return;
-    }
-    setSharingPdf(true);
-    try {
-      if (!syncedQuote) {
-        syncToBackend('SENT').catch(() => {});
-      }
-      const payload = buildPdfPayload();
-      const html = generateQuotationHtml(payload);
-      await sharePdfFile(html, `Quick_Quote_${prospectName.replace(/\s+/g, '_')}.pdf`, prospectPhone);
-    } catch (err: any) {
-      Alert.alert('PDF Export Error', err.message || 'Could not export proposal PDF');
-    } finally {
-      setSharingPdf(false);
-    }
-  };
-
   return (
-    <View style={styles.container}>
-      {/* STANDARDIZED HEADER */}
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      {/* HEADER */}
       <Header
         variant={navigation?.canGoBack?.() ? 'detail' : 'main'}
         title="60s Solar Estimator"
@@ -522,152 +511,347 @@ export const QuickQuoteScreen: React.FC<{ navigation?: any; route?: any }> = ({ 
         rightAction={
           syncedQuote ? (
             <View style={styles.badgeSynced}>
-              <CheckCircle2 size={12} color="#15803d" />
+              <CheckCircle2 size={12} color="#10B981" />
               <Text style={styles.badgeSyncedText}>Web: {syncedQuote.qNumber}</Text>
             </View>
           ) : syncing ? (
             <View style={styles.badgeSyncing}>
-              <ActivityIndicator size="small" color="#2563eb" />
+              <ActivityIndicator size="small" color="#0066FF" />
               <Text style={styles.badgeSyncingText}>Syncing...</Text>
             </View>
           ) : undefined
         }
       />
 
-      {/* 1. PERSISTENT FLOATING FINANCIAL KPI STRIP (WhereReady Field Experience) */}
-      <View style={styles.floatingKpiStrip}>
+      {/* FLOATING FINANCIAL KPI STRIP */}
+      <View
+        style={[
+          styles.floatingKpiStrip,
+          {
+            backgroundColor: colors.surface,
+            borderColor: colors.borderSubtle,
+          },
+        ]}
+      >
         <View style={styles.kpiCol}>
-          <Text style={styles.kpiColLabel}>CAPACITY</Text>
-          <Text style={styles.kpiColVal}>{cap} kWp</Text>
+          <Text style={[styles.kpiColLabel, { color: colors.textMuted }]}>CAPACITY</Text>
+          <Text style={[styles.kpiColVal, { color: colors.text }]}>{cap} kWp</Text>
         </View>
-        <View style={styles.kpiDivider} />
+        <View style={[styles.kpiDivider, { backgroundColor: colors.borderSubtle }]} />
         <View style={styles.kpiCol}>
-          <Text style={styles.kpiColLabel}>TURNKEY GROSS</Text>
-          <Text style={styles.kpiColVal}>₹{(gross / 1000).toFixed(0)}k</Text>
+          <Text style={[styles.kpiColLabel, { color: colors.textMuted }]}>GROSS</Text>
+          <Text style={[styles.kpiColVal, { color: colors.text }]}>₹{(gross / 1000).toFixed(0)}k</Text>
         </View>
-        <View style={styles.kpiDivider} />
+        <View style={[styles.kpiDivider, { backgroundColor: colors.borderSubtle }]} />
         <View style={styles.kpiCol}>
-          <Text style={styles.kpiColLabel}>DBT SUBSIDY</Text>
-          <Text style={[styles.kpiColVal, { color: '#059669' }]}>-₹{(subsidy / 1000).toFixed(0)}k</Text>
+          <Text style={[styles.kpiColLabel, { color: colors.textMuted }]}>DBT SUBSIDY</Text>
+          <Text style={[styles.kpiColVal, { color: '#10B981' }]}>-₹{(subsidy / 1000).toFixed(0)}k</Text>
         </View>
-        <View style={styles.kpiDivider} />
+        <View style={[styles.kpiDivider, { backgroundColor: colors.borderSubtle }]} />
         <View style={styles.kpiCol}>
-          <Text style={styles.kpiColLabel}>NET PAYABLE</Text>
+          <Text style={[styles.kpiColLabel, { color: colors.textMuted }]}>NET PAYABLE</Text>
           <Text style={[styles.kpiColVal, { color: '#0066FF' }]}>₹{(net / 1000).toFixed(0)}k</Text>
         </View>
       </View>
 
-      {/* 2. OLA-INSPIRED GUIDED PROGRESS STEPPER TRACK */}
-      <View style={styles.guidedStepperTrack}>
+      {/* STEPPER TRACK */}
+      <View
+        style={[
+          styles.stepperTrack,
+          {
+            backgroundColor: colors.surface,
+            borderColor: colors.borderSubtle,
+          },
+        ]}
+      >
         <TouchableOpacity
           style={[styles.stepTab, currentStep === 1 && styles.stepTabActive]}
           onPress={() => setCurrentStep(1)}
           activeOpacity={0.8}
         >
-          <View style={[styles.stepNumCircle, currentStep === 1 ? styles.stepNumActive : currentStep > 1 ? styles.stepNumDone : styles.stepNumInactive]}>
-            {currentStep > 1 ? <Check size={11} color="#ffffff" strokeWidth={3} /> : <Text style={styles.stepNumText}>1</Text>}
+          <View
+            style={[
+              styles.stepNumCircle,
+              currentStep === 1
+                ? styles.stepNumActive
+                : currentStep > 1
+                  ? styles.stepNumDone
+                  : styles.stepNumInactive,
+            ]}
+          >
+            {currentStep > 1 ? (
+              <Check size={11} color="#FFFFFF" strokeWidth={3} />
+            ) : (
+              <Text style={styles.stepNumText}>1</Text>
+            )}
           </View>
-          <Text style={[styles.stepTabText, currentStep === 1 && styles.stepTabTextActive]}>Customer</Text>
+          <Text
+            style={[
+              styles.stepTabText,
+              { color: currentStep === 1 ? colors.text : colors.textMuted },
+              currentStep === 1 && { fontWeight: '800' },
+            ]}
+          >
+            Customer
+          </Text>
         </TouchableOpacity>
 
-        <View style={[styles.stepConnector, currentStep > 1 && styles.stepConnectorActive]} />
+        <View
+          style={[
+            styles.stepConnector,
+            { backgroundColor: currentStep > 1 ? '#0066FF' : colors.borderSubtle },
+          ]}
+        />
 
         <TouchableOpacity
           style={[styles.stepTab, currentStep === 2 && styles.stepTabActive]}
           onPress={() => setCurrentStep(2)}
           activeOpacity={0.8}
         >
-          <View style={[styles.stepNumCircle, currentStep === 2 ? styles.stepNumActive : currentStep > 2 ? styles.stepNumDone : styles.stepNumInactive]}>
-            {currentStep > 2 ? <Check size={11} color="#ffffff" strokeWidth={3} /> : <Text style={styles.stepNumText}>2</Text>}
+          <View
+            style={[
+              styles.stepNumCircle,
+              currentStep === 2
+                ? styles.stepNumActive
+                : currentStep > 2
+                  ? styles.stepNumDone
+                  : styles.stepNumInactive,
+            ]}
+          >
+            {currentStep > 2 ? (
+              <Check size={11} color="#FFFFFF" strokeWidth={3} />
+            ) : (
+              <Text style={styles.stepNumText}>2</Text>
+            )}
           </View>
-          <Text style={[styles.stepTabText, currentStep === 2 && styles.stepTabTextActive]}>Sizing & Gear</Text>
+          <Text
+            style={[
+              styles.stepTabText,
+              { color: currentStep === 2 ? colors.text : colors.textMuted },
+              currentStep === 2 && { fontWeight: '800' },
+            ]}
+          >
+            Sizing & Gear
+          </Text>
         </TouchableOpacity>
 
-        <View style={[styles.stepConnector, currentStep > 2 && styles.stepConnectorActive]} />
+        <View
+          style={[
+            styles.stepConnector,
+            { backgroundColor: currentStep > 2 ? '#0066FF' : colors.borderSubtle },
+          ]}
+        />
 
         <TouchableOpacity
           style={[styles.stepTab, currentStep === 3 && styles.stepTabActive]}
           onPress={() => setCurrentStep(3)}
           activeOpacity={0.8}
         >
-          <View style={[styles.stepNumCircle, currentStep === 3 ? styles.stepNumActive : styles.stepNumInactive]}>
+          <View
+            style={[
+              styles.stepNumCircle,
+              currentStep === 3 ? styles.stepNumActive : styles.stepNumInactive,
+            ]}
+          >
             <Text style={styles.stepNumText}>3</Text>
           </View>
-          <Text style={[styles.stepTabText, currentStep === 3 && styles.stepTabTextActive]}>Proposal</Text>
+          <Text
+            style={[
+              styles.stepTabText,
+              { color: currentStep === 3 ? colors.text : colors.textMuted },
+              currentStep === 3 && { fontWeight: '800' },
+            ]}
+          >
+            Proposal
+          </Text>
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.body} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.body}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
         {/* STEP 1: PROSPECT & ELECTRICITY BILL */}
         {currentStep === 1 && (
-          <View style={styles.stepCard}>
+          <View
+            style={[
+              styles.stepCard,
+              {
+                backgroundColor: colors.surface,
+                borderColor: colors.borderSubtle,
+              },
+            ]}
+          >
             <View style={styles.stepCardHeader}>
               <View style={styles.stepBadge}>
                 <Text style={styles.stepBadgeText}>STEP 1 OF 3</Text>
               </View>
-              <Text style={styles.stepCardTitle}>Prospect & Consumption Profile</Text>
-              <Text style={styles.stepCardSub}>Input client details to auto-size optimal solar capacity</Text>
+              <Text style={[styles.stepCardTitle, { color: colors.text }]}>
+                Prospect & Consumption Profile
+              </Text>
+              <Text style={[styles.stepCardSub, { color: colors.textSecondary }]}>
+                Input customer details to auto-size optimal solar capacity
+              </Text>
             </View>
 
-            <Text style={styles.label}>Prospect / Client Name *</Text>
+            <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>PROSPECT NAME *</Text>
             <TextInput
-              style={styles.input}
+              style={[
+                styles.input,
+                {
+                  backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
+                  borderColor: colors.borderSubtle,
+                  color: colors.text,
+                },
+              ]}
               value={prospectName}
               onChangeText={setProspectName}
               placeholder="e.g. Suresh Deshmukh"
-              placeholderTextColor="#94a3b8"
+              placeholderTextColor={colors.textMuted}
             />
 
-            <Text style={styles.label}>Mobile Number (WhatsApp Enabled)</Text>
+            <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>
+              MOBILE NUMBER (WHATSAPP)
+            </Text>
             <TextInput
-              style={styles.input}
+              style={[
+                styles.input,
+                {
+                  backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
+                  borderColor: colors.borderSubtle,
+                  color: colors.text,
+                },
+              ]}
               value={prospectPhone}
               onChangeText={setProspectPhone}
               placeholder="10-digit mobile number"
-              placeholderTextColor="#94a3b8"
+              placeholderTextColor={colors.textMuted}
               keyboardType="phone-pad"
             />
 
-            <Text style={styles.label}>Current Monthly Electricity Bill (₹) *</Text>
+            <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>
+              CURRENT MONTHLY ELECTRICITY BILL (₹) *
+            </Text>
             <TextInput
-              style={styles.inputHighlight}
+              style={[
+                styles.inputHighlight,
+                {
+                  backgroundColor: isDark ? 'rgba(0, 102, 255, 0.12)' : '#EFF6FF',
+                  borderColor: isDark ? '#1E3A8A' : '#BFDBFE',
+                  color: colors.text,
+                },
+              ]}
               value={monthlyBill}
               onChangeText={handleBillChange}
               keyboardType="numeric"
               placeholder="e.g. 3500"
+              placeholderTextColor={colors.textMuted}
             />
 
-            {/* Quick Bill Preset Chips */}
-            <View style={styles.chipScrollRow}>
+            {/* Quick Bill Presets */}
+            <View style={styles.presetChipRow}>
               {['2500', '3500', '5000', '8000', '15000'].map((preset) => (
                 <TouchableOpacity
                   key={preset}
-                  style={[styles.presetChip, monthlyBill === preset && styles.presetChipActive]}
+                  style={[
+                    styles.presetChip,
+                    {
+                      backgroundColor:
+                        monthlyBill === preset
+                          ? '#0066FF'
+                          : isDark
+                            ? '#1E293B'
+                            : '#F8FAFC',
+                      borderColor:
+                        monthlyBill === preset
+                          ? '#0066FF'
+                          : colors.borderSubtle,
+                    },
+                  ]}
                   onPress={() => handleBillChange(preset)}
                   activeOpacity={0.8}
                 >
-                  <Text style={[styles.presetChipText, monthlyBill === preset && styles.presetChipTextActive]}>
+                  <Text
+                    style={[
+                      styles.presetChipText,
+                      {
+                        color:
+                          monthlyBill === preset
+                            ? '#FFFFFF'
+                            : colors.textSecondary,
+                        fontWeight: monthlyBill === preset ? '800' : '600',
+                      },
+                    ]}
+                  >
                     ₹{parseInt(preset).toLocaleString('en-IN')}
                   </Text>
                 </TouchableOpacity>
               ))}
             </View>
 
-            {/* AI Sizing Intelligence Callout */}
-            <View style={styles.aiHintBox}>
-              <View style={styles.aiHintHeader}>
-                <Sparkles size={13} color="#f59e0b" />
-                <Text style={styles.aiHintTitle}>AI SIZING RECOMMENDATION</Text>
+            <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>
+              DISCOM SANCTIONED LOAD (kW)
+            </Text>
+            <TextInput
+              style={[
+                styles.input,
+                {
+                  backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
+                  borderColor: colors.borderSubtle,
+                  color: colors.text,
+                },
+              ]}
+              value={sanctionedLoad}
+              onChangeText={setSanctionedLoad}
+              placeholder="e.g. 5.0 kW"
+              placeholderTextColor={colors.textMuted}
+              keyboardType="numeric"
+            />
+
+            {parseFloat(sanctionedLoad) > 0 && cap > parseFloat(sanctionedLoad) && (
+              <View
+                style={[
+                  styles.advisoryBox,
+                  {
+                    backgroundColor: isDark ? 'rgba(245, 158, 11, 0.12)' : '#FFFBEB',
+                    borderColor: isDark ? '#B45309' : '#FDE68A',
+                  },
+                ]}
+              >
+                <View style={styles.advisoryHeader}>
+                  <AlertTriangle size={13} color="#F59E0B" />
+                  <Text style={styles.advisoryTitle}>DISCOM CAPACITY ADVISORY</Text>
+                </View>
+                <Text style={[styles.advisoryBody, { color: isDark ? '#FEF3C7' : '#92400E' }]}>
+                  Under state net-metering regulations, solar capacity ({cap} kWp) cannot exceed sanctioned load ({sanctionedLoad} kW). A load enhancement request will be filed.
+                </Text>
               </View>
-              <Text style={styles.aiHintBody}>
+            )}
+
+            {/* AI Recommendation Callout */}
+            <View
+              style={[
+                styles.aiRecBox,
+                {
+                  backgroundColor: isDark ? 'rgba(0, 102, 255, 0.08)' : '#EFF6FF',
+                  borderColor: isDark ? '#1E3A8A' : '#BFDBFE',
+                },
+              ]}
+            >
+              <View style={styles.aiRecHeader}>
+                <Sparkles size={13} color="#0066FF" />
+                <Text style={styles.aiRecTitle}>RECOMMENDED SOLAR CAPACITY</Text>
+              </View>
+              <Text style={[styles.aiRecBody, { color: colors.textSecondary }]}>
                 A monthly tariff of ₹{monthlyBill || '3,500'} recommends a{' '}
-                <Text style={{ fontWeight: '900', color: '#0f172a' }}>{cap} kWp plant</Text>, generating ~
-                {monthlyUnits} units/mo to offset ~90% of electricity bills and save ₹{monthlySavings.toLocaleString('en-IN')}/mo.
+                <Text style={{ fontWeight: '800', color: colors.text }}>{cap} kWp system</Text>, generating ~
+                {monthlyUnits} units/mo and saving ₹{monthlySavings.toLocaleString('en-IN')}/mo on electricity bills.
               </Text>
             </View>
 
             <TouchableOpacity
-              style={styles.stepNextBtn}
+              style={styles.stepPrimaryBtn}
               onPress={() => {
                 if (!prospectName.trim()) {
                   Alert.alert('Customer Name Required', 'Please enter prospect name before proceeding.');
@@ -677,184 +861,327 @@ export const QuickQuoteScreen: React.FC<{ navigation?: any; route?: any }> = ({ 
               }}
               activeOpacity={0.85}
             >
-              <Text style={styles.stepNextBtnText}>Configure System & Hardware</Text>
-              <ChevronRight size={16} color="#ffffff" />
+              <Text style={styles.stepPrimaryBtnText}>Configure Equipment & Sizing</Text>
+              <ChevronRight size={15} color="#FFFFFF" strokeWidth={2.5} />
             </TouchableOpacity>
           </View>
         )}
 
-        {/* STEP 2: TURNKEY SIZING & HARDWARE SPECIFICATIONS */}
+        {/* STEP 2: SIZING & HARDWARE */}
         {currentStep === 2 && (
-          <View style={styles.stepCard}>
+          <View
+            style={[
+              styles.stepCard,
+              {
+                backgroundColor: colors.surface,
+                borderColor: colors.borderSubtle,
+              },
+            ]}
+          >
             <View style={styles.stepCardHeader}>
               <View style={styles.stepBadge}>
                 <Text style={styles.stepBadgeText}>STEP 2 OF 3</Text>
               </View>
-              <Text style={styles.stepCardTitle}>Turnkey Sizing & Equipment Specs</Text>
-              <Text style={styles.stepCardSub}>Select Tier-1 DCR solar modules, inverter, and mounting structure</Text>
+              <Text style={[styles.stepCardTitle, { color: colors.text }]}>
+                Hardware & Turnkey Equipment
+              </Text>
+              <Text style={[styles.stepCardSub, { color: colors.textSecondary }]}>
+                Select Tier-1 DCR solar modules, inverter, and mounting structure
+              </Text>
             </View>
 
-            <Text style={styles.label}>System Capacity (kWp) *</Text>
+            <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>
+              SYSTEM CAPACITY (kWp) *
+            </Text>
             <TextInput
-              style={styles.inputHighlight}
+              style={[
+                styles.inputHighlight,
+                {
+                  backgroundColor: isDark ? 'rgba(0, 102, 255, 0.12)' : '#EFF6FF',
+                  borderColor: isDark ? '#1E3A8A' : '#BFDBFE',
+                  color: colors.text,
+                },
+              ]}
               value={capacityKw}
               onChangeText={handleCapacityChange}
               keyboardType="decimal-pad"
             />
 
             {/* Capacity Presets */}
-            <View style={styles.chipScrollRow}>
+            <View style={styles.presetChipRow}>
               {['2.0', '3.3', '4.0', '5.0', '10.0'].map((kwPreset) => (
                 <TouchableOpacity
                   key={kwPreset}
-                  style={[styles.presetChip, capacityKw === kwPreset && styles.presetChipActive]}
+                  style={[
+                    styles.presetChip,
+                    {
+                      backgroundColor:
+                        capacityKw === kwPreset
+                          ? '#0066FF'
+                          : isDark
+                            ? '#1E293B'
+                            : '#F8FAFC',
+                      borderColor:
+                        capacityKw === kwPreset
+                          ? '#0066FF'
+                          : colors.borderSubtle,
+                    },
+                  ]}
                   onPress={() => handleCapacityChange(kwPreset)}
                   activeOpacity={0.8}
                 >
-                  <Text style={[styles.presetChipText, capacityKw === kwPreset && styles.presetChipTextActive]}>
+                  <Text
+                    style={[
+                      styles.presetChipText,
+                      {
+                        color:
+                          capacityKw === kwPreset
+                            ? '#FFFFFF'
+                            : colors.textSecondary,
+                        fontWeight: capacityKw === kwPreset ? '800' : '600',
+                      },
+                    ]}
+                  >
                     {kwPreset} kWp
                   </Text>
                 </TouchableOpacity>
               ))}
             </View>
 
-            {/* Equipment 1: Modules */}
+            {/* Modules Selector */}
             <View style={styles.gearHeaderRow}>
-              <Text style={styles.label}>Tier-1 DCR Solar Modules</Text>
+              <Text style={[styles.fieldLabel, { color: colors.textSecondary, marginBottom: 0 }]}>
+                TIER-1 DCR SOLAR MODULES
+              </Text>
               <TouchableOpacity
-                style={styles.addGearHeaderBtn}
+                style={[
+                  styles.addGearBtn,
+                  {
+                    backgroundColor: isDark ? '#1E293B' : '#EFF6FF',
+                    borderColor: isDark ? '#1E3A8A' : '#BFDBFE',
+                  },
+                ]}
                 onPress={() => handleOpenAddGear('PANEL')}
                 activeOpacity={0.8}
               >
-                <Plus size={12} color="#0066FF" strokeWidth={2.5} />
-                <Text style={styles.addGearHeaderBtnText}>+ Add Brand</Text>
+                <Plus size={11} color="#0066FF" strokeWidth={2.5} />
+                <Text style={styles.addGearBtnText}>+ Add Make</Text>
               </TouchableOpacity>
             </View>
-            <View style={styles.gearSelectionCol}>
+
+            <View style={styles.gearList}>
               {allPanels.map((panel) => {
                 const isSelected = panelBrand === panel.name;
                 return (
                   <TouchableOpacity
                     key={panel.id}
-                    style={[styles.gearCard, isSelected && styles.gearCardActive]}
+                    style={[
+                      styles.gearCard,
+                      {
+                        backgroundColor: isSelected
+                          ? (isDark ? 'rgba(0, 102, 255, 0.12)' : '#EFF6FF')
+                          : isDark
+                            ? '#1E293B'
+                            : '#F8FAFC',
+                        borderColor: isSelected
+                          ? '#0066FF'
+                          : colors.borderSubtle,
+                      },
+                    ]}
                     onPress={() => setPanelBrand(panel.name)}
                     activeOpacity={0.8}
                   >
                     <View style={styles.gearCardTop}>
-                      <View style={styles.gearCardTitleRow}>
-                        <Text style={[styles.gearCardTitle, isSelected && styles.gearCardTitleActive]}>
+                      <View style={{ flex: 1 }}>
+                        <Text
+                          style={[
+                            styles.gearCardTitle,
+                            { color: isSelected ? '#0066FF' : colors.text },
+                          ]}
+                        >
                           {panel.name}
                         </Text>
-                        <View style={[styles.gearTagPill, isSelected && styles.gearTagPillActive]}>
-                          <Text style={[styles.gearTagPillText, isSelected && styles.gearTagPillTextActive]}>
+                        <Text style={[styles.gearCardSub, { color: colors.textMuted }]}>
+                          {panel.subtitle}
+                        </Text>
+                      </View>
+                      {isSelected ? (
+                        <CheckCircle2 size={16} color="#0066FF" />
+                      ) : (
+                        <View
+                          style={[
+                            styles.gearTag,
+                            {
+                              backgroundColor: isDark ? '#334155' : '#E2E8F0',
+                            },
+                          ]}
+                        >
+                          <Text style={[styles.gearTagText, { color: colors.textSecondary }]}>
                             {panel.tag}
                           </Text>
                         </View>
-                      </View>
-                      {isSelected && <Check size={14} color="#0066FF" strokeWidth={3} />}
+                      )}
                     </View>
-                    <Text style={styles.gearCardSub}>{panel.subtitle}</Text>
                   </TouchableOpacity>
                 );
               })}
             </View>
 
-            {/* Equipment 2: Inverter */}
+            {/* Inverter Selector */}
             <View style={[styles.gearHeaderRow, { marginTop: 14 }]}>
-              <Text style={styles.label}>Grid-Tied Solar Inverter</Text>
+              <Text style={[styles.fieldLabel, { color: colors.textSecondary, marginBottom: 0 }]}>
+                GRID-TIED INVERTER
+              </Text>
               <TouchableOpacity
-                style={styles.addGearHeaderBtn}
+                style={[
+                  styles.addGearBtn,
+                  {
+                    backgroundColor: isDark ? '#1E293B' : '#EFF6FF',
+                    borderColor: isDark ? '#1E3A8A' : '#BFDBFE',
+                  },
+                ]}
                 onPress={() => handleOpenAddGear('INVERTER')}
                 activeOpacity={0.8}
               >
-                <Plus size={12} color="#0066FF" strokeWidth={2.5} />
-                <Text style={styles.addGearHeaderBtnText}>+ Add Inverter</Text>
+                <Plus size={11} color="#0066FF" strokeWidth={2.5} />
+                <Text style={styles.addGearBtnText}>+ Add Inverter</Text>
               </TouchableOpacity>
             </View>
-            <View style={styles.gearSelectionCol}>
+
+            <View style={styles.gearList}>
               {allInverters.map((inv) => {
                 const isSelected = inverterBrand === inv.name;
                 return (
                   <TouchableOpacity
                     key={inv.id}
-                    style={[styles.gearCard, isSelected && styles.gearCardActive]}
+                    style={[
+                      styles.gearCard,
+                      {
+                        backgroundColor: isSelected
+                          ? (isDark ? 'rgba(0, 102, 255, 0.12)' : '#EFF6FF')
+                          : isDark
+                            ? '#1E293B'
+                            : '#F8FAFC',
+                        borderColor: isSelected
+                          ? '#0066FF'
+                          : colors.borderSubtle,
+                      },
+                    ]}
                     onPress={() => setInverterBrand(inv.name)}
                     activeOpacity={0.8}
                   >
                     <View style={styles.gearCardTop}>
-                      <View style={styles.gearCardTitleRow}>
-                        <Text style={[styles.gearCardTitle, isSelected && styles.gearCardTitleActive]}>
+                      <View style={{ flex: 1 }}>
+                        <Text
+                          style={[
+                            styles.gearCardTitle,
+                            { color: isSelected ? '#0066FF' : colors.text },
+                          ]}
+                        >
                           {inv.name}
                         </Text>
-                        <View style={[styles.gearTagPill, isSelected && styles.gearTagPillActive]}>
-                          <Text style={[styles.gearTagPillText, isSelected && styles.gearTagPillTextActive]}>
+                        <Text style={[styles.gearCardSub, { color: colors.textMuted }]}>
+                          {inv.subtitle}
+                        </Text>
+                      </View>
+                      {isSelected ? (
+                        <CheckCircle2 size={16} color="#0066FF" />
+                      ) : (
+                        <View
+                          style={[
+                            styles.gearTag,
+                            {
+                              backgroundColor: isDark ? '#334155' : '#E2E8F0',
+                            },
+                          ]}
+                        >
+                          <Text style={[styles.gearTagText, { color: colors.textSecondary }]}>
                             {inv.tag}
                           </Text>
                         </View>
-                      </View>
-                      {isSelected && <Check size={14} color="#0066FF" strokeWidth={3} />}
+                      )}
                     </View>
-                    <Text style={styles.gearCardSub}>{inv.subtitle}</Text>
                   </TouchableOpacity>
                 );
               })}
             </View>
 
-            {/* Turnkey System Pricing Input */}
-            <View style={styles.systemCostBox}>
+            {/* Turnkey Pricing Input */}
+            <View
+              style={[
+                styles.systemCostBox,
+                {
+                  backgroundColor: isDark ? 'rgba(16, 185, 129, 0.1)' : '#ECFDF5',
+                  borderColor: isDark ? '#065F46' : '#A7F3D0',
+                },
+              ]}
+            >
               <View style={styles.costTitleRow}>
-                <Text style={styles.costPrimaryLabel}>Turnkey System Cost (Incl. All GST) *</Text>
+                <Text style={styles.costPrimaryLabel}>Turnkey Plant Cost (All GST Included)</Text>
                 <View style={styles.gstTag}>
                   <Text style={styles.gstTagText}>GST Included</Text>
                 </View>
               </View>
-              <View style={styles.costInputRow}>
+              <View
+                style={[
+                  styles.costInputRow,
+                  {
+                    backgroundColor: colors.surface,
+                    borderColor: colors.borderSubtle,
+                  },
+                ]}
+              >
                 <Text style={styles.rupeeSymbol}>₹</Text>
                 <TextInput
-                  style={styles.costInput}
+                  style={[styles.costInput, { color: colors.text }]}
                   value={systemCost}
                   onChangeText={setSystemCost}
                   keyboardType="numeric"
                   placeholder="e.g. 195000"
+                  placeholderTextColor={colors.textMuted}
                 />
               </View>
-              <Text style={styles.costHelpText}>
-                Turnkey price includes modules, inverter, structure, wiring, and installation.
+              <Text style={[styles.costHelpText, { color: isDark ? '#34D399' : '#047857' }]}>
+                Turnkey price includes modules, inverter, elevated structure, wiring, installation & DISCOM net-metering.
               </Text>
             </View>
 
-            {/* Step 2 Navigation Buttons */}
+            {/* Step Navigation */}
             <View style={styles.stepNavRow}>
               <TouchableOpacity
-                style={styles.stepBackBtn}
+                style={[
+                  styles.stepBackBtn,
+                  {
+                    backgroundColor: isDark ? '#1E293B' : '#F1F5F9',
+                    borderColor: colors.borderSubtle,
+                  },
+                ]}
                 onPress={() => setCurrentStep(1)}
                 activeOpacity={0.8}
               >
-                <ChevronLeft size={16} color="#64748b" />
-                <Text style={styles.stepBackBtnText}>Back</Text>
+                <ChevronLeft size={15} color={colors.textSecondary} />
+                <Text style={[styles.stepBackBtnText, { color: colors.textSecondary }]}>Back</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={styles.stepNextBtnFlex}
+                style={styles.stepPrimaryBtnFlex}
                 onPress={() => setCurrentStep(3)}
                 activeOpacity={0.85}
               >
-                <Text style={styles.stepNextBtnText}>Review PM Subsidy & Proposal</Text>
-                <ChevronRight size={16} color="#ffffff" />
+                <Text style={styles.stepPrimaryBtnText}>Review PM Subsidy & Proposal</Text>
+                <ChevronRight size={15} color="#FFFFFF" strokeWidth={2.5} />
               </TouchableOpacity>
             </View>
           </View>
         )}
 
-        {/* STEP 3: PM SURYA GHAR COMMERCIALS & INSTANT PROPOSAL */}
+        {/* STEP 3: PM SURYA GHAR PROPOSAL & ECONOMICS */}
         {currentStep === 3 && (
           <View>
             {/* HERO COMMERCIAL ECONOMICS CARD */}
             <View style={styles.heroCard}>
               <View style={styles.heroCardHeader}>
-                <View style={styles.heroCardPill}>
-                  <Text style={styles.heroCardPillText}>CENTRAL DBT FINANCIAL BREAKDOWN</Text>
-                </View>
+                <Text style={styles.heroCardPillText}>CENTRAL DBT FINANCIAL BREAKDOWN</Text>
               </View>
 
               <View style={styles.heroRow}>
@@ -875,31 +1202,51 @@ export const QuickQuoteScreen: React.FC<{ navigation?: any; route?: any }> = ({ 
               </View>
             </View>
 
-            {/* SAVINGS & PAYBACK ROI MATRIX */}
-            <View style={styles.savingsCard}>
+            {/* ROI MATRIX */}
+            <View
+              style={[
+                styles.savingsCard,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: colors.borderSubtle,
+                },
+              ]}
+            >
               <View style={styles.savingsCol}>
-                <Text style={styles.savingsLabel}>Est. Monthly Gen</Text>
-                <Text style={styles.savingsVal}>{monthlyUnits} Units</Text>
+                <Text style={[styles.savingsLabel, { color: colors.textMuted }]}>EST. MONTHLY GEN</Text>
+                <Text style={[styles.savingsVal, { color: colors.text }]}>{monthlyUnits} Units</Text>
               </View>
-              <View style={styles.savingsDivider} />
+              <View style={[styles.savingsDivider, { backgroundColor: colors.borderSubtle }]} />
               <View style={styles.savingsCol}>
-                <Text style={styles.savingsLabel}>Monthly Tariff Saved</Text>
+                <Text style={[styles.savingsLabel, { color: colors.textMuted }]}>MONTHLY SAVINGS</Text>
                 <Text style={styles.savingsValGreen}>₹{monthlySavings.toLocaleString('en-IN')}</Text>
               </View>
-              <View style={styles.savingsDivider} />
+              <View style={[styles.savingsDivider, { backgroundColor: colors.borderSubtle }]} />
               <View style={styles.savingsCol}>
-                <Text style={styles.savingsLabel}>Payback ROI</Text>
+                <Text style={[styles.savingsLabel, { color: colors.textMuted }]}>PAYBACK ROI</Text>
                 <Text style={styles.savingsValBlue}>{paybackYears} Yrs</Text>
               </View>
             </View>
 
-            {/* HARDWARE AUDIT SUMMARY CARD */}
-            <View style={styles.summaryGearCard}>
-              <Text style={styles.summaryGearTitle}>EQUIPMENT SPECIFICATIONS INCLUDED</Text>
-              <Text style={styles.summaryGearRow}>• Modules: {panelBrand}</Text>
-              <Text style={styles.summaryGearRow}>• Inverter: {inverterBrand}</Text>
-              <Text style={styles.summaryGearRow}>• Structure: {structureType}</Text>
-              <Text style={styles.summaryGearRow}>• Recipient: {prospectName} ({prospectPhone || 'No Phone'})</Text>
+            {/* SUMMARY GEAR CARD */}
+            <View
+              style={[
+                styles.summaryGearCard,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: colors.borderSubtle,
+                },
+              ]}
+            >
+              <Text style={[styles.summaryGearTitle, { color: colors.textSecondary }]}>
+                EQUIPMENT SPECIFICATIONS INCLUDED
+              </Text>
+              <Text style={[styles.summaryGearRow, { color: colors.text }]}>• Modules: {panelBrand}</Text>
+              <Text style={[styles.summaryGearRow, { color: colors.text }]}>• Inverter: {inverterBrand}</Text>
+              <Text style={[styles.summaryGearRow, { color: colors.text }]}>• Structure: {structureType}</Text>
+              <Text style={[styles.summaryGearRow, { color: colors.text }]}>
+                • Recipient: {prospectName} ({prospectPhone || 'No Phone'})
+              </Text>
 
               <TouchableOpacity
                 style={styles.modifyGearBtn}
@@ -914,15 +1261,29 @@ export const QuickQuoteScreen: React.FC<{ navigation?: any; route?: any }> = ({ 
       </ScrollView>
 
       {/* BOTTOM ACTION BAR */}
-      <View style={styles.bottomBar}>
+      <View
+        style={[
+          styles.bottomBar,
+          {
+            backgroundColor: colors.surface,
+            borderTopColor: colors.borderSubtle,
+          },
+        ]}
+      >
         <View style={styles.actionRowTop}>
           <TouchableOpacity
-            style={styles.pdfBtn}
+            style={[
+              styles.pdfBtn,
+              {
+                backgroundColor: isDark ? '#1E293B' : '#F1F5F9',
+                borderColor: colors.borderSubtle,
+              },
+            ]}
             onPress={handlePreviewPdf}
             activeOpacity={0.8}
           >
-            <Eye size={16} color="#0f172a" />
-            <Text style={styles.pdfBtnText}>Preview</Text>
+            <Eye size={15} color={colors.text} />
+            <Text style={[styles.pdfBtnText, { color: colors.text }]}>Preview</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -932,26 +1293,32 @@ export const QuickQuoteScreen: React.FC<{ navigation?: any; route?: any }> = ({ 
             activeOpacity={0.85}
           >
             {sharingWhatsAppPdf ? (
-              <ActivityIndicator size="small" color="#ffffff" />
+              <ActivityIndicator size="small" color="#FFFFFF" />
             ) : (
               <>
-                <MessageCircle size={17} color="#ffffff" />
+                <MessageCircle size={15} color="#FFFFFF" />
                 <Text style={styles.whatsAppBtnText}>WhatsApp PDF</Text>
               </>
             )}
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.pitchTextBtn}
+            style={[
+              styles.pitchTextBtn,
+              {
+                backgroundColor: isDark ? 'rgba(16, 185, 129, 0.12)' : '#ECFDF5',
+                borderColor: isDark ? '#065F46' : '#A7F3D0',
+              },
+            ]}
             onPress={handleSendTextPitch}
             disabled={sendingPitchText}
             activeOpacity={0.85}
           >
             {sendingPitchText ? (
-              <ActivityIndicator size="small" color="#16a34a" />
+              <ActivityIndicator size="small" color="#10B981" />
             ) : (
               <>
-                <Send size={14} color="#16a34a" />
+                <Send size={13} color="#10B981" />
                 <Text style={styles.pitchTextBtnText}>Direct Chat</Text>
               </>
             )}
@@ -959,7 +1326,7 @@ export const QuickQuoteScreen: React.FC<{ navigation?: any; route?: any }> = ({ 
         </View>
       </View>
 
-      {/* IN-APP VISUAL PROPOSAL PREVIEW MODAL */}
+      {/* PROPOSAL PREVIEW MODAL */}
       {showVisualPreview && (
         <ProposalPreviewModal
           visible={showVisualPreview}
@@ -969,7 +1336,7 @@ export const QuickQuoteScreen: React.FC<{ navigation?: any; route?: any }> = ({ 
         />
       )}
 
-      {/* CUSTOM GEAR SPECIFICATION MODAL */}
+      {/* CUSTOM GEAR MODAL */}
       <Modal
         visible={gearModalVisible}
         transparent
@@ -977,13 +1344,21 @@ export const QuickQuoteScreen: React.FC<{ navigation?: any; route?: any }> = ({ 
         onRequestClose={() => setGearModalVisible(false)}
       >
         <View style={styles.gearModalOverlay}>
-          <View style={styles.gearModalContent}>
+          <View
+            style={[
+              styles.gearModalContent,
+              {
+                backgroundColor: colors.surface,
+                borderColor: colors.borderSubtle,
+              },
+            ]}
+          >
             <View style={styles.gearModalHeader}>
               <View style={{ flex: 1, paddingRight: 8 }}>
-                <Text style={styles.gearModalTitle}>
+                <Text style={[styles.gearModalTitle, { color: colors.text }]}>
                   {gearModalType === 'PANEL' ? 'Add Custom Solar Module' : 'Add Custom Solar Inverter'}
                 </Text>
-                <Text style={styles.gearModalSubtitle}>
+                <Text style={[styles.gearModalSubtitle, { color: colors.textMuted }]}>
                   {gearModalType === 'PANEL'
                     ? 'Enter custom Tier-1 / ALMM module details & wattage'
                     : 'Enter custom grid-tied inverter make & model'}
@@ -991,34 +1366,55 @@ export const QuickQuoteScreen: React.FC<{ navigation?: any; route?: any }> = ({ 
               </View>
               <TouchableOpacity
                 onPress={() => setGearModalVisible(false)}
-                style={styles.gearModalCloseBtn}
+                style={[
+                  styles.gearModalCloseBtn,
+                  { backgroundColor: isDark ? '#1E293B' : '#F1F5F9' },
+                ]}
                 activeOpacity={0.7}
               >
-                <X size={18} color="#64748b" />
+                <X size={16} color={colors.textSecondary} />
               </TouchableOpacity>
             </View>
 
             <View style={styles.gearModalBody}>
-              <Text style={styles.modalFieldLabel}>Equipment Name / Model *</Text>
+              <Text style={[styles.modalFieldLabel, { color: colors.textSecondary }]}>
+                EQUIPMENT MAKE & MODEL *
+              </Text>
               <TextInput
-                style={styles.modalInput}
+                style={[
+                  styles.modalInput,
+                  {
+                    backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
+                    borderColor: colors.borderSubtle,
+                    color: colors.text,
+                  },
+                ]}
                 placeholder={
                   gearModalType === 'PANEL'
                     ? 'e.g. Vikram Solar 550W Mono PERC'
                     : 'e.g. Sungrow 3.3kW Dual MPPT'
                 }
-                placeholderTextColor="#94a3b8"
+                placeholderTextColor={colors.textMuted}
                 value={customGearName}
                 onChangeText={setCustomGearName}
               />
 
               {gearModalType === 'PANEL' && (
                 <>
-                  <Text style={styles.modalFieldLabel}>Rated Wattage (Wp) *</Text>
+                  <Text style={[styles.modalFieldLabel, { color: colors.textSecondary }]}>
+                    RATED WATTAGE (Wp) *
+                  </Text>
                   <TextInput
-                    style={styles.modalInput}
+                    style={[
+                      styles.modalInput,
+                      {
+                        backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
+                        borderColor: colors.borderSubtle,
+                        color: colors.text,
+                      },
+                    ]}
                     placeholder="e.g. 550"
-                    placeholderTextColor="#94a3b8"
+                    placeholderTextColor={colors.textMuted}
                     value={customGearWattage}
                     onChangeText={setCustomGearWattage}
                     keyboardType="numeric"
@@ -1026,43 +1422,51 @@ export const QuickQuoteScreen: React.FC<{ navigation?: any; route?: any }> = ({ 
                 </>
               )}
 
-              <Text style={styles.modalFieldLabel}>Warranty / Tech Specifications</Text>
+              <Text style={[styles.modalFieldLabel, { color: colors.textSecondary }]}>
+                WARRANTY & SPECIFICATIONS
+              </Text>
               <TextInput
-                style={styles.modalInput}
+                style={[
+                  styles.modalInput,
+                  {
+                    backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
+                    borderColor: colors.borderSubtle,
+                    color: colors.text,
+                  },
+                ]}
                 placeholder={
                   gearModalType === 'PANEL'
                     ? 'e.g. 25 Years Performance • DCR ALMM'
                     : 'e.g. 10 Years Warranty • Dual MPPT • WiFi'
                 }
-                placeholderTextColor="#94a3b8"
+                placeholderTextColor={colors.textMuted}
                 value={customGearSubtitle}
                 onChangeText={setCustomGearSubtitle}
-              />
-
-              <Text style={styles.modalFieldLabel}>Category Badge / Tag</Text>
-              <TextInput
-                style={styles.modalInput}
-                placeholder="e.g. DCR Tier-1 or TopCon"
-                placeholderTextColor="#94a3b8"
-                value={customGearTag}
-                onChangeText={setCustomGearTag}
               />
             </View>
 
             <View style={styles.gearModalFooter}>
               <TouchableOpacity
-                style={styles.gearModalCancelBtn}
+                style={[
+                  styles.gearModalCancelBtn,
+                  {
+                    backgroundColor: isDark ? '#1E293B' : '#F1F5F9',
+                    borderColor: colors.borderSubtle,
+                  },
+                ]}
                 onPress={() => setGearModalVisible(false)}
                 activeOpacity={0.8}
               >
-                <Text style={styles.gearModalCancelBtnText}>Cancel</Text>
+                <Text style={[styles.gearModalCancelBtnText, { color: colors.textSecondary }]}>
+                  Cancel
+                </Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.gearModalSaveBtn}
                 onPress={handleSaveCustomGear}
                 activeOpacity={0.85}
               >
-                <Check size={16} color="#ffffff" strokeWidth={2.5} />
+                <Check size={15} color="#FFFFFF" strokeWidth={2.5} />
                 <Text style={styles.gearModalSaveBtnText}>Save & Select</Text>
               </TouchableOpacity>
             </View>
@@ -1076,352 +1480,24 @@ export const QuickQuoteScreen: React.FC<{ navigation?: any; route?: any }> = ({ 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
   },
-  header: {
-    backgroundColor: '#ffffff',
-    paddingHorizontal: 20,
-    paddingTop: 54,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '900',
-    color: '#0f172a',
-    letterSpacing: -0.4,
-  },
-  headerSubtitle: {
-    fontSize: 11,
-    color: '#64748b',
-    marginTop: 2,
-    fontWeight: '500',
-  },
-  body: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: 16,
-    paddingBottom: Platform.OS === 'ios' ? 120 : 100,
-  },
-  card: {
-    backgroundColor: '#ffffff',
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  formRow: {
+  badgeSynced: {
     flexDirection: 'row',
-    gap: 12,
-    marginBottom: 10,
-  },
-  formCol: {
-    flex: 1,
-  },
-  label: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#475569',
-    marginBottom: 6,
-    textTransform: 'uppercase',
-    letterSpacing: 0.3,
-  },
-  input: {
-    backgroundColor: '#f8fafc',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 14,
-    color: '#0f172a',
-    fontWeight: '600',
-    marginBottom: 10,
-  },
-  inputHighlight: {
-    backgroundColor: '#eff6ff',
-    borderWidth: 1.5,
-    borderColor: '#2563eb',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 15,
-    color: '#1d4ed8',
-    fontWeight: '800',
-    marginBottom: 10,
-  },
-  systemCostBox: {
-    backgroundColor: '#f0fdf4',
-    borderWidth: 1.5,
-    borderColor: '#16a34a',
-    borderRadius: 12,
-    padding: 14,
-    marginTop: 4,
-    marginBottom: 6,
-  },
-  costTitleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
-  },
-  costPrimaryLabel: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#14532d',
-    textTransform: 'uppercase',
-    letterSpacing: 0.3,
-  },
-  gstTag: {
-    backgroundColor: '#dcfce7',
+    gap: 4,
+    backgroundColor: '#ECFDF5',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: '#86efac',
-  },
-  gstTagText: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#15803d',
-    textTransform: 'uppercase',
-  },
-  costInputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#ffffff',
-    borderWidth: 1.5,
-    borderColor: '#22c55e',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    marginBottom: 6,
-  },
-  rupeeSymbol: {
-    fontSize: 22,
-    fontWeight: '900',
-    color: '#15803d',
-    marginRight: 6,
-  },
-  costInput: {
-    flex: 1,
-    fontSize: 20,
-    fontWeight: '900',
-    color: '#0f172a',
-    paddingVertical: 10,
-  },
-  costHelpText: {
-    fontSize: 11,
-    color: '#166534',
-    fontWeight: '500',
-    lineHeight: 15,
-  },
-  heroCard: {
-    backgroundColor: '#0f172a',
-    borderRadius: 14,
-    padding: 18,
-    marginBottom: 16,
-  },
-  heroRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  heroLabel: {
-    fontSize: 13,
-    color: '#cbd5e1',
-  },
-  heroVal: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#ffffff',
-  },
-  heroLabelGreen: {
-    fontSize: 13,
-    color: '#4ade80',
-    fontWeight: '600',
-  },
-  heroValGreen: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#4ade80',
-  },
-  heroDivider: {
-    height: 1,
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    marginVertical: 10,
-  },
-  netRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  netLabel: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#ffffff',
-  },
-  netSub: {
-    fontSize: 10,
-    color: '#94a3b8',
-    marginTop: 1,
-  },
-  netVal: {
-    fontSize: 22,
-    fontWeight: '900',
-    color: '#38bdf8',
-  },
-  savingsCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 14,
-    flexDirection: 'row',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  savingsCol: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  savingsLabel: {
-    fontSize: 10,
-    color: '#64748b',
-    fontWeight: '700',
-    textTransform: 'uppercase',
-  },
-  savingsVal: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: '#0f172a',
-    marginTop: 3,
-  },
-  savingsValGreen: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: '#16a34a',
-    marginTop: 3,
-  },
-  savingsValBlue: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: '#0284c7',
-    marginTop: 3,
-  },
-  bottomBar: {
-    backgroundColor: '#ffffff',
-    borderTopWidth: 1,
-    borderTopColor: '#f1f5f9',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    gap: 8,
-  },
-  actionHintRow: {
-    backgroundColor: '#f8fafc',
-    borderRadius: 6,
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    alignItems: 'center',
-    marginBottom: 2,
-  },
-  actionHintText: {
-    fontSize: 10.5,
-    color: '#64748b',
-    fontWeight: '500',
-  },
-  actionRowTop: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  pdfBtn: {
-    flex: 1,
-    backgroundColor: '#f1f5f9',
-    borderRadius: 10,
-    paddingVertical: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  pdfBtnText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#0f172a',
-  },
-  whatsAppBtn: {
-    flex: 1.5,
-    backgroundColor: '#16a34a',
-    borderRadius: 10,
-    paddingVertical: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-  },
-  whatsAppBtnText: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: '#ffffff',
-  },
-  pitchTextBtn: {
-    flex: 1,
-    backgroundColor: '#f0fdf4',
-    borderRadius: 10,
-    paddingVertical: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    borderWidth: 1.5,
-    borderColor: '#86efac',
-  },
-  pitchTextBtnText: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: '#15803d',
-  },
-  shareFileBtn: {
-    flex: 1,
-    backgroundColor: '#f8fafc',
-    borderRadius: 10,
-    paddingVertical: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    borderWidth: 1,
-    borderColor: '#cbd5e1',
-  },
-  shareFileBtnText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#334155',
-  },
-  badgeSynced: {
-    backgroundColor: '#dcfce7',
-    borderWidth: 1,
-    borderColor: '#86efac',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
+    borderColor: '#A7F3D0',
   },
   badgeSyncedText: {
     fontSize: 10,
     fontWeight: '800',
-    color: '#15803d',
-    textTransform: 'uppercase',
+    color: '#10B981',
   },
   badgeSyncing: {
-    backgroundColor: '#eff6ff',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
@@ -1429,21 +1505,25 @@ const styles = StyleSheet.create({
   badgeSyncingText: {
     fontSize: 10,
     fontWeight: '700',
-    color: '#2563eb',
+    color: '#0066FF',
   },
 
-  // ----------------------------------------------------
-  // WHERE READY FIELD EXPERIENCE: GUIDED PROPOSAL STYLES
-  // ----------------------------------------------------
+  // FLOATING KPI STRIP
   floatingKpiStrip: {
-    backgroundColor: '#0f172a',
     flexDirection: 'row',
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    justifyContent: 'space-between',
     alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: '#1e293b',
+    marginHorizontal: 16,
+    marginTop: 10,
+    marginBottom: 6,
+    borderRadius: 16,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderWidth: 1,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
   },
   kpiCol: {
     flex: 1,
@@ -1452,28 +1532,30 @@ const styles = StyleSheet.create({
   kpiColLabel: {
     fontSize: 8,
     fontWeight: '800',
-    color: '#94a3b8',
-    letterSpacing: 0.5,
+    letterSpacing: 0.4,
   },
   kpiColVal: {
     fontSize: 13,
-    fontWeight: '900',
-    color: '#ffffff',
-    marginTop: 1,
+    fontWeight: '800',
+    fontVariant: ['tabular-nums'],
+    marginTop: 2,
   },
   kpiDivider: {
     width: 1,
     height: 22,
-    backgroundColor: '#1e293b',
   },
-  guidedStepperTrack: {
+
+  // STEPPER TRACK
+  stepperTrack: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#ffffff',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
+    justifyContent: 'space-between',
+    marginHorizontal: 16,
+    marginBottom: 8,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderWidth: 1,
   },
   stepTab: {
     flexDirection: 'row',
@@ -1492,305 +1574,516 @@ const styles = StyleSheet.create({
     backgroundColor: '#0066FF',
   },
   stepNumDone: {
-    backgroundColor: '#059669',
+    backgroundColor: '#10B981',
   },
   stepNumInactive: {
-    backgroundColor: '#e2e8f0',
+    backgroundColor: '#94A3B8',
   },
   stepNumText: {
     fontSize: 10,
-    fontWeight: '900',
-    color: '#ffffff',
+    fontWeight: '800',
+    color: '#FFFFFF',
   },
   stepTabText: {
     fontSize: 11,
-    fontWeight: '700',
-    color: '#64748b',
-  },
-  stepTabTextActive: {
-    color: '#0f172a',
-    fontWeight: '800',
   },
   stepConnector: {
     flex: 1,
     height: 2,
-    backgroundColor: '#e2e8f0',
     marginHorizontal: 8,
+    borderRadius: 1,
   },
-  stepConnectorActive: {
-    backgroundColor: '#059669',
+
+  // BODY & CARDS
+  body: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingHorizontal: 16,
+    paddingTop: 4,
+    paddingBottom: Platform.OS === 'ios' ? 120 : 100,
   },
   stepCard: {
-    backgroundColor: '#ffffff',
     borderRadius: 18,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
-    shadowColor: '#0f172a',
+    shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
+    shadowOpacity: 0.03,
+    shadowRadius: 8,
     elevation: 2,
-    marginBottom: 16,
   },
   stepCardHeader: {
-    marginBottom: 16,
+    marginBottom: 14,
   },
   stepBadge: {
-    backgroundColor: '#eff6ff',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
     alignSelf: 'flex-start',
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
     marginBottom: 6,
   },
   stepBadgeText: {
     fontSize: 9,
-    fontWeight: '900',
+    fontWeight: '800',
     color: '#0066FF',
-    letterSpacing: 0.6,
+    letterSpacing: 0.4,
   },
   stepCardTitle: {
     fontSize: 16,
-    fontWeight: '900',
-    color: '#0f172a',
+    fontWeight: '800',
+    letterSpacing: -0.3,
   },
   stepCardSub: {
     fontSize: 11,
-    color: '#64748b',
     marginTop: 2,
+    fontWeight: '500',
   },
-  chipScrollRow: {
+  fieldLabel: {
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.4,
+    marginBottom: 6,
+    marginTop: 4,
+  },
+  input: {
+    borderRadius: 10,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    height: 42,
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  inputHighlight: {
+    borderRadius: 10,
+    borderWidth: 1.5,
+    paddingHorizontal: 12,
+    height: 44,
+    fontSize: 15,
+    fontWeight: '800',
+    marginBottom: 8,
+    fontVariant: ['tabular-nums'],
+  },
+  presetChipRow: {
     flexDirection: 'row',
     gap: 6,
-    marginBottom: 14,
+    marginBottom: 10,
   },
   presetChip: {
-    backgroundColor: '#f8fafc',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 10,
-  },
-  presetChipActive: {
-    backgroundColor: '#0f172a',
-    borderColor: '#0f172a',
   },
   presetChipText: {
     fontSize: 11,
-    fontWeight: '700',
-    color: '#334155',
   },
-  presetChipTextActive: {
-    color: '#ffffff',
-    fontWeight: '800',
-  },
-  aiHintBox: {
-    backgroundColor: '#fffbeb',
+  advisoryBox: {
     borderWidth: 1,
-    borderColor: '#fde68a',
-    borderRadius: 14,
-    padding: 12,
-    marginBottom: 16,
-  },
-  aiHintHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 4,
-  },
-  aiHintTitle: {
-    fontSize: 9,
-    fontWeight: '900',
-    color: '#d97706',
-    letterSpacing: 0.5,
-  },
-  aiHintBody: {
-    fontSize: 11,
-    color: '#475569',
-    lineHeight: 16,
-  },
-  stepNextBtn: {
-    backgroundColor: '#0066FF',
-    borderRadius: 14,
-    paddingVertical: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    shadowColor: '#0066FF',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 3,
-  },
-  stepNextBtnText: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: '#ffffff',
-  },
-  gearSelectionCol: {
-    gap: 8,
-    marginBottom: 14,
-  },
-  gearCard: {
-    backgroundColor: '#f8fafc',
-    borderWidth: 1.5,
-    borderColor: '#e2e8f0',
     borderRadius: 12,
-    padding: 12,
-  },
-  gearCardActive: {
-    backgroundColor: '#eff6ff',
-    borderColor: '#0066FF',
-  },
-  gearCardTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 2,
-  },
-  gearCardTitle: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#334155',
-  },
-  gearCardTitleActive: {
-    color: '#0066FF',
-  },
-  gearCardSub: {
-    fontSize: 10,
-    color: '#64748b',
-  },
-  stepNavRow: {
-    flexDirection: 'row',
-    gap: 10,
-    marginTop: 8,
-  },
-  stepBackBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-    backgroundColor: '#f1f5f9',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  stepBackBtnText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#64748b',
-  },
-  stepNextBtnFlex: {
-    flex: 1,
-    backgroundColor: '#0066FF',
-    borderRadius: 12,
-    paddingVertical: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-  },
-  heroCardHeader: {
+    padding: 10,
     marginBottom: 10,
   },
-  heroCardPill: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-    alignSelf: 'flex-start',
-  },
-  heroCardPillText: {
-    fontSize: 9,
-    fontWeight: '800',
-    color: '#fbbf24',
-    letterSpacing: 0.6,
-  },
-  savingsDivider: {
-    width: 1,
-    height: 28,
-    backgroundColor: '#f1f5f9',
-  },
-  summaryGearCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    padding: 14,
-    marginTop: 14,
-  },
-  summaryGearTitle: {
-    fontSize: 9,
-    fontWeight: '900',
-    color: '#64748b',
-    letterSpacing: 0.6,
-    marginBottom: 6,
-  },
-  summaryGearRow: {
-    fontSize: 11,
-    color: '#334155',
-    fontWeight: '600',
+  advisoryHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
     marginBottom: 3,
   },
-  modifyGearBtn: {
-    alignSelf: 'flex-end',
-    marginTop: 6,
+  advisoryTitle: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#F59E0B',
+    letterSpacing: 0.4,
   },
-  modifyGearBtnText: {
+  advisoryBody: {
     fontSize: 11,
+    lineHeight: 15,
+  },
+  aiRecBox: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    marginVertical: 8,
+  },
+  aiRecHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginBottom: 4,
+  },
+  aiRecTitle: {
+    fontSize: 10,
     fontWeight: '800',
     color: '#0066FF',
+    letterSpacing: 0.5,
+  },
+  aiRecBody: {
+    fontSize: 11,
+    lineHeight: 16,
+  },
+  stepPrimaryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#0066FF',
+    paddingVertical: 12,
+    borderRadius: 12,
+    marginTop: 10,
+    shadowColor: '#0066FF',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  stepPrimaryBtnText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#FFFFFF',
   },
   gearHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 8,
-    marginTop: 8,
+    marginTop: 6,
   },
-  addGearHeaderBtn: {
+  addGearBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#eff6ff',
+    gap: 3,
+    borderWidth: 1,
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#bfdbfe',
+    borderRadius: 7,
   },
-  addGearHeaderBtnText: {
+  addGearBtnText: {
     fontSize: 10,
-    fontWeight: '800',
+    fontWeight: '700',
     color: '#0066FF',
   },
-  gearCardTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  gearList: {
     gap: 6,
-    flex: 1,
-    flexWrap: 'wrap',
+    marginBottom: 6,
   },
-  gearTagPill: {
-    backgroundColor: '#e2e8f0',
+  gearCard: {
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 10,
+  },
+  gearCardTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 8,
+  },
+  gearCardTitle: {
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  gearCardSub: {
+    fontSize: 10,
+    marginTop: 2,
+  },
+  gearTag: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  gearTagText: {
+    fontSize: 9,
+    fontWeight: '700',
+  },
+  systemCostBox: {
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 12,
+    marginTop: 10,
+    marginBottom: 10,
+  },
+  costTitleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  costPrimaryLabel: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#10B981',
+  },
+  gstTag: {
+    backgroundColor: '#ECFDF5',
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 4,
   },
-  gearTagPillActive: {
-    backgroundColor: '#dbeafe',
-  },
-  gearTagPillText: {
+  gstTagText: {
     fontSize: 9,
     fontWeight: '800',
-    color: '#475569',
+    color: '#10B981',
   },
-  gearTagPillTextActive: {
-    color: '#1d4ed8',
+  costInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 10,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    marginBottom: 6,
   },
+  rupeeSymbol: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: '#10B981',
+    marginRight: 4,
+  },
+  costInput: {
+    flex: 1,
+    fontSize: 18,
+    fontWeight: '900',
+    fontVariant: ['tabular-nums'],
+    paddingVertical: 8,
+  },
+  costHelpText: {
+    fontSize: 10,
+    lineHeight: 14,
+  },
+  stepNavRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 6,
+  },
+  stepBackBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  stepBackBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  stepPrimaryBtnFlex: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#0066FF',
+    paddingVertical: 12,
+    borderRadius: 12,
+    shadowColor: '#0066FF',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+
+  // HERO CARD
+  heroCard: {
+    backgroundColor: '#0F172A',
+    borderRadius: 20,
+    padding: 16,
+    marginBottom: 10,
+  },
+  heroCardHeader: {
+    marginBottom: 12,
+  },
+  heroCardPillText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#94A3B8',
+    letterSpacing: 0.5,
+  },
+  heroRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  heroLabel: {
+    fontSize: 12,
+    color: '#CBD5E1',
+  },
+  heroVal: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    fontVariant: ['tabular-nums'],
+  },
+  heroLabelGreen: {
+    fontSize: 12,
+    color: '#34D399',
+    fontWeight: '700',
+  },
+  heroValGreen: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#34D399',
+    fontVariant: ['tabular-nums'],
+  },
+  heroDivider: {
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    marginVertical: 10,
+  },
+  netRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  netLabel: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  netSub: {
+    fontSize: 10,
+    color: '#94A3B8',
+    marginTop: 1,
+  },
+  netVal: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: '#0066FF',
+    fontVariant: ['tabular-nums'],
+  },
+
+  // SAVINGS CARD
+  savingsCard: {
+    flexDirection: 'row',
+    borderRadius: 16,
+    padding: 12,
+    marginBottom: 10,
+    borderWidth: 1,
+  },
+  savingsCol: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  savingsLabel: {
+    fontSize: 8,
+    fontWeight: '800',
+    letterSpacing: 0.4,
+  },
+  savingsVal: {
+    fontSize: 13,
+    fontWeight: '800',
+    marginTop: 2,
+  },
+  savingsValGreen: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#10B981',
+    marginTop: 2,
+    fontVariant: ['tabular-nums'],
+  },
+  savingsValBlue: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#0066FF',
+    marginTop: 2,
+  },
+  savingsDivider: {
+    width: 1,
+    height: 28,
+  },
+
+  // SUMMARY GEAR CARD
+  summaryGearCard: {
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    marginBottom: 10,
+  },
+  summaryGearTitle: {
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+    marginBottom: 8,
+  },
+  summaryGearRow: {
+    fontSize: 11,
+    fontWeight: '600',
+    marginBottom: 3,
+  },
+  modifyGearBtn: {
+    marginTop: 8,
+    alignSelf: 'flex-start',
+  },
+  modifyGearBtnText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#0066FF',
+  },
+
+  // BOTTOM ACTION BAR
+  bottomBar: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderTopWidth: 1,
+  },
+  actionRowTop: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  pdfBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    borderRadius: 11,
+    borderWidth: 1,
+    paddingVertical: 11,
+  },
+  pdfBtnText: {
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  whatsAppBtn: {
+    flex: 1.5,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    backgroundColor: '#0066FF',
+    borderRadius: 11,
+    paddingVertical: 11,
+    shadowColor: '#0066FF',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  whatsAppBtnText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  pitchTextBtn: {
+    flex: 1.2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    borderRadius: 11,
+    borderWidth: 1,
+    paddingVertical: 11,
+  },
+  pitchTextBtnText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#10B981',
+  },
+
+  // GEAR MODAL
   gearModalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(15, 23, 42, 0.65)',
@@ -1799,85 +2092,90 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   gearModalContent: {
-    backgroundColor: '#ffffff',
-    borderRadius: 20,
-    width: '100%',
-    maxWidth: 420,
+    borderRadius: 22,
+    borderWidth: 1,
     padding: 20,
+    width: '100%',
+    maxWidth: 440,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.25,
-    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.2,
+    shadowRadius: 14,
     elevation: 8,
   },
   gearModalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 16,
+    alignItems: 'center',
+    marginBottom: 12,
   },
   gearModalTitle: {
     fontSize: 16,
-    fontWeight: '900',
-    color: '#0f172a',
+    fontWeight: '800',
+    letterSpacing: -0.3,
   },
   gearModalSubtitle: {
     fontSize: 11,
-    color: '#64748b',
     marginTop: 2,
   },
   gearModalCloseBtn: {
-    padding: 4,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   gearModalBody: {
-    gap: 10,
-    marginBottom: 18,
+    gap: 6,
   },
   modalFieldLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#334155',
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.4,
+    marginTop: 4,
   },
   modalInput: {
-    backgroundColor: '#f8fafc',
-    borderWidth: 1,
-    borderColor: '#cbd5e1',
     borderRadius: 10,
+    borderWidth: 1,
     paddingHorizontal: 12,
-    paddingVertical: 10,
+    height: 42,
     fontSize: 13,
-    color: '#0f172a',
   },
   gearModalFooter: {
     flexDirection: 'row',
     gap: 10,
-    justifyContent: 'flex-end',
+    marginTop: 16,
   },
   gearModalCancelBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 10,
-    backgroundColor: '#f1f5f9',
+    flex: 1,
+    paddingVertical: 11,
+    borderRadius: 11,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
   gearModalCancelBtnText: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#64748b',
   },
   gearModalSaveBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 10,
+    flex: 2,
     backgroundColor: '#0066FF',
-    flexDirection: 'row',
+    paddingVertical: 11,
+    borderRadius: 11,
     alignItems: 'center',
-    gap: 6,
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 4,
+    shadowColor: '#0066FF',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3,
+    elevation: 2,
   },
   gearModalSaveBtnText: {
     fontSize: 12,
     fontWeight: '800',
-    color: '#ffffff',
+    color: '#FFFFFF',
   },
 });

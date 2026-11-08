@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -27,10 +27,12 @@ import {
   Check,
   Camera,
   AlertTriangle,
+  Compass,
 } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
-import { ModalHeader } from '../../components/Header';
+import { ModalHeader, useDirtyFormWarning } from '../../components/common/ModalHeader';
+import { KeyboardAvoidingContainer } from '../../components/common/KeyboardAvoidingContainer';
 import { crmApi } from '../../api/endpoints';
 import { offlineSyncService } from '../../services/offlineSyncService';
 
@@ -56,6 +58,7 @@ export const LeadCaptureModal: React.FC<LeadCaptureModalProps> = ({
   const [address, setAddress] = useState('');
   const [city, setCity] = useState('');
   const [pincode, setPincode] = useState('');
+  const [source, setSource] = useState('Field App');
 
   // Electricity & Utility Profile
   const [discomName, setDiscomName] = useState('MSEDCL (Mahavitaran)');
@@ -193,6 +196,28 @@ export const LeadCaptureModal: React.FC<LeadCaptureModalProps> = ({
     setBillAttachmentName(null);
   };
 
+  const isDirty = useMemo(() => {
+    return Boolean(
+      name.trim() ||
+      mobile.trim() ||
+      altPhone.trim() ||
+      address.trim() ||
+      city.trim() ||
+      pincode.trim() ||
+      consumerNumber.trim() ||
+      monthlyBill.trim() ||
+      monthlyUnits.trim() ||
+      billAttachmentUri
+    );
+  }, [name, mobile, altPhone, address, city, pincode, consumerNumber, monthlyBill, monthlyUnits, billAttachmentUri]);
+
+  const handleGuardedClose = useDirtyFormWarning(
+    isDirty,
+    onClose,
+    'Discard Lead Entry?',
+    'You have unsaved customer details. Are you sure you want to discard this lead?'
+  );
+
   /**
    * Form Submission (Direct API or Offline Draft)
    */
@@ -206,6 +231,10 @@ export const LeadCaptureModal: React.FC<LeadCaptureModalProps> = ({
       Alert.alert('Invalid Mobile', 'Please enter a valid 10-digit mobile number.');
       return;
     }
+    if (pincode && !/^[1-9][0-9]{5}$/.test(pincode.trim())) {
+      Alert.alert('Invalid PIN Code', 'Please enter a valid 6-digit Indian PIN code.');
+      return;
+    }
 
     setSubmitting(true);
     try {
@@ -216,7 +245,7 @@ export const LeadCaptureModal: React.FC<LeadCaptureModalProps> = ({
         address: address.trim() || undefined,
         city: city.trim() || 'Site Location',
         pincode: pincode.trim() || undefined,
-        source: 'Field App',
+        source: source || 'Field App',
         estimatedCap: recommendedKw,
         monthlyBill: parseFloat(monthlyBill) || undefined,
         sanctionedLoad: parseFloat(sanctionedLoad) || undefined,
@@ -266,17 +295,45 @@ export const LeadCaptureModal: React.FC<LeadCaptureModalProps> = ({
   };
 
   return (
-    <Modal visible={visible} animationType="slide" transparent={false} onRequestClose={onClose}>
-      <View style={styles.container}>
-        {/* STANDARDIZED MODAL HEADER */}
-        <ModalHeader
-          title="New Solar Lead"
-          subtitle="Direct field entry & prospect registration"
-          onClose={onClose}
-        />
+    <Modal visible={visible} animationType="slide" transparent={false} onRequestClose={handleGuardedClose}>
+      <KeyboardAvoidingContainer
+        header={
+          <ModalHeader
+            title="New Solar Lead"
+            subtitle="Direct field entry & prospect registration"
+            onClose={handleGuardedClose}
+            isDirty={isDirty}
+          />
+        }
+        footer={
+          <View style={styles.bottomBar}>
+            <TouchableOpacity
+              style={styles.saveOnlyBtn}
+              onPress={() => handleSubmit(false)}
+              disabled={submitting}
+              activeOpacity={0.8}
+            >
+              {submitting ? (
+                <ActivityIndicator color="#0f172a" />
+              ) : (
+                <Text style={styles.saveOnlyText}>Save Lead</Text>
+              )}
+            </TouchableOpacity>
 
-        <ScrollView style={styles.body} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-          {/* SECTION 1: PROSPECT CONTACT DETAILS */}
+            <TouchableOpacity
+              style={styles.proceedBtn}
+              onPress={() => handleSubmit(true)}
+              disabled={submitting}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.proceedText}>Create Proposal</Text>
+              <ArrowRight size={18} color="#ffffff" />
+            </TouchableOpacity>
+          </View>
+        }
+        contentContainerStyle={styles.scrollContent}
+      >
+        {/* SECTION 1: PROSPECT CONTACT DETAILS */}
           <View style={styles.sectionCard}>
             <View style={styles.sectionHeader}>
               <View style={styles.iconCircleAmber}>
@@ -360,6 +417,25 @@ export const LeadCaptureModal: React.FC<LeadCaptureModalProps> = ({
                   keyboardType="numeric"
                   maxLength={6}
                 />
+              </View>
+            </View>
+
+            {/* Lead Source Attribution Selector */}
+            <View style={styles.fieldGroup}>
+              <Text style={styles.label}>Lead Source Attribution</Text>
+              <View style={styles.chipRow}>
+                {['Field App', 'Referral', 'Canopy / Stall', 'Social Media', 'Inbound Call', 'Channel Partner', 'Website'].map((src) => (
+                  <TouchableOpacity
+                    key={src}
+                    style={[styles.sourceChip, source === src && styles.sourceChipActive]}
+                    onPress={() => setSource(src)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.sourceChipText, source === src && styles.sourceChipTextActive]}>
+                      {src}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
               </View>
             </View>
           </View>
@@ -531,34 +607,7 @@ export const LeadCaptureModal: React.FC<LeadCaptureModalProps> = ({
               </View>
             </View>
           </View>
-        </ScrollView>
-
-        {/* BOTTOM ACTION BAR */}
-        <View style={styles.bottomBar}>
-          <TouchableOpacity
-            style={styles.saveOnlyBtn}
-            onPress={() => handleSubmit(false)}
-            disabled={submitting}
-            activeOpacity={0.8}
-          >
-            {submitting ? (
-              <ActivityIndicator color="#0f172a" />
-            ) : (
-              <Text style={styles.saveOnlyText}>Save Lead</Text>
-            )}
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.proceedBtn}
-            onPress={() => handleSubmit(true)}
-            disabled={submitting}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.proceedText}>Create Proposal</Text>
-            <ArrowRight size={18} color="#ffffff" />
-          </TouchableOpacity>
-        </View>
-      </View>
+      </KeyboardAvoidingContainer>
     </Modal>
   );
 };
@@ -882,5 +931,32 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '800',
     color: '#ffffff',
+  },
+  chipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 4,
+  },
+  sourceChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 8,
+    backgroundColor: '#f1f5f9',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  sourceChipActive: {
+    backgroundColor: '#eff6ff',
+    borderColor: '#2563eb',
+  },
+  sourceChipText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#475569',
+  },
+  sourceChipTextActive: {
+    color: '#2563eb',
+    fontWeight: '800',
   },
 });

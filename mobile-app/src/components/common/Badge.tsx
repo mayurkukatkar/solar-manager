@@ -1,12 +1,25 @@
 import React from 'react';
 import { View, Text, StyleSheet, ViewStyle, TextStyle } from 'react-native';
-import { colors, spacing, radii, typography } from '../../theme';
+import { spacing, radii, typography, useTheme } from '../../theme';
+
+export type BadgeVariant =
+  | 'primary'
+  | 'success'
+  | 'warning'
+  | 'danger'
+  | 'purple'
+  | 'neutral'
+  | 'info'
+  | 'accent';
+
+export type BadgeSize = 'sm' | 'md';
 
 export interface BadgeProps {
   label: string;
-  variant?: 'primary' | 'success' | 'warning' | 'danger' | 'purple' | 'neutral';
-  size?: 'sm' | 'md';
+  variant?: BadgeVariant;
+  size?: BadgeSize;
   icon?: React.ReactNode;
+  dot?: boolean;
   style?: ViewStyle;
   textStyle?: TextStyle;
 }
@@ -16,24 +29,71 @@ export const Badge: React.FC<BadgeProps> = ({
   variant = 'neutral',
   size = 'sm',
   icon,
+  dot = false,
   style,
   textStyle,
 }) => {
+  const { colors, isDark } = useTheme();
+
   const getBadgeColors = () => {
     switch (variant) {
       case 'primary':
-        return { bg: '#eff6ff', text: '#1d4ed8', border: '#bfdbfe' };
+        return {
+          bg: colors.primaryLight,
+          text: isDark ? colors.primaryLight : colors.primaryDark,
+          border: isDark ? colors.primary : '#bfdbfe',
+          dot: colors.primary,
+        };
       case 'success':
-        return { bg: '#ecfdf5', text: '#059669', border: '#a7f3d0' };
+        return {
+          bg: colors.successLight,
+          text: isDark ? colors.success : colors.successDark,
+          border: colors.successBorder,
+          dot: colors.success,
+        };
       case 'warning':
-        return { bg: '#fffbeb', text: '#d97706', border: '#fde68a' };
+        return {
+          bg: colors.warningLight,
+          text: isDark ? colors.warning : colors.warningDark,
+          border: colors.warningBorder,
+          dot: colors.warning,
+        };
       case 'danger':
-        return { bg: '#fef2f2', text: '#dc2626', border: '#fecaca' };
+        return {
+          bg: colors.dangerLight,
+          text: isDark ? colors.danger : colors.dangerDark,
+          border: colors.dangerBorder,
+          dot: colors.danger,
+        };
       case 'purple':
-        return { bg: '#faf5ff', text: '#7c3aed', border: '#e9d5ff' };
+        return {
+          bg: colors.purpleLight,
+          text: isDark ? colors.purple : colors.purpleDark,
+          border: colors.purpleBorder,
+          dot: colors.purple,
+        };
+      case 'info':
+        return {
+          bg: colors.infoLight,
+          text: isDark ? colors.info : colors.infoDark,
+          border: colors.infoBorder,
+          dot: colors.info,
+        };
+      case 'accent':
+        return {
+          bg: colors.accentLight,
+          text: isDark ? colors.accent : colors.accentDark,
+          border: isDark ? colors.warningBorder : '#fed7aa',
+          dot: colors.accent,
+        };
       case 'neutral':
       default:
-        return { bg: '#f1f5f9', text: '#475569', border: '#e2e8f0' };
+        return {
+          bg: colors.surfaceRecessed,
+          text: colors.textSecondary,
+          border: colors.border,
+          dot: colors.textMuted,
+        };
     }
   };
 
@@ -52,7 +112,10 @@ export const Badge: React.FC<BadgeProps> = ({
         },
         style,
       ]}
+      accessibilityRole="text"
+      accessibilityLabel={`Status: ${label}`}
     >
+      {dot && <View style={[styles.dot, { backgroundColor: scheme.dot }]} />}
       {icon && <View style={styles.iconBox}>{icon}</View>}
       <Text
         style={[
@@ -77,6 +140,12 @@ const styles = StyleSheet.create({
     borderRadius: radii.full,
     borderWidth: 1,
     alignSelf: 'flex-start',
+  },
+  dot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginRight: 5,
   },
   iconBox: {
     marginRight: 4,

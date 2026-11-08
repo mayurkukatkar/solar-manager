@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -12,11 +12,11 @@ import {
   Linking,
   Alert,
   Platform,
+  FlatList,
 } from 'react-native';
 import {
   Receipt,
   Search,
-  Filter,
   CreditCard,
   MessageCircle,
   AlertTriangle,
@@ -30,20 +30,25 @@ import {
   RefreshCw,
   Building,
   Calendar,
-  Layers,
   ChevronDown,
   ChevronUp,
   FileText,
-  Briefcase,
-  Sparkles,
+  MapPin,
+  User,
+  Zap,
 } from 'lucide-react-native';
 import { Header } from '../../components/Header';
 import { InvoicePdfModal } from '../../components/InvoicePdfModal';
 import { CreateInvoiceModal } from '../../components/CreateInvoiceModal';
 import { financeApi } from '../../api/endpoints';
-import { colors } from '../../theme/colors';
+import { useTheme } from '../../theme';
+import { useDebounce } from '../../hooks/useDebounce';
+import { haptics } from '../../utils/haptics';
+import { offlineSyncService } from '../../services/offlineSyncService';
+import { EmptyState, SkeletonLoader } from '../../components/common';
 
 export const FinanceScreen: React.FC<{ navigation?: any; route?: any }> = ({ navigation, route }) => {
+  const { colors, isDark } = useTheme();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState(route?.params?.customerName || '');
@@ -81,6 +86,9 @@ export const FinanceScreen: React.FC<{ navigation?: any; route?: any }> = ({ nav
   // Expanded Invoice Details
   const [expandedInvoiceId, setExpandedInvoiceId] = useState<string | null>(null);
 
+  // 300ms search debouncing
+  const debouncedSearch = useDebounce(searchQuery, 300);
+
   useEffect(() => {
     if (route?.params?.customerName) {
       setSearchQuery(route.params.customerName);
@@ -90,6 +98,13 @@ export const FinanceScreen: React.FC<{ navigation?: any; route?: any }> = ({ nav
 
   const fetchFinanceData = async () => {
     try {
+      const cached = await offlineSyncService.getCachedResponse<any>('finance');
+      if (cached?.data && invoices.length === 0) {
+        if (cached.data.stats) setStats(cached.data.stats);
+        if (cached.data.invoices) setInvoices(cached.data.invoices);
+        setLoading(false);
+      }
+
       const [statsRes, finRes] = await Promise.all([
         financeApi.getStats().catch((err) => {
           console.warn('Finance stats fetch notice:', err.message);
@@ -101,8 +116,11 @@ export const FinanceScreen: React.FC<{ navigation?: any; route?: any }> = ({ nav
         }),
       ]);
 
+      let newStats = stats;
+      let newInvoices = invoices;
+
       if (statsRes && statsRes.stats) {
-        setStats({
+        newStats = {
           totalRevenue: statsRes.stats.totalCollected || 0,
           outstanding: statsRes.stats.outstanding || 0,
           overdueAmount: statsRes.stats.overdueAmount || 0,
@@ -110,14 +128,23 @@ export const FinanceScreen: React.FC<{ navigation?: any; route?: any }> = ({ nav
           expectedSubsidies: statsRes.stats.expectedSubsidies || 0,
           paidCount: statsRes.stats.paidCount || 0,
           unpaidCount: statsRes.stats.unpaidCount || 0,
-        });
+        };
+        setStats(newStats);
       }
 
       if (finRes && Array.isArray(finRes.finance)) {
-        setInvoices(finRes.finance);
+        newInvoices = finRes.finance;
+        setInvoices(newInvoices);
       }
+
+      await offlineSyncService.setCachedResponse('finance', { stats: newStats, invoices: newInvoices });
     } catch (err: any) {
       console.warn('Finance fetch error:', err.message);
+      const cached = await offlineSyncService.getCachedResponse<any>('finance');
+      if (cached?.data) {
+        if (cached.data.stats) setStats(cached.data.stats);
+        if (cached.data.invoices) setInvoices(cached.data.invoices);
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -129,11 +156,42 @@ export const FinanceScreen: React.FC<{ navigation?: any; route?: any }> = ({ nav
     fetchFinanceData();
   };
 
+  // 3-Tier Overdue Aging Breakdown (<15d, 15-30d, >30d)
+  const agingStats = useMemo(() => {
+    let under15 = 0;
+    let between15and30 = 0;
+    let over30 = 0;
+
+    invoices.forEach((inv) => {
+      const isPaid = (inv.computedStatus || inv.status) === 'PAID';
+      const isOverdue = inv.isOverdue || (inv.dueDate && new Date(inv.dueDate) < new Date() && !isPaid);
+      if (isOverdue && inv.dueDate) {
+        const days = Math.floor((Date.now() - new Date(inv.dueDate).getTime()) / (1000 * 60 * 60 * 24));
+        if (days < 15) under15++;
+        else if (days <= 30) between15and30++;
+        else over30++;
+      }
+    });
+
+    return { under15, between15and30, over30 };
+  }, [invoices]);
+
+  const getAgingBadge = (dueDate?: string) => {
+    if (!dueDate) return { label: 'OVERDUE', color: '#EF4444', bg: isDark ? 'rgba(239, 68, 68, 0.15)' : '#FEE2E2' };
+    const days = Math.max(1, Math.floor((Date.now() - new Date(dueDate).getTime()) / (1000 * 60 * 60 * 24)));
+    if (days < 15) {
+      return { label: `OVERDUE (${days}d)`, sub: '<15d Grace', color: '#F59E0B', bg: isDark ? 'rgba(245, 158, 11, 0.15)' : '#FEF3C7' };
+    } else if (days <= 30) {
+      return { label: `OVERDUE (${days}d)`, sub: '15-30d Urgent', color: '#F97316', bg: isDark ? 'rgba(249, 115, 22, 0.15)' : '#FFEDD5' };
+    } else {
+      return { label: `OVERDUE (>30d)`, sub: '>30d Critical', color: '#EF4444', bg: isDark ? 'rgba(239, 68, 68, 0.15)' : '#FEE2E2' };
+    }
+  };
+
   // Filtered Invoices
   const filteredInvoices = useMemo(() => {
     return invoices.filter((inv) => {
-      // 1. Text Search
-      const search = searchQuery.toLowerCase().trim();
+      const search = debouncedSearch.toLowerCase().trim();
       const matchSearch =
         !search ||
         (inv.invoiceNumber || '').toLowerCase().includes(search) ||
@@ -143,18 +201,22 @@ export const FinanceScreen: React.FC<{ navigation?: any; route?: any }> = ({ nav
 
       if (!matchSearch) return false;
 
-      // 2. Status Filter
       const totalPaid = inv.totalPaid ?? (inv.payments || []).reduce((s: number, p: any) => s + (p.amount || 0), 0);
       const isPaid = (inv.computedStatus || inv.status) === 'PAID';
       const isOverdue = inv.isOverdue || (inv.dueDate && new Date(inv.dueDate) < new Date() && !isPaid);
 
-      if (statusFilter === 'ALL') return true;
-      if (statusFilter === 'OVERDUE') return isOverdue;
-      if (statusFilter === 'UNPAID') return !isPaid && totalPaid === 0 && !isOverdue;
-      if (statusFilter === 'PARTIAL') return !isPaid && totalPaid > 0 && !isOverdue;
-      if (statusFilter === 'PAID') return isPaid;
+      if (statusFilter === 'ALL') {
+        // Continue to docCategoryFilter check
+      } else if (statusFilter === 'OVERDUE') {
+        if (!isOverdue) return false;
+      } else if (statusFilter === 'UNPAID') {
+        if (isPaid || totalPaid > 0 || isOverdue) return false;
+      } else if (statusFilter === 'PARTIAL') {
+        if (isPaid || totalPaid === 0 || isOverdue) return false;
+      } else if (statusFilter === 'PAID') {
+        if (!isPaid) return false;
+      }
 
-      // 3. Document Category Filter (Tax Invoice, Proforma, Advance)
       if (docCategoryFilter !== 'ALL') {
         const num = (inv.invoiceNumber || '').toUpperCase();
         const type = (inv.invoiceType || inv.milestone || '').toUpperCase();
@@ -166,7 +228,7 @@ export const FinanceScreen: React.FC<{ navigation?: any; route?: any }> = ({ nav
 
       return true;
     });
-  }, [invoices, searchQuery, statusFilter, docCategoryFilter]);
+  }, [invoices, debouncedSearch, statusFilter, docCategoryFilter]);
 
   // Open PDF Invoice Modal
   const handleOpenPdfModal = (invoice: any) => {
@@ -205,7 +267,7 @@ export const FinanceScreen: React.FC<{ navigation?: any; route?: any }> = ({ nav
       });
 
       Alert.alert(
-        'Payment Recorded! 🎉',
+        'Payment Recorded',
         `Receipt No: ${res.receiptNumber || 'REC-' + Date.now().toString().slice(-6)}\nAmount: ₹${amt.toLocaleString(
           'en-IN'
         )}\nInvoice Status: ${res.invoiceStatus || 'Updated'}`
@@ -230,7 +292,6 @@ export const FinanceScreen: React.FC<{ navigation?: any; route?: any }> = ({ nav
       if (res?.whatsappUrl) {
         await Linking.openURL(res.whatsappUrl);
       } else {
-        // Fallback WhatsApp message
         const phone = (inv.customer?.mobile || '').replace(/[^0-9]/g, '');
         if (!phone) {
           Alert.alert('Missing Phone', 'No customer phone number registered for this invoice.');
@@ -238,15 +299,13 @@ export const FinanceScreen: React.FC<{ navigation?: any; route?: any }> = ({ nav
         }
         const totalPaid = inv.totalPaid ?? (inv.payments || []).reduce((s: number, p: any) => s + (p.amount || 0), 0);
         const balance = inv.balance ?? Math.max(0, (inv.amount || 0) - totalPaid);
-        const msg = `☀️ *Payment Reminder - Solar EPC Milestone*\n\nDear ${
-          inv.customer?.name || 'Customer'
-        },\n\nThis is a friendly reminder regarding your solar project invoice:\n• Invoice No: *${
-          inv.invoiceNumber
-        }*\n• Milestone: *${inv.milestone || 'Project Milestone'}*\n• Total Amount: ₹${(
-          inv.amount || 0
-        ).toLocaleString('en-IN')}\n• Balance Due: *₹${balance.toLocaleString(
-          'en-IN'
-        )}*\n\nPlease complete the payment via UPI or Bank Transfer to proceed with installation stages.\n\nThank you!\n*WhereReady Solar OS*`;
+        const msg = `☀️ *Payment Notice — WhereReady Solar OS*\n\nDear *${inv.customer?.name || 'Customer'
+          }*,\n\nInvoice details for your solar installation:\n• Invoice No: *${inv.invoiceNumber
+          }*\n• Milestone: *${inv.milestone || 'Project Milestone'}*\n• Total Amount: ₹${(
+            inv.amount || 0
+          ).toLocaleString('en-IN')}\n• Balance Due: *₹${balance.toLocaleString(
+            'en-IN'
+          )}*\n\nPlease transfer via UPI or Bank Transfer to proceed to the next milestone.\n\nThank you,\n*WhereReady Solar OS Billing*`;
         const url = `whatsapp://send?phone=${phone.startsWith('91') ? phone : '91' + phone}&text=${encodeURIComponent(
           msg
         )}`;
@@ -257,507 +316,868 @@ export const FinanceScreen: React.FC<{ navigation?: any; route?: any }> = ({ nav
     }
   };
 
-  return (
-    <View style={styles.container}>
-      <Header
-        title="Finance & Billing"
-        subtitle="EPC Milestone Invoicing, DBT Subsidies & Cashflow"
-      />
+  const getItemLayout = useCallback(
+    (_: any, index: number) => ({
+      length: 220,
+      offset: 220 * index,
+      index,
+    }),
+    []
+  );
 
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* EXECUTIVE FINANCIAL OVERVIEW */}
-        <View style={styles.executiveCard}>
-          <View style={styles.kpiRow}>
-            <View style={styles.kpiCol}>
-              <View style={styles.kpiTopRow}>
-                <Text style={styles.kpiLabel}>COLLECTIONS REALIZED</Text>
-                <TrendingUp size={14} color="#059669" />
-              </View>
-              <Text style={styles.kpiVal}>₹{(stats.totalRevenue / 100000).toFixed(2)}L</Text>
-              <Text style={styles.kpiSub}>₹{stats.totalRevenue.toLocaleString('en-IN')} received</Text>
-            </View>
+  const keyExtractor = useCallback((item: any) => item.id || item.invoiceNumber || String(Math.random()), []);
 
-            <View style={styles.kpiDivider} />
+  const renderInvoiceItem = useCallback(
+    ({ item: inv }: { item: any }) => {
+      const totalPaid = inv.totalPaid ?? (inv.payments || []).reduce((s: number, p: any) => s + (p.amount || 0), 0);
+      const balance = inv.balance ?? Math.max(0, (inv.amount || 0) - totalPaid);
+      const isPaid = (inv.computedStatus || inv.status) === 'PAID';
+      const isOverdue = inv.isOverdue || (inv.dueDate && new Date(inv.dueDate) < new Date() && !isPaid);
+      const progress = inv.amount > 0 ? Math.min(100, Math.round((totalPaid / inv.amount) * 100)) : 0;
+      const isExpanded = expandedInvoiceId === inv.id;
 
-            <View style={styles.kpiCol}>
-              <View style={styles.kpiTopRow}>
-                <Text style={styles.kpiLabel}>OUTSTANDING RECEIVABLES</Text>
-                <Clock size={14} color="#d97706" />
-              </View>
-              <Text style={styles.kpiVal}>₹{(stats.outstanding / 100000).toFixed(2)}L</Text>
-              <Text style={styles.kpiSub}>Active milestone balances</Text>
-            </View>
-          </View>
+      const num = (inv.invoiceNumber || '').toUpperCase();
+      const type = (inv.invoiceType || inv.milestone || '').toUpperCase();
+      const isProforma = type.includes('PROFORMA') || num.startsWith('PRO');
+      const isAdvance = type.includes('ADVANCE') || num.startsWith('ADV');
 
-          {/* Capital Realization Progress Bar */}
-          <View style={styles.capitalTrackContainer}>
-            <View style={styles.capitalTrackLabels}>
-              <Text style={styles.capitalTrackLeftText}>
-                Collected: {stats.totalRevenue + stats.outstanding > 0 ? Math.round((stats.totalRevenue / (stats.totalRevenue + stats.outstanding)) * 100) : 65}%
-              </Text>
-              <Text style={styles.capitalTrackRightText}>
-                Total Order Book: ₹{((stats.totalRevenue + stats.outstanding) / 100000).toFixed(1)}L
-              </Text>
-            </View>
-            <View style={styles.capitalProgressBar}>
-              <View
-                style={[
-                  styles.capitalProgressFill,
-                  {
-                    width: `${
-                      stats.totalRevenue + stats.outstanding > 0
-                        ? Math.min(100, Math.round((stats.totalRevenue / (stats.totalRevenue + stats.outstanding)) * 100))
-                        : 65
-                    }%`,
-                  },
-                ]}
-              />
-            </View>
-          </View>
-        </View>
-
-        {/* OVERDUE ALERTS CARD */}
-        {stats.overdueCount > 0 && (
-          <View style={styles.overdueNoticeCard}>
-            <View style={styles.overdueNoticeLeft}>
-              <AlertTriangle size={18} color="#e11d48" />
-              <View style={{ flex: 1 }}>
-                <Text style={styles.overdueNoticeTitle}>
-                  {stats.overdueCount} Milestone Invoice{stats.overdueCount > 1 ? 's' : ''} Past Due Date
-                </Text>
-                <Text style={styles.overdueNoticeSub}>
-                  Total ₹{stats.overdueAmount.toLocaleString('en-IN')} pending immediate collection
-                </Text>
-              </View>
-            </View>
-            <TouchableOpacity
-              style={styles.overdueActionBtn}
-              onPress={() => setStatusFilter('OVERDUE')}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.overdueActionBtnText}>View Overdue</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* PM SURYA GHAR DBT SUBSIDY TRACKER */}
-        <View style={styles.subsidyBanner}>
-          <View style={styles.subsidyBannerLeft}>
-            <View style={styles.subsidyIconCircle}>
-              <ShieldCheck size={18} color="#0066FF" />
-            </View>
+      return (
+        <View
+          key={inv.id}
+          style={[
+            styles.invoiceCard,
+            {
+              backgroundColor: colors.surface,
+              borderColor: colors.borderSubtle,
+            },
+          ]}
+        >
+          {/* HEADER ROW: INVOICE NUMBER, DOC TYPE, STATUS */}
+          <View style={styles.cardHeader}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.subsidyBannerTitle}>PM Surya Ghar DBT Subsidy Pipeline</Text>
-              <Text style={styles.subsidyBannerSub}>
-                Direct Central Financial Assistance to consumer accounts
-              </Text>
-            </View>
-          </View>
-          <View style={styles.subsidyBannerRight}>
-            <Text style={styles.subsidyBannerVal}>
-              ₹{(stats.expectedSubsidies / 100000).toFixed(2)} Lakhs
-            </Text>
-          </View>
-        </View>
+              <View style={styles.invoiceNumRow}>
+                <Text style={[styles.invoiceNumber, { color: colors.text }]}>
+                  {inv.invoiceNumber || 'INV-2026'}
+                </Text>
 
-        {/* SMART COMMERCIAL INVOICE GENERATOR BANNER */}
-        <View style={styles.createInvoiceBar}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.createInvoiceBarTitle}>Smart Commercial Invoicing</Text>
-            <Text style={styles.createInvoiceBarSub}>
-              GST Tax Invoices, Bank Proformas & Advance Receipts
-            </Text>
-          </View>
-          <TouchableOpacity
-            style={styles.createInvoiceBtn}
-            onPress={() => setCreateInvoiceModalVisible(true)}
-            activeOpacity={0.85}
-          >
-            <Plus size={15} color="#ffffff" strokeWidth={2.8} />
-            <Text style={styles.createInvoiceBtnText}>New Invoice</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* SEARCH AND FILTER BAR */}
-        <View style={styles.filterSection}>
-          <View style={styles.searchBox}>
-            <Search size={16} color="#94a3b8" />
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Search invoice #, customer name, mobile..."
-              placeholderTextColor="#94a3b8"
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-            />
-            {searchQuery ? (
-              <TouchableOpacity onPress={() => setSearchQuery('')}>
-                <X size={15} color="#94a3b8" />
-              </TouchableOpacity>
-            ) : null}
-          </View>
-
-          {/* STATUS PILL BUTTONS */}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.statusChipsContainer}>
-            {(['ALL', 'OVERDUE', 'UNPAID', 'PARTIAL', 'PAID'] as const).map((filterKey) => {
-              const isActive = statusFilter === filterKey;
-              return (
-                <TouchableOpacity
-                  key={filterKey}
-                  style={[styles.statusChip, isActive && styles.statusChipActive]}
-                  onPress={() => setStatusFilter(filterKey)}
-                  activeOpacity={0.7}
+                <View
+                  style={[
+                    styles.docTypeBadge,
+                    {
+                      backgroundColor: isProforma
+                        ? (isDark ? 'rgba(0, 102, 255, 0.12)' : '#EFF6FF')
+                        : isAdvance
+                          ? (isDark ? 'rgba(139, 92, 246, 0.12)' : '#F5F3FF')
+                          : (isDark ? 'rgba(16, 185, 129, 0.12)' : '#ECFDF5'),
+                      borderColor: isProforma
+                        ? (isDark ? '#1E3A8A' : '#BFDBFE')
+                        : isAdvance
+                          ? (isDark ? '#4C1D95' : '#DDD6FE')
+                          : (isDark ? '#065F46' : '#A7F3D0'),
+                    },
+                  ]}
                 >
-                  <Text style={[styles.statusChipText, isActive && styles.statusChipTextActive]}>
-                    {filterKey === 'ALL'
-                      ? `All Status`
-                      : filterKey === 'OVERDUE'
-                      ? `Overdue (${stats.overdueCount})`
-                      : filterKey === 'UNPAID'
-                      ? 'Unpaid'
-                      : filterKey === 'PARTIAL'
-                      ? 'Partial'
-                      : 'Paid'}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-
-          {/* COMMERCIAL DOCUMENT TYPE FILTER CHIPS */}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.statusChipsContainer, { marginTop: 8 }]}>
-            {([
-              { key: 'ALL', label: `All Invoices (${invoices.length})` },
-              { key: 'TAX_INVOICE', label: '📄 Tax Invoices' },
-              { key: 'PROFORMA', label: '🏦 Bank Proformas' },
-              { key: 'ADVANCE', label: '💳 Advance Vouchers' },
-            ] as const).map((docItem) => {
-              const isActive = docCategoryFilter === docItem.key;
-              return (
-                <TouchableOpacity
-                  key={docItem.key}
-                  style={[styles.milestoneChip, isActive && styles.milestoneChipActive]}
-                  onPress={() => setDocCategoryFilter(docItem.key)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[styles.milestoneChipText, isActive && styles.milestoneChipTextActive]}>
-                    {docItem.label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-        </View>
-
-        {/* INVOICES SECTION */}
-        <View style={styles.invoicesHeaderRow}>
-          <Text style={styles.sectionTitle}>
-            Invoices & Commercial Bills ({filteredInvoices.length})
-          </Text>
-          <TouchableOpacity
-            style={styles.refreshIconBtn}
-            onPress={fetchFinanceData}
-            activeOpacity={0.7}
-          >
-            <RefreshCw size={14} color="#64748b" />
-          </TouchableOpacity>
-        </View>
-
-        {loading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#059669" />
-            <Text style={styles.loadingText}>Syncing financial ledgers & milestone invoices...</Text>
-          </View>
-        ) : filteredInvoices.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <View style={styles.emptyIconCircle}>
-              <Receipt size={36} color="#94a3b8" />
-            </View>
-            <Text style={styles.emptyTitle}>No Invoices Found</Text>
-            <Text style={styles.emptySub}>
-              {statusFilter !== 'ALL'
-                ? `No invoices matching '${statusFilter}' status.`
-                : 'Convert a lead into an onboarding project to automatically generate milestone payment cycles.'}
-            </Text>
-            {statusFilter !== 'ALL' && (
-              <TouchableOpacity
-                style={styles.clearFilterBtn}
-                onPress={() => setStatusFilter('ALL')}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.clearFilterBtnText}>Show All Invoices</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        ) : (
-          filteredInvoices.map((inv) => {
-            const totalPaid = inv.totalPaid ?? (inv.payments || []).reduce((s: number, p: any) => s + (p.amount || 0), 0);
-            const balance = inv.balance ?? Math.max(0, (inv.amount || 0) - totalPaid);
-            const isPaid = (inv.computedStatus || inv.status) === 'PAID';
-            const isOverdue = inv.isOverdue || (inv.dueDate && new Date(inv.dueDate) < new Date() && !isPaid);
-            const progress = inv.amount > 0 ? Math.min(100, Math.round((totalPaid / inv.amount) * 100)) : 0;
-            const isExpanded = expandedInvoiceId === inv.id;
-
-            const num = (inv.invoiceNumber || '').toUpperCase();
-            const type = (inv.invoiceType || inv.milestone || '').toUpperCase();
-            const isProforma = type.includes('PROFORMA') || num.startsWith('PRO');
-            const isAdvance = type.includes('ADVANCE') || num.startsWith('ADV');
-
-            return (
-              <View key={inv.id} style={styles.invoiceCard}>
-                {/* INVOICE CARD TOP */}
-                <View style={styles.cardHeader}>
-                  <View style={{ flex: 1 }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                      <Text style={styles.invoiceNumber}>{inv.invoiceNumber || 'INV-2026'}</Text>
-                      {inv.project?.capacity && (
-                        <View style={styles.capacityBadge}>
-                          <Text style={styles.capacityBadgeText}>{inv.project.capacity} kWp</Text>
-                        </View>
-                      )}
-                    </View>
-                    <Text style={styles.customerName}>
-                      {inv.customer?.name || inv.project?.name || 'Customer Account'}
-                    </Text>
-                    <Text style={styles.customerSub}>
-                      📍 {inv.customer?.city || 'Site Location'} {inv.customer?.mobile ? `• 📞 ${inv.customer.mobile}` : ''}
-                    </Text>
-                  </View>
-
-                  {/* STATUS BADGE */}
-                  <View
+                  <Text
                     style={[
-                      styles.statusPill,
-                      isPaid
-                        ? styles.statusPillPaid
-                        : isOverdue
-                        ? styles.statusPillOverdue
-                        : totalPaid > 0
-                        ? styles.statusPillPartial
-                        : styles.statusPillUnpaid,
+                      styles.docTypeBadgeText,
+                      {
+                        color: isProforma
+                          ? '#0066FF'
+                          : isAdvance
+                            ? '#8B5CF6'
+                            : '#10B981',
+                      },
                     ]}
                   >
-                    <Text
-                      style={[
-                        styles.statusPillText,
-                        isPaid
-                          ? styles.statusPillTextPaid
-                          : isOverdue
-                          ? styles.statusPillTextOverdue
-                          : totalPaid > 0
-                          ? styles.statusPillTextPartial
-                          : styles.statusPillTextUnpaid,
-                      ]}
-                    >
-                      {isPaid ? 'PAID' : isOverdue ? 'OVERDUE' : totalPaid > 0 ? 'PARTIAL' : 'UNPAID'}
-                    </Text>
-                  </View>
+                    {isProforma ? 'PROFORMA' : isAdvance ? 'ADVANCE' : 'TAX INVOICE'}
+                  </Text>
                 </View>
 
-                {/* DOCUMENT TYPE & BILLING SCOPE */}
-                <View style={styles.milestoneTagRow}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, marginRight: 8 }}>
-                    <View
-                      style={[
-                        styles.docTypePill,
-                        isProforma
-                          ? styles.docTypePillProforma
-                          : isAdvance
-                          ? styles.docTypePillAdvance
-                          : styles.docTypePillTax,
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.docTypePillText,
-                          isProforma
-                            ? styles.docTypePillTextProforma
-                            : isAdvance
-                            ? styles.docTypePillTextAdvance
-                            : styles.docTypePillTextTax,
-                        ]}
-                      >
-                        {isProforma ? 'PROFORMA' : isAdvance ? 'ADVANCE' : 'TAX INVOICE'}
-                      </Text>
-                    </View>
-                    <Text style={styles.invoiceScopeText} numberOfLines={1}>
-                      {inv.milestoneTitle || 'Complete Turnkey Rooftop Solar Supply & Installation'}
-                    </Text>
-                  </View>
-                  {inv.dueDate && (
-                    <Text style={[styles.dueDateText, isOverdue && { color: '#e11d48', fontWeight: '700' }]}>
-                      Due: {new Date(inv.dueDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
-                    </Text>
-                  )}
-                </View>
-
-                {/* FINANCIAL METRICS BREAKDOWN */}
-                <View style={styles.financialMetricsBox}>
-                  <View style={styles.metricCol}>
-                    <Text style={styles.metricColLabel}>Invoice Total</Text>
-                    <Text style={styles.metricColVal}>₹{(inv.amount || 0).toLocaleString('en-IN')}</Text>
-                  </View>
-                  <View style={styles.metricCol}>
-                    <Text style={styles.metricColLabel}>Paid</Text>
-                    <Text style={[styles.metricColVal, { color: '#059669' }]}>
-                      ₹{totalPaid.toLocaleString('en-IN')}
-                    </Text>
-                  </View>
-                  <View style={styles.metricCol}>
-                    <Text style={styles.metricColLabel}>Balance Due</Text>
-                    <Text style={[styles.metricColVal, { color: balance > 0 ? '#d97706' : '#64748b', fontWeight: '800' }]}>
-                      ₹{balance.toLocaleString('en-IN')}
-                    </Text>
-                  </View>
-                </View>
-
-                {/* PAYMENT PROGRESS BAR */}
-                <View style={styles.progressBarBg}>
+                {inv.project?.capacity && (
                   <View
                     style={[
-                      styles.progressBarFill,
+                      styles.capacityMiniBadge,
                       {
-                        width: `${progress}%`,
-                        backgroundColor: isPaid ? '#10b981' : progress > 0 ? '#2563eb' : '#e2e8f0',
+                        backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
+                        borderColor: colors.borderSubtle,
+                      },
+                    ]}
+                  >
+                    <Zap size={10} color="#0066FF" />
+                    <Text style={[styles.capacityMiniText, { color: colors.text }]}>
+                      {inv.project.capacity} kWp
+                    </Text>
+                  </View>
+                )}
+              </View>
+
+              <Text style={[styles.customerName, { color: colors.text }]} numberOfLines={1}>
+                {inv.customer?.name || inv.project?.name || 'Customer Account'}
+              </Text>
+
+              <View style={styles.locationRow}>
+                <MapPin size={11} color={colors.textMuted} />
+                <Text style={[styles.customerSub, { color: colors.textSecondary }]} numberOfLines={1}>
+                  {inv.customer?.city || 'Site Location'}
+                  {inv.customer?.mobile ? ` • ${inv.customer.mobile}` : ''}
+                </Text>
+              </View>
+            </View>
+
+            {/* STATUS BADGE */}
+            {isOverdue ? (() => {
+              const aging = getAgingBadge(inv.dueDate);
+              return (
+                <View style={[styles.statusPill, { backgroundColor: aging.bg, borderColor: aging.color }]}>
+                  <Text style={[styles.statusPillText, { color: aging.color }]}>
+                    {aging.label}
+                  </Text>
+                </View>
+              );
+            })() : (
+              <View
+                style={[
+                  styles.statusPill,
+                  {
+                    backgroundColor: isPaid
+                      ? (isDark ? 'rgba(16, 185, 129, 0.15)' : '#ECFDF5')
+                      : totalPaid > 0
+                        ? (isDark ? 'rgba(0, 102, 255, 0.15)' : '#EFF6FF')
+                        : (isDark ? 'rgba(245, 158, 11, 0.15)' : '#FFFBEB'),
+                    borderColor: isPaid
+                      ? '#10B981'
+                      : totalPaid > 0
+                        ? '#0066FF'
+                        : '#F59E0B',
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.statusPillText,
+                    {
+                      color: isPaid
+                        ? '#10B981'
+                        : totalPaid > 0
+                          ? '#0066FF'
+                          : '#D97706',
+                    },
+                  ]}
+                >
+                  {isPaid ? 'PAID' : totalPaid > 0 ? 'PARTIAL' : 'UNPAID'}
+                </Text>
+              </View>
+            )}
+          </View>
+
+          {/* SCOPE & DUE DATE */}
+          <View style={styles.scopeRow}>
+            <Text style={[styles.scopeText, { color: colors.textSecondary }]} numberOfLines={1}>
+              {inv.milestoneTitle || 'Complete Turnkey Rooftop Solar Supply & Installation'}
+            </Text>
+            {inv.dueDate && (
+              <Text style={[styles.dueDateText, { color: isOverdue ? '#EF4444' : colors.textMuted }]}>
+                Due: {new Date(inv.dueDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+              </Text>
+            )}
+          </View>
+
+          {/* FINANCIAL BREAKDOWN BOX */}
+          <View
+            style={[
+              styles.metricsBox,
+              {
+                backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
+                borderColor: colors.borderSubtle,
+              },
+            ]}
+          >
+            <View style={styles.metricItem}>
+              <Text style={[styles.metricLabel, { color: colors.textMuted }]}>INVOICE TOTAL</Text>
+              <Text style={[styles.metricVal, { color: colors.text }]}>
+                ₹{(inv.amount || 0).toLocaleString('en-IN')}
+              </Text>
+            </View>
+
+            <View style={styles.metricItem}>
+              <Text style={[styles.metricLabel, { color: colors.textMuted }]}>COLLECTED</Text>
+              <Text style={[styles.metricVal, { color: '#10B981' }]}>
+                ₹{totalPaid.toLocaleString('en-IN')}
+              </Text>
+            </View>
+
+            <View style={styles.metricItem}>
+              <Text style={[styles.metricLabel, { color: colors.textMuted }]}>BALANCE DUE</Text>
+              <Text
+                style={[
+                  styles.metricVal,
+                  { color: balance > 0 ? '#F59E0B' : colors.textMuted },
+                ]}
+              >
+                ₹{balance.toLocaleString('en-IN')}
+              </Text>
+            </View>
+          </View>
+
+          {/* PAYMENT PROGRESS TRACK */}
+          <View style={[styles.progressTrack, { backgroundColor: isDark ? '#334155' : '#F1F5F9' }]}>
+            <View
+              style={[
+                styles.progressFill,
+                {
+                  width: `${progress}%`,
+                  backgroundColor: isPaid ? '#10B981' : progress > 0 ? '#0066FF' : '#94A3B8',
+                },
+              ]}
+            />
+          </View>
+
+          {/* EXPANDABLE PAYMENTS HISTORY */}
+          {inv.payments && inv.payments.length > 0 && (
+            <TouchableOpacity
+              style={styles.expandHistoryBtn}
+              onPress={() => setExpandedInvoiceId(isExpanded ? null : inv.id)}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.expandHistoryText}>
+                {inv.payments.length} Transaction{inv.payments.length > 1 ? 's' : ''} Recorded
+              </Text>
+              {isExpanded ? (
+                <ChevronUp size={14} color="#10B981" />
+              ) : (
+                <ChevronDown size={14} color="#10B981" />
+              )}
+            </TouchableOpacity>
+          )}
+
+          {isExpanded && inv.payments && (
+            <View
+              style={[
+                styles.paymentHistoryBox,
+                {
+                  backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
+                  borderColor: colors.borderSubtle,
+                },
+              ]}
+            >
+              {inv.payments.map((p: any, pIdx: number) => (
+                <View key={pIdx} style={styles.paymentHistoryRow}>
+                  <View>
+                    <Text style={[styles.paymentHistoryMode, { color: colors.text }]}>
+                      {p.mode || 'UPI'} • {p.reference ? `Ref: ${p.reference}` : 'Verified'}
+                    </Text>
+                    <Text style={[styles.paymentHistoryDate, { color: colors.textMuted }]}>
+                      {p.date ? new Date(p.date).toLocaleDateString() : 'Recorded'}
+                    </Text>
+                  </View>
+                  <Text style={styles.paymentHistoryAmt}>
+                    +₹{(p.amount || 0).toLocaleString('en-IN')}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          )}
+
+          {/* ACTION BUTTONS ROW */}
+          <View style={[styles.cardActionsRow, { borderTopColor: colors.borderSubtle }]}>
+            <TouchableOpacity
+              style={[
+                styles.pdfBtn,
+                {
+                  backgroundColor: isDark ? '#1E293B' : '#EFF6FF',
+                  borderColor: isDark ? '#1E3A8A' : '#BFDBFE',
+                },
+              ]}
+              onPress={() => handleOpenPdfModal(inv)}
+              activeOpacity={0.85}
+            >
+              <FileText size={13} color="#0066FF" />
+              <Text style={styles.pdfBtnText}>PDF Invoice</Text>
+            </TouchableOpacity>
+
+            {!isPaid && (
+              <TouchableOpacity
+                style={styles.recordPayBtn}
+                onPress={() => handleOpenPaymentModal(inv)}
+                activeOpacity={0.85}
+              >
+                <CreditCard size={13} color="#FFFFFF" />
+                <Text style={styles.recordPayBtnText}>Record Pay</Text>
+              </TouchableOpacity>
+            )}
+
+            <TouchableOpacity
+              style={[
+                styles.whatsappBtn,
+                {
+                  backgroundColor: isDark ? 'rgba(16, 185, 129, 0.12)' : '#ECFDF5',
+                  borderColor: isDark ? '#065F46' : '#A7F3D0',
+                },
+                isPaid && { flex: 1 },
+              ]}
+              onPress={() => handleSendWhatsAppReminder(inv)}
+              activeOpacity={0.85}
+            >
+              <MessageCircle size={13} color="#10B981" />
+              <Text style={styles.whatsappBtnText}>
+                {isPaid ? 'Share' : 'Remind'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      );
+    },
+    [colors, isDark, expandedInvoiceId]
+  );
+
+  return (
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      {/* GLOBAL HEADER */}
+      <Header
+        title="Finance & Billing"
+        subtitle="EPC milestone invoices, collections ledger & DBT subsidies"
+      />
+
+      <FlatList
+        data={filteredInvoices}
+        keyExtractor={keyExtractor}
+        renderItem={renderInvoiceItem}
+        getItemLayout={getItemLayout}
+        windowSize={7}
+        maxToRenderPerBatch={10}
+        initialNumToRender={8}
+        removeClippedSubviews={Platform.OS === 'android'}
+        style={[styles.scroll, { backgroundColor: colors.background }]}
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.primary}
+          />
+        }
+        showsVerticalScrollIndicator={false}
+        ListHeaderComponent={
+          <View>
+            {/* EXECUTIVE FINANCIAL OVERVIEW */}
+            <View
+              style={[
+                styles.executiveCard,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: colors.borderSubtle,
+                },
+              ]}
+            >
+              <View style={styles.kpiRow}>
+                <View style={styles.kpiCol}>
+                  <View style={styles.kpiTopRow}>
+                    <Text style={[styles.kpiLabel, { color: colors.textMuted }]}>
+                      COLLECTIONS REALIZED
+                    </Text>
+                    <TrendingUp size={13} color="#10B981" />
+                  </View>
+                  <Text style={[styles.kpiVal, { color: colors.text }]}>
+                    ₹{(stats.totalRevenue / 100000).toFixed(2)}L
+                  </Text>
+                  <Text style={[styles.kpiSub, { color: colors.textSecondary }]}>
+                    ₹{stats.totalRevenue.toLocaleString('en-IN')} received
+                  </Text>
+                </View>
+
+                <View style={[styles.kpiDivider, { backgroundColor: colors.borderSubtle }]} />
+
+                <View style={styles.kpiCol}>
+                  <View style={styles.kpiTopRow}>
+                    <Text style={[styles.kpiLabel, { color: colors.textMuted }]}>
+                      RECEIVABLES
+                    </Text>
+                    <Clock size={13} color="#F59E0B" />
+                  </View>
+                  <Text style={[styles.kpiVal, { color: '#0066FF' }]}>
+                    ₹{(stats.outstanding / 100000).toFixed(2)}L
+                  </Text>
+                  <Text style={[styles.kpiSub, { color: colors.textSecondary }]}>
+                    Active milestone balance
+                  </Text>
+                </View>
+              </View>
+
+              {/* Realization Progress Bar */}
+              <View style={styles.capitalTrackContainer}>
+                <View style={styles.capitalTrackLabels}>
+                  <Text style={styles.capitalTrackLeftText}>
+                    {stats.totalRevenue + stats.outstanding > 0
+                      ? Math.round((stats.totalRevenue / (stats.totalRevenue + stats.outstanding)) * 100)
+                      : 65}
+                    % Collected
+                  </Text>
+                  <Text style={[styles.capitalTrackRightText, { color: colors.textMuted }]}>
+                    Total Book: ₹{((stats.totalRevenue + stats.outstanding) / 100000).toFixed(1)}L
+                  </Text>
+                </View>
+
+                <View style={[styles.capitalProgressBar, { backgroundColor: isDark ? '#334155' : '#F1F5F9' }]}>
+                  <View
+                    style={[
+                      styles.capitalProgressFill,
+                      {
+                        width: `${stats.totalRevenue + stats.outstanding > 0
+                            ? Math.min(
+                              100,
+                              Math.round(
+                                (stats.totalRevenue / (stats.totalRevenue + stats.outstanding)) * 100
+                              )
+                            )
+                            : 65
+                          }%`,
                       },
                     ]}
                   />
                 </View>
+              </View>
+            </View>
 
-                {/* EXPANDABLE PAYMENTS HISTORY */}
-                {inv.payments && inv.payments.length > 0 && (
-                  <TouchableOpacity
-                    style={styles.expandHistoryBtn}
-                    onPress={() => setExpandedInvoiceId(isExpanded ? null : inv.id)}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={styles.expandHistoryText}>
-                      {inv.payments.length} Payment Transaction{inv.payments.length > 1 ? 's' : ''} Recorded
+            {/* OVERDUE NOTICE WITH 3-TIER AGING */}
+            {stats.overdueCount > 0 && (
+              <View
+                style={[
+                  styles.overdueNoticeCard,
+                  {
+                    backgroundColor: isDark ? 'rgba(239, 68, 68, 0.1)' : '#FFF1F2',
+                    borderColor: isDark ? '#991B1B' : '#FECDD3',
+                  },
+                ]}
+              >
+                <View style={styles.overdueNoticeLeft}>
+                  <AlertTriangle size={18} color="#EF4444" />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.overdueNoticeTitle}>
+                      {stats.overdueCount} Milestone Invoice{stats.overdueCount > 1 ? 's' : ''} Past Due
                     </Text>
-                    {isExpanded ? <ChevronUp size={14} color="#64748b" /> : <ChevronDown size={14} color="#64748b" />}
-                  </TouchableOpacity>
-                )}
+                    <Text style={styles.overdueNoticeSub}>
+                      ₹{stats.overdueAmount.toLocaleString('en-IN')} pending collection
+                    </Text>
 
-                {isExpanded && inv.payments && (
-                  <View style={styles.paymentHistoryBox}>
-                    {inv.payments.map((p: any, pIdx: number) => (
-                      <View key={pIdx} style={styles.paymentHistoryRow}>
-                        <View>
-                          <Text style={styles.paymentHistoryMode}>
-                            💳 {p.mode || 'UPI'} • {p.reference ? `Ref: ${p.reference}` : 'Confirmed'}
-                          </Text>
-                          <Text style={styles.paymentHistoryDate}>
-                            {p.date ? new Date(p.date).toLocaleDateString() : 'Recorded'}
-                          </Text>
-                        </View>
-                        <Text style={styles.paymentHistoryAmt}>
-                          +₹{(p.amount || 0).toLocaleString('en-IN')}
-                        </Text>
+                    <View style={styles.agingPillRow}>
+                      <View style={styles.agingPill}>
+                        <Text style={styles.agingPillTextAmber}>&lt;15d: {agingStats.under15}</Text>
                       </View>
-                    ))}
+                      <View style={styles.agingPill}>
+                        <Text style={styles.agingPillTextOrange}>15-30d: {agingStats.between15and30}</Text>
+                      </View>
+                      <View style={styles.agingPill}>
+                        <Text style={styles.agingPillTextRed}>&gt;30d: {agingStats.over30}</Text>
+                      </View>
+                    </View>
                   </View>
-                )}
+                </View>
 
-                {/* ACTION BUTTONS ROW */}
-                <View style={styles.cardActionsRow}>
-                  <TouchableOpacity
-                    style={styles.pdfInvoiceBtn}
-                    onPress={() => handleOpenPdfModal(inv)}
-                    activeOpacity={0.85}
-                  >
-                    <FileText size={14} color="#2563eb" style={{ marginRight: 4 }} />
-                    <Text style={styles.pdfInvoiceBtnText}>PDF Invoice</Text>
-                  </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.overdueActionBtn}
+                  onPress={() => {
+                    haptics.selection();
+                    setStatusFilter('OVERDUE');
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.overdueActionBtnText}>Filter</Text>
+                </TouchableOpacity>
+              </View>
+            )}
 
-                  {!isPaid && (
-                    <TouchableOpacity
-                      style={styles.recordPayBtn}
-                      onPress={() => handleOpenPaymentModal(inv)}
-                      activeOpacity={0.85}
-                    >
-                      <CreditCard size={14} color="#ffffff" style={{ marginRight: 4 }} />
-                      <Text style={styles.recordPayBtnText}>Record Pay</Text>
-                    </TouchableOpacity>
-                  )}
-
-                  <TouchableOpacity
-                    style={[styles.whatsappNoticeBtn, isPaid && { flex: 1 }]}
-                    onPress={() => handleSendWhatsAppReminder(inv)}
-                    activeOpacity={0.85}
-                  >
-                    <MessageCircle size={14} color="#15803d" style={{ marginRight: 4 }} />
-                    <Text style={styles.whatsappNoticeBtnText}>
-                      {isPaid ? 'Share WA' : 'WA Notice'}
-                    </Text>
-                  </TouchableOpacity>
+            {/* PM SURYA GHAR DBT SUBSIDY TRACKER */}
+            <View
+              style={[
+                styles.subsidyBanner,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: colors.borderSubtle,
+                },
+              ]}
+            >
+              <View style={styles.subsidyBannerLeft}>
+                <View
+                  style={[
+                    styles.subsidyIconCircle,
+                    { backgroundColor: isDark ? 'rgba(0, 102, 255, 0.15)' : '#EFF6FF' },
+                  ]}
+                >
+                  <ShieldCheck size={18} color="#0066FF" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.subsidyBannerTitle, { color: colors.text }]}>
+                    PM Surya Ghar DBT Subsidy
+                  </Text>
+                  <Text style={[styles.subsidyBannerSub, { color: colors.textSecondary }]}>
+                    Central Financial Assistance to consumer accounts
+                  </Text>
                 </View>
               </View>
-            );
-          })
-        )}
-      </ScrollView>
+              <View
+                style={[
+                  styles.subsidyBannerRight,
+                  { backgroundColor: isDark ? '#1E293B' : '#EFF6FF' },
+                ]}
+              >
+                <Text style={styles.subsidyBannerVal}>
+                  ₹{(stats.expectedSubsidies / 100000).toFixed(2)}L
+                </Text>
+              </View>
+            </View>
+
+            {/* CANONICAL 4-STAGE MILESTONE SCHEDULE CARD */}
+            <View
+              style={[
+                styles.milestonesCard,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: colors.borderSubtle,
+                },
+              ]}
+            >
+              <View style={styles.milestonesHeaderRow}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Receipt size={14} color="#10B981" />
+                  <Text style={[styles.milestonesTitle, { color: colors.text }]}>
+                    Statutory 13.8% Composite Solar GST
+                  </Text>
+                </View>
+                <View
+                  style={[
+                    styles.gstRuleBadge,
+                    {
+                      backgroundColor: isDark ? 'rgba(16, 185, 129, 0.15)' : '#ECFDF5',
+                      borderColor: isDark ? '#065F46' : '#A7F3D0',
+                    },
+                  ]}
+                >
+                  <Text style={styles.gstRuleText}>70:30 Rule</Text>
+                </View>
+              </View>
+
+              <Text style={[styles.gstSubText, { color: colors.textSecondary }]}>
+                70% Goods (@ 12%) + 30% Services (@ 18%) = 13.8% effective composite rate
+              </Text>
+
+              <View style={styles.milestonesGrid}>
+                {[
+                  { pct: '20%', name: 'Advance', desc: 'Design & Token' },
+                  { pct: '60%', name: 'Material', desc: 'Site Delivery' },
+                  { pct: '15%', name: 'Erection', desc: 'Install & QA' },
+                  { pct: '5%', name: 'Sync', desc: 'Net-Meter/DBT' },
+                ].map((m) => (
+                  <View
+                    key={m.pct}
+                    style={[
+                      styles.milestoneGridItem,
+                      {
+                        backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
+                        borderColor: colors.borderSubtle,
+                      },
+                    ]}
+                  >
+                    <Text style={styles.milestoneGridPct}>{m.pct}</Text>
+                    <Text style={[styles.milestoneGridName, { color: colors.text }]}>{m.name}</Text>
+                    <Text style={[styles.milestoneGridDesc, { color: colors.textMuted }]} numberOfLines={1}>
+                      {m.desc}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+
+            {/* CREATE INVOICE QUICK BANNER */}
+            <View
+              style={[
+                styles.createInvoiceBar,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: colors.borderSubtle,
+                },
+              ]}
+            >
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.createInvoiceBarTitle, { color: colors.text }]}>
+                  Smart Commercial Invoicing
+                </Text>
+                <Text style={[styles.createInvoiceBarSub, { color: colors.textSecondary }]}>
+                  GST Tax Invoices, Bank Proformas & Advance Receipts
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={styles.createInvoiceBtn}
+                onPress={() => setCreateInvoiceModalVisible(true)}
+                activeOpacity={0.85}
+              >
+                <Plus size={14} color="#FFFFFF" strokeWidth={3} />
+                <Text style={styles.createInvoiceBtnText}>New Invoice</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* SEARCH AND FILTER SECTION */}
+            <View style={styles.filterSection}>
+              <View
+                style={[
+                  styles.searchBox,
+                  {
+                    backgroundColor: colors.surface,
+                    borderColor: colors.borderSubtle,
+                  },
+                ]}
+              >
+                <Search size={15} color={colors.textMuted} />
+                <TextInput
+                  style={[styles.searchInput, { color: colors.text }]}
+                  placeholder="Search invoice #, customer name, mobile..."
+                  placeholderTextColor={colors.textMuted}
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                />
+                {searchQuery ? (
+                  <TouchableOpacity onPress={() => setSearchQuery('')}>
+                    <X size={15} color={colors.textMuted} />
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+
+              {/* STATUS FILTER CHIPS */}
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.chipsContainer}
+              >
+                {(['ALL', 'OVERDUE', 'UNPAID', 'PARTIAL', 'PAID'] as const).map((filterKey) => {
+                  const isActive = statusFilter === filterKey;
+                  return (
+                    <TouchableOpacity
+                      key={filterKey}
+                      style={[
+                        styles.chipBtn,
+                        {
+                          backgroundColor: isActive ? '#0066FF' : colors.surface,
+                          borderColor: isActive ? '#0066FF' : colors.borderSubtle,
+                        },
+                      ]}
+                      onPress={() => {
+                        haptics.selection();
+                        setStatusFilter(filterKey);
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Text
+                        style={[
+                          styles.chipBtnText,
+                          {
+                            color: isActive ? '#FFFFFF' : colors.textSecondary,
+                            fontWeight: isActive ? '700' : '600',
+                          },
+                        ]}
+                      >
+                        {filterKey === 'ALL'
+                          ? `All Status`
+                          : filterKey === 'OVERDUE'
+                            ? `Overdue (${stats.overdueCount})`
+                            : filterKey === 'UNPAID'
+                              ? 'Unpaid'
+                              : filterKey === 'PARTIAL'
+                                ? 'Partial'
+                                : 'Paid'}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+
+              {/* DOCUMENT TYPE FILTER CHIPS */}
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={[styles.chipsContainer, { marginTop: 6 }]}
+              >
+                {[
+                  { key: 'ALL' as const, label: `All Types (${invoices.length})` },
+                  { key: 'TAX_INVOICE' as const, label: 'Tax Invoices' },
+                  { key: 'PROFORMA' as const, label: 'Bank Proformas' },
+                  { key: 'ADVANCE' as const, label: 'Advance Vouchers' },
+                ].map((docItem) => {
+                  const isActive = docCategoryFilter === docItem.key;
+                  return (
+                    <TouchableOpacity
+                      key={docItem.key}
+                      style={[
+                        styles.docFilterChip,
+                        {
+                          backgroundColor: isActive
+                            ? (isDark ? '#1E293B' : '#0F172A')
+                            : colors.surface,
+                          borderColor: isActive
+                            ? (isDark ? '#334155' : '#0F172A')
+                            : colors.borderSubtle,
+                        },
+                      ]}
+                      onPress={() => {
+                        haptics.selection();
+                        setDocCategoryFilter(docItem.key);
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Text
+                        style={[
+                          styles.docFilterChipText,
+                          {
+                            color: isActive ? '#FFFFFF' : colors.textSecondary,
+                            fontWeight: isActive ? '700' : '600',
+                          },
+                        ]}
+                      >
+                        {docItem.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
+
+            {/* INVOICES SECTION HEADER */}
+            <View style={styles.invoicesHeaderRow}>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                Invoices & Commercial Bills ({filteredInvoices.length})
+              </Text>
+              <TouchableOpacity
+                style={[styles.refreshIconBtn, { backgroundColor: colors.surface }]}
+                onPress={fetchFinanceData}
+                activeOpacity={0.7}
+              >
+                <RefreshCw size={13} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+          </View>
+        }
+        ListEmptyComponent={
+          loading ? (
+            <View style={styles.skeletonContainer}>
+              <SkeletonLoader.Card />
+              <SkeletonLoader.Card />
+            </View>
+          ) : (
+            <EmptyState
+              icon={<Receipt size={36} color={colors.textMuted} />}
+              title="No Invoices Found"
+              description={
+                statusFilter !== 'ALL'
+                  ? `No invoices matching '${statusFilter}' status.`
+                  : 'Convert a lead into an onboarding project to automatically generate milestone payment cycles.'
+              }
+              actionTitle={statusFilter !== 'ALL' ? 'Show All Invoices' : undefined}
+              onActionPress={() => setStatusFilter('ALL')}
+            />
+          )
+        }
+      />
 
       {/* RECORD PAYMENT MODAL */}
-      <Modal visible={paymentModalVisible} transparent animationType="slide">
+      <Modal
+        visible={paymentModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setPaymentModalVisible(false)}
+      >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
-            <View style={styles.modalHeader}>
+          <View
+            style={[
+              styles.modalSheet,
+              {
+                backgroundColor: colors.surface,
+                borderColor: colors.borderSubtle,
+              },
+            ]}
+          >
+            <View style={styles.modalDragHandle} />
+            <View style={[styles.modalHeader, { borderBottomColor: colors.borderSubtle }]}>
               <View>
-                <Text style={styles.modalTitle}>Record Customer Payment</Text>
-                <Text style={styles.modalSub}>
+                <Text style={[styles.modalTitle, { color: colors.text }]}>Record Customer Payment</Text>
+                <Text style={[styles.modalSub, { color: colors.textMuted }]}>
                   {selectedInvoice?.invoiceNumber} • {selectedInvoice?.customer?.name}
                 </Text>
               </View>
               <TouchableOpacity
-                style={styles.modalCloseBtn}
+                style={[styles.modalCloseBtn, { backgroundColor: isDark ? '#1E293B' : '#F1F5F9' }]}
                 onPress={() => setPaymentModalVisible(false)}
                 activeOpacity={0.7}
               >
-                <X size={18} color="#64748b" />
+                <X size={16} color={colors.textSecondary} />
               </TouchableOpacity>
             </View>
 
             <ScrollView style={{ maxHeight: 420 }} showsVerticalScrollIndicator={false}>
               {/* BALANCE SUMMARY */}
-              <View style={styles.modalSummaryBox}>
+              <View
+                style={[
+                  styles.modalSummaryBox,
+                  {
+                    backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
+                    borderColor: colors.borderSubtle,
+                  },
+                ]}
+              >
                 <View style={styles.modalSummaryRow}>
-                  <Text style={styles.modalSummaryLabel}>Milestone Total:</Text>
-                  <Text style={styles.modalSummaryVal}>₹{(selectedInvoice?.amount || 0).toLocaleString('en-IN')}</Text>
+                  <Text style={[styles.modalSummaryLabel, { color: colors.textSecondary }]}>Milestone Total:</Text>
+                  <Text style={[styles.modalSummaryVal, { color: colors.text }]}>
+                    ₹{(selectedInvoice?.amount || 0).toLocaleString('en-IN')}
+                  </Text>
                 </View>
                 <View style={styles.modalSummaryRow}>
-                  <Text style={styles.modalSummaryLabel}>Pending Balance:</Text>
-                  <Text style={[styles.modalSummaryVal, { color: '#d97706', fontWeight: '800' }]}>
+                  <Text style={[styles.modalSummaryLabel, { color: colors.textSecondary }]}>Pending Balance:</Text>
+                  <Text style={[styles.modalSummaryVal, { color: '#F59E0B', fontWeight: '800' }]}>
                     ₹{(selectedInvoice?.balance ?? selectedInvoice?.amount ?? 0).toLocaleString('en-IN')}
                   </Text>
                 </View>
               </View>
 
               {/* PAYMENT AMOUNT INPUT */}
-              <Text style={styles.inputLabel}>AMOUNT RECEIVED (₹) *</Text>
+              <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>AMOUNT RECEIVED (₹) *</Text>
               <TextInput
-                style={styles.modalInput}
+                style={[
+                  styles.modalInput,
+                  {
+                    backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
+                    borderColor: colors.borderSubtle,
+                    color: colors.text,
+                  },
+                ]}
                 keyboardType="numeric"
                 value={payAmount}
                 onChangeText={setPayAmount}
                 placeholder="e.g. 50000"
-                placeholderTextColor="#94a3b8"
+                placeholderTextColor={colors.textMuted}
               />
 
               {/* PAYMENT MODE PICKER */}
-              <Text style={styles.inputLabel}>PAYMENT METHOD</Text>
+              <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>PAYMENT METHOD</Text>
               <View style={styles.modePickerRow}>
                 {(['UPI', 'NEFT', 'CHEQUE', 'CASH'] as const).map((mode) => (
                   <TouchableOpacity
                     key={mode}
-                    style={[styles.modeChip, payMode === mode && styles.modeChipSelected]}
+                    style={[
+                      styles.modeChip,
+                      {
+                        backgroundColor: payMode === mode ? '#10B981' : isDark ? '#1E293B' : '#F8FAFC',
+                        borderColor: payMode === mode ? '#10B981' : colors.borderSubtle,
+                      },
+                    ]}
                     onPress={() => setPayMode(mode)}
                     activeOpacity={0.7}
                   >
-                    <Text style={[styles.modeChipText, payMode === mode && styles.modeChipTextSelected]}>
+                    <Text
+                      style={[
+                        styles.modeChipText,
+                        {
+                          color: payMode === mode ? '#FFFFFF' : colors.textSecondary,
+                          fontWeight: payMode === mode ? '800' : '600',
+                        },
+                      ]}
+                    >
                       {mode}
                     </Text>
                   </TouchableOpacity>
@@ -765,24 +1185,41 @@ export const FinanceScreen: React.FC<{ navigation?: any; route?: any }> = ({ nav
               </View>
 
               {/* TRANSACTION REFERENCE / UTR */}
-              <Text style={styles.inputLabel}>TRANSACTION REFERENCE / UTR NO.</Text>
+              <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>
+                TRANSACTION REFERENCE / UTR NO.
+              </Text>
               <TextInput
-                style={styles.modalInput}
+                style={[
+                  styles.modalInput,
+                  {
+                    backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
+                    borderColor: colors.borderSubtle,
+                    color: colors.text,
+                  },
+                ]}
                 value={payRef}
                 onChangeText={setPayRef}
                 placeholder="e.g. UPI/428910293812 or Chq #4401"
-                placeholderTextColor="#94a3b8"
+                placeholderTextColor={colors.textMuted}
               />
 
               {/* OPTIONAL NOTES */}
-              <Text style={styles.inputLabel}>INTERNAL NOTES</Text>
+              <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>INTERNAL NOTES</Text>
               <TextInput
-                style={[styles.modalInput, { height: 60 }]}
+                style={[
+                  styles.modalInput,
+                  {
+                    height: 60,
+                    backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
+                    borderColor: colors.borderSubtle,
+                    color: colors.text,
+                  },
+                ]}
                 multiline
                 value={payNotes}
                 onChangeText={setPayNotes}
                 placeholder="e.g. Advance paid at site during structural layout"
-                placeholderTextColor="#94a3b8"
+                placeholderTextColor={colors.textMuted}
               />
             </ScrollView>
 
@@ -793,10 +1230,10 @@ export const FinanceScreen: React.FC<{ navigation?: any; route?: any }> = ({ nav
               activeOpacity={0.85}
             >
               {submittingPayment ? (
-                <ActivityIndicator size="small" color="#ffffff" />
+                <ActivityIndicator size="small" color="#FFFFFF" />
               ) : (
                 <>
-                  <CheckCircle2 size={18} color="#ffffff" style={{ marginRight: 8 }} />
+                  <CheckCircle2 size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
                   <Text style={styles.submitPayBtnText}>Confirm & Post Payment</Text>
                 </>
               )}
@@ -828,7 +1265,6 @@ export const FinanceScreen: React.FC<{ navigation?: any; route?: any }> = ({ nav
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
   },
   scroll: {
     flex: 1,
@@ -837,14 +1273,18 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingBottom: Platform.OS === 'ios' ? 120 : 100,
   },
+  skeletonContainer: {
+    paddingVertical: 12,
+    gap: 12,
+  },
+
+  // EXECUTIVE OVERVIEW
   executiveCard: {
-    backgroundColor: '#ffffff',
     borderRadius: 20,
-    padding: 18,
+    padding: 16,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
-    marginBottom: 12,
-    shadowColor: '#0f172a',
+    marginBottom: 10,
+    shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
     shadowRadius: 8,
@@ -861,31 +1301,28 @@ const styles = StyleSheet.create({
   },
   kpiDivider: {
     width: 1,
-    height: 36,
-    backgroundColor: '#f1f5f9',
+    height: 38,
     marginHorizontal: 12,
   },
   kpiTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 5,
     marginBottom: 4,
   },
   kpiLabel: {
     fontSize: 9,
     fontWeight: '800',
-    color: '#64748b',
     letterSpacing: 0.5,
   },
   kpiVal: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '900',
-    color: '#0f172a',
-    letterSpacing: -0.5,
+    letterSpacing: -0.4,
+    fontVariant: ['tabular-nums'],
   },
   kpiSub: {
     fontSize: 10,
-    color: '#94a3b8',
     marginTop: 2,
     fontWeight: '500',
   },
@@ -896,33 +1333,31 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   capitalTrackLeftText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#059669',
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#10B981',
   },
   capitalTrackRightText: {
     fontSize: 10,
-    fontWeight: '700',
-    color: '#64748b',
+    fontWeight: '600',
   },
   capitalProgressBar: {
     height: 6,
-    backgroundColor: '#f1f5f9',
     borderRadius: 3,
     overflow: 'hidden',
   },
   capitalProgressFill: {
     height: '100%',
-    backgroundColor: '#059669',
+    backgroundColor: '#10B981',
     borderRadius: 3,
   },
+
+  // OVERDUE NOTICE
   overdueNoticeCard: {
-    backgroundColor: '#fff1f2',
-    borderRadius: 14,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#fecdd3',
     padding: 12,
-    marginBottom: 12,
+    marginBottom: 10,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -937,35 +1372,63 @@ const styles = StyleSheet.create({
   overdueNoticeTitle: {
     fontSize: 12,
     fontWeight: '800',
-    color: '#9f1239',
+    color: '#EF4444',
   },
   overdueNoticeSub: {
     fontSize: 10,
-    color: '#be123c',
+    color: '#EF4444',
     marginTop: 1,
   },
+  agingPillRow: {
+    flexDirection: 'row',
+    gap: 5,
+    marginTop: 6,
+    flexWrap: 'wrap',
+  },
+  agingPill: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.2)',
+  },
+  agingPillTextAmber: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#F59E0B',
+  },
+  agingPillTextOrange: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#F97316',
+  },
+  agingPillTextRed: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#EF4444',
+  },
   overdueActionBtn: {
-    backgroundColor: '#e11d48',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    backgroundColor: '#EF4444',
+    paddingHorizontal: 11,
+    paddingVertical: 7,
     borderRadius: 8,
   },
   overdueActionBtnText: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '800',
-    color: '#ffffff',
+    color: '#FFFFFF',
   },
+
+  // SUBSIDY BANNER
   subsidyBanner: {
-    backgroundColor: '#ffffff',
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
-    padding: 14,
+    padding: 12,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 12,
-    shadowColor: '#0f172a',
+    marginBottom: 10,
+    shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.03,
     shadowRadius: 4,
@@ -978,58 +1441,106 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   subsidyIconCircle: {
-    width: 32,
-    height: 32,
+    width: 34,
+    height: 34,
     borderRadius: 10,
-    backgroundColor: '#eff6ff',
     alignItems: 'center',
     justifyContent: 'center',
   },
   subsidyBannerTitle: {
     fontSize: 12,
     fontWeight: '800',
-    color: '#0f172a',
   },
   subsidyBannerSub: {
     fontSize: 10,
-    color: '#64748b',
     marginTop: 1,
   },
   subsidyBannerRight: {
-    backgroundColor: '#eff6ff',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 8,
   },
   subsidyBannerVal: {
     fontSize: 12,
-    fontWeight: '900',
+    fontWeight: '800',
+    color: '#0066FF',
+    fontVariant: ['tabular-nums'],
+  },
+
+  // CANONICAL MILESTONES
+  milestonesCard: {
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 10,
+    borderWidth: 1,
+  },
+  milestonesHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  milestonesTitle: {
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  gstRuleBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  gstRuleText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#10B981',
+  },
+  gstSubText: {
+    fontSize: 10,
+    marginBottom: 10,
+  },
+  milestonesGrid: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  milestoneGridItem: {
+    flex: 1,
+    padding: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: 'center',
+  },
+  milestoneGridPct: {
+    fontSize: 12,
+    fontWeight: '800',
     color: '#0066FF',
   },
+  milestoneGridName: {
+    fontSize: 10,
+    fontWeight: '700',
+    marginTop: 2,
+  },
+  milestoneGridDesc: {
+    fontSize: 8,
+    marginTop: 1,
+  },
+
+  // CREATE INVOICE BAR
   createInvoiceBar: {
-    backgroundColor: '#ffffff',
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
     padding: 14,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 12,
-    shadowColor: '#0f172a',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.03,
-    shadowRadius: 4,
-    elevation: 1,
+    marginBottom: 10,
   },
   createInvoiceBarTitle: {
     fontSize: 12,
     fontWeight: '800',
-    color: '#0f172a',
   },
   createInvoiceBarSub: {
     fontSize: 10,
-    color: '#64748b',
     marginTop: 1,
   },
   createInvoiceBtn: {
@@ -1040,95 +1551,60 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
+    shadowColor: '#0066FF',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3,
+    elevation: 2,
   },
   createInvoiceBtnText: {
     fontSize: 11,
     fontWeight: '800',
-    color: '#ffffff',
+    color: '#FFFFFF',
   },
-  docTypePill: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-    borderWidth: 1,
-  },
-  docTypePillTax: {
-    backgroundColor: '#ecfdf5',
-    borderColor: '#a7f3d0',
-  },
-  docTypePillProforma: {
-    backgroundColor: '#eff6ff',
-    borderColor: '#bfdbfe',
-  },
-  docTypePillAdvance: {
-    backgroundColor: '#faf5ff',
-    borderColor: '#e9d5ff',
-  },
-  docTypePillText: {
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 0.3,
-  },
-  docTypePillTextTax: {
-    color: '#059669',
-  },
-  docTypePillTextProforma: {
-    color: '#2563eb',
-  },
-  docTypePillTextAdvance: {
-    color: '#7c3aed',
-  },
-  invoiceScopeText: {
-    flex: 1,
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#334155',
-  },
+
+  // FILTER SECTION
   filterSection: {
-    marginBottom: 14,
+    marginBottom: 12,
   },
   searchBox: {
-    backgroundColor: '#ffffff',
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
     paddingHorizontal: 12,
     height: 42,
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 8,
   },
   searchInput: {
     flex: 1,
     marginLeft: 8,
     fontSize: 13,
-    color: '#0f172a',
   },
-  statusChipsContainer: {
+  chipsContainer: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 6,
   },
-  statusChip: {
-    backgroundColor: '#ffffff',
+  chipBtn: {
     paddingHorizontal: 12,
-    paddingVertical: 7,
+    paddingVertical: 6,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
   },
-  statusChipActive: {
-    backgroundColor: '#059669',
-    borderColor: '#059669',
+  chipBtnText: {
+    fontSize: 11,
   },
-  statusChipText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#64748b',
+  docFilterChip: {
+    paddingHorizontal: 11,
+    paddingVertical: 5,
+    borderRadius: 16,
+    borderWidth: 1,
   },
-  statusChipTextActive: {
-    color: '#ffffff',
-    fontWeight: '700',
+  docFilterChipText: {
+    fontSize: 10,
   },
+
+  // INVOICES LIST HEADER
   invoicesHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -1136,227 +1612,164 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   sectionTitle: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '800',
-    color: '#0f172a',
+    letterSpacing: -0.2,
   },
   refreshIconBtn: {
-    padding: 6,
-  },
-  loadingContainer: {
-    paddingVertical: 40,
-    alignItems: 'center',
-  },
-  loadingText: {
-    fontSize: 13,
-    color: '#64748b',
-    marginTop: 10,
-    fontWeight: '500',
-  },
-  emptyContainer: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 30,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    marginTop: 10,
-  },
-  emptyIconCircle: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: '#f1f5f9',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  emptyTitle: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: '#0f172a',
-  },
-  emptySub: {
-    fontSize: 12,
-    color: '#64748b',
-    textAlign: 'center',
-    marginTop: 6,
-    lineHeight: 18,
-  },
-  clearFilterBtn: {
-    marginTop: 14,
-    backgroundColor: '#059669',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    width: 28,
+    height: 28,
     borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  clearFilterBtnText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#ffffff',
-  },
+
+  // INVOICE CARD
   invoiceCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 16,
+    borderRadius: 18,
+    padding: 14,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 8,
     elevation: 2,
   },
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
+    marginBottom: 8,
+  },
+  invoiceNumRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flexWrap: 'wrap',
   },
   invoiceNumber: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '800',
-    color: '#0f172a',
+    fontVariant: ['tabular-nums'],
   },
-  capacityBadge: {
-    backgroundColor: '#f0fdf4',
+  docTypeBadge: {
     paddingHorizontal: 6,
     paddingVertical: 2,
-    borderRadius: 4,
+    borderRadius: 6,
     borderWidth: 1,
-    borderColor: '#bbf7d0',
   },
-  capacityBadgeText: {
+  docTypeBadgeText: {
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+  },
+  capacityMiniBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  capacityMiniText: {
     fontSize: 10,
     fontWeight: '700',
-    color: '#15803d',
   },
   customerName: {
     fontSize: 15,
     fontWeight: '800',
-    color: '#0f172a',
-    marginTop: 3,
+    letterSpacing: -0.2,
+    marginTop: 4,
+  },
+  locationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 2,
   },
   customerSub: {
     fontSize: 11,
-    color: '#64748b',
-    marginTop: 2,
+    fontWeight: '500',
   },
   statusPill: {
-    paddingHorizontal: 9,
-    paddingVertical: 4,
-    borderRadius: 6,
-    borderWidth: 1,
-  },
-  statusPillPaid: {
-    backgroundColor: '#ecfdf5',
-    borderColor: '#a7f3d0',
-  },
-  statusPillOverdue: {
-    backgroundColor: '#fff1f2',
-    borderColor: '#fecdd3',
-  },
-  statusPillPartial: {
-    backgroundColor: '#eff6ff',
-    borderColor: '#bfdbfe',
-  },
-  statusPillUnpaid: {
-    backgroundColor: '#fffbeb',
-    borderColor: '#fde68a',
-  },
-  statusPillText: {
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 0.4,
-  },
-  statusPillTextPaid: {
-    color: '#059669',
-  },
-  statusPillTextOverdue: {
-    color: '#e11d48',
-  },
-  statusPillTextPartial: {
-    color: '#2563eb',
-  },
-  statusPillTextUnpaid: {
-    color: '#d97706',
-  },
-  milestoneTagRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 10,
-  },
-  milestoneTag: {
-    backgroundColor: '#f8fafc',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
   },
-  milestoneTagText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#475569',
+  statusPillText: {
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.4,
   },
-  dueDateText: {
-    fontSize: 11,
-    color: '#64748b',
-    fontWeight: '500',
-  },
-  financialMetricsBox: {
+  scopeRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    backgroundColor: '#f8fafc',
-    borderRadius: 12,
-    padding: 12,
-    marginTop: 10,
-    borderWidth: 1,
-    borderColor: '#f1f5f9',
-  },
-  metricCol: {
     alignItems: 'center',
+    marginBottom: 10,
+    gap: 8,
   },
-  metricColLabel: {
+  scopeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    flex: 1,
+  },
+  dueDateText: {
     fontSize: 10,
     fontWeight: '600',
-    color: '#64748b',
-    marginBottom: 2,
   },
-  metricColVal: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#0f172a',
+  metricsBox: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    borderRadius: 12,
+    padding: 10,
+    marginBottom: 10,
+    borderWidth: 1,
   },
-  progressBarBg: {
+  metricItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  metricLabel: {
+    fontSize: 8,
+    fontWeight: '800',
+    letterSpacing: 0.4,
+  },
+  metricVal: {
+    fontSize: 12,
+    fontWeight: '800',
+    fontVariant: ['tabular-nums'],
+    marginTop: 2,
+  },
+  progressTrack: {
     height: 5,
-    backgroundColor: '#f1f5f9',
-    borderRadius: 3,
-    marginTop: 10,
+    borderRadius: 2.5,
     overflow: 'hidden',
+    marginBottom: 10,
   },
-  progressBarFill: {
+  progressFill: {
     height: '100%',
-    borderRadius: 3,
+    borderRadius: 2.5,
   },
   expandHistoryBtn: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 8,
-    marginTop: 6,
+    paddingVertical: 4,
+    marginBottom: 6,
   },
   expandHistoryText: {
     fontSize: 11,
-    fontWeight: '600',
-    color: '#059669',
+    fontWeight: '700',
+    color: '#10B981',
   },
   paymentHistoryBox: {
-    backgroundColor: '#f8fafc',
     borderRadius: 10,
     padding: 10,
-    marginTop: 4,
+    marginBottom: 10,
+    borderWidth: 1,
     gap: 8,
   },
   paymentHistoryRow: {
@@ -1367,64 +1780,90 @@ const styles = StyleSheet.create({
   paymentHistoryMode: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#334155',
   },
   paymentHistoryDate: {
     fontSize: 10,
-    color: '#94a3b8',
     marginTop: 1,
   },
   paymentHistoryAmt: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '800',
-    color: '#059669',
+    color: '#10B981',
+    fontVariant: ['tabular-nums'],
   },
   cardActionsRow: {
     flexDirection: 'row',
     gap: 8,
-    marginTop: 12,
+    paddingTop: 10,
+    borderTopWidth: 1,
+  },
+  pdfBtn: {
+    flex: 1,
+    borderRadius: 10,
+    paddingVertical: 9,
+    paddingHorizontal: 8,
+    borderWidth: 1,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 4,
+  },
+  pdfBtnText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#0066FF',
   },
   recordPayBtn: {
     flex: 1,
-    backgroundColor: '#059669',
+    backgroundColor: '#10B981',
     borderRadius: 10,
-    paddingVertical: 10,
+    paddingVertical: 9,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
+    gap: 4,
   },
   recordPayBtnText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#ffffff',
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#FFFFFF',
   },
-  whatsappNoticeBtn: {
-    backgroundColor: '#dcfce7',
+  whatsappBtn: {
     borderRadius: 10,
-    paddingVertical: 10,
+    paddingVertical: 9,
     paddingHorizontal: 12,
     borderWidth: 1,
-    borderColor: '#86efac',
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
+    gap: 4,
   },
-  whatsappNoticeBtnText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#15803d',
+  whatsappBtnText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#10B981',
   },
+
+  // MODAL
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.5)',
+    backgroundColor: 'rgba(15, 23, 42, 0.65)',
     justifyContent: 'flex-end',
   },
-  modalContainer: {
-    backgroundColor: '#ffffff',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+  modalSheet: {
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    borderTopWidth: 1,
     padding: 20,
-    paddingBottom: 36,
+    paddingBottom: Platform.OS === 'ios' ? 36 : 24,
+  },
+  modalDragHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#94A3B8',
+    alignSelf: 'center',
+    marginBottom: 12,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -1433,26 +1872,29 @@ const styles = StyleSheet.create({
     marginBottom: 14,
     paddingBottom: 10,
     borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
   },
   modalTitle: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '800',
-    color: '#0f172a',
+    letterSpacing: -0.3,
   },
   modalSub: {
-    fontSize: 12,
-    color: '#64748b',
+    fontSize: 11,
     marginTop: 2,
+    fontWeight: '500',
   },
   modalCloseBtn: {
-    padding: 6,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   modalSummaryBox: {
-    backgroundColor: '#f8fafc',
     borderRadius: 12,
     padding: 12,
     marginBottom: 14,
+    borderWidth: 1,
     gap: 6,
   },
   modalSummaryRow: {
@@ -1460,32 +1902,27 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   modalSummaryLabel: {
-    fontSize: 12,
-    color: '#64748b',
+    fontSize: 11,
     fontWeight: '600',
   },
   modalSummaryVal: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#0f172a',
+    fontSize: 12,
+    fontWeight: '800',
+    fontVariant: ['tabular-nums'],
   },
   inputLabel: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '800',
-    color: '#475569',
     marginTop: 10,
     marginBottom: 6,
-    letterSpacing: 0.3,
+    letterSpacing: 0.4,
   },
   modalInput: {
-    backgroundColor: '#f8fafc',
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
     paddingHorizontal: 12,
     height: 44,
-    fontSize: 14,
-    color: '#0f172a',
+    fontSize: 13,
     fontWeight: '600',
   },
   modePickerRow: {
@@ -1494,75 +1931,31 @@ const styles = StyleSheet.create({
   },
   modeChip: {
     flex: 1,
-    backgroundColor: '#f8fafc',
-    borderRadius: 8,
+    borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
     paddingVertical: 10,
     alignItems: 'center',
-  },
-  modeChipSelected: {
-    backgroundColor: '#059669',
-    borderColor: '#059669',
   },
   modeChipText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#64748b',
-  },
-  modeChipTextSelected: {
-    color: '#ffffff',
+    fontSize: 11,
   },
   submitPayBtn: {
-    backgroundColor: '#059669',
+    backgroundColor: '#10B981',
     borderRadius: 12,
-    paddingVertical: 14,
+    paddingVertical: 12,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 18,
+    marginTop: 16,
+    shadowColor: '#10B981',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3,
+    elevation: 2,
   },
   submitPayBtnText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '800',
-    color: '#ffffff',
-  },
-  milestoneChip: {
-    backgroundColor: '#ffffff',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  milestoneChipActive: {
-    backgroundColor: '#0284c7',
-    borderColor: '#0284c7',
-  },
-  milestoneChipText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#64748b',
-  },
-  milestoneChipTextActive: {
-    color: '#ffffff',
-    fontWeight: '700',
-  },
-  pdfInvoiceBtn: {
-    flex: 1,
-    backgroundColor: '#eff6ff',
-    borderRadius: 10,
-    paddingVertical: 10,
-    paddingHorizontal: 8,
-    borderWidth: 1,
-    borderColor: '#bfdbfe',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  pdfInvoiceBtnText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#2563eb',
+    color: '#FFFFFF',
   },
 });

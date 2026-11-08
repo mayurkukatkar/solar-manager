@@ -28,7 +28,7 @@ router.get('/api/tenant/leads/dashboard', requireTenantAuth, async (req, res) =>
 });
 router.get('/api/tenant/leads', requireTenantAuth, requirePermission('leads.view'), async (req, res) => {
   try {
-    const { source, status, assigneeId, search, all } = req.query;
+    const { source, status, assigneeId, search, all, limit: queryLimit, page: queryPage } = req.query;
     let where = { tenantId: req.user.tenantId };
     if (source) where.source = source;
     if (status && status !== 'ALL') {
@@ -43,37 +43,109 @@ router.get('/api/tenant/leads', requireTenantAuth, requirePermission('leads.view
         { company: { contains: search, mode: 'insensitive' } }
       ];
     }
+
+    // High performance lean pagination: default 100 for CRM view, up to 300
+    const take = queryLimit ? Math.min(parseInt(queryLimit), 300) : (all === 'true' || all === true ? 250 : 100);
+    const page = Math.max(1, parseInt(queryPage) || 1);
+    const skip = (page - 1) * take;
     
-    const leads = await prisma.lead.findMany({
-      where,
-      include: {
-        assignee: true,
-        customer: {
-          include: {
-            invoices: {
-              include: { payments: true },
-              orderBy: { createdAt: 'asc' }
+    const [leads, total] = await Promise.all([
+      prisma.lead.findMany({
+        where,
+        take,
+        skip,
+        select: {
+          id: true,
+          leadNumber: true,
+          name: true,
+          company: true,
+          customerType: true,
+          email: true,
+          mobile: true,
+          alternatePhone: true,
+          address: true,
+          city: true,
+          state: true,
+          pincode: true,
+          status: true,
+          estimatedValue: true,
+          estimatedCap: true,
+          capacityUnit: true,
+          systemType: true,
+          monthlyBill: true,
+          roofType: true,
+          roofArea: true,
+          electricityConnection: true,
+          sanctionedLoad: true,
+          source: true,
+          notes: true,
+          assigneeId: true,
+          createdAt: true,
+          updatedAt: true,
+          assignee: {
+            select: { id: true, name: true, email: true, phone: true }
+          },
+          customer: {
+            select: {
+              id: true,
+              name: true,
+              mobile: true,
+              email: true,
+              address: true,
+              city: true,
+              pincode: true,
+              invoices: {
+                select: {
+                  id: true,
+                  invoiceNumber: true,
+                  amount: true,
+                  status: true,
+                  totalPaid: true,
+                  dueDate: true,
+                  createdAt: true,
+                  payments: {
+                    select: { id: true, amount: true, date: true }
+                  }
+                },
+                orderBy: { createdAt: 'asc' }
+              }
             }
+          },
+          projects: {
+            select: {
+              id: true,
+              name: true,
+              status: true,
+              capacity: true,
+              invoices: {
+                select: {
+                  id: true,
+                  invoiceNumber: true,
+                  amount: true,
+                  status: true,
+                  totalPaid: true,
+                  dueDate: true,
+                  createdAt: true,
+                  payments: {
+                    select: { id: true, amount: true, date: true }
+                  }
+                },
+                orderBy: { createdAt: 'asc' }
+              }
+            }
+          },
+          quotations: {
+            select: { id: true, qNumber: true, total: true, status: true, systemCapacity: true }
           }
         },
-        projects: {
-          select: {
-            id: true,
-            name: true,
-            status: true,
-            capacity: true,
-            invoices: {
-              include: { payments: true },
-              orderBy: { createdAt: 'asc' }
-            }
-          }
-        },
-        quotations: { select: { id: true, qNumber: true, total: true, status: true } }
-      },
-      orderBy: { createdAt: 'desc' }
-    });
-    res.json({ leads });
+        orderBy: { createdAt: 'desc' }
+      }),
+      prisma.lead.count({ where })
+    ]);
+
+    res.json({ leads, total, page, limit: take });
   } catch (error) {
+    console.error('Fetch leads error:', error);
     res.status(500).json({ error: 'Failed to fetch leads' });
   }
 });

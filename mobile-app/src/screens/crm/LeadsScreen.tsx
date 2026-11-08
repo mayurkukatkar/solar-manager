@@ -195,13 +195,13 @@ export const LeadsScreen: React.FC<{ route?: any; navigation?: any }> = ({ route
     const sub = targetKw >= 3 ? 78000 : targetKw >= 2 ? 60000 : 30000;
     const net = gross - sub;
 
-    const text = `☀️ *PM Surya Ghar Solar Proposal*
+    const text = `*PM Surya Ghar Solar Proposal*
 Dear ${name},
 Here is your customized Rooftop Solar estimate:
-⚡ System Capacity: ${targetKw} kWp Grid-Tied Solar
-💰 Turnkey Cost: ₹${gross.toLocaleString('en-IN')}
-🏛️ PM Surya Ghar Subsidy: -₹${sub.toLocaleString('en-IN')}
-✅ Net Investment: ₹${net.toLocaleString('en-IN')}
+• System Capacity: ${targetKw} kWp Grid-Tied Solar
+• Turnkey Cost: ₹${gross.toLocaleString('en-IN')}
+• PM Surya Ghar Subsidy: -₹${sub.toLocaleString('en-IN')}
+• Net Investment: ₹${net.toLocaleString('en-IN')}
 
 Let's schedule your 3D site survey today!`;
 
@@ -457,7 +457,12 @@ Let's schedule your 3D site survey today!`;
       </ScrollView>
 
       {/* ADD LEAD MODAL */}
-      <Modal visible={addModalVisible} animationType="slide" transparent>
+      <Modal
+        visible={addModalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setAddModalVisible(false)}
+      >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalDragHandle} />

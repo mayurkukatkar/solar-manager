@@ -33,9 +33,10 @@ import {
 } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
-import { documentsApi } from '../../api/endpoints';
-import { apiClient } from '../../api/client';
-import { ModalHeader } from '../../components/Header';
+import { documentsApi, tenantApi } from '../../api/endpoints';
+import { apiClient, SafeStorage } from '../../api/client';
+import { ModalHeader, useDirtyFormWarning } from '../../components/common/ModalHeader';
+import { PermissionRationaleModal } from '../../components/common/PermissionRationaleModal';
 import { colors } from '../../theme/colors';
 
 interface ProjectDossierModalProps {
@@ -75,13 +76,130 @@ export const ProjectDossierModal: React.FC<ProjectDossierModalProps> = ({
   const [activeTab, setActiveTab] = useState('ALL');
   const [documents, setDocuments] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  
+
   // Upload State
   const [showUploadSheet, setShowUploadSheet] = useState(false);
   const [uploadTitle, setUploadTitle] = useState('');
   const [uploadCategory, setUploadCategory] = useState('Customer KYC');
   const [pickedFile, setPickedFile] = useState<{ uri: string; name: string; type: string } | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [advancingStage, setAdvancingStage] = useState(false);
+
+  const isDirty = Boolean(uploadTitle.trim() || pickedFile);
+  const handleGuardedClose = useDirtyFormWarning(
+    isDirty,
+    onClose,
+    'Discard Unsaved Upload?',
+    'You have an unuploaded document draft. Discard?'
+  );
+
+  const STAGES_ORDER = [
+    { key: 'SURVEY', name: '1. Survey & Feasibility' },
+    { key: 'ENGINEERING', name: '2. Engineering & SLD' },
+    { key: 'PROCUREMENT', name: '3. Procurement & Delivery' },
+    { key: 'INSTALLATION', name: '4. Erection & Installation' },
+    { key: 'NET_METERING', name: '5. Net Metering Approval' },
+    { key: 'INSPECTION', name: '6. Electrical Inspection & QA' },
+    { key: 'HANDOVER', name: '7. Handover & DBT Sync' },
+  ];
+
+  const currentStageKey = (project?.currentStage || project?.status || 'SURVEY').toUpperCase();
+  const currentStageIdx = Math.max(0, STAGES_ORDER.findIndex((s) => currentStageKey.includes(s.key)));
+  const nextStageObj = currentStageIdx < STAGES_ORDER.length - 1 ? STAGES_ORDER[currentStageIdx + 1] : null;
+
+  const checkStagePrerequisites = async (): Promise<{ met: boolean; unmet: string[] }> => {
+    const idx = currentStageIdx + 1; // 1-based index (1 to 7)
+    const consumerNo = project?.consumerNumber || project?.customer?.consumerNumber || project?.lead?.electricityConnection;
+    let hasSerials = (project?.moduleSerials && project.moduleSerials.length > 0) || Boolean(project?.dcrModuleSerials);
+    if (!hasSerials && project?.id) {
+      try {
+        const stored = (await SafeStorage.getItem(`@solar_project_serials_${project.id}`)) ||
+          (await SafeStorage.getItem(`@solar_serials_${project.id}`));
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed.modules && Array.isArray(parsed.modules) && parsed.modules.length > 0) {
+            hasSerials = true;
+          }
+        }
+      } catch (_) { }
+    }
+    const hasDocs = documents.length > 0 || (project?.Document && project.Document.length > 0);
+    const unmet: string[] = [];
+
+    if (idx === 1) {
+      if (!consumerNo || consumerNo === 'Pending' || consumerNo.trim().length < 6) {
+        unmet.push('DISCOM Consumer Number: Valid 6+ digit consumer number required');
+      }
+      if (!hasDocs && !project?.address) {
+        unmet.push('Site Survey: Rooftop photos or site specification required');
+      }
+    } else if (idx === 2) {
+      const cap = Number(project?.capacity || project?.systemCapacity);
+      if (isNaN(cap) || cap <= 0) {
+        unmet.push('Approved Plant Capacity: System kW capacity must be greater than 0');
+      }
+    } else if (idx === 4) {
+      if (!hasSerials) {
+        unmet.push('2D Module Serial Barcodes: Tier-1 ALMM/DCR hardware serial numbers recorded');
+      }
+    } else if (idx === 5) {
+      if (!consumerNo || consumerNo === 'Pending') {
+        unmet.push('DISCOM Application: Verified consumer number required for net metering');
+      }
+    } else if (idx === 6) {
+      let qa = project?.qaReadings;
+      if (!qa && project?.id) {
+        try {
+          const storedQA = await SafeStorage.getItem(`@solar_qa_${project.id}`);
+          if (storedQA) qa = JSON.parse(storedQA);
+        } catch (_) { }
+      }
+      const isPassed = qa
+        ? (qa.passed === true || (
+          parseFloat(qa.pit1Inverter) >= 0 && parseFloat(qa.pit1Inverter) < 5.0 &&
+          parseFloat(qa.pit2Structure) >= 0 && parseFloat(qa.pit2Structure) < 5.0 &&
+          parseFloat(qa.pit3Lightning) >= 0 && parseFloat(qa.pit3Lightning) < 5.0 &&
+          parseFloat(qa.antiIslandingTripSec) >= 0 && parseFloat(qa.antiIslandingTripSec) < 2.0 &&
+          parseFloat(qa.insulationMegaOhms) > 1.0
+        ))
+        : Boolean(project?.qaPassed || project?.isQaPassed || project?.ceaSafetyPassed);
+
+      if (!isPassed) {
+        unmet.push('CEA Safety Threshold Sign-off: Earth pits < 5.0Ω and trip time < 2.0s passed');
+      }
+    }
+
+    return { met: unmet.length === 0, unmet };
+  };
+
+  const handleAdvanceStage = async () => {
+    if (!nextStageObj || !project?.id) return;
+
+    const prereqCheck = await checkStagePrerequisites();
+    if (!prereqCheck.met) {
+      Alert.alert(
+        'Prerequisites Incomplete',
+        `Cannot advance to ${nextStageObj.name} due to missing prerequisites:\n\n• ${prereqCheck.unmet.join('\n• ')}\n\nPlease upload missing documents, record hardware serials, or complete electrical QA.`
+      );
+      return;
+    }
+
+    try {
+      setAdvancingStage(true);
+      await tenantApi.advanceProjectStage(
+        project.id,
+        nextStageObj.key,
+        `Stage advanced to ${nextStageObj.name} via Mobile Dossier`
+      );
+      Alert.alert('Stage Advanced!', `Project advanced to ${nextStageObj.name}.`);
+      if (onRefreshProject) onRefreshProject();
+      loadProjectDocuments();
+    } catch (err: any) {
+      Alert.alert('Stage Advancement Note', err.message || 'Could not advance project stage');
+    } finally {
+      setAdvancingStage(false);
+    }
+  };
 
   useEffect(() => {
     if (visible && project) {
@@ -187,7 +305,7 @@ export const ProjectDossierModal: React.FC<ProjectDossierModalProps> = ({
       `*Namaste ${project.customer?.name || 'Customer'}*,\n\n` +
       `Regarding your Solar Project (*${project.projectNumber || project.name}*):\n\n` +
       `To process your *PM Surya Ghar ₹78,000 DBT Subsidy* and DISCOM Net Metering without delay, we need:\n` +
-      `👉 *${missingStr}*\n\n` +
+      `- *${missingStr}*\n\n` +
       `Kindly share photo/PDF here on WhatsApp so our field team can complete your sanction.\n\n` +
       `_Best regards,_\n*Solar Operations Team*`
     );
@@ -197,12 +315,20 @@ export const ProjectDossierModal: React.FC<ProjectDossierModalProps> = ({
     });
   };
 
+  const [permRationaleVisible, setPermRationaleVisible] = useState(false);
+  const [permKind, setPermKind] = useState<'camera' | 'mediaLibrary'>('camera');
+
   // Upload Actions
   const handleLaunchCamera = async () => {
     try {
-      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      const { status, canAskAgain } = await ImagePicker.requestCameraPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permission Denied', 'Camera permission is needed to snap document photos.');
+        if (!canAskAgain) {
+          setPermKind('camera');
+          setPermRationaleVisible(true);
+        } else {
+          Alert.alert('Permission Denied', 'Camera permission is needed to snap document photos.');
+        }
         return;
       }
       const res = await ImagePicker.launchCameraAsync({
@@ -224,9 +350,14 @@ export const ProjectDossierModal: React.FC<ProjectDossierModalProps> = ({
 
   const handlePickGallery = async () => {
     try {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      const { status, canAskAgain } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permission Denied', 'Gallery permission is needed to select documents.');
+        if (!canAskAgain) {
+          setPermKind('mediaLibrary');
+          setPermRationaleVisible(true);
+        } else {
+          Alert.alert('Permission Denied', 'Gallery permission is needed to select documents.');
+        }
         return;
       }
       const res = await ImagePicker.launchImageLibraryAsync({
@@ -328,13 +459,13 @@ export const ProjectDossierModal: React.FC<ProjectDossierModalProps> = ({
   });
 
   return (
-    <Modal visible={visible} animationType="slide" transparent={false} onRequestClose={onClose}>
+    <Modal visible={visible} animationType="slide" transparent={false} onRequestClose={handleGuardedClose}>
       <View style={styles.container}>
-        {/* STANDARDIZED MODAL HEADER */}
+        {/* STANDARDIZED MODAL HEADER WITH DIRTY GUARD */}
         <ModalHeader
           title={project?.name || 'Project Dossier'}
-          subtitle={`👤 ${project?.customer?.name || 'Client'} • ⚡ ${project?.capacity || 3.3} kWp`}
-          onClose={onClose}
+          subtitle={`${project?.customer?.name || 'Client'} • ${project?.capacity || 3.3} kWp`}
+          onClose={handleGuardedClose}
           rightAction={
             <View style={styles.vaultBadge}>
               <FolderLock size={11} color="#059669" />
@@ -342,6 +473,60 @@ export const ProjectDossierModal: React.FC<ProjectDossierModalProps> = ({
             </View>
           }
         />
+
+        {/* 7-STAGE CANONICAL PROGRESSION STEPPER */}
+        <View style={{ backgroundColor: '#ffffff', padding: 14, marginHorizontal: 16, marginTop: 12, borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0' }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <View>
+              <Text style={{ fontSize: 11, fontWeight: '700', color: '#64748b', textTransform: 'uppercase' }}>
+                Stage {currentStageIdx + 1} of 7 • EPC Execution
+              </Text>
+              <Text style={{ fontSize: 14, fontWeight: '800', color: '#0f172a' }}>
+                {STAGES_ORDER[currentStageIdx]?.name || 'Site Survey'}
+              </Text>
+            </View>
+            {nextStageObj && (
+              <TouchableOpacity
+                style={{
+                  backgroundColor: '#2563eb',
+                  paddingHorizontal: 12,
+                  paddingVertical: 7,
+                  borderRadius: 8,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 4,
+                }}
+                onPress={handleAdvanceStage}
+                disabled={advancingStage}
+                activeOpacity={0.8}
+              >
+                {advancingStage ? (
+                  <ActivityIndicator size="small" color="#ffffff" />
+                ) : (
+                  <>
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: '#ffffff' }}>Advance Stage</Text>
+                    <Check size={13} color="#ffffff" />
+                  </>
+                )}
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Mini 7-stage progress track */}
+          <View style={{ flexDirection: 'row', gap: 4, marginTop: 4 }}>
+            {STAGES_ORDER.map((st, i) => (
+              <View
+                key={st.key}
+                style={{
+                  flex: 1,
+                  height: 4,
+                  borderRadius: 2,
+                  backgroundColor: i <= currentStageIdx ? '#2563eb' : '#e2e8f0',
+                }}
+              />
+            ))}
+          </View>
+        </View>
 
         {/* SUBSIDY & READINESS SCORECARD */}
         <View style={styles.scorecardContainer}>
@@ -369,8 +554,8 @@ export const ProjectDossierModal: React.FC<ProjectDossierModalProps> = ({
                   readinessScore >= 80
                     ? styles.scoreGreenText
                     : readinessScore >= 50
-                    ? styles.scoreAmberText
-                    : styles.scoreRedText,
+                      ? styles.scoreAmberText
+                      : styles.scoreRedText,
                 ]}
               >
                 {readinessScore}%
@@ -648,6 +833,22 @@ export const ProjectDossierModal: React.FC<ProjectDossierModalProps> = ({
             </View>
           </View>
         </Modal>
+        <PermissionRationaleModal
+          visible={permRationaleVisible}
+          permissionType={permKind}
+          isPermanentlyDenied={true}
+          title={permKind === 'camera' ? 'Camera Access Required' : 'Storage / Photos Access Required'}
+          description={
+            permKind === 'camera'
+              ? 'Camera access is required to capture clear photos of statutory solar engineering documents, DISCOM test reports, and site compliance forms.'
+              : 'Photo library access is required to select and upload statutory compliance documents and project engineering drawings.'
+          }
+          onDismiss={() => setPermRationaleVisible(false)}
+          onRequestNativePermission={() => {
+            setPermRationaleVisible(false);
+            Linking.openSettings();
+          }}
+        />
       </View>
     </Modal>
   );

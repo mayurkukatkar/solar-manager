@@ -11,6 +11,7 @@ import {
   Alert,
   ActivityIndicator,
   Platform,
+  Linking,
 } from 'react-native';
 import {
   X,
@@ -32,7 +33,9 @@ import {
 } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
-import { ModalHeader } from '../../components/Header';
+import { ModalHeader, useDirtyFormWarning } from '../../components/common/ModalHeader';
+import { KeyboardAvoidingContainer } from '../../components/common/KeyboardAvoidingContainer';
+import { PermissionRationaleModal } from '../../components/common/PermissionRationaleModal';
 import { crmApi, documentsApi, tenantApi } from '../../api/endpoints';
 
 interface CustomerOnboardingModalProps {
@@ -97,6 +100,27 @@ export const CustomerOnboardingModal: React.FC<CustomerOnboardingModalProps> = (
   const [advanceAmount, setAdvanceAmount] = useState(defaultAdvance);
   const [paymentMode, setPaymentMode] = useState('UPI / QR Transfer');
   const [transactionRef, setTransactionRef] = useState('');
+
+  // 4-Step Wizard Stepper state
+  const [activeStep, setActiveStep] = useState<number>(1);
+  const [panNumber, setPanNumber] = useState(lead?.pan || '');
+  const [aadhaarNumber, setAadhaarNumber] = useState(lead?.aadhaar || '');
+  const [discomProvider, setDiscomProvider] = useState(lead?.discomName || 'MSEDCL');
+
+  const isDirty = Boolean(
+    legalName.trim() ||
+    mobile.trim() ||
+    consumerNumber.trim() ||
+    accountNumber.trim() ||
+    transactionRef.trim()
+  );
+
+  const handleGuardedClose = useDirtyFormWarning(
+    isDirty,
+    onClose,
+    'Discard Onboarding?',
+    'You have entered onboarding details. Are you sure you want to discard this onboarding draft?'
+  );
 
   // 6 KYC Document Slots
   const [documents, setDocuments] = useState<DocSlot[]>([
@@ -208,11 +232,17 @@ export const CustomerOnboardingModal: React.FC<CustomerOnboardingModalProps> = (
     }
   }, [visible, lead, quotationData]);
 
+  const [cameraRationaleVisible, setCameraRationaleVisible] = useState(false);
+
   const handleCapturePhoto = async (docId: string) => {
     try {
-      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      const { status, canAskAgain } = await ImagePicker.requestCameraPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permission Denied', 'Camera permission required for document upload.');
+        if (!canAskAgain) {
+          setCameraRationaleVisible(true);
+        } else {
+          Alert.alert('Permission Denied', 'Camera permission required for document upload.');
+        }
         return;
       }
       const result = await ImagePicker.launchCameraAsync({
@@ -395,14 +425,62 @@ export const CustomerOnboardingModal: React.FC<CustomerOnboardingModalProps> = (
   };
 
   return (
-    <Modal visible={visible} animationType="slide" transparent={false} onRequestClose={onClose}>
+    <Modal visible={visible} animationType="slide" transparent={false} onRequestClose={handleGuardedClose}>
       <View style={styles.container}>
-        {/* STANDARDIZED MODAL HEADER */}
+        {/* STANDARDIZED MODAL HEADER WITH DIRTY GUARD */}
         <ModalHeader
           title="Customer Onboarding"
           subtitle="Stage 3: Legal KYC & Project Provisioning"
-          onClose={onClose}
+          onClose={handleGuardedClose}
         />
+
+        {/* 4-STEP WIZARD STEPPER HEADER */}
+        <View style={styles.stepperContainer}>
+          {[
+            { step: 1, label: 'Profile' },
+            { step: 2, label: 'Feasibility' },
+            { step: 3, label: 'KYC Docs' },
+            { step: 4, label: 'DISCOM & DBT' },
+          ].map((item) => (
+            <TouchableOpacity
+              key={item.step}
+              style={[
+                styles.stepTab,
+                activeStep === item.step && styles.stepTabActive,
+                activeStep > item.step && styles.stepTabCompleted,
+              ]}
+              onPress={() => setActiveStep(item.step)}
+              activeOpacity={0.7}
+            >
+              <View
+                style={[
+                  styles.stepNumberBadge,
+                  activeStep === item.step && styles.stepNumberBadgeActive,
+                  activeStep > item.step && styles.stepNumberBadgeCompleted,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.stepNumberText,
+                    activeStep === item.step && styles.stepNumberTextActive,
+                    activeStep > item.step && styles.stepNumberTextCompleted,
+                  ]}
+                >
+                  {activeStep > item.step ? '✓' : item.step}
+                </Text>
+              </View>
+              <Text
+                style={[
+                  styles.stepLabelText,
+                  activeStep === item.step && styles.stepLabelTextActive,
+                ]}
+                numberOfLines={1}
+              >
+                {item.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
 
         <ScrollView style={styles.body} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           {/* CLIENT BADGE CARD */}
@@ -712,25 +790,82 @@ export const CustomerOnboardingModal: React.FC<CustomerOnboardingModalProps> = (
           </View>
         </ScrollView>
 
-        {/* BOTTOM ACTION BAR */}
+        {/* BOTTOM ACTION BAR WITH STEPPER NAVIGATION */}
         <View style={styles.bottomBar}>
-          <TouchableOpacity
-            style={styles.submitOnboardingBtn}
-            onPress={handleCompleteOnboarding}
-            disabled={submitting}
-            activeOpacity={0.85}
-          >
-            {submitting ? (
-              <ActivityIndicator color="#ffffff" />
-            ) : (
-              <>
-                <Text style={styles.submitOnboardingText}>Convert to Client & Provision Project</Text>
+          {activeStep < 4 ? (
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              {activeStep > 1 && (
+                <TouchableOpacity
+                  style={[styles.submitOnboardingBtn, { flex: 1, backgroundColor: '#64748b' }]}
+                  onPress={() => setActiveStep(activeStep - 1)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.submitOnboardingText}>Back</Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity
+                style={[styles.submitOnboardingBtn, { flex: activeStep > 1 ? 2 : 1, backgroundColor: '#2563eb' }]}
+                onPress={() => {
+                  if (activeStep === 1) {
+                    if (!legalName.trim()) {
+                      Alert.alert('Customer Name Required', 'Customer legal name matching electricity bill is compulsory to complete onboarding.');
+                      return;
+                    }
+                    if (mobile.trim().length < 10) {
+                      Alert.alert('Mobile Number Incomplete', 'Please enter a valid 10-digit mobile number for portal communications and SMS updates.');
+                      return;
+                    }
+                  }
+                  setActiveStep(activeStep + 1);
+                }}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.submitOnboardingText}>
+                  {activeStep === 1 ? 'Next: Roof Feasibility' : activeStep === 2 ? 'Next: KYC Documents' : 'Next: DISCOM & DBT'}
+                </Text>
                 <ArrowRight size={18} color="#ffffff" />
-              </>
-            )}
-          </TouchableOpacity>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <TouchableOpacity
+                style={[styles.submitOnboardingBtn, { flex: 1, backgroundColor: '#64748b' }]}
+                onPress={() => setActiveStep(3)}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.submitOnboardingText}>Back</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.submitOnboardingBtn, { flex: 2 }]}
+                onPress={handleCompleteOnboarding}
+                disabled={submitting}
+                activeOpacity={0.85}
+              >
+                {submitting ? (
+                  <ActivityIndicator color="#ffffff" />
+                ) : (
+                  <>
+                    <Text style={styles.submitOnboardingText}>Convert to Client & Provision Project</Text>
+                    <ArrowRight size={18} color="#ffffff" />
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
       </View>
+      <PermissionRationaleModal
+        visible={cameraRationaleVisible}
+        permissionType="camera"
+        isPermanentlyDenied={true}
+        title="Camera Access Required"
+        description="Camera access is required to capture clear photos of electricity bills, property tax receipts, and customer identity documents for PM Surya Ghar subsidy processing."
+        onDismiss={() => setCameraRationaleVisible(false)}
+        onRequestNativePermission={() => {
+          setCameraRationaleVisible(false);
+          Linking.openSettings();
+        }}
+      />
     </Modal>
   );
 };
@@ -1124,5 +1259,67 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
     color: '#64748b',
+  },
+  stepperContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+    gap: 6,
+  },
+  stepTab: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 4,
+    borderRadius: 8,
+    backgroundColor: '#f8fafc',
+    gap: 4,
+  },
+  stepTabActive: {
+    backgroundColor: '#eff6ff',
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+  },
+  stepTabCompleted: {
+    backgroundColor: '#f0fdf4',
+  },
+  stepNumberBadge: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#e2e8f0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepNumberBadgeActive: {
+    backgroundColor: '#2563eb',
+  },
+  stepNumberBadgeCompleted: {
+    backgroundColor: '#16a34a',
+  },
+  stepNumberText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#64748b',
+  },
+  stepNumberTextActive: {
+    color: '#ffffff',
+  },
+  stepNumberTextCompleted: {
+    color: '#ffffff',
+  },
+  stepLabelText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#64748b',
+  },
+  stepLabelTextActive: {
+    color: '#1d4ed8',
+    fontWeight: '700',
   },
 });

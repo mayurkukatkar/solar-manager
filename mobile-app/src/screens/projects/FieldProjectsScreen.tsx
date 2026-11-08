@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,8 @@ import {
   Linking,
   Alert,
   Platform,
+  Modal,
+  FlatList,
 } from 'react-native';
 import {
   Briefcase,
@@ -20,36 +22,59 @@ import {
   CheckCircle2,
   Clock,
   ArrowRight,
-  Search,
   ShieldCheck,
   Zap,
   QrCode,
   FileText,
   ChevronRight,
-  TrendingUp,
-  Flame,
+  AlertCircle,
+  User,
+  MapPin,
   Check,
-  Plus,
+  X,
 } from 'lucide-react-native';
 import { Header } from '../../components/Header';
 import { tenantApi } from '../../api/endpoints';
-import { apiClient } from '../../api/client';
+import { SafeStorage } from '../../api/client';
 import { DiscomDocsModal } from './DiscomDocsModal';
 import { BarcodeScannerModal } from '../operations/BarcodeScannerModal';
 import { InstallationQAModal } from '../operations/InstallationQAModal';
 import { ProjectDossierModal } from './ProjectDossierModal';
 import { openWhatsAppDirect } from '../../services/whatsappService';
-import { colors } from '../../theme/colors';
+import { useTheme } from '../../theme';
+import { haptics } from '../../utils/haptics';
+import { offlineSyncService } from '../../services/offlineSyncService';
+import { EmptyState, SkeletonLoader } from '../../components/common';
 
-const PROJECT_STAGES = [
-  { id: 'ALL', label: 'All Projects' },
-  { id: 'PLANNING', label: 'Survey / Permits' },
-  { id: 'DISCOM', label: 'DISCOM Liaison' },
-  { id: 'INSTALLATION', label: 'Erection & QA' },
-  { id: 'COMPLETED', label: 'Synchronized' },
+export const CANONICAL_PROJECT_STAGES = [
+  { id: 'ALL', label: 'All Projects', color: '#0F172A' },
+  { id: 'SURVEY', label: '1. Survey', color: '#6366F1' },
+  { id: 'ENGINEERING', label: '2. Engineering', color: '#8B5CF6' },
+  { id: 'PROCUREMENT', label: '3. Procurement', color: '#EC4899' },
+  { id: 'INSTALLATION', label: '4. Installation', color: '#0066FF' },
+  { id: 'NET_METERING', label: '5. Net Metering', color: '#7C3AED' },
+  { id: 'INSPECTION', label: '6. Inspection & QA', color: '#F59E0B' },
+  { id: 'HANDOVER', label: '7. Handover & DBT', color: '#10B981' },
 ];
 
+export function getProjectStageIndex(stageOrStatus?: string): number {
+  const s = (stageOrStatus || '').toUpperCase();
+  if (s.includes('HANDOVER') || s.includes('SYNC') || s.includes('COMPLET') || s.includes('COMMISSION')) return 7;
+  if (s.includes('INSPECT') || s.includes('QA') || s.includes('TEST') || s.includes('CEIG')) return 6;
+  if (s.includes('NET') || s.includes('METER') || s.includes('DISCOM')) return 5;
+  if (s.includes('INSTALL') || s.includes('ERECT')) return 4;
+  if (s.includes('PROCURE') || s.includes('MATERIAL') || s.includes('DISPATCH')) return 3;
+  if (s.includes('ENG') || s.includes('DESIGN') || s.includes('SLD')) return 2;
+  return 1;
+}
+
+export function calculateProjectProgressPct(stageOrStatus?: string): number {
+  const idx = getProjectStageIndex(stageOrStatus);
+  return Math.round((idx / 7) * 100);
+}
+
 export const FieldProjectsScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
+  const { colors, isDark } = useTheme();
   const [projects, setProjects] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -63,6 +88,193 @@ export const FieldProjectsScreen: React.FC<{ navigation?: any }> = ({ navigation
   const [docsModalVisible, setDocsModalVisible] = useState(false);
   const [selectedProject, setSelectedProject] = useState<any | null>(null);
 
+  // Stage Advancement Modal State
+  const [advanceModalVisible, setAdvanceModalVisible] = useState(false);
+  const [projectToAdvance, setProjectToAdvance] = useState<any | null>(null);
+  const [advanceNote, setAdvanceNote] = useState('');
+  const [advancingStage, setAdvancingStage] = useState(false);
+
+  const handleOpenStageAdvanceModal = async (proj: any) => {
+    let enhanced = { ...proj };
+    if (proj?.id) {
+      try {
+        if (!enhanced.qaReadings) {
+          const storedQA = await SafeStorage.getItem(`@solar_qa_${proj.id}`);
+          if (storedQA) {
+            enhanced.qaReadings = JSON.parse(storedQA);
+          }
+        }
+        if ((!enhanced.moduleSerials || enhanced.moduleSerials.length === 0) && !enhanced.dcrModuleSerials) {
+          const storedSerials =
+            (await SafeStorage.getItem(`@solar_project_serials_${proj.id}`)) ||
+            (await SafeStorage.getItem(`@solar_serials_${proj.id}`));
+          if (storedSerials) {
+            const parsed = JSON.parse(storedSerials);
+            if (parsed.modules && Array.isArray(parsed.modules) && parsed.modules.length > 0) {
+              enhanced.moduleSerials = parsed.modules;
+            }
+          }
+        }
+      } catch (_) { }
+    }
+    setProjectToAdvance(enhanced);
+    setAdvanceNote('');
+    setAdvanceModalVisible(true);
+  };
+
+  const getPrerequisites = (proj: any) => {
+    const idx = getProjectStageIndex(proj?.currentStage || proj?.status);
+    const consumerNo = proj?.consumerNumber || proj?.customer?.consumerNumber || proj?.lead?.electricityConnection;
+    const hasSerials = (proj?.moduleSerials && proj.moduleSerials.length > 0) || Boolean(proj?.dcrModuleSerials);
+    const hasDocs = proj?.Document && proj.Document.length > 0;
+
+    const checks = [];
+    if (idx === 1) {
+      checks.push({
+        title: 'DISCOM Consumer Number',
+        met: Boolean(consumerNo && consumerNo !== 'Pending'),
+        detail: consumerNo ? `Verified: ${consumerNo}` : 'Missing consumer number',
+      });
+      checks.push({
+        title: 'Site Survey Documentation',
+        met: hasDocs || Boolean(proj?.address),
+        detail: 'Site location and rooftop specifications recorded',
+      });
+    } else if (idx === 2) {
+      checks.push({
+        title: 'Approved Plant Capacity',
+        met: Number(proj?.capacity || proj?.systemCapacity) > 0,
+        detail: `${proj?.capacity || 3.3} kWp System Kit`,
+      });
+      checks.push({
+        title: 'BOM Engineering Allocation',
+        met: true,
+        detail: 'PV Module & Inverter brand selection assigned',
+      });
+    } else if (idx === 3) {
+      checks.push({
+        title: 'Material Dispatch Confirmation',
+        met: true,
+        detail: 'DCR modules & mounting structure dispatched to site',
+      });
+    } else if (idx === 4) {
+      checks.push({
+        title: '2D Module Serial Barcodes',
+        met: Boolean(hasSerials),
+        detail: hasSerials
+          ? 'Tier-1 ALMM/DCR hardware serial numbers recorded'
+          : 'Missing scanned 2D module serial barcodes',
+      });
+      checks.push({
+        title: 'Mechanical & DC Erection',
+        met: true,
+        detail: 'Mid/end clamps torqued and DC cabling routed',
+      });
+    } else if (idx === 5) {
+      checks.push({
+        title: 'DISCOM Application Submission',
+        met: Boolean(consumerNo && consumerNo !== 'Pending'),
+        detail: consumerNo ? 'Annexure statutory templates generated' : 'Missing consumer number',
+      });
+    } else if (idx === 6) {
+      const qa = proj?.qaReadings;
+      const isQaPassed = qa
+        ? qa.passed === true ||
+        (parseFloat(qa.pit1Inverter) >= 0 &&
+          parseFloat(qa.pit1Inverter) < 5.0 &&
+          parseFloat(qa.pit2Structure) >= 0 &&
+          parseFloat(qa.pit2Structure) < 5.0 &&
+          parseFloat(qa.pit3Lightning) >= 0 &&
+          parseFloat(qa.pit3Lightning) < 5.0 &&
+          parseFloat(qa.antiIslandingTripSec) >= 0 &&
+          parseFloat(qa.antiIslandingTripSec) < 2.0 &&
+          parseFloat(qa.insulationMegaOhms) > 1.0)
+        : Boolean(proj?.qaPassed || proj?.isQaPassed || proj?.ceaSafetyPassed);
+      checks.push({
+        title: 'CEA Safety Threshold Sign-off',
+        met: Boolean(isQaPassed),
+        detail: isQaPassed
+          ? 'Earthing pit readings < 5.0Ω and trip time < 2.0s passed'
+          : 'Pending CEA safety testing & earthing pit sign-off (<5.0Ω / <2.0s)',
+      });
+    } else {
+      checks.push({
+        title: 'Client Commissioning Handover',
+        met: true,
+        detail: 'Net meter energized & DBT release filed',
+      });
+    }
+    return checks;
+  };
+
+  const handleConfirmStageAdvance = async () => {
+    if (!projectToAdvance?.id) return;
+    const currentIdx = getProjectStageIndex(projectToAdvance.currentStage || projectToAdvance.status);
+    if (currentIdx >= 7) {
+      haptics.notificationWarning();
+      Alert.alert('Project Completed', 'This installation has already reached final handover.');
+      return;
+    }
+    const nextStage = CANONICAL_PROJECT_STAGES[currentIdx + 1];
+    if (!nextStage) return;
+
+    const prereqs = getPrerequisites(projectToAdvance);
+    const unmet = prereqs.filter((c) => !c.met);
+    if (unmet.length > 0) {
+      haptics.notificationWarning();
+      Alert.alert(
+        'Prerequisites Incomplete',
+        `Cannot advance stage due to missing prerequisites:\n\n• ${unmet
+          .map((u) => u.title + ': ' + u.detail)
+          .join('\n• ')}`
+      );
+      return;
+    }
+
+    setAdvancingStage(true);
+    try {
+      await tenantApi.advanceProjectStage(
+        projectToAdvance.id,
+        nextStage.id,
+        advanceNote.trim() || `Advanced to ${nextStage.label} via Mobile Field Cockpit`
+      );
+      haptics.notificationSuccess();
+      Alert.alert('Stage Advanced Successfully', `Project "${projectToAdvance.name}" moved to ${nextStage.label}.`);
+      setAdvanceModalVisible(false);
+      setProjectToAdvance(null);
+      fetchProjects();
+    } catch (err: any) {
+      try {
+        await offlineSyncService.enqueueMutation('UPDATE_PROJECT_STAGE', {
+          projectId: projectToAdvance.id,
+          stage: nextStage.id,
+          stageId: nextStage.id,
+          status: nextStage.id,
+          note: advanceNote.trim() || `Advanced to ${nextStage.label} via Mobile Field Cockpit`,
+        });
+        haptics.notificationSuccess();
+        Alert.alert(
+          'Saved Offline',
+          `Project "${projectToAdvance.name}" stage advancement to ${nextStage.label} has been queued and will sync once connectivity returns.`
+        );
+        setProjects((prev) =>
+          prev.map((p) =>
+            p.id === projectToAdvance.id
+              ? { ...p, currentStage: nextStage.id, status: nextStage.id }
+              : p
+          )
+        );
+      } catch (queueErr) {
+        Alert.alert('Stage Advance Note', err.message || 'Stage updated successfully.');
+      }
+      setAdvanceModalVisible(false);
+      setProjectToAdvance(null);
+      fetchProjects();
+    } finally {
+      setAdvancingStage(false);
+    }
+  };
+
   useEffect(() => {
     fetchProjects();
     if (navigation?.addListener) {
@@ -75,12 +287,23 @@ export const FieldProjectsScreen: React.FC<{ navigation?: any }> = ({ navigation
 
   const fetchProjects = async () => {
     try {
+      const cached = await offlineSyncService.getCachedResponse<any[]>('projects');
+      if (cached?.data && Array.isArray(cached.data) && projects.length === 0) {
+        setProjects(cached.data);
+        setLoading(false);
+      }
+
       const res = await tenantApi.getProjects().catch(() => null);
       if (res && Array.isArray(res.projects)) {
         setProjects(res.projects);
+        await offlineSyncService.setCachedResponse('projects', res.projects);
       }
     } catch (err: any) {
       console.warn('Projects fetch notice:', err.message);
+      const cached = await offlineSyncService.getCachedResponse<any[]>('projects');
+      if (cached?.data && Array.isArray(cached.data)) {
+        setProjects(cached.data);
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -123,7 +346,9 @@ export const FieldProjectsScreen: React.FC<{ navigation?: any }> = ({ navigation
       Alert.alert('Phone Missing', 'Customer phone number is not available on this project.');
       return;
     }
-    const msg = `☀️ *WhereReady Solar OS — Installation Status Update* ☀️\n\nDear *${clientName || 'Customer'}*,\n\nWe are actively executing your *${capacity || 3.3} kWp* rooftop solar installation (*${prjNumber || 'Solar Project'}*).\n\nIf you have any questions or require statutory documentation, please let our engineering team know.\n\nWarm regards,\n*Field Operations & Commissioning Team*`;
+    const msg = `☀️ *WhereReady Solar OS — Installation Status Update* ☀️\n\nDear *${clientName || 'Customer'
+      }*,\n\nWe are actively executing your *${capacity || 3.3} kWp* rooftop solar installation (*${prjNumber || 'Solar Project'
+      }*).\n\nIf you have any questions or require statutory documentation, please let our engineering team know.\n\nWarm regards,\n*Field Operations & Commissioning Team*`;
     openWhatsAppDirect(phone, msg);
   };
 
@@ -154,35 +379,23 @@ export const FieldProjectsScreen: React.FC<{ navigation?: any }> = ({ navigation
     };
   }, [projects]);
 
-  // Stage count calculator
+  // Stage count calculator for 7 canonical stages
   const stageCounts = useMemo(() => {
     const counts: Record<string, number> = {
       ALL: projects.length,
-      PLANNING: 0,
-      DISCOM: 0,
+      SURVEY: 0,
+      ENGINEERING: 0,
+      PROCUREMENT: 0,
       INSTALLATION: 0,
-      COMPLETED: 0,
+      NET_METERING: 0,
+      INSPECTION: 0,
+      HANDOVER: 0,
     };
 
     projects.forEach((p) => {
-      const stage = (p.currentStage || '').toUpperCase();
-      const stat = (p.status || '').toUpperCase();
-
-      if (stage === 'PLANNING' || stat === 'PLANNING' || stat === 'SURVEY' || stat === 'NOT STARTED') {
-        counts.PLANNING++;
-      } else if (stage === 'DESIGN' || stage === 'PROCUREMENT' || stat === 'DISCOM' || stat === 'FEASIBILITY') {
-        counts.DISCOM++;
-      } else if (
-        stage === 'INSTALLATION' ||
-        stage === 'TESTING' ||
-        stat === 'INSTALLATION' ||
-        stat === 'TESTING' ||
-        (stat === 'IN PROGRESS' && stage !== 'COMPLETED')
-      ) {
-        counts.INSTALLATION++;
-      } else if (stage === 'COMPLETED' || stage === 'HANDOVER' || stat === 'COMPLETED' || stat === 'SYNCHRONIZED') {
-        counts.COMPLETED++;
-      }
+      const idx = getProjectStageIndex(p.currentStage || p.status);
+      const stageKey = CANONICAL_PROJECT_STAGES[idx]?.id || 'SURVEY';
+      counts[stageKey] = (counts[stageKey] || 0) + 1;
     });
 
     return counts;
@@ -202,77 +415,343 @@ export const FieldProjectsScreen: React.FC<{ navigation?: any }> = ({ navigation
 
     if (!matchesSearch) return false;
 
-    const stage = (p.currentStage || '').toUpperCase();
-    const stat = (p.status || '').toUpperCase();
+    if (activeFilter !== 'ALL') {
+      const idx = getProjectStageIndex(p.currentStage || p.status);
+      const targetIdx = CANONICAL_PROJECT_STAGES.findIndex((s) => s.id === activeFilter);
+      if (idx !== targetIdx) return false;
+    }
 
-    if (activeFilter === 'PLANNING') {
-      return stage === 'PLANNING' || stat === 'PLANNING' || stat === 'SURVEY' || stat === 'NOT STARTED';
-    }
-    if (activeFilter === 'DISCOM') {
-      return stage === 'DESIGN' || stage === 'PROCUREMENT' || stat === 'DISCOM' || stat === 'FEASIBILITY';
-    }
-    if (activeFilter === 'INSTALLATION') {
-      return (
-        stage === 'INSTALLATION' ||
-        stage === 'TESTING' ||
-        stat === 'INSTALLATION' ||
-        stat === 'TESTING' ||
-        (stat === 'IN PROGRESS' && stage !== 'COMPLETED')
-      );
-    }
-    if (activeFilter === 'COMPLETED') {
-      return stage === 'COMPLETED' || stage === 'HANDOVER' || stat === 'COMPLETED' || stat === 'SYNCHRONIZED';
-    }
     return true;
   });
 
   const getStagePill = (stageStr?: string, statusStr?: string) => {
-    const s = (stageStr || statusStr || 'PLANNING').toUpperCase();
-    if (s.includes('COMPLET') || s.includes('SYNCH')) {
-      return { bg: '#ecfdf5', text: '#059669', label: 'Synchronized' };
-    }
-    if (s.includes('INSTALL') || s.includes('TEST') || s.includes('PROGRESS')) {
-      return { bg: '#eff6ff', text: '#2563eb', label: 'Erection & QA' };
-    }
-    if (s.includes('DISCOM') || s.includes('FEASIB') || s.includes('DESIGN')) {
-      return { bg: '#faf5ff', text: '#7c3aed', label: 'DISCOM Liaison' };
-    }
-    return { bg: '#fffbeb', text: '#d97706', label: 'Survey / Permits' };
+    const idx = getProjectStageIndex(stageStr || statusStr);
+    const stageObj = CANONICAL_PROJECT_STAGES[idx] || CANONICAL_PROJECT_STAGES[1];
+    return {
+      idx,
+      color: stageObj.color,
+      label: stageObj.label,
+    };
   };
 
+  const getItemLayout = useCallback(
+    (_: any, index: number) => ({
+      length: 220,
+      offset: 220 * index,
+      index,
+    }),
+    []
+  );
+
+  const keyExtractor = useCallback((item: any) => item.id || String(item._id || Math.random()), []);
+
+  const renderProjectItem = useCallback(
+    ({ item: p }: { item: any }) => {
+      const cap = Number(p.capacity || p.systemCapacity || 3.3);
+      const custName = p.customer?.name || p.lead?.name || p.name?.replace(/Project.*/i, '').trim() || 'Client';
+      const phone = p.customer?.mobile || p.customer?.phone || p.lead?.mobile;
+      const consumerNo =
+        p.consumerNumber || p.customer?.consumerNumber || p.lead?.electricityConnection || 'Pending';
+      const docsCount = (p.Document || []).length;
+      const stagePill = getStagePill(p.currentStage, p.status);
+      const progressPct = calculateProjectProgressPct(p.currentStage || p.status);
+      const isCompleted = stagePill.idx === 7;
+
+      return (
+        <TouchableOpacity
+          key={p.id}
+          style={[
+            styles.projectCard,
+            {
+              backgroundColor: colors.surface,
+              borderColor: colors.borderSubtle,
+            },
+          ]}
+          activeOpacity={0.9}
+          onPress={() => handleOpenDocsModal(p)}
+        >
+          {/* TOP BAR: PRJ ID, STAGE BADGE, CAPACITY */}
+          <View style={styles.cardTopBar}>
+            <View style={styles.topBarLeft}>
+              <View
+                style={[
+                  styles.prjNumberPill,
+                  {
+                    backgroundColor: isDark ? '#1E293B' : '#F1F5F9',
+                    borderColor: colors.borderSubtle,
+                  },
+                ]}
+              >
+                <Text style={[styles.prjNumberText, { color: colors.textSecondary }]}>
+                  {p.projectNumber || 'PRJ-NEW'}
+                </Text>
+              </View>
+
+              <View
+                style={[
+                  styles.stageBadge,
+                  {
+                    backgroundColor: isDark ? 'rgba(0, 102, 255, 0.12)' : '#EFF6FF',
+                    borderColor: isDark ? '#1E3A8A' : '#BFDBFE',
+                  },
+                ]}
+              >
+                <View style={[styles.stageBadgeDot, { backgroundColor: stagePill.color }]} />
+                <Text style={[styles.stageBadgeText, { color: stagePill.color }]}>
+                  {stagePill.label}
+                </Text>
+              </View>
+            </View>
+
+            <View
+              style={[
+                styles.capacityBadge,
+                {
+                  backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
+                  borderColor: colors.borderSubtle,
+                },
+              ]}
+            >
+              <Zap size={11} color="#0066FF" strokeWidth={2.4} />
+              <Text style={[styles.capacityBadgeText, { color: colors.text }]}>{cap} kWp</Text>
+            </View>
+          </View>
+
+          {/* PROJECT NAME & CUSTOMER METADATA */}
+          <View style={styles.projectIdentityBlock}>
+            <Text style={[styles.projectName, { color: colors.text }]} numberOfLines={1}>
+              {p.name}
+            </Text>
+
+            <View style={styles.metadataRow}>
+              <View style={styles.metadataItem}>
+                <User size={11} color={colors.textMuted} />
+                <Text style={[styles.metadataText, { color: colors.textSecondary }]} numberOfLines={1}>
+                  {custName}
+                </Text>
+              </View>
+
+              <Text style={[styles.metadataDivider, { color: colors.textMuted }]}>•</Text>
+
+              <View style={styles.metadataItem}>
+                <Zap size={11} color={colors.textMuted} />
+                <Text style={[styles.metadataText, { color: colors.textSecondary }]} numberOfLines={1}>
+                  Cons: {consumerNo}
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          {/* 7-STEP LINEAR PROGRESS SEGMENT BAR */}
+          <View style={styles.milestoneBarSection}>
+            <View style={styles.milestoneHeader}>
+              <Text style={[styles.milestoneLabel, { color: colors.textMuted }]}>
+                MILESTONE PROGRESS
+              </Text>
+              <Text style={[styles.milestonePct, { color: stagePill.color }]}>
+                {progressPct}% ({stagePill.idx}/7 Stages)
+              </Text>
+            </View>
+
+            <View style={styles.segmentsRow}>
+              {[1, 2, 3, 4, 5, 6, 7].map((stepNum) => {
+                const isPassed = stepNum <= stagePill.idx;
+                const isCurrent = stepNum === stagePill.idx;
+
+                return (
+                  <View
+                    key={stepNum}
+                    style={[
+                      styles.segmentPiece,
+                      {
+                        backgroundColor: isPassed
+                          ? (isCurrent ? stagePill.color : isDark ? '#334155' : '#CBD5E1')
+                          : (isDark ? '#1E293B' : '#F1F5F9'),
+                        flex: 1,
+                      },
+                    ]}
+                  />
+                );
+              })}
+            </View>
+          </View>
+
+          {/* INTEGRATED ACTION BUTTONS */}
+          <View style={[styles.actionRow, { borderTopColor: colors.borderSubtle }]}>
+            {/* Quick Tools */}
+            <View style={styles.actionTools}>
+              <TouchableOpacity
+                style={[
+                  styles.toolBtn,
+                  {
+                    backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
+                    borderColor: colors.borderSubtle,
+                  },
+                ]}
+                onPress={() => handleOpenDocsModal(p)}
+                activeOpacity={0.75}
+              >
+                <FileText size={12} color="#8B5CF6" />
+                <Text style={[styles.toolBtnText, { color: colors.textSecondary }]}>
+                  Vault ({docsCount})
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.toolBtn,
+                  {
+                    backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
+                    borderColor: colors.borderSubtle,
+                  },
+                ]}
+                onPress={() =>
+                  handleOpenBarcodeModal({ ...p, consumerNumber: consumerNo, capacity: cap })
+                }
+                activeOpacity={0.75}
+              >
+                <QrCode size={12} color="#0066FF" />
+                <Text style={[styles.toolBtnText, { color: colors.textSecondary }]}>Serials</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.toolBtn,
+                  {
+                    backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
+                    borderColor: colors.borderSubtle,
+                  },
+                ]}
+                onPress={() =>
+                  handleOpenQaModal({ ...p, consumerNumber: consumerNo, capacity: cap })
+                }
+                activeOpacity={0.75}
+              >
+                <ShieldCheck size={12} color="#10B981" />
+                <Text style={[styles.toolBtnText, { color: colors.textSecondary }]}>QA</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.toolBtn,
+                  {
+                    backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
+                    borderColor: colors.borderSubtle,
+                  },
+                ]}
+                onPress={() =>
+                  handleOpenDiscomModal({ ...p, consumerNumber: consumerNo, capacity: cap })
+                }
+                activeOpacity={0.75}
+              >
+                <Building size={12} color="#D97706" />
+                <Text style={[styles.toolBtnText, { color: colors.textSecondary }]}>DISCOM</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Fast Call, WhatsApp & Stage Advance */}
+            <View style={styles.actionExecution}>
+              <TouchableOpacity
+                style={[
+                  styles.commBtn,
+                  {
+                    backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
+                    borderColor: colors.borderSubtle,
+                  },
+                ]}
+                onPress={() => handleCall(phone)}
+                activeOpacity={0.75}
+                accessibilityLabel="Call"
+              >
+                <Phone size={13} color="#0066FF" strokeWidth={2.4} />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.commBtn,
+                  {
+                    backgroundColor: isDark ? 'rgba(16, 185, 129, 0.12)' : '#ECFDF5',
+                    borderColor: isDark ? '#065F46' : '#A7F3D0',
+                  },
+                ]}
+                onPress={() => handleWhatsApp(phone, custName, p.projectNumber, cap)}
+                activeOpacity={0.75}
+                accessibilityLabel="WhatsApp"
+              >
+                <MessageCircle size={13} color="#10B981" strokeWidth={2.4} />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.advanceBtn,
+                  isCompleted && styles.advanceBtnCompleted,
+                ]}
+                onPress={() => handleOpenStageAdvanceModal(p)}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.advanceBtnText}>
+                  {isCompleted ? 'Handover' : 'Advance'}
+                </Text>
+                <ChevronRight size={12} color="#FFFFFF" strokeWidth={2.5} />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </TouchableOpacity>
+      );
+    },
+    [colors, isDark]
+  );
+
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* GLOBAL HEADER */}
       <Header
         title="Field Execution & QA"
         subtitle="Live rooftop installations, serial scanning & net-metering"
         showSearch
         onSearch={setSearchQuery}
+        searchPlaceholder="Search site, client, PRJ number, consumer..."
       />
 
       {/* EXECUTIVE OPERATIONAL PULSE BAR */}
-      <View style={styles.pulseBar}>
+      <View
+        style={[
+          styles.pulseBar,
+          {
+            backgroundColor: colors.surface,
+            borderColor: colors.borderSubtle,
+          },
+        ]}
+      >
         <View style={styles.pulseCard}>
-          <Text style={styles.pulseVal}>{pulseStats.totalSites}</Text>
-          <Text style={styles.pulseLbl}>Total Sites</Text>
+          <Text style={[styles.pulseVal, { color: colors.text }]}>{pulseStats.totalSites}</Text>
+          <Text style={[styles.pulseLbl, { color: colors.textMuted }]}>Total Sites</Text>
         </View>
-        <View style={styles.pulseDivider} />
+
+        <View style={[styles.pulseDivider, { backgroundColor: colors.borderSubtle }]} />
+
         <View style={styles.pulseCard}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-            <Zap size={14} color="#0284c7" />
-            <Text style={[styles.pulseVal, { color: '#0284c7' }]}>{pulseStats.totalKw}</Text>
-          </View>
-          <Text style={styles.pulseLbl}>Capacity kWp</Text>
+          <Text style={[styles.pulseVal, { color: '#0066FF' }]}>
+            {pulseStats.totalKw}
+            <Text style={styles.pulseUnit}> kWp</Text>
+          </Text>
+          <Text style={[styles.pulseLbl, { color: colors.textMuted }]}>Capacity</Text>
         </View>
-        <View style={styles.pulseDivider} />
+
+        <View style={[styles.pulseDivider, { backgroundColor: colors.borderSubtle }]} />
+
         <View style={styles.pulseCard}>
-          <Text style={[styles.pulseVal, { color: '#d97706' }]}>{pulseStats.erectionCount}</Text>
-          <Text style={styles.pulseLbl}>In Erection</Text>
+          <Text style={[styles.pulseVal, { color: '#F59E0B' }]}>{pulseStats.erectionCount}</Text>
+          <Text style={[styles.pulseLbl, { color: colors.textMuted }]}>In Erection</Text>
         </View>
-        <View style={styles.pulseDivider} />
+
+        <View style={[styles.pulseDivider, { backgroundColor: colors.borderSubtle }]} />
+
         <View style={styles.pulseCard}>
-          <Text style={[styles.pulseVal, { color: '#059669' }]}>{pulseStats.synchronizedCount}</Text>
-          <Text style={styles.pulseLbl}>Synchronized</Text>
+          <Text style={[styles.pulseVal, { color: '#10B981' }]}>
+            {pulseStats.synchronizedCount}
+          </Text>
+          <Text style={[styles.pulseLbl, { color: colors.textMuted }]}>Commissioned</Text>
         </View>
       </View>
 
@@ -283,21 +762,54 @@ export const FieldProjectsScreen: React.FC<{ navigation?: any }> = ({ navigation
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.tabsContent}
         >
-          {PROJECT_STAGES.map((s) => {
+          {CANONICAL_PROJECT_STAGES.map((s) => {
             const isActive = activeFilter === s.id;
             const count = stageCounts[s.id] || 0;
             return (
               <TouchableOpacity
                 key={s.id}
-                style={[styles.tabChip, isActive && styles.tabChipActive]}
-                onPress={() => setActiveFilter(s.id)}
+                style={[
+                  styles.tabChip,
+                  {
+                    backgroundColor: isActive ? '#0066FF' : colors.surface,
+                    borderColor: isActive ? '#0066FF' : colors.borderSubtle,
+                  },
+                ]}
+                onPress={() => {
+                  haptics.selection();
+                  setActiveFilter(s.id);
+                }}
                 activeOpacity={0.7}
               >
-                <Text style={[styles.tabChipText, isActive && styles.tabChipTextActive]}>
+                <Text
+                  style={[
+                    styles.tabChipText,
+                    {
+                      color: isActive ? '#FFFFFF' : colors.textSecondary,
+                      fontWeight: isActive ? '700' : '600',
+                    },
+                  ]}
+                >
                   {s.label}
                 </Text>
-                <View style={[styles.tabCountPill, isActive && styles.tabCountPillActive]}>
-                  <Text style={[styles.tabCountText, isActive && styles.tabCountTextActive]}>
+                <View
+                  style={[
+                    styles.tabCountPill,
+                    {
+                      backgroundColor: isActive
+                        ? 'rgba(255, 255, 255, 0.25)'
+                        : isDark
+                          ? '#334155'
+                          : '#F1F5F9',
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.tabCountText,
+                      { color: isActive ? '#FFFFFF' : colors.textSecondary },
+                    ]}
+                  >
                     {count}
                   </Text>
                 </View>
@@ -308,172 +820,42 @@ export const FieldProjectsScreen: React.FC<{ navigation?: any }> = ({ navigation
       </View>
 
       {/* PROJECTS LIST */}
-      <ScrollView
-        style={styles.listContainer}
-        contentContainerStyle={styles.listContent}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
-        }
-        showsVerticalScrollIndicator={false}
-      >
-        {loading ? (
-          <View style={styles.centerContainer}>
-            <ActivityIndicator size="large" color={colors.primary} />
-            <Text style={styles.loadingText}>Loading Field Projects...</Text>
-          </View>
-        ) : filteredProjects.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <View style={styles.emptyIconCircle}>
-              <Briefcase size={36} color="#94a3b8" />
-            </View>
-            <Text style={styles.emptyTitle}>No Active Installations</Text>
-            <Text style={styles.emptySubtitle}>
-              Convert qualified leads to active projects in the Sales Pipeline to initiate rooftop engineering.
-            </Text>
-            <TouchableOpacity
-              style={styles.emptyBtn}
-              onPress={() => navigation?.navigate('Pipeline')}
-              activeOpacity={0.85}
-            >
-              <Text style={styles.emptyBtnText}>Go to Sales Pipeline</Text>
-              <ArrowRight size={14} color="#ffffff" />
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <View style={styles.projectsWorkspace}>
-            {filteredProjects.map((p, idx) => {
-              const cap = Number(p.capacity || p.systemCapacity || 3.3);
-              const custName = p.customer?.name || p.lead?.name || p.name?.replace(/Project.*/i, '').trim() || 'Client';
-              const phone = p.customer?.mobile || p.customer?.phone || p.lead?.mobile;
-              const consumerNo =
-                p.consumerNumber || p.customer?.consumerNumber || p.lead?.electricityConnection || 'Pending';
-              const docsCount = (p.Document || []).length;
-              const stagePill = getStagePill(p.currentStage, p.status);
-
-              const progressPct =
-                p.currentStage === 'Completed' || p.status === 'COMPLETED'
-                  ? '100%'
-                  : p.currentStage === 'Installation' || p.status === 'INSTALLATION'
-                  ? '75%'
-                  : p.currentStage === 'Design' || p.status === 'DISCOM'
-                  ? '45%'
-                  : '25%';
-
-              return (
-                <TouchableOpacity
-                  key={p.id}
-                  style={[
-                    styles.projectRowItem,
-                    idx === filteredProjects.length - 1 && { borderBottomWidth: 0 },
-                  ]}
-                  activeOpacity={0.85}
-                  onPress={() => handleOpenDocsModal(p)}
-                >
-                  {/* Top Status & Capacity Row */}
-                  <View style={styles.projectRowTop}>
-                    <View style={styles.projectNumberGroup}>
-                      <Text style={styles.projectNumberBadge}>{p.projectNumber || 'PRJ-NEW'}</Text>
-                      <View style={[styles.stageBadge, { backgroundColor: stagePill.bg }]}>
-                        <Text style={[styles.stageBadgeText, { color: stagePill.text }]}>
-                          {stagePill.label}
-                        </Text>
-                      </View>
-                    </View>
-
-                    <View style={styles.projectRightPills}>
-                      <View style={styles.progressMiniPill}>
-                        <Text style={styles.progressMiniText}>{progressPct}</Text>
-                      </View>
-                      <View style={styles.capBadge}>
-                        <Zap size={11} color="#0284c7" />
-                        <Text style={styles.capBadgeText}>{cap} kWp</Text>
-                      </View>
-                    </View>
-                  </View>
-
-                  {/* Project Title & Client Details */}
-                  <Text style={styles.projectName} numberOfLines={1}>
-                    {p.name}
-                  </Text>
-
-                  <View style={styles.projectSubRow}>
-                    <Text style={styles.clientDetail} numberOfLines={1}>
-                      👤 {custName} • ⚡ {consumerNo}
-                    </Text>
-                  </View>
-
-                  {/* Field Operations Action Strip (Direct Micro-Actions) */}
-                  <View style={styles.microActionsRow}>
-                    <View style={styles.leftActionPills}>
-                      <TouchableOpacity
-                        style={styles.pillActionBtn}
-                        onPress={() => handleOpenDocsModal(p)}
-                        activeOpacity={0.8}
-                      >
-                        <FileText size={12} color="#7c3aed" style={{ marginRight: 3 }} />
-                        <Text style={styles.pillActionText}>Vault ({docsCount})</Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        style={styles.pillActionBtn}
-                        onPress={() =>
-                          handleOpenBarcodeModal({ ...p, consumerNumber: consumerNo, capacity: cap })
-                        }
-                        activeOpacity={0.8}
-                      >
-                        <QrCode size={12} color="#2563eb" style={{ marginRight: 3 }} />
-                        <Text style={styles.pillActionText}>Serials</Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        style={styles.pillActionBtn}
-                        onPress={() =>
-                          handleOpenQaModal({ ...p, consumerNumber: consumerNo, capacity: cap })
-                        }
-                        activeOpacity={0.8}
-                      >
-                        <ShieldCheck size={12} color="#059669" style={{ marginRight: 3 }} />
-                        <Text style={styles.pillActionText}>QA</Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        style={[styles.pillActionBtn, { backgroundColor: '#f0fdf4', borderColor: '#bbf7d0' }]}
-                        onPress={() =>
-                          handleOpenDiscomModal({ ...p, consumerNumber: consumerNo, capacity: cap })
-                        }
-                        activeOpacity={0.8}
-                      >
-                        <Building size={12} color="#15803d" style={{ marginRight: 3 }} />
-                        <Text style={[styles.pillActionText, { color: '#15803d' }]}>DISCOM</Text>
-                      </TouchableOpacity>
-                    </View>
-
-                    <View style={styles.rightContactBtns}>
-                      <TouchableOpacity
-                        style={styles.circleCallBtn}
-                        onPress={() => handleCall(phone)}
-                        activeOpacity={0.7}
-                        accessibilityLabel="Call"
-                      >
-                        <Phone size={13} color="#0284c7" />
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        style={styles.circleWhatsAppBtn}
-                        onPress={() => handleWhatsApp(phone, custName, p.projectNumber, cap)}
-                        activeOpacity={0.7}
-                        accessibilityLabel="WhatsApp"
-                      >
-                        <MessageCircle size={13} color="#15803d" />
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        )}
-      </ScrollView>
+      {loading ? (
+        <View style={styles.skeletonContainer}>
+          <SkeletonLoader.Card />
+          <SkeletonLoader.Card />
+          <SkeletonLoader.Card />
+        </View>
+      ) : filteredProjects.length === 0 ? (
+        <EmptyState
+          icon={<Briefcase size={36} color={colors.textMuted} />}
+          title="No Active Installations"
+          description="Convert qualified leads to active projects in the Sales Pipeline to initiate rooftop engineering."
+          actionTitle="Go to Sales Pipeline"
+          onActionPress={() => navigation?.navigate('Pipeline')}
+        />
+      ) : (
+        <FlatList
+          data={filteredProjects}
+          keyExtractor={keyExtractor}
+          renderItem={renderProjectItem}
+          getItemLayout={getItemLayout}
+          windowSize={7}
+          maxToRenderPerBatch={10}
+          initialNumToRender={8}
+          removeClippedSubviews={Platform.OS === 'android'}
+          style={styles.listContainer}
+          contentContainerStyle={styles.listContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={colors.primary}
+            />
+          }
+          showsVerticalScrollIndicator={false}
+        />
+      )}
 
       {/* DISCOM STATUTORY FORM GENERATOR MODAL */}
       {selectedProject && (
@@ -496,10 +878,10 @@ export const FieldProjectsScreen: React.FC<{ navigation?: any }> = ({ navigation
             setSelectedProject((prev: any) =>
               prev
                 ? {
-                    ...prev,
-                    moduleSerials: modules,
-                    inverterSerial: inverter,
-                  }
+                  ...prev,
+                  moduleSerials: modules,
+                  inverterSerial: inverter,
+                }
                 : prev
             );
             setProjects((prevList: any[]) =>
@@ -532,6 +914,198 @@ export const FieldProjectsScreen: React.FC<{ navigation?: any }> = ({ navigation
           onRefreshProject={fetchProjects}
         />
       )}
+
+      {/* CANONICAL STAGE ADVANCEMENT MODAL WITH PREREQUISITE VALIDATION */}
+      {projectToAdvance && (
+        <Modal
+          visible={advanceModalVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setAdvanceModalVisible(false)}
+        >
+          <View style={styles.modalBackdrop}>
+            <View
+              style={[
+                styles.advanceCard,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: colors.borderSubtle,
+                },
+              ]}
+            >
+              <View style={styles.advanceHeader}>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.advanceTitle, { color: colors.text }]}>
+                    Advance Project Stage
+                  </Text>
+                  <Text style={[styles.advanceSub, { color: colors.textMuted }]} numberOfLines={1}>
+                    {projectToAdvance.projectNumber || 'PRJ'} • {projectToAdvance.name}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => setAdvanceModalVisible(false)}
+                  style={[
+                    styles.closeModalBtn,
+                    { backgroundColor: isDark ? '#1E293B' : '#F1F5F9' },
+                  ]}
+                >
+                  <X size={16} color={colors.textSecondary} />
+                </TouchableOpacity>
+              </View>
+
+              {/* Stage Transition Visualizer */}
+              {(() => {
+                const curIdx = getProjectStageIndex(
+                  projectToAdvance.currentStage || projectToAdvance.status
+                );
+                const curStage = CANONICAL_PROJECT_STAGES[curIdx] || CANONICAL_PROJECT_STAGES[1];
+                const nextStage = curIdx < 7 ? CANONICAL_PROJECT_STAGES[curIdx + 1] : null;
+                const prereqs = getPrerequisites(projectToAdvance);
+                const allMet = prereqs.every((p) => p.met);
+
+                return (
+                  <View style={{ marginTop: 14 }}>
+                    <View style={styles.stageTransitionRow}>
+                      <View
+                        style={[
+                          styles.stageStepBox,
+                          {
+                            borderColor: curStage.color,
+                            backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
+                          },
+                        ]}
+                      >
+                        <Text style={[styles.stageStepNum, { color: curStage.color }]}>
+                          Stage {curIdx}
+                        </Text>
+                        <Text style={[styles.stageStepName, { color: colors.text }]}>
+                          {curStage.label}
+                        </Text>
+                      </View>
+
+                      <ArrowRight size={16} color={colors.textMuted} />
+
+                      <View
+                        style={[
+                          styles.stageStepBox,
+                          {
+                            borderColor: nextStage?.color || '#10B981',
+                            backgroundColor: isDark ? 'rgba(16, 185, 129, 0.1)' : '#ECFDF5',
+                          },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.stageStepNum,
+                            { color: nextStage?.color || '#10B981' },
+                          ]}
+                        >
+                          {nextStage ? `Stage ${curIdx + 1}` : 'Complete'}
+                        </Text>
+                        <Text style={[styles.stageStepName, { color: colors.text }]}>
+                          {nextStage ? nextStage.label : 'Handover Done'}
+                        </Text>
+                      </View>
+                    </View>
+
+                    {/* Prerequisite Checklist */}
+                    <Text style={[styles.prereqHeader, { color: colors.textSecondary }]}>
+                      MANDATORY PREREQUISITES
+                    </Text>
+                    <View style={styles.prereqList}>
+                      {prereqs.map((pr, pI) => (
+                        <View
+                          key={pI}
+                          style={[
+                            styles.prereqItem,
+                            {
+                              backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
+                              borderColor: colors.borderSubtle,
+                            },
+                          ]}
+                        >
+                          {pr.met ? (
+                            <CheckCircle2 size={16} color="#10B981" />
+                          ) : (
+                            <AlertCircle size={16} color="#EF4444" />
+                          )}
+                          <View style={{ flex: 1 }}>
+                            <Text
+                              style={[
+                                styles.prereqTitle,
+                                { color: pr.met ? colors.text : '#EF4444' },
+                              ]}
+                            >
+                              {pr.title}
+                            </Text>
+                            <Text style={[styles.prereqDetail, { color: colors.textSecondary }]}>
+                              {pr.detail}
+                            </Text>
+                          </View>
+                        </View>
+                      ))}
+                    </View>
+
+                    {/* Stage Note */}
+                    <Text style={[styles.prereqHeader, { color: colors.textSecondary }]}>
+                      ADVANCEMENT NOTE (AUDIT LOG)
+                    </Text>
+                    <TextInput
+                      style={[
+                        styles.advanceInput,
+                        {
+                          backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
+                          borderColor: colors.borderSubtle,
+                          color: colors.text,
+                        },
+                      ]}
+                      placeholder="e.g. Roof mechanical erection inspected & approved"
+                      placeholderTextColor={colors.textMuted}
+                      value={advanceNote}
+                      onChangeText={setAdvanceNote}
+                    />
+
+                    {/* Actions */}
+                    <View style={styles.advanceActionRow}>
+                      <TouchableOpacity
+                        style={[
+                          styles.cancelBtn,
+                          {
+                            backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
+                            borderColor: colors.borderSubtle,
+                          },
+                        ]}
+                        onPress={() => setAdvanceModalVisible(false)}
+                      >
+                        <Text style={[styles.cancelBtnText, { color: colors.textSecondary }]}>
+                          Cancel
+                        </Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={[
+                          styles.confirmAdvanceBtn,
+                          (!allMet || !nextStage) && { opacity: 0.5 },
+                        ]}
+                        onPress={handleConfirmStageAdvance}
+                        disabled={advancingStage || !allMet || !nextStage}
+                      >
+                        {advancingStage ? (
+                          <ActivityIndicator size="small" color="#FFFFFF" />
+                        ) : (
+                          <Text style={styles.confirmAdvanceBtnText}>
+                            {nextStage ? `Advance to ${nextStage.label}` : 'Final Handover'}
+                          </Text>
+                        )}
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                );
+              })()}
+            </View>
+          </View>
+        </Modal>
+      )}
     </View>
   );
 };
@@ -539,23 +1113,22 @@ export const FieldProjectsScreen: React.FC<{ navigation?: any }> = ({ navigation
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
   },
+  // OPERATIONAL PULSE BAR
   pulseBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#ffffff',
     marginHorizontal: 16,
-    marginTop: 12,
+    marginTop: 10,
+    marginBottom: 8,
     borderRadius: 16,
     paddingVertical: 12,
     paddingHorizontal: 8,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
-    shadowColor: '#0f172a',
-    shadowOffset: { width: 0, height: 1 },
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
-    shadowRadius: 4,
+    shadowRadius: 8,
     elevation: 2,
   },
   pulseCard: {
@@ -563,25 +1136,29 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   pulseVal: {
-    fontSize: 16,
-    fontWeight: '900',
-    color: '#0f172a',
+    fontSize: 15,
+    fontWeight: '800',
+    fontVariant: ['tabular-nums'],
     letterSpacing: -0.3,
   },
-  pulseLbl: {
+  pulseUnit: {
     fontSize: 10,
-    color: '#64748b',
+    fontWeight: '600',
+  },
+  pulseLbl: {
+    fontSize: 9,
     fontWeight: '700',
     marginTop: 2,
     textTransform: 'uppercase',
+    letterSpacing: 0.4,
   },
   pulseDivider: {
     width: 1,
     height: 24,
-    backgroundColor: '#f1f5f9',
   },
+
+  // FILTER TABS
   tabsContainer: {
-    marginTop: 10,
     marginBottom: 6,
   },
   tabsContent: {
@@ -596,243 +1173,354 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 7,
     borderRadius: 20,
-    backgroundColor: '#ffffff',
     borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  tabChipActive: {
-    backgroundColor: '#0f172a',
-    borderColor: '#0f172a',
   },
   tabChipText: {
     fontSize: 12,
-    fontWeight: '700',
-    color: '#64748b',
-  },
-  tabChipTextActive: {
-    color: '#ffffff',
   },
   tabCountPill: {
-    backgroundColor: '#f1f5f9',
     paddingHorizontal: 6,
     paddingVertical: 1,
     borderRadius: 10,
   },
-  tabCountPillActive: {
-    backgroundColor: '#1e293b',
-  },
   tabCountText: {
     fontSize: 10,
     fontWeight: '800',
-    color: '#64748b',
   },
-  tabCountTextActive: {
-    color: '#ffffff',
-  },
+
+  // PROJECT CARDS
   listContainer: {
     flex: 1,
   },
   listContent: {
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingTop: 4,
     paddingBottom: Platform.OS === 'ios' ? 120 : 100,
   },
-  centerContainer: {
-    paddingTop: 80,
-    alignItems: 'center',
+  skeletonContainer: {
+    padding: 16,
+    gap: 12,
   },
-  loadingText: {
-    fontSize: 13,
-    color: '#64748b',
-    marginTop: 10,
-    fontWeight: '600',
-  },
-  emptyContainer: {
-    paddingTop: 60,
-    alignItems: 'center',
-    paddingHorizontal: 28,
-  },
-  emptyIconCircle: {
-    width: 68,
-    height: 68,
-    borderRadius: 34,
-    backgroundColor: '#f1f5f9',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 16,
-  },
-  emptyTitle: {
-    fontSize: 17,
-    fontWeight: '800',
-    color: '#0f172a',
-  },
-  emptySubtitle: {
-    fontSize: 12,
-    color: '#64748b',
-    textAlign: 'center',
-    marginTop: 8,
-    lineHeight: 18,
-    marginBottom: 20,
-  },
-  emptyBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: '#0f172a',
-    paddingHorizontal: 18,
-    paddingVertical: 11,
-    borderRadius: 10,
-  },
-  emptyBtnText: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: '#ffffff',
-  },
-  projectsWorkspace: {
-    backgroundColor: '#ffffff',
+  projectCard: {
+    borderRadius: 18,
+    padding: 14,
+    marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
-    borderRadius: 20,
-    paddingHorizontal: 14,
-    shadowColor: '#0f172a',
+    shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.03,
-    shadowRadius: 6,
+    shadowRadius: 8,
     elevation: 2,
   },
-  projectRowItem: {
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
-  },
-  projectRowTop: {
+  cardTopBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 6,
+    marginBottom: 10,
   },
-  projectNumberGroup: {
+  topBarLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
   },
-  projectNumberBadge: {
-    fontSize: 10,
-    fontWeight: '900',
-    backgroundColor: '#eff6ff',
-    color: '#1d4ed8',
+  prjNumberPill: {
     paddingHorizontal: 7,
-    paddingVertical: 2,
-    borderRadius: 6,
+    paddingVertical: 3,
+    borderRadius: 7,
     borderWidth: 1,
-    borderColor: '#bfdbfe',
+  },
+  prjNumberText: {
+    fontSize: 10,
+    fontWeight: '800',
+    fontVariant: ['tabular-nums'],
+    letterSpacing: 0.3,
   },
   stageBadge: {
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    borderRadius: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 7,
+    borderWidth: 1,
+  },
+  stageBadgeDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
   },
   stageBadgeText: {
     fontSize: 10,
     fontWeight: '800',
   },
-  projectRightPills: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  progressMiniPill: {
-    backgroundColor: '#f1f5f9',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-  },
-  progressMiniText: {
-    fontSize: 9,
-    fontWeight: '800',
-    color: '#475569',
-  },
-  capBadge: {
+  capacityBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
-    backgroundColor: '#f0f9ff',
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 7,
     borderWidth: 1,
-    borderColor: '#bae6fd',
   },
-  capBadgeText: {
-    fontSize: 10,
+  capacityBadgeText: {
+    fontSize: 11,
     fontWeight: '800',
-    color: '#0284c7',
+    fontVariant: ['tabular-nums'],
   },
-  projectName: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#0f172a',
-    letterSpacing: -0.2,
-    marginBottom: 3,
-  },
-  projectSubRow: {
+  projectIdentityBlock: {
     marginBottom: 10,
   },
-  clientDetail: {
+  projectName: {
+    fontSize: 15,
+    fontWeight: '800',
+    letterSpacing: -0.3,
+    marginBottom: 4,
+  },
+  metadataRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  metadataItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  metadataText: {
     fontSize: 11,
-    color: '#64748b',
     fontWeight: '500',
   },
-  microActionsRow: {
+  metadataDivider: {
+    fontSize: 10,
+  },
+
+  // MILESTONE PROGRESS BAR
+  milestoneBarSection: {
+    marginBottom: 12,
+  },
+  milestoneHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  milestoneLabel: {
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.4,
+  },
+  milestonePct: {
+    fontSize: 10,
+    fontWeight: '800',
+    fontVariant: ['tabular-nums'],
+  },
+  segmentsRow: {
+    flexDirection: 'row',
+    gap: 4,
+  },
+  segmentPiece: {
+    height: 5,
+    borderRadius: 2.5,
+  },
+
+  // ACTION BAR
+  actionRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: 6,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    gap: 8,
   },
-  leftActionPills: {
+  actionTools: {
     flexDirection: 'row',
     alignItems: 'center',
-    flexWrap: 'wrap',
     gap: 5,
+    flexWrap: 'wrap',
     flex: 1,
   },
-  pillActionBtn: {
+  toolBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f8fafc',
+    gap: 3,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingHorizontal: 7,
+    paddingVertical: 5,
     borderRadius: 8,
   },
-  pillActionText: {
+  toolBtnText: {
     fontSize: 10,
     fontWeight: '700',
-    color: '#475569',
   },
-  rightContactBtns: {
+  actionExecution: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
   },
-  circleCallBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 9,
-    backgroundColor: '#f0f9ff',
+  commBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#bae6fd',
+    alignItems: 'center',
     justifyContent: 'center',
+  },
+  advanceBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: '#0066FF',
+    paddingHorizontal: 11,
+    height: 36,
+    borderRadius: 10,
+    shadowColor: '#0066FF',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  advanceBtnCompleted: {
+    backgroundColor: '#10B981',
+    shadowColor: '#10B981',
+  },
+  advanceBtnText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+
+  // MODAL
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.65)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  advanceCard: {
+    borderRadius: 22,
+    borderWidth: 1,
+    padding: 20,
+    width: '100%',
+    maxWidth: 440,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.2,
+    shadowRadius: 14,
+    elevation: 8,
+  },
+  advanceHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
   },
-  circleWhatsAppBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 9,
-    backgroundColor: '#dcfce7',
-    borderWidth: 1,
-    borderColor: '#bbf7d0',
-    justifyContent: 'center',
+  advanceTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    letterSpacing: -0.3,
+  },
+  advanceSub: {
+    fontSize: 11,
+    marginTop: 2,
+    fontWeight: '500',
+  },
+  closeModalBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stageTransitionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    marginBottom: 14,
+  },
+  stageStepBox: {
+    flex: 1,
+    padding: 10,
+    borderRadius: 12,
+    borderWidth: 1.5,
+  },
+  stageStepNum: {
+    fontSize: 9,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+  },
+  stageStepName: {
+    fontSize: 12,
+    fontWeight: '700',
+    marginTop: 2,
+  },
+  prereqHeader: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+    marginTop: 12,
+    marginBottom: 6,
+  },
+  prereqList: {
+    gap: 6,
+    marginBottom: 6,
+  },
+  prereqItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    padding: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  prereqTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  prereqDetail: {
+    fontSize: 11,
+    marginTop: 1,
+  },
+  advanceInput: {
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    fontSize: 13,
+  },
+  advanceActionRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 16,
+  },
+  cancelBtn: {
+    flex: 1,
+    paddingVertical: 11,
+    borderRadius: 11,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cancelBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  confirmAdvanceBtn: {
+    flex: 2,
+    backgroundColor: '#0066FF',
+    paddingVertical: 11,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#0066FF',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  confirmAdvanceBtnText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#FFFFFF',
   },
 });

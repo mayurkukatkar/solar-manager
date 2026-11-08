@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -26,8 +26,10 @@ import {
   Percent,
   Eye,
   Send,
+  Package,
 } from 'lucide-react-native';
-import { ModalHeader } from '../../components/Header';
+import { ModalHeader, useDirtyFormWarning } from '../../components/common/ModalHeader';
+import { KeyboardAvoidingContainer } from '../../components/common/KeyboardAvoidingContainer';
 import {
   generateQuotationHtml,
   previewPdf,
@@ -100,11 +102,109 @@ export const QuotationBuilderModal: React.FC<QuotationBuilderModalProps> = ({
     }
   }, [visible, lead]);
 
-  // Solar Economics Calculation
-  const cap = parseFloat(capacityKw) || 3.3;
-  const grossTotal = parseFloat(totalSystemCost) || 0;
-  const isHybrid = systemType === 'Hybrid' || systemType === 'Off-grid' || templateType === 'hybrid_offgrid';
-  const isComm = templateType === 'commercial_epc';
+  // Solar Economics & Statutory 13.8% Composite Solar GST Calculation (Memoized)
+  const {
+    cap,
+    grossTotal,
+    isHybrid,
+    isComm,
+    subsidy,
+    netCustomerCost,
+    monthlyUnits,
+    annualUnits,
+    tariff,
+    monthlySavings,
+    lifetimeSavings,
+    paybackYears,
+    approxMonthlyEmi,
+    subtotal,
+    taxAmount,
+    goodsValueDeemed,
+    servicesValueDeemed,
+    goodsGstAmount,
+    servicesGstAmount,
+    totalCompositeGst,
+    panelWattage,
+    panelQuantity,
+    estModuleCost,
+    estInverterCost,
+    estStructureCost,
+    estBosCost,
+    estInstallCost,
+  } = useMemo(() => {
+    const c = parseFloat(capacityKw) || 3.3;
+    const gross = parseFloat(totalSystemCost) || 0;
+    const hybrid = systemType === 'Hybrid' || systemType === 'Off-grid' || templateType === 'hybrid_offgrid';
+    const comm = templateType === 'commercial_epc';
+
+    // PM Surya Ghar Muft Bijli Yojana Central Subsidy
+    let sub = 0;
+    if (c > 0 && !comm) {
+      if (c <= 1) sub = 30000;
+      else if (c <= 2) sub = 60000;
+      else sub = 78000; // Capped at ₹78,000 for >=3kW residential
+    }
+
+    const netCost = Math.max(0, gross - sub);
+
+    // Generation & Savings
+    const mUnits = Math.round(c * 120);
+    const aUnits = Math.round(c * 1460);
+    const t = comm ? 10.5 : 8.5;
+    const mSavings = Math.round(mUnits * t);
+    const lSavings = Math.round(aUnits * 25 * t * 0.92);
+    const pYears = mSavings > 0 ? Number((netCost / (mSavings * 12)).toFixed(1)) : 0;
+
+    // EMI Comparison (9.5% for 5 years ~ ₹21/₹1,000)
+    const emi = Math.round(netCost * 0.021);
+
+    // Statutory 13.8% Composite Solar GST Breakdown
+    const subTot = Math.round(gross / 1.138);
+    const tax = gross - subTot;
+    const goodsVal = Math.round(subTot * 0.70);
+    const servVal = subTot - goodsVal;
+    const goodsGst = Math.round(goodsVal * 0.12);
+    const servGst = Math.round(servVal * 0.18);
+    const compGst = goodsGst + servGst;
+
+    const pWattage = 540;
+    const pQty = Math.ceil((c * 1000) / pWattage);
+    const modCost = Math.round(pQty * pWattage * 24);
+    const invCost = c <= 3.5 ? 26000 : c <= 6 ? 38000 : Math.round(c * 7000);
+    const structCost = Math.round(c * 6000);
+    const bosCost = Math.round(c * 5500);
+    const instCost = Math.round(c * 6500);
+
+    return {
+      cap: c,
+      grossTotal: gross,
+      isHybrid: hybrid,
+      isComm: comm,
+      subsidy: sub,
+      netCustomerCost: netCost,
+      monthlyUnits: mUnits,
+      annualUnits: aUnits,
+      tariff: t,
+      monthlySavings: mSavings,
+      lifetimeSavings: lSavings,
+      paybackYears: pYears,
+      approxMonthlyEmi: emi,
+      subtotal: subTot,
+      taxAmount: tax,
+      goodsValueDeemed: goodsVal,
+      servicesValueDeemed: servVal,
+      goodsGstAmount: goodsGst,
+      servicesGstAmount: servGst,
+      totalCompositeGst: compGst,
+      panelWattage: pWattage,
+      panelQuantity: pQty,
+      estModuleCost: modCost,
+      estInverterCost: invCost,
+      estStructureCost: structCost,
+      estBosCost: bosCost,
+      estInstallCost: instCost,
+    };
+  }, [capacityKw, totalSystemCost, systemType, templateType]);
 
   const handleCapacityChange = (val: string) => {
     setCapacityKw(val);
@@ -121,29 +221,20 @@ export const QuotationBuilderModal: React.FC<QuotationBuilderModalProps> = ({
     }
   };
 
-  // PM Surya Ghar Muft Bijli Yojana Central Subsidy
-  const computeSubsidy = (kw: number): number => {
-    if (kw <= 0 || isComm) return 0;
-    if (kw <= 1) return 30000;
-    if (kw <= 2) return 60000;
-    return 78000; // Cap at 78,000 for 3kW and above
-  };
+  const isDirty = useMemo(() => {
+    return Boolean(
+      totalSystemCost.trim() ||
+      consumerNumber.trim() ||
+      capacityKw !== String(initialCap)
+    );
+  }, [totalSystemCost, consumerNumber, capacityKw, initialCap]);
 
-  const subsidy = computeSubsidy(cap);
-  const netCustomerCost = Math.max(0, grossTotal - subsidy);
-
-  // Generation & Savings
-  const monthlyUnits = Math.round(cap * 120);
-  const annualUnits = Math.round(cap * 1460);
-  const tariff = isComm ? 10.5 : 8.5;
-  const monthlySavings = Math.round(monthlyUnits * tariff);
-  const lifetimeSavings = Math.round(annualUnits * 25 * tariff * 0.92);
-  const paybackYears = Number((netCustomerCost / (monthlySavings * 12)).toFixed(1));
-
-  // EMI Comparison (9.5% for 5 years ~ ₹21/₹1,000)
-  const approxMonthlyEmi = Math.round(netCustomerCost * 0.021);
-  const subtotal = Math.round(grossTotal / 1.138);
-  const taxAmount = grossTotal - subtotal;
+  const handleGuardedClose = useDirtyFormWarning(
+    isDirty,
+    onClose,
+    'Discard Quotation Draft?',
+    'You have unsaved quotation configurations. Are you sure you want to close without saving?'
+  );
 
   const buildPdfPayload = (): QuotationPdfProps => ({
     quotationNumber: syncedQuote?.qNumber || `QT-${Date.now().toString().slice(-6)}`,
@@ -263,7 +354,7 @@ export const QuotationBuilderModal: React.FC<QuotationBuilderModalProps> = ({
 
   const handlePreviewPdf = () => {
     if (!syncedQuote) {
-      syncToBackend('VIEWED').catch(() => {});
+      syncToBackend('VIEWED').catch(() => { });
     }
     setShowVisualPreview(true);
   };
@@ -299,7 +390,7 @@ export const QuotationBuilderModal: React.FC<QuotationBuilderModalProps> = ({
 
       // 3. Mark stage advancement in CRM
       if (lead?.id) {
-        crmApi.advanceLeadStage(lead.id, 'PROPOSAL_SENT').catch(() => {});
+        crmApi.advanceLeadStage(lead.id, 'PROPOSAL_SENT').catch(() => { });
       }
     } catch (err: any) {
       Alert.alert('WhatsApp PDF Share Error', err.message || 'Failed to dispatch quotation PDF via WhatsApp');
@@ -332,7 +423,7 @@ export const QuotationBuilderModal: React.FC<QuotationBuilderModalProps> = ({
       });
 
       if (lead?.id) {
-        crmApi.advanceLeadStage(lead.id, 'PROPOSAL_SENT').catch(() => {});
+        crmApi.advanceLeadStage(lead.id, 'PROPOSAL_SENT').catch(() => { });
       }
     } catch (err: any) {
       Alert.alert('WhatsApp Text Pitch Error', err.message || 'Could not launch WhatsApp');
@@ -349,7 +440,7 @@ export const QuotationBuilderModal: React.FC<QuotationBuilderModalProps> = ({
     setSharingPdf(true);
     try {
       if (!syncedQuote) {
-        syncToBackend('SENT').catch(() => {});
+        syncToBackend('SENT').catch(() => { });
       }
       const payload = buildPdfPayload();
       const html = generateQuotationHtml(payload);
@@ -378,13 +469,13 @@ export const QuotationBuilderModal: React.FC<QuotationBuilderModalProps> = ({
   };
 
   return (
-    <Modal visible={visible} animationType="slide" transparent={false} onRequestClose={onClose}>
+    <Modal visible={visible} animationType="slide" transparent={false} onRequestClose={handleGuardedClose}>
       <View style={styles.container}>
-        {/* STANDARDIZED MODAL HEADER */}
+        {/* STANDARDIZED MODAL HEADER WITH DIRTY GUARD */}
         <ModalHeader
           title="Quotation Builder"
           subtitle="Stage 2: Custom Pricing & WhatsApp PDF Proposal"
-          onClose={onClose}
+          onClose={handleGuardedClose}
         />
 
         <ScrollView style={styles.body} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -393,7 +484,7 @@ export const QuotationBuilderModal: React.FC<QuotationBuilderModalProps> = ({
             <View style={{ flex: 1 }}>
               <Text style={styles.clientName}>{lead?.name || 'Prospect'}</Text>
               <Text style={styles.clientPhone}>
-                📞 {lead?.mobile || 'No Phone'} {lead?.consumerNumber ? `| Consumer: ${lead.consumerNumber}` : ''}
+                {lead?.mobile || 'No Phone'} {lead?.consumerNumber ? `| Consumer: ${lead.consumerNumber}` : ''}
               </Text>
             </View>
             {syncedQuote ? (
@@ -633,7 +724,75 @@ export const QuotationBuilderModal: React.FC<QuotationBuilderModalProps> = ({
             </View>
           </View>
 
-          {/* SECTION 3: SUBSIDY & NET CUSTOMER INVESTMENT */}
+          {/* ITEMIzED BILL OF MATERIALS (BOM) & STATUTORY GST */}
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <View style={styles.costHeaderBetween}>
+                <Text style={styles.cardTitle}>3. Statutory 13.8% Solar GST Breakdown</Text>
+                <View style={[styles.gstTag, { backgroundColor: '#eff6ff' }]}>
+                  <Text style={[styles.gstTagText, { color: '#1d4ed8' }]}>Notification 11/2017</Text>
+                </View>
+              </View>
+              <Text style={styles.cardSubtitle}>
+                Indian Ministry of Finance formula: 70% Deemed Goods @ 12% + 30% Deemed Services @ 18%
+              </Text>
+            </View>
+
+            <View style={{ backgroundColor: '#f8fafc', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#e2e8f0', gap: 8 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <Text style={{ fontSize: 13, color: '#64748b' }}>Base Taxable Subtotal (100%)</Text>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: '#0f172a' }}>₹{subtotal.toLocaleString('en-IN')}</Text>
+              </View>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <Text style={{ fontSize: 13, color: '#64748b' }}>Deemed Goods (70% @ 12% GST)</Text>
+                <Text style={{ fontSize: 13, fontWeight: '600', color: '#0f172a' }}>
+                  ₹{goodsValueDeemed.toLocaleString('en-IN')} → ₹{goodsGstAmount.toLocaleString('en-IN')}
+                </Text>
+              </View>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <Text style={{ fontSize: 13, color: '#64748b' }}>Deemed Services (30% @ 18% GST)</Text>
+                <Text style={{ fontSize: 13, fontWeight: '600', color: '#0f172a' }}>
+                  ₹{servicesValueDeemed.toLocaleString('en-IN')} → ₹{servicesGstAmount.toLocaleString('en-IN')}
+                </Text>
+              </View>
+              <View style={{ height: 1, backgroundColor: '#e2e8f0', marginVertical: 4 }} />
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: '#2563eb' }}>Total Composite GST (13.8%)</Text>
+                <Text style={{ fontSize: 14, fontWeight: '800', color: '#2563eb' }}>₹{totalCompositeGst.toLocaleString('en-IN')}</Text>
+              </View>
+            </View>
+
+            {/* Itemized BOQ / BOM Estimation */}
+            <View style={{ marginTop: 14, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#f1f5f9' }}>
+              <Text style={{ fontSize: 13, fontWeight: '700', color: '#334155', marginBottom: 8 }}>
+                Itemized BOM Estimates ({cap} kWp • {panelQuantity} Modules)
+              </Text>
+              <View style={{ gap: 6 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <Text style={{ fontSize: 12, color: '#64748b' }}>• Solar Modules ({panelQuantity}x {panelWattage}W)</Text>
+                  <Text style={{ fontSize: 12, fontWeight: '600', color: '#334155' }}>₹{estModuleCost.toLocaleString('en-IN')}</Text>
+                </View>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <Text style={{ fontSize: 12, color: '#64748b' }}>• Grid-Tied Inverter ({inverterBrand})</Text>
+                  <Text style={{ fontSize: 12, fontWeight: '600', color: '#334155' }}>₹{estInverterCost.toLocaleString('en-IN')}</Text>
+                </View>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <Text style={{ fontSize: 12, color: '#64748b' }}>• HDG Elevated Structure</Text>
+                  <Text style={{ fontSize: 12, fontWeight: '600', color: '#334155' }}>₹{estStructureCost.toLocaleString('en-IN')}</Text>
+                </View>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <Text style={{ fontSize: 12, color: '#64748b' }}>• Balance of System (ACDB/DCDB/Cables/Earthing)</Text>
+                  <Text style={{ fontSize: 12, fontWeight: '600', color: '#334155' }}>₹{estBosCost.toLocaleString('en-IN')}</Text>
+                </View>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <Text style={{ fontSize: 12, color: '#64748b' }}>• EPC Installation & DISCOM Net-Metering</Text>
+                  <Text style={{ fontSize: 12, fontWeight: '600', color: '#334155' }}>₹{estInstallCost.toLocaleString('en-IN')}</Text>
+                </View>
+              </View>
+            </View>
+          </View>
+
+          {/* SECTION 4: SUBSIDY & NET CUSTOMER INVESTMENT */}
           <View style={styles.summaryCard}>
             <View style={styles.summaryRow}>
               <Text style={styles.summaryLabel}>Solar System Cost (All GST Included)</Text>
@@ -668,7 +827,7 @@ export const QuotationBuilderModal: React.FC<QuotationBuilderModalProps> = ({
                 </Text>
               </View>
               <Text style={styles.loanPitch}>
-                💡 Customer earns <Text style={{ color: '#4ade80', fontWeight: '800' }}>₹{Math.max(0, monthlySavings - approxMonthlyEmi).toLocaleString('en-IN')}/mo</Text> surplus from Month 1!
+                Customer earns <Text style={{ color: '#4ade80', fontWeight: '800' }}>₹{Math.max(0, monthlySavings - approxMonthlyEmi).toLocaleString('en-IN')}/mo</Text> surplus from Month 1!
               </Text>
             </View>
           </View>
@@ -758,7 +917,7 @@ export const QuotationBuilderModal: React.FC<QuotationBuilderModalProps> = ({
             isSynced={Boolean(syncedQuote)}
             onWhatsAppSent={() => {
               if (lead?.id) {
-                crmApi.advanceLeadStage(lead.id, 'PROPOSAL_SENT').catch(() => {});
+                crmApi.advanceLeadStage(lead.id, 'PROPOSAL_SENT').catch(() => { });
               }
             }}
           />

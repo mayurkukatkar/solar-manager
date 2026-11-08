@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -20,9 +20,19 @@ import {
   CheckCircle2,
   Building,
   KeyRound,
+  Sun,
+  Moon,
+  Sparkles,
 } from 'lucide-react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
-import { colors, spacing, radii, typography, touchTarget } from '../theme';
+import { colors, spacing, radii, typography, touchTarget, useTheme } from '../theme';
+import { GlobalSearchModal } from './GlobalSearchModal';
+import { AppOnboardingModal } from './AppOnboardingModal';
+import { InAppProductTour } from './InAppProductTour';
+import { GuideCharacter } from './GuideCharacter';
+import { useDebounce } from '../hooks/useDebounce';
+import { offlineSyncService } from '../services/offlineSyncService';
 
 export interface HeaderProps {
   title?: string;
@@ -33,15 +43,11 @@ export interface HeaderProps {
   showSearch?: boolean;
   onSearch?: (q: string) => void;
   searchPlaceholder?: string;
+  onSearchPress?: () => void;
 }
 
-export interface ModalHeaderProps {
-  title: string;
-  subtitle?: string;
-  onClose: () => void;
-  rightAction?: React.ReactNode;
-  dragHandle?: boolean;
-}
+export { ModalHeader, useDirtyFormWarning } from './common/ModalHeader';
+export type { ModalHeaderProps } from './common/ModalHeader';
 
 export const Header: React.FC<HeaderProps> = ({
   title,
@@ -52,54 +58,185 @@ export const Header: React.FC<HeaderProps> = ({
   showSearch,
   onSearch,
   searchPlaceholder = 'Search leads, projects, or contacts...',
+  onSearchPress,
 }) => {
-  const { user, backendStatus, logout } = useAuth();
+  const { user, backendStatus, logout, checkServerConnection } = useAuth();
+  const { colors: themeColors, isDark, toggleTheme } = useTheme();
+  const insets = useSafeAreaInsets();
   const [profileModalVisible, setProfileModalVisible] = useState(false);
+  const [searchModalVisible, setSearchModalVisible] = useState(false);
+  const [tourVisible, setTourVisible] = useState(false);
+  const [spotlightTourVisible, setSpotlightTourVisible] = useState(false);
   const [searchText, setSearchText] = useState('');
+  const [pendingCount, setPendingCount] = useState(0);
+  const [isCheckingConnection, setIsCheckingConnection] = useState(false);
+
+  const handlePillPress = async () => {
+    setIsCheckingConnection(true);
+    try {
+      await checkServerConnection();
+      if (pendingCount > 0) {
+        await offlineSyncService.syncQueue();
+      }
+    } catch {}
+    finally {
+      setIsCheckingConnection(false);
+    }
+  };
+
+  const debouncedSearchText = useDebounce(searchText, 300);
+
+  useEffect(() => {
+    return offlineSyncService.subscribe((q) => {
+      setPendingCount(q.filter((m) => m.status === 'PENDING' || m.status === 'SYNCING').length);
+    });
+  }, []);
+
+  useEffect(() => {
+    if (onSearch) {
+      onSearch(debouncedSearchText);
+    }
+  }, [debouncedSearchText, onSearch]);
+
+  // Dynamic status bar and camera punch-hole safe area calculation
+  // Replaces static StatusBar.currentHeight fallback to eliminate notch/camera clipping on Android Edge-to-Edge
+  const topSafeArea = Math.max(
+    insets.top,
+    Platform.OS === 'android' ? (StatusBar.currentHeight || 24) : 44
+  );
 
   // VARIANT: HOME (Ultra-Compact Flush Spatial Header for Operational Radar)
   if (variant === 'home') {
     return (
-      <View style={styles.homeContainer}>
+      <View
+        style={[
+          styles.homeContainer,
+          {
+            paddingTop: topSafeArea,
+            backgroundColor: themeColors.surface,
+            borderBottomColor: themeColors.borderSubtle,
+          },
+        ]}
+      >
         <View style={styles.homeRow}>
           <View style={styles.homeBrandGroup}>
             <Image
               source={require('../../assets/app-icon.png')}
-              style={styles.homeBrandLogo}
+              style={[styles.homeBrandLogo, { borderColor: themeColors.borderSubtle }]}
               resizeMode="cover"
             />
-            <View>
+            <View style={styles.homeBrandTextGroup}>
               <View style={styles.homeBrandTitleRow}>
-                <Text style={styles.homeBrandTitle}>WhereReady</Text>
-                <View style={styles.homeOsBadge}>
+                <Text style={[styles.homeBrandTitle, { color: themeColors.text }]} numberOfLines={1}>
+                  WhereReady
+                </Text>
+                <View style={[styles.homeOsBadge, { backgroundColor: themeColors.primary }]}>
                   <Text style={styles.homeOsBadgeText}>SOLAR OS</Text>
                 </View>
               </View>
-              <Text style={styles.homeTagline}>Where Growth Gets Ready.</Text>
+              <Text style={[styles.homeTagline, { color: themeColors.textMuted }]} numberOfLines={1}>
+                Where Growth Gets Ready.
+              </Text>
             </View>
           </View>
 
           <View style={styles.homeRightGroup}>
-            <View style={styles.homeStatusPill}>
+            <TouchableOpacity
+              style={[
+                styles.homeStatusPill,
+                {
+                  backgroundColor: themeColors.background,
+                  borderColor: themeColors.borderSubtle,
+                },
+              ]}
+              onPress={handlePillPress}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel={`Network status: ${!backendStatus.isOnline ? 'Offline' : 'Live'}. Tap to refresh.`}
+            >
               <View
                 style={[
                   styles.statusDot,
-                  { backgroundColor: backendStatus.isOnline ? '#34d399' : '#f59e0b' },
+                  {
+                    backgroundColor: isCheckingConnection
+                      ? '#3b82f6'
+                      : !backendStatus.isOnline
+                        ? '#f59e0b'
+                        : pendingCount > 0
+                          ? '#3b82f6'
+                          : '#34d399',
+                  },
                 ]}
               />
-              <Text style={styles.homeStatusText}>
-                {backendStatus.isOnline ? 'MSEDCL Live' : 'Offline'}
+              <Text style={[styles.homeStatusText, { color: themeColors.textSecondary }]}>
+                {isCheckingConnection
+                  ? 'Checking...'
+                  : !backendStatus.isOnline
+                    ? 'Offline'
+                    : pendingCount > 0
+                      ? `Sync (${pendingCount})`
+                      : 'Live'}
               </Text>
-            </View>
+            </TouchableOpacity>
+
+            {/* Global Search Icon Button */}
+            <TouchableOpacity
+              style={[
+                styles.homeSearchBtn,
+                {
+                  backgroundColor: themeColors.background,
+                  borderColor: themeColors.borderSubtle,
+                },
+              ]}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              onPress={() => {
+                if (onSearchPress) onSearchPress();
+                else setSearchModalVisible(true);
+              }}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel="Global Search"
+            >
+              <Search
+                size={16}
+                color={themeColors.textSecondary}
+                strokeWidth={2.2}
+              />
+            </TouchableOpacity>
+
+            {/* Sol Mascot Spotlight Tour Button */}
+            <TouchableOpacity
+              style={[
+                styles.solTourBtn,
+                {
+                  backgroundColor: isDark ? 'rgba(37, 99, 235, 0.15)' : '#EFF6FF',
+                  borderColor: isDark ? 'rgba(37, 99, 235, 0.35)' : '#BFDBFE',
+                },
+              ]}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              onPress={() => setSpotlightTourVisible(true)}
+              activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel="Launch In-App Spotlight Tour"
+            >
+              <GuideCharacter pose="wave" size={26} animated={false} />
+            </TouchableOpacity>
 
             <TouchableOpacity
-              style={styles.homeAvatarBtn}
+              style={[
+                styles.homeAvatarBtn,
+                {
+                  backgroundColor: themeColors.primaryLight,
+                  borderColor: themeColors.primary,
+                },
+              ]}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               onPress={() => setProfileModalVisible(true)}
               activeOpacity={0.8}
               accessibilityRole="button"
               accessibilityLabel="View profile"
             >
-              <Text style={styles.homeAvatarText}>
+              <Text style={[styles.homeAvatarText, { color: themeColors.primary }]}>
                 {user?.name ? user.name.charAt(0).toUpperCase() : 'W'}
               </Text>
             </TouchableOpacity>
@@ -107,43 +244,60 @@ export const Header: React.FC<HeaderProps> = ({
         </View>
 
         {/* USER ACCOUNT PROFILE MODAL */}
-        <Modal visible={profileModalVisible} transparent animationType="fade">
+        <Modal
+          visible={profileModalVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setProfileModalVisible(false)}
+        >
           <TouchableOpacity
             style={styles.modalOverlay}
             activeOpacity={1}
             onPress={() => setProfileModalVisible(false)}
           >
-            <View style={styles.modalContent}>
-              <View style={styles.modalDragHandle} />
+            <View style={[styles.modalContent, { backgroundColor: themeColors.surface }]}>
+              <View style={[styles.modalDragHandle, { backgroundColor: themeColors.borderSubtle }]} />
 
-              <View style={styles.accountProfileCard}>
-                <View style={styles.accountAvatar}>
+              <View style={[styles.accountProfileCard, { borderBottomColor: themeColors.borderSubtle }]}>
+                <View style={[styles.accountAvatar, { backgroundColor: themeColors.primary }]}>
                   <Text style={styles.accountAvatarText}>
                     {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}
                   </Text>
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.accountNameText}>{user?.name || 'Administrator'}</Text>
-                  <Text style={styles.accountEmailText}>{user?.email}</Text>
-                  <View style={styles.accountRoleBadge}>
-                    <Text style={styles.accountRoleBadgeText}>
+                  <Text style={[styles.accountNameText, { color: themeColors.text }]}>
+                    {user?.name || 'Administrator'}
+                  </Text>
+                  <Text style={[styles.accountEmailText, { color: themeColors.textSecondary }]}>
+                    {user?.email}
+                  </Text>
+                  <View style={[styles.accountRoleBadge, { backgroundColor: themeColors.primaryLight }]}>
+                    <Text style={[styles.accountRoleBadgeText, { color: themeColors.primary }]}>
                       {user?.role === 'SUPER_ADMIN' ? 'PLATFORM SUPER ADMIN' : 'TENANT ADMINISTRATOR'}
                     </Text>
                   </View>
                 </View>
               </View>
 
-              <View style={styles.sessionInfoBox}>
+              <View
+                style={[
+                  styles.sessionInfoBox,
+                  {
+                    backgroundColor: themeColors.background,
+                    borderColor: themeColors.borderSubtle,
+                  },
+                ]}
+              >
                 <View style={styles.sessionInfoRow}>
-                  <Building size={14} color="#64748b" />
-                  <Text style={styles.sessionInfoLabel}>Vendor Enterprise:</Text>
-                  <Text style={styles.sessionInfoVal} numberOfLines={1}>
+                  <Building size={14} color={themeColors.textMuted} />
+                  <Text style={[styles.sessionInfoLabel, { color: themeColors.textSecondary }]}>Vendor Enterprise:</Text>
+                  <Text style={[styles.sessionInfoVal, { color: themeColors.text }]} numberOfLines={1}>
                     {user?.tenantName || 'WhereReady Solar OS'}
                   </Text>
                 </View>
                 <View style={styles.sessionInfoRow}>
                   <ShieldCheck size={14} color="#059669" />
-                  <Text style={styles.sessionInfoLabel}>Sync Status:</Text>
+                  <Text style={[styles.sessionInfoLabel, { color: themeColors.textSecondary }]}>Sync Status:</Text>
                   <Text style={[styles.sessionInfoVal, { color: '#059669' }]}>
                     {backendStatus.isOnline ? 'Active & Synchronized' : 'Offline Mode'}
                   </Text>
@@ -151,7 +305,60 @@ export const Header: React.FC<HeaderProps> = ({
               </View>
 
               <TouchableOpacity
-                style={styles.logoutBtn}
+                style={[
+                  styles.themeToggleBtn,
+                  {
+                    backgroundColor: themeColors.background,
+                    borderColor: themeColors.borderSubtle,
+                  },
+                ]}
+                onPress={async () => {
+                  await toggleTheme();
+                }}
+                activeOpacity={0.8}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  {isDark ? (
+                    <Sun size={16} color={themeColors.accent} />
+                  ) : (
+                    <Moon size={16} color={themeColors.primary} />
+                  )}
+                  <Text style={[styles.themeToggleText, { color: themeColors.text }]}>
+                    {isDark ? 'Dark Theme Active' : 'Light Theme Active'}
+                  </Text>
+                </View>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: themeColors.primary }}>
+                  Switch to {isDark ? 'Light' : 'Dark'}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.themeToggleBtn,
+                  {
+                    backgroundColor: themeColors.background,
+                    borderColor: themeColors.borderSubtle,
+                    marginBottom: 8,
+                  },
+                ]}
+                onPress={() => {
+                  setProfileModalVisible(false);
+                  setSpotlightTourVisible(true);
+                }}
+                activeOpacity={0.8}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <GuideCharacter pose="guide" size={22} animated={false} />
+                  <Text style={[styles.themeToggleText, { color: themeColors.text }]}>
+                    Interactive Button-by-Button Tour
+                  </Text>
+                </View>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: themeColors.primary }}>
+                  Explore
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
                 onPress={() => {
                   setProfileModalVisible(false);
                   logout();
@@ -163,15 +370,34 @@ export const Header: React.FC<HeaderProps> = ({
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={styles.closeBtn}
+                style={[styles.closeBtn, { backgroundColor: themeColors.background, borderColor: themeColors.borderSubtle }]}
                 onPress={() => setProfileModalVisible(false)}
                 activeOpacity={0.7}
               >
-                <Text style={styles.closeBtnText}>Done</Text>
+                <Text style={[styles.closeBtnText, { color: themeColors.text }]}>Done</Text>
               </TouchableOpacity>
             </View>
           </TouchableOpacity>
         </Modal>
+
+        {/* GLOBAL SEARCH MODAL */}
+        <GlobalSearchModal
+          visible={searchModalVisible}
+          onClose={() => setSearchModalVisible(false)}
+        />
+
+        {/* APP PRODUCT TOUR / ONBOARDING MODAL */}
+        <AppOnboardingModal
+          visible={tourVisible}
+          onClose={() => setTourVisible(false)}
+          forceShow={true}
+        />
+
+        {/* IN-APP INTERACTIVE SPOTLIGHT PRODUCT TOUR */}
+        <InAppProductTour
+          visible={spotlightTourVisible}
+          onClose={() => setSpotlightTourVisible(false)}
+        />
       </View>
     );
   }
@@ -179,17 +405,26 @@ export const Header: React.FC<HeaderProps> = ({
   // VARIANT: DETAIL (With Back Button, Inline Title, and Right Action)
   if (variant === 'detail') {
     return (
-      <View style={styles.detailContainer}>
+      <View
+        style={[
+          styles.detailContainer,
+          {
+            paddingTop: topSafeArea,
+            backgroundColor: themeColors.surface,
+            borderBottomColor: themeColors.borderSubtle,
+          },
+        ]}
+      >
         <View style={styles.detailRow}>
           {onBack ? (
             <TouchableOpacity
               onPress={onBack}
-              style={styles.backButton}
+              style={[styles.backButton, { backgroundColor: themeColors.background, borderColor: themeColors.borderSubtle }]}
               activeOpacity={0.7}
               accessibilityRole="button"
               accessibilityLabel="Go back"
             >
-              <ArrowLeft size={20} color={colors.slate900} strokeWidth={2.4} />
+              <ArrowLeft size={20} color={themeColors.text} strokeWidth={2.4} />
             </TouchableOpacity>
           ) : (
             <View style={styles.backPlaceholder} />
@@ -197,12 +432,12 @@ export const Header: React.FC<HeaderProps> = ({
 
           <View style={styles.detailTitleBox}>
             {title && (
-              <Text style={styles.detailTitleText} numberOfLines={1}>
+              <Text style={[styles.detailTitleText, { color: themeColors.text }]} numberOfLines={1}>
                 {title}
               </Text>
             )}
             {subtitle && (
-              <Text style={styles.detailSubtitleText} numberOfLines={1}>
+              <Text style={[styles.detailSubtitleText, { color: themeColors.textSecondary }]} numberOfLines={1}>
                 {subtitle}
               </Text>
             )}
@@ -212,7 +447,7 @@ export const Header: React.FC<HeaderProps> = ({
             {rightAction ? (
               rightAction
             ) : (
-              <View style={styles.statusPillCompact}>
+              <View style={[styles.statusPillCompact, { backgroundColor: themeColors.background, borderColor: themeColors.borderSubtle }]}>
                 <View
                   style={[
                     styles.statusDot,
@@ -229,20 +464,29 @@ export const Header: React.FC<HeaderProps> = ({
 
   // VARIANT: MAIN (Root Tab Header with Brand Row, Title, and Search)
   return (
-    <View style={styles.container}>
+    <View
+      style={[
+        styles.container,
+        {
+          paddingTop: topSafeArea,
+          backgroundColor: themeColors.surface,
+          borderBottomColor: themeColors.borderSubtle,
+        },
+      ]}
+    >
       {/* TOP BRAND ROW */}
       <View style={styles.topRow}>
         <View style={styles.brandContainer}>
           <Image
             source={require('../../assets/app-icon.png')}
-            style={styles.brandLogoImage}
+            style={[styles.brandLogoImage, { borderColor: themeColors.borderSubtle }]}
             resizeMode="cover"
           />
           <View style={styles.brandTextContainer}>
-            <Text style={styles.companyName} numberOfLines={1}>
+            <Text style={[styles.companyName, { color: themeColors.text }]} numberOfLines={1}>
               {title || user?.tenantName || 'WhereReady Solar OS'}
             </Text>
-            <Text style={styles.userName} numberOfLines={1}>
+            <Text style={[styles.userName, { color: themeColors.textSecondary }]} numberOfLines={1}>
               {subtitle || `${user?.name || 'Solar Partner'} • Where Growth Gets Ready.`}
             </Text>
           </View>
@@ -254,27 +498,79 @@ export const Header: React.FC<HeaderProps> = ({
           ) : (
             <>
               {/* Status Indicator */}
-              <View style={styles.statusPill}>
+              <TouchableOpacity
+                style={[
+                  styles.statusPill,
+                  {
+                    backgroundColor: themeColors.background,
+                    borderColor: themeColors.borderSubtle,
+                  },
+                ]}
+                onPress={handlePillPress}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel="Connection status. Tap to refresh."
+              >
                 <View
                   style={[
                     styles.statusDot,
-                    { backgroundColor: backendStatus.isOnline ? colors.success : colors.warning },
+                    {
+                      backgroundColor: isCheckingConnection
+                        ? '#3b82f6'
+                        : !backendStatus.isOnline
+                          ? colors.warning
+                          : pendingCount > 0
+                            ? '#3b82f6'
+                            : colors.success,
+                    },
                   ]}
                 />
-                <Text style={styles.statusText}>
-                  {backendStatus.isOnline ? 'Online' : 'Offline'}
+                <Text style={[styles.statusText, { color: themeColors.textSecondary }]}>
+                  {isCheckingConnection
+                    ? 'Checking...'
+                    : !backendStatus.isOnline
+                      ? 'Offline'
+                      : pendingCount > 0
+                        ? `Syncing (${pendingCount})`
+                        : 'Online'}
                 </Text>
-              </View>
+              </TouchableOpacity>
+
+              {/* Global Search Button */}
+              <TouchableOpacity
+                style={[
+                  styles.mainSearchBtn,
+                  {
+                    backgroundColor: themeColors.background,
+                    borderColor: themeColors.borderSubtle,
+                  },
+                ]}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                onPress={() => {
+                  if (onSearchPress) onSearchPress();
+                  else setSearchModalVisible(true);
+                }}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel="Global Search"
+              >
+                <Search
+                  size={16}
+                  color={themeColors.textSecondary}
+                  strokeWidth={2.2}
+                />
+              </TouchableOpacity>
 
               {/* User Profile Avatar Pill */}
               <TouchableOpacity
                 style={styles.avatarPill}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 onPress={() => setProfileModalVisible(true)}
                 activeOpacity={0.8}
                 accessibilityRole="button"
                 accessibilityLabel="View profile"
               >
-                <View style={styles.avatarCircle}>
+                <View style={[styles.avatarCircle, { backgroundColor: themeColors.primary }]}>
                   <Text style={styles.avatarLetter}>
                     {user?.name ? user.name.charAt(0).toUpperCase() : 'W'}
                   </Text>
@@ -287,16 +583,23 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* OPTIONAL SEARCH BAR */}
       {showSearch && (
-        <View style={styles.searchBox}>
-          <Search size={16} color={colors.slate400} />
+        <View
+          style={[
+            styles.searchBox,
+            {
+              backgroundColor: themeColors.background,
+              borderColor: themeColors.borderSubtle,
+            },
+          ]}
+        >
+          <Search size={16} color={themeColors.textMuted} />
           <TextInput
-            style={styles.searchInput}
+            style={[styles.searchInput, { color: themeColors.text }]}
             placeholder={searchPlaceholder}
-            placeholderTextColor={colors.slate400}
+            placeholderTextColor={themeColors.textMuted}
             value={searchText}
             onChangeText={(t) => {
               setSearchText(t);
-              if (onSearch) onSearch(t);
             }}
             returnKeyType="search"
           />
@@ -304,59 +607,107 @@ export const Header: React.FC<HeaderProps> = ({
             <TouchableOpacity
               onPress={() => {
                 setSearchText('');
-                if (onSearch) onSearch('');
               }}
               style={styles.searchClearBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Clear search text"
             >
-              <X size={14} color={colors.slate400} />
+              <X size={14} color={themeColors.textMuted} />
             </TouchableOpacity>
           ) : null}
         </View>
       )}
 
       {/* USER ACCOUNT PROFILE MODAL */}
-      <Modal visible={profileModalVisible} transparent animationType="fade">
+      <Modal
+        visible={profileModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setProfileModalVisible(false)}
+      >
         <TouchableOpacity
           style={styles.modalOverlay}
           activeOpacity={1}
           onPress={() => setProfileModalVisible(false)}
         >
-          <View style={styles.modalContent}>
-            <View style={styles.modalDragHandle} />
+          <View style={[styles.modalContent, { backgroundColor: themeColors.surface }]}>
+            <View style={[styles.modalDragHandle, { backgroundColor: themeColors.borderSubtle }]} />
 
-            <View style={styles.accountProfileCard}>
-              <View style={styles.accountAvatar}>
+            <View style={[styles.accountProfileCard, { borderBottomColor: themeColors.borderSubtle }]}>
+              <View style={[styles.accountAvatar, { backgroundColor: themeColors.primary }]}>
                 <Text style={styles.accountAvatarText}>
                   {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}
                 </Text>
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.accountNameText}>{user?.name || 'Administrator'}</Text>
-                <Text style={styles.accountEmailText}>{user?.email}</Text>
-                <View style={styles.accountRoleBadge}>
-                  <Text style={styles.accountRoleBadgeText}>
+                <Text style={[styles.accountNameText, { color: themeColors.text }]}>
+                  {user?.name || 'Administrator'}
+                </Text>
+                <Text style={[styles.accountEmailText, { color: themeColors.textSecondary }]}>
+                  {user?.email}
+                </Text>
+                <View style={[styles.accountRoleBadge, { backgroundColor: themeColors.primaryLight }]}>
+                  <Text style={[styles.accountRoleBadgeText, { color: themeColors.primary }]}>
                     {user?.role === 'SUPER_ADMIN' ? 'PLATFORM SUPER ADMIN' : 'TENANT ADMINISTRATOR'}
                   </Text>
                 </View>
               </View>
             </View>
 
-            <View style={styles.sessionInfoBox}>
+            <View
+              style={[
+                styles.sessionInfoBox,
+                {
+                  backgroundColor: themeColors.background,
+                  borderColor: themeColors.borderSubtle,
+                },
+              ]}
+            >
               <View style={styles.sessionInfoRow}>
-                <Text style={styles.sessionInfoLabel}>Workspace</Text>
-                <Text style={styles.sessionInfoVal}>{user?.tenantName || 'WhereReady Solar OS'}</Text>
+                <Text style={[styles.sessionInfoLabel, { color: themeColors.textSecondary }]}>Workspace</Text>
+                <Text style={[styles.sessionInfoVal, { color: themeColors.text }]}>
+                  {user?.tenantName || 'WhereReady Solar OS'}
+                </Text>
               </View>
               <View style={styles.sessionInfoRow}>
-                <Text style={styles.sessionInfoLabel}>Network</Text>
+                <Text style={[styles.sessionInfoLabel, { color: themeColors.textSecondary }]}>Network</Text>
                 <Text style={[styles.sessionInfoVal, { color: colors.success }]}>
                   {backendStatus.isOnline ? 'Operational' : 'Reconnecting'}
                 </Text>
               </View>
               <View style={styles.sessionInfoRow}>
-                <Text style={styles.sessionInfoLabel}>Security</Text>
-                <Text style={styles.sessionInfoVal}>TLS 1.3 256-Bit</Text>
+                <Text style={[styles.sessionInfoLabel, { color: themeColors.textSecondary }]}>Security</Text>
+                <Text style={[styles.sessionInfoVal, { color: themeColors.text }]}>TLS 1.3 256-Bit</Text>
               </View>
             </View>
+
+            <TouchableOpacity
+              style={[
+                styles.themeToggleBtn,
+                {
+                  backgroundColor: themeColors.background,
+                  borderColor: themeColors.borderSubtle,
+                },
+              ]}
+              onPress={async () => {
+                await toggleTheme();
+              }}
+              activeOpacity={0.8}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                {isDark ? (
+                  <Sun size={16} color={themeColors.accent} />
+                ) : (
+                  <Moon size={16} color={themeColors.primary} />
+                )}
+                <Text style={[styles.themeToggleText, { color: themeColors.text }]}>
+                  {isDark ? 'Dark Theme Active' : 'Light Theme Active'}
+                </Text>
+              </View>
+              <Text style={{ fontSize: 11, fontWeight: '700', color: themeColors.primary }}>
+                Switch to {isDark ? 'Light' : 'Dark'}
+              </Text>
+            </TouchableOpacity>
 
             <TouchableOpacity
               style={styles.logoutBtn}
@@ -371,75 +722,31 @@ export const Header: React.FC<HeaderProps> = ({
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={styles.closeBtn}
+              style={[styles.closeBtn, { backgroundColor: themeColors.background, borderColor: themeColors.borderSubtle }]}
               onPress={() => setProfileModalVisible(false)}
               activeOpacity={0.8}
             >
-              <Text style={styles.closeBtnText}>Done</Text>
+              <Text style={[styles.closeBtnText, { color: themeColors.text }]}>Done</Text>
             </TouchableOpacity>
           </View>
         </TouchableOpacity>
       </Modal>
+
+      {/* GLOBAL SEARCH MODAL */}
+      <GlobalSearchModal
+        visible={searchModalVisible}
+        onClose={() => setSearchModalVisible(false)}
+      />
     </View>
   );
 };
-
-/**
- * Standard Modal & Bottom Sheet Header
- */
-export const ModalHeader: React.FC<ModalHeaderProps> = ({
-  title,
-  subtitle,
-  onClose,
-  rightAction,
-  dragHandle = true,
-}) => {
-  return (
-    <View style={styles.modalHeaderContainer}>
-      {dragHandle && <View style={styles.modalDragHandle} />}
-      <View style={styles.modalHeaderRow}>
-        <View style={styles.modalHeaderTextBox}>
-          <Text style={styles.modalHeaderTitle} numberOfLines={1}>
-            {title}
-          </Text>
-          {subtitle && (
-            <Text style={styles.modalHeaderSubtitle} numberOfLines={1}>
-              {subtitle}
-            </Text>
-          )}
-        </View>
-
-        <View style={styles.modalHeaderActionBox}>
-          {rightAction}
-          <TouchableOpacity
-            onPress={onClose}
-            style={styles.modalCloseBtn}
-            activeOpacity={0.7}
-            accessibilityRole="button"
-            accessibilityLabel="Close modal"
-          >
-            <X size={18} color={colors.slate600} strokeWidth={2.4} />
-          </TouchableOpacity>
-        </View>
-      </View>
-    </View>
-  );
-};
-
-const topSafeArea =
-  Platform.OS === 'android'
-    ? (StatusBar.currentHeight ? StatusBar.currentHeight + 10 : 36)
-    : 50;
 
 const styles = StyleSheet.create({
   // HOME VARIANT (Unified Luminous Header)
   homeContainer: {
-    backgroundColor: '#ffffff',
-    paddingTop: topSafeArea,
     paddingHorizontal: spacing[4],
     paddingBottom: spacing[2],
     borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
   },
   homeRow: {
     flexDirection: 'row',
@@ -451,30 +758,34 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    flex: 1,
+    minWidth: 0,
+    marginRight: 6,
   },
   homeBrandLogo: {
     width: 32,
     height: 32,
     borderRadius: 9,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+  },
+  homeBrandTextGroup: {
+    flex: 1,
+    minWidth: 0,
   },
   homeBrandTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 5,
   },
   homeBrandTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '900',
-    color: '#0f172a',
     letterSpacing: -0.3,
   },
   homeOsBadge: {
-    backgroundColor: '#0066FF',
-    paddingHorizontal: 5,
+    paddingHorizontal: 4,
     paddingVertical: 1,
-    borderRadius: 5,
+    borderRadius: 4,
   },
   homeOsBadgeText: {
     fontSize: 8,
@@ -484,54 +795,61 @@ const styles = StyleSheet.create({
   },
   homeTagline: {
     fontSize: 9,
-    color: '#64748b',
     fontWeight: '600',
   },
   homeRightGroup: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
+    flexShrink: 0,
   },
   homeStatusPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    backgroundColor: '#f8fafc',
+    gap: 4,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
-    paddingHorizontal: 8,
+    paddingHorizontal: 6,
     paddingVertical: 4,
-    borderRadius: 12,
+    borderRadius: 10,
   },
   homeStatusText: {
     fontSize: 10,
     fontWeight: '700',
-    color: '#475569',
+  },
+  homeSearchBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  solTourBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   homeAvatarBtn: {
     width: 32,
     height: 32,
     borderRadius: 10,
-    backgroundColor: '#eff6ff',
     borderWidth: 1,
-    borderColor: '#bfdbfe',
     alignItems: 'center',
     justifyContent: 'center',
   },
   homeAvatarText: {
     fontSize: 13,
     fontWeight: '900',
-    color: '#0066FF',
   },
 
   // MAIN VARIANT
   container: {
-    backgroundColor: colors.white,
-    paddingTop: topSafeArea,
     paddingHorizontal: spacing[4],
     paddingBottom: spacing[3],
     borderBottomWidth: 1,
-    borderBottomColor: colors.slate100,
   },
   topRow: {
     flexDirection: 'row',
@@ -551,7 +869,6 @@ const styles = StyleSheet.create({
     height: 36,
     borderRadius: radii.sm,
     borderWidth: 1,
-    borderColor: colors.slate200,
   },
   brandTextContainer: {
     flex: 1,
@@ -559,7 +876,6 @@ const styles = StyleSheet.create({
   companyName: {
     fontSize: typography.size.base,
     fontWeight: typography.weight.extrabold,
-    color: colors.slate900,
     letterSpacing: typography.tracking.tight,
   },
   brandSubRow: {
@@ -569,12 +885,10 @@ const styles = StyleSheet.create({
   },
   userName: {
     fontSize: typography.size.caption,
-    color: colors.slate500,
     fontWeight: typography.weight.semibold,
   },
   brandTag: {
     fontSize: 9,
-    color: colors.primary,
     fontWeight: typography.weight.extrabold,
     letterSpacing: 0.5,
   },
@@ -586,12 +900,10 @@ const styles = StyleSheet.create({
   statusPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.slate50,
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: radii.full,
     borderWidth: 1,
-    borderColor: colors.slate200,
   },
   statusDot: {
     width: 6,
@@ -602,7 +914,14 @@ const styles = StyleSheet.create({
   statusText: {
     fontSize: typography.size.caption,
     fontWeight: typography.weight.semibold,
-    color: colors.slate600,
+  },
+  mainSearchBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: radii.full,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   avatarPill: {
     padding: 2,
@@ -611,7 +930,6 @@ const styles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 17,
-    backgroundColor: colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -626,31 +944,26 @@ const styles = StyleSheet.create({
   titleText: {
     fontSize: typography.size.h2,
     fontWeight: typography.weight.extrabold,
-    color: colors.slate900,
     letterSpacing: typography.tracking.tight,
   },
   subtitleText: {
     fontSize: typography.size.body,
-    color: colors.slate500,
     marginTop: 2,
     lineHeight: 18,
   },
   searchBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.slate50,
     borderRadius: radii.md,
     paddingHorizontal: spacing[3],
     height: 42,
     marginTop: spacing[3],
     borderWidth: 1,
-    borderColor: colors.slate200,
   },
   searchInput: {
     flex: 1,
     marginLeft: spacing[2],
     fontSize: typography.size.body,
-    color: colors.slate900,
     fontWeight: typography.weight.medium,
   },
   searchClearBtn: {
@@ -659,12 +972,9 @@ const styles = StyleSheet.create({
 
   // DETAIL VARIANT (Back button, Inline title)
   detailContainer: {
-    backgroundColor: colors.white,
-    paddingTop: topSafeArea,
     paddingHorizontal: spacing[4],
     paddingBottom: spacing[3],
     borderBottomWidth: 1,
-    borderBottomColor: colors.slate100,
   },
   detailRow: {
     flexDirection: 'row',
@@ -676,9 +986,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: radii.sm,
-    backgroundColor: colors.slate50,
     borderWidth: 1,
-    borderColor: colors.slate200,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -692,12 +1000,10 @@ const styles = StyleSheet.create({
   detailTitleText: {
     fontSize: typography.size.title,
     fontWeight: typography.weight.extrabold,
-    color: colors.slate900,
     letterSpacing: typography.tracking.snug,
   },
   detailSubtitleText: {
     fontSize: typography.size.caption,
-    color: colors.slate500,
     marginTop: 1,
   },
   detailRightBox: {
@@ -708,27 +1014,22 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: colors.slate50,
     borderWidth: 1,
-    borderColor: colors.slate200,
     alignItems: 'center',
     justifyContent: 'center',
   },
 
   // MODAL HEADER
   modalHeaderContainer: {
-    backgroundColor: colors.white,
     paddingHorizontal: spacing[4],
     paddingTop: spacing[3],
     paddingBottom: spacing[3],
     borderBottomWidth: 1,
-    borderBottomColor: colors.slate100,
   },
   modalDragHandle: {
     width: 40,
     height: 4,
     borderRadius: 2,
-    backgroundColor: colors.slate300,
     alignSelf: 'center',
     marginBottom: spacing[2],
   },
@@ -745,12 +1046,10 @@ const styles = StyleSheet.create({
   modalHeaderTitle: {
     fontSize: typography.size.title,
     fontWeight: typography.weight.extrabold,
-    color: colors.slate900,
     letterSpacing: typography.tracking.snug,
   },
   modalHeaderSubtitle: {
     fontSize: typography.size.caption,
-    color: colors.slate500,
     marginTop: 2,
   },
   modalHeaderActionBox: {
@@ -762,7 +1061,6 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: radii.sm,
-    backgroundColor: colors.slate100,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -774,7 +1072,6 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: colors.white,
     borderTopLeftRadius: radii.xxl,
     borderTopRightRadius: radii.xxl,
     paddingHorizontal: spacing[5],
@@ -787,13 +1084,11 @@ const styles = StyleSheet.create({
     gap: spacing[3],
     paddingVertical: spacing[3],
     borderBottomWidth: 1,
-    borderBottomColor: colors.slate100,
   },
   accountAvatar: {
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -805,15 +1100,12 @@ const styles = StyleSheet.create({
   accountNameText: {
     fontSize: typography.size.title,
     fontWeight: typography.weight.extrabold,
-    color: colors.slate900,
   },
   accountEmailText: {
     fontSize: typography.size.sub,
-    color: colors.slate500,
     marginTop: 1,
   },
   accountRoleBadge: {
-    backgroundColor: colors.primaryMuted,
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: radii.xs,
@@ -823,16 +1115,13 @@ const styles = StyleSheet.create({
   accountRoleBadgeText: {
     fontSize: 9,
     fontWeight: typography.weight.bold,
-    color: colors.primary,
   },
   sessionInfoBox: {
-    backgroundColor: colors.slate50,
     borderRadius: radii.md,
     padding: spacing[3],
     marginVertical: spacing[4],
     gap: spacing[2],
     borderWidth: 1,
-    borderColor: colors.slate100,
   },
   sessionInfoRow: {
     flexDirection: 'row',
@@ -841,13 +1130,25 @@ const styles = StyleSheet.create({
   },
   sessionInfoLabel: {
     fontSize: typography.size.sub,
-    color: colors.slate500,
     fontWeight: typography.weight.medium,
   },
   sessionInfoVal: {
     fontSize: typography.size.sub,
     fontWeight: typography.weight.bold,
-    color: colors.slate900,
+  },
+  themeToggleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderRadius: radii.md,
+    borderWidth: 1,
+    paddingHorizontal: spacing[3],
+    paddingVertical: spacing[3],
+    marginBottom: spacing[3],
+  },
+  themeToggleText: {
+    fontSize: typography.size.body,
+    fontWeight: typography.weight.semibold,
   },
   logoutBtn: {
     flexDirection: 'row',
@@ -869,10 +1170,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: touchTarget.min,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    paddingVertical: spacing[2],
   },
   closeBtnText: {
     fontSize: typography.size.body,
     fontWeight: typography.weight.bold,
-    color: colors.slate600,
   },
 });

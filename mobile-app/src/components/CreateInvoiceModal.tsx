@@ -17,6 +17,9 @@ import {
   IndianRupee,
   CheckCircle2,
   Calendar,
+  Building2,
+  CreditCard,
+  Zap,
   Building,
   User,
   ShieldCheck,
@@ -110,6 +113,22 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
   const applyPercentPreset = (pct: number) => {
     const baseTotal = initialLead?.estimatedValue || Math.round(parseFloat(capacityKw || '3.3') * 56000);
     setTotalAmount(String(Math.round(baseTotal * (pct / 100))));
+    if (pct === 20) {
+      setTitle(`Advance Booking Token & Engineering Design (${capacityKw || 3.3} kWp)`);
+      setInvoiceType('ADVANCE_RECEIPT');
+    } else if (pct === 60) {
+      setTitle(`Procurement & Material Delivery at Site (${capacityKw || 3.3} kWp)`);
+      setInvoiceType('TAX_INVOICE');
+    } else if (pct === 15) {
+      setTitle(`Structure Erection & Electrical Installation (${capacityKw || 3.3} kWp)`);
+      setInvoiceType('TAX_INVOICE');
+    } else if (pct === 5) {
+      setTitle(`Grid Synchronization & Net-Metering Handover (${capacityKw || 3.3} kWp)`);
+      setInvoiceType('TAX_INVOICE');
+    } else if (pct === 100) {
+      setTitle(`Turnkey Supply & Commissioning of ${capacityKw || 3.3} kWp Solar Rooftop Plant`);
+      setInvoiceType('TAX_INVOICE');
+    }
   };
 
   const handleSubmit = async () => {
@@ -162,7 +181,7 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
       const res = await financeApi.createInvoice(payload);
       const createdInvoice = res?.invoice || res;
 
-      Alert.alert('Invoice Generated! 🎉', `Invoice ${createdInvoice.invoiceNumber || 'Created'} for ₹${amt.toLocaleString('en-IN')} has been generated successfully.`);
+      Alert.alert('Invoice Generated', `Invoice ${createdInvoice.invoiceNumber || 'Created'} for ₹${amt.toLocaleString('en-IN')} has been generated successfully.`);
       onSuccess(createdInvoice);
       onClose();
     } catch (err: any) {
@@ -188,12 +207,13 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
             <Text style={styles.sectionHeading}>SELECT INVOICE CATEGORY</Text>
             <View style={styles.categoryGrid}>
               {[
-                { key: 'TAX_INVOICE', label: 'Tax Invoice', sub: 'Standard GST Bill', icon: '📄' },
-                { key: 'PROFORMA', label: 'Proforma', sub: 'Bank Loan / DISCOM', icon: '🏦' },
-                { key: 'ADVANCE_RECEIPT', label: 'Advance Deposit', sub: 'Token Voucher', icon: '💳' },
-                { key: 'CUSTOM', label: 'Progress Bill', sub: 'Custom Tranche', icon: '⚡' },
+                { key: 'TAX_INVOICE', label: 'Tax Invoice', sub: 'Standard GST Bill', icon: FileText },
+                { key: 'PROFORMA', label: 'Proforma', sub: 'Bank Loan / DISCOM', icon: Building2 },
+                { key: 'ADVANCE_RECEIPT', label: 'Advance Deposit', sub: 'Token Voucher', icon: CreditCard },
+                { key: 'CUSTOM', label: 'Progress Bill', sub: 'Custom Tranche', icon: Zap },
               ].map((cat) => {
                 const isSelected = invoiceType === cat.key;
+                const IconComponent = cat.icon;
                 return (
                   <TouchableOpacity
                     key={cat.key}
@@ -201,7 +221,9 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
                     onPress={() => handleSelectType(cat.key as InvoiceTypeCategory)}
                     activeOpacity={0.75}
                   >
-                    <Text style={styles.categoryIcon}>{cat.icon}</Text>
+                    <View style={{ marginBottom: 4 }}>
+                      <IconComponent size={20} color={isSelected ? '#059669' : '#64748b'} />
+                    </View>
                     <Text style={[styles.categoryLabel, isSelected && styles.categoryLabelSelected]}>
                       {cat.label}
                     </Text>
@@ -254,7 +276,7 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
             <View style={styles.amountHeaderRow}>
               <Text style={styles.inputLabel}>TOTAL INVOICE AMOUNT (₹ INCL. GST)</Text>
               <View style={styles.presetButtonsRow}>
-                {[10, 25, 50, 100].map((pct) => (
+                {[20, 60, 15, 5, 100].map((pct) => (
                   <TouchableOpacity
                     key={pct}
                     style={styles.pctBtn}

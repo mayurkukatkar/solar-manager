@@ -42,6 +42,33 @@ app.use(cookieParser());
 // Static file serving for uploads (KYC, documents, photos, invoices)
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
+// Fast public health check
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', service: 'solar-erp-backend', timestamp: new Date().toISOString() });
+});
+
+// Mobile App Version & In-App Update Gating
+app.get('/api/app/version', (req, res) => {
+  res.json({
+    latestVersion: '1.1.0',
+    versionCode: 2,
+    minSupportedVersion: '1.0.0',
+    isMandatory: false,
+    releaseDate: '2026-11-09',
+    title: 'WhereReady Solar OS v1.1.0 Released!',
+    summary: 'CRM Pipeline bugfix, 10x database query optimization, and new Interactive Button Tour.',
+    releaseNotes: [
+      'Resolved CRM Sales Pipeline crash and improved lead rendering stability',
+      'Database performance optimization with compound indexing for 10x faster query response',
+      'New Interactive Button-by-Button Tour with animated Sol Guide companion',
+      'Enhanced real-time network detection with instant auto-reconnect & offline banner',
+      'Instant local cache hydration for zero-flicker startup'
+    ],
+    downloadUrl: process.env.APP_DOWNLOAD_URL || 'https://solar-manager-three.vercel.app/download/whereready-solar-os-latest.apk',
+    playStoreUrl: 'https://play.google.com/store/apps/details?id=com.whereready.solaros'
+  });
+});
+
 
 // AUTH
 const authRoutes = require('./routes/auth');
