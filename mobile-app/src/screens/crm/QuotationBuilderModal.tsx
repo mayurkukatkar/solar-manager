@@ -39,6 +39,7 @@ import {
   QuotationPdfProps,
 } from '../../services/pdfService';
 import { openWhatsAppWithPitch } from '../../services/whatsappService';
+import { solarGamificationService } from '../../services/solarGamificationService';
 import { crmApi, quotationsApi } from '../../api/endpoints';
 import { ProposalPreviewModal } from '../../components/ProposalPreviewModal';
 
@@ -388,10 +389,14 @@ export const QuotationBuilderModal: React.FC<QuotationBuilderModalProps> = ({
       const fileName = `Solar_Proposal_${payload.customerName.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
       await sharePdfFile(html, fileName, payload.customerPhone);
 
-      // 3. Mark stage advancement in CRM
+      // 3. Mark stage advancement in CRM & award Solar XP
       if (lead?.id) {
         crmApi.advanceLeadStage(lead.id, 'PROPOSAL_SENT').catch(() => { });
       }
+      solarGamificationService.recordAction('PROPOSAL_SENT', {
+        capacityKw: cap,
+        customerName: payload.customerName,
+      }).catch(() => {});
     } catch (err: any) {
       Alert.alert('WhatsApp PDF Share Error', err.message || 'Failed to dispatch quotation PDF via WhatsApp');
     } finally {
@@ -425,6 +430,10 @@ export const QuotationBuilderModal: React.FC<QuotationBuilderModalProps> = ({
       if (lead?.id) {
         crmApi.advanceLeadStage(lead.id, 'PROPOSAL_SENT').catch(() => { });
       }
+      solarGamificationService.recordAction('PROPOSAL_SENT', {
+        capacityKw: cap,
+        customerName: payload.customerName,
+      }).catch(() => {});
     } catch (err: any) {
       Alert.alert('WhatsApp Text Pitch Error', err.message || 'Could not launch WhatsApp');
     } finally {

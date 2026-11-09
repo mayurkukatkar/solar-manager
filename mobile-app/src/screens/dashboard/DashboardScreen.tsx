@@ -29,6 +29,8 @@ import {
 import { Header } from '../../components/Header';
 import { GuideCharacter } from '../../components/GuideCharacter';
 import { InAppProductTour } from '../../components/InAppProductTour';
+import { GamificationPill } from '../../components/GamificationPill';
+import { SolarJourneyRoadmap } from '../../components/SolarJourneyRoadmap';
 import { tenantApi, crmApi } from '../../api/endpoints';
 import { openWhatsAppWithPitch } from '../../services/whatsappService';
 import { useAuth } from '../../context/AuthContext';
@@ -241,12 +243,10 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
             <View style={styles.liveIndicatorRow}>
               <View style={[styles.liveDot, { backgroundColor: colors.success }]} />
               <Text style={[styles.liveLabel, { color: colors.textSecondary }]}>
-                {hasFinanceAccess ? 'EXECUTIVE COMMAND' : 'FIELD OPERATIONS'}
+                {hasFinanceAccess ? 'COMMAND' : 'FIELD'}
               </Text>
             </View>
-            <Text style={[styles.heroDate, { color: colors.textMuted }]}>
-              {new Date().toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })}
-            </Text>
+            <GamificationPill />
           </View>
 
           <View style={styles.heroMainRow}>
@@ -390,6 +390,25 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
             <Text style={[styles.quickActionLabel, { color: colors.text }]}>Finance</Text>
           </TouchableOpacity>
         </View>
+
+        {/* 2.5 GAMIFIED SOLAR JOURNEY ROADMAP */}
+        {projects.length > 0 ? (
+          <SolarJourneyRoadmap
+            currentStageId={projects[0].currentStage || projects[0].status || 'DISPATCH'}
+            customerName={projects[0].customer?.name || projects[0].name}
+            capacityKw={Number(projects[0].capacity || 3.3)}
+            onActionPress={() => navigation.navigate('Projects')}
+            compact={false}
+          />
+        ) : recentLeads.length > 0 ? (
+          <SolarJourneyRoadmap
+            currentStageId="PROPOSAL"
+            customerName={recentLeads[0].name}
+            capacityKw={Number(recentLeads[0].estimatedCap || 3.3)}
+            onActionPress={() => navigation.navigate('Pipeline')}
+            compact={false}
+          />
+        ) : null}
 
         {/* 3. IMMEDIATE ATTENTION / HOT PROSPECT */}
         {urgentProspect && (

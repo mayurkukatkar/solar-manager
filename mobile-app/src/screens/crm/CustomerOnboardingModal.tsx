@@ -36,6 +36,8 @@ import * as DocumentPicker from 'expo-document-picker';
 import { ModalHeader, useDirtyFormWarning } from '../../components/common/ModalHeader';
 import { KeyboardAvoidingContainer } from '../../components/common/KeyboardAvoidingContainer';
 import { PermissionRationaleModal } from '../../components/common/PermissionRationaleModal';
+import { CelebrationModal } from '../../components/CelebrationModal';
+import { solarGamificationService } from '../../services/solarGamificationService';
 import { crmApi, documentsApi, tenantApi } from '../../api/endpoints';
 
 interface CustomerOnboardingModalProps {
@@ -63,6 +65,9 @@ export const CustomerOnboardingModal: React.FC<CustomerOnboardingModalProps> = (
   onSuccess,
 }) => {
   const [submitting, setSubmitting] = useState(false);
+  const [celebrationData, setCelebrationData] = useState<any | null>(null);
+  const [showCelebration, setShowCelebration] = useState(false);
+  const [provisionedProject, setProvisionedProject] = useState<any | null>(null);
 
   // Customer Legal Profile - initialized from opened lead
   const [legalName, setLegalName] = useState(lead?.name || '');
@@ -410,18 +415,41 @@ export const CustomerOnboardingModal: React.FC<CustomerOnboardingModalProps> = (
         }
       }
 
-      Alert.alert(
-        'Client Onboarded Successfully!',
-        `Customer "${legalName}" converted to Project: ${projectResult.projectNumber || projectResult.name}.\n\n${uploadedCount} KYC documents uploaded to central cloud repository.`
-      );
+      let reward: any = null;
+      try {
+        reward = await solarGamificationService.recordAction('CLIENT_ONBOARDED', {
+          capacityKw: parseFloat(capacity) || 3.3,
+          customerName: legalName,
+          projectName: projectResult.projectNumber || projectResult.name,
+        });
+      } catch (_) {}
 
-      onSuccess(projectResult);
-      onClose();
+      setProvisionedProject(projectResult);
+      setCelebrationData({
+        title: 'Customer Onboarded Successfully! 🎉',
+        subtitle: `Prospect "${legalName}" converted to Project: ${projectResult.projectNumber || projectResult.name}. All KYC & bank documents securely archived.`,
+        stageName: 'Stage 3: Deal Won & Project Provisioned',
+        xpAwarded: reward?.xpGained || 150,
+        badgeUnlocked: reward?.unlockedBadge?.title,
+        customerName: legalName,
+        customerPhone: mobile,
+        projectName: projectResult.name,
+        capacityKw: parseFloat(capacity) || 3.3,
+      });
+      setShowCelebration(true);
     } catch (err: any) {
       Alert.alert('Onboarding Notice', err.message || 'Could not complete onboarding.');
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleCelebrationComplete = () => {
+    setShowCelebration(false);
+    if (provisionedProject) {
+      onSuccess(provisionedProject);
+    }
+    onClose();
   };
 
   return (
@@ -866,6 +894,23 @@ export const CustomerOnboardingModal: React.FC<CustomerOnboardingModalProps> = (
           Linking.openSettings();
         }}
       />
+      {showCelebration && celebrationData ? (
+        <CelebrationModal
+          visible={showCelebration}
+          title={celebrationData.title}
+          subtitle={celebrationData.subtitle}
+          stageName={celebrationData.stageName}
+          xpAwarded={celebrationData.xpAwarded}
+          badgeUnlocked={celebrationData.badgeUnlocked}
+          customerName={celebrationData.customerName}
+          customerPhone={celebrationData.customerPhone}
+          projectName={celebrationData.projectName}
+          capacityKw={celebrationData.capacityKw}
+          nextActionLabel="View Provisioned Project ➔"
+          onNextAction={handleCelebrationComplete}
+          onClose={handleCelebrationComplete}
+        />
+      ) : null}
     </Modal>
   );
 };

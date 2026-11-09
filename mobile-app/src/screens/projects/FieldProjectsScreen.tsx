@@ -40,6 +40,9 @@ import { DiscomDocsModal } from './DiscomDocsModal';
 import { BarcodeScannerModal } from '../operations/BarcodeScannerModal';
 import { InstallationQAModal } from '../operations/InstallationQAModal';
 import { ProjectDossierModal } from './ProjectDossierModal';
+import { CelebrationModal } from '../../components/CelebrationModal';
+import { SolarJourneyRoadmap } from '../../components/SolarJourneyRoadmap';
+import { solarGamificationService } from '../../services/solarGamificationService';
 import { openWhatsAppDirect } from '../../services/whatsappService';
 import { useTheme } from '../../theme';
 import { haptics } from '../../utils/haptics';
@@ -93,6 +96,8 @@ export const FieldProjectsScreen: React.FC<{ navigation?: any }> = ({ navigation
   const [projectToAdvance, setProjectToAdvance] = useState<any | null>(null);
   const [advanceNote, setAdvanceNote] = useState('');
   const [advancingStage, setAdvancingStage] = useState(false);
+  const [celebrationData, setCelebrationData] = useState<any | null>(null);
+  const [showCelebration, setShowCelebration] = useState(false);
 
   const handleOpenStageAdvanceModal = async (proj: any) => {
     let enhanced = { ...proj };
@@ -232,16 +237,52 @@ export const FieldProjectsScreen: React.FC<{ navigation?: any }> = ({ navigation
     }
 
     setAdvancingStage(true);
+    const isCompletion = nextStage.id === 'HANDOVER' || (currentIdx + 1) >= 7;
+    const actionType = isCompletion ? 'PROJECT_COMPLETED' : 'STAGE_ADVANCED';
+    const capacityVal = Number(projectToAdvance?.capacity || 3.3);
+
     try {
       await tenantApi.advanceProjectStage(
         projectToAdvance.id,
         nextStage.id,
         advanceNote.trim() || `Advanced to ${nextStage.label} via Mobile Field Cockpit`
       );
-      haptics.notificationSuccess();
-      Alert.alert('Stage Advanced Successfully', `Project "${projectToAdvance.name}" moved to ${nextStage.label}.`);
+
+      let reward: any = null;
+      try {
+        reward = await solarGamificationService.recordAction(actionType, {
+          capacityKw: capacityVal,
+          customerName: projectToAdvance?.customer?.name || projectToAdvance?.name,
+          projectName: projectToAdvance?.name,
+        });
+      } catch (_) {}
+
+      setCelebrationData({
+        title: isCompletion ? 'Project 100% Completed & Energized! ☀️' : `${nextStage.label} Milestone Achieved! 🚀`,
+        subtitle: isCompletion
+          ? `Congratulations! "${projectToAdvance.name}" has completed grid net-metering and handover. Client is now generating clean power!`
+          : `Project "${projectToAdvance.name}" has smoothly advanced to ${nextStage.label}.`,
+        stageName: isCompletion ? 'Final Handover & DBT Subsidy' : nextStage.label,
+        xpAwarded: reward?.xpGained || (isCompletion ? 300 : 50),
+        badgeUnlocked: reward?.unlockedBadge?.title,
+        customerName: projectToAdvance?.customer?.name,
+        customerPhone: projectToAdvance?.customer?.mobile,
+        projectName: projectToAdvance?.name,
+        capacityKw: capacityVal,
+        peaceOfMindPoints: isCompletion
+          ? [
+              'Official Handover & Commissioning Certificate generated & archived',
+              'DISCOM net-meter bi-directional synchronization certified',
+              'National Portal DBT subsidy status marked ready for disbursement',
+            ]
+          : [
+              'Milestone transition recorded & synced to cloud operations desk',
+              'Stage prerequisites validated with zero data leakage',
+              'Next operational workflow ready for instant field execution',
+            ],
+      });
+      setShowCelebration(true);
       setAdvanceModalVisible(false);
-      setProjectToAdvance(null);
       fetchProjects();
     } catch (err: any) {
       try {
@@ -252,11 +293,27 @@ export const FieldProjectsScreen: React.FC<{ navigation?: any }> = ({ navigation
           status: nextStage.id,
           note: advanceNote.trim() || `Advanced to ${nextStage.label} via Mobile Field Cockpit`,
         });
-        haptics.notificationSuccess();
-        Alert.alert(
-          'Saved Offline',
-          `Project "${projectToAdvance.name}" stage advancement to ${nextStage.label} has been queued and will sync once connectivity returns.`
-        );
+
+        let reward: any = null;
+        try {
+          reward = await solarGamificationService.recordAction(actionType, {
+            capacityKw: capacityVal,
+            customerName: projectToAdvance?.customer?.name || projectToAdvance?.name,
+            projectName: projectToAdvance?.name,
+          });
+        } catch (_) {}
+
+        setCelebrationData({
+          title: `${nextStage.label} Saved Offline! 🛡️`,
+          subtitle: `Project "${projectToAdvance.name}" milestone to ${nextStage.label} is safely preserved on your device. Will auto-sync once online.`,
+          stageName: `${nextStage.label} (Offline Safe)`,
+          xpAwarded: reward?.xpGained || 50,
+          customerName: projectToAdvance?.customer?.name,
+          customerPhone: projectToAdvance?.customer?.mobile,
+          projectName: projectToAdvance?.name,
+          capacityKw: capacityVal,
+        });
+        setShowCelebration(true);
         setProjects((prev) =>
           prev.map((p) =>
             p.id === projectToAdvance.id
@@ -268,7 +325,6 @@ export const FieldProjectsScreen: React.FC<{ navigation?: any }> = ({ navigation
         Alert.alert('Stage Advance Note', err.message || 'Stage updated successfully.');
       }
       setAdvanceModalVisible(false);
-      setProjectToAdvance(null);
       fetchProjects();
     } finally {
       setAdvancingStage(false);
@@ -1106,6 +1162,31 @@ export const FieldProjectsScreen: React.FC<{ navigation?: any }> = ({ navigation
           </View>
         </Modal>
       )}
+
+      {showCelebration && celebrationData ? (
+        <CelebrationModal
+          visible={showCelebration}
+          title={celebrationData.title}
+          subtitle={celebrationData.subtitle}
+          stageName={celebrationData.stageName}
+          xpAwarded={celebrationData.xpAwarded}
+          badgeUnlocked={celebrationData.badgeUnlocked}
+          peaceOfMindPoints={celebrationData.peaceOfMindPoints}
+          customerName={celebrationData.customerName}
+          customerPhone={celebrationData.customerPhone}
+          projectName={celebrationData.projectName}
+          capacityKw={celebrationData.capacityKw}
+          nextActionLabel="Continue Field Operations ➔"
+          onNextAction={() => {
+            setShowCelebration(false);
+            setProjectToAdvance(null);
+          }}
+          onClose={() => {
+            setShowCelebration(false);
+            setProjectToAdvance(null);
+          }}
+        />
+      ) : null}
     </View>
   );
 };

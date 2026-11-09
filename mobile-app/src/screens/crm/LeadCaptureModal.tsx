@@ -35,6 +35,7 @@ import { ModalHeader, useDirtyFormWarning } from '../../components/common/ModalH
 import { KeyboardAvoidingContainer } from '../../components/common/KeyboardAvoidingContainer';
 import { crmApi } from '../../api/endpoints';
 import { offlineSyncService } from '../../services/offlineSyncService';
+import { solarGamificationService } from '../../services/solarGamificationService';
 
 interface LeadCaptureModalProps {
   visible: boolean;
@@ -280,11 +281,16 @@ export const LeadCaptureModal: React.FC<LeadCaptureModalProps> = ({
         createdLead = { ...draft, id: draft.localId, stage: 'NEW', isDraft: true };
       }
 
+      solarGamificationService.recordAction('LEAD_CAPTURED', {
+        customerName: name.trim(),
+        capacityKw: recommendedKw,
+      }).catch(() => {});
+
       onSuccess(createdLead);
       if (proceedQuote && onProceedToQuote) {
         onProceedToQuote(createdLead);
       } else {
-        Alert.alert('Lead Created', `Prospect ${name} registered successfully.`);
+        Alert.alert('Lead Created', `Prospect ${name} registered successfully (+25 Solar XP).`);
         onClose();
       }
     } catch (err: any) {

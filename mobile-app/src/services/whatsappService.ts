@@ -141,3 +141,34 @@ export async function openWhatsAppWithPitch(data: WhatsAppPitchData): Promise<bo
   const text = generateWhatsAppMessage(data);
   return openWhatsAppDirect(data.customerPhone, text);
 }
+
+export interface WhatsAppMilestoneData {
+  customerName: string;
+  customerPhone?: string;
+  projectName?: string;
+  stageTitle: string;
+  capacityKw?: number;
+  highlightNote?: string;
+  companyName?: string;
+}
+
+export async function openWhatsAppMilestoneCelebration(data: WhatsAppMilestoneData): Promise<boolean> {
+  const company = data.companyName || 'WhereReady Solar';
+  const cap = data.capacityKw ? `${data.capacityKw} kWp ` : '';
+  const text = `🎉 *CONGRATULATIONS ${data.customerName.toUpperCase()}!* ☀️
+
+Dear *${data.customerName}*,
+We are delighted to share a major milestone update on your *${cap}Rooftop Solar Project*!
+
+🏆 *Current Milestone*: *${data.stageTitle}* ✅
+${data.highlightNote ? `📋 *Update*: ${data.highlightNote}\n` : ''}
+🌱 *Environmental Impact*: You are taking a massive step toward zero electricity bills and clean solar energy!
+
+We are actively advancing your project with zero hassle for you. If you have any questions, we're always right here!
+
+Warm regards,
+*Project Operations Team*
+${company} ⚡`;
+
+  return openWhatsAppDirect(data.customerPhone, text);
+}
