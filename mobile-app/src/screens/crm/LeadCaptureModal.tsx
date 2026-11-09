@@ -28,11 +28,17 @@ import {
   Camera,
   AlertTriangle,
   Compass,
+  CheckCircle2,
+  ShieldCheck,
+  Home,
 } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import { ModalHeader, useDirtyFormWarning } from '../../components/common/ModalHeader';
 import { KeyboardAvoidingContainer } from '../../components/common/KeyboardAvoidingContainer';
+import { CelebrationModal } from '../../components/CelebrationModal';
+import { GuideCharacter } from '../../components/GuideCharacter';
+import { haptics } from '../../utils/haptics';
 import { crmApi } from '../../api/endpoints';
 import { offlineSyncService } from '../../services/offlineSyncService';
 import { solarGamificationService } from '../../services/solarGamificationService';
@@ -51,6 +57,10 @@ export const LeadCaptureModal: React.FC<LeadCaptureModalProps> = ({
   onProceedToQuote,
 }) => {
   const [submitting, setSubmitting] = useState(false);
+  const [roofType, setRoofType] = useState('Flat RCC Concrete');
+  const [celebrationData, setCelebrationData] = useState<any | null>(null);
+  const [showCelebration, setShowCelebration] = useState(false);
+  const [createdLeadRecord, setCreatedLeadRecord] = useState<any | null>(null);
 
   // Prospect Contact Information
   const [name, setName] = useState('');
@@ -94,6 +104,32 @@ export const LeadCaptureModal: React.FC<LeadCaptureModalProps> = ({
   const recommendedKw = computeRecommendedKw();
   const estimatedAnnualGen = Math.round(recommendedKw * 1460);
   const estimatedMonthlySavings = Math.round(recommendedKw * 120 * 8.5);
+  const subsidyAmount = recommendedKw >= 3 ? 78000 : recommendedKw >= 2 ? 60000 : 30000;
+
+  const completionPct = useMemo(() => {
+    let score = 0;
+    if (name.trim()) score += 25;
+    if (mobile.trim().length >= 10) score += 25;
+    if (monthlyBill.trim() || monthlyUnits.trim()) score += 25;
+    if (address.trim() || city.trim() || consumerNumber.trim()) score += 25;
+    return score;
+  }, [name, mobile, monthlyBill, monthlyUnits, address, city, consumerNumber]);
+
+  const solGuidanceMessage = useMemo(() => {
+    if (!name.trim()) {
+      return "Hi there! Let's register a new solar prospect in under 30 seconds.";
+    }
+    if (!monthlyBill.trim() && !monthlyUnits.trim()) {
+      return `Great! What is ${name.split(' ')[0]}'s monthly electricity bill?`;
+    }
+    return `⚡ Sized to ${recommendedKw} kWp! Eligible for ₹${subsidyAmount.toLocaleString('en-IN')} PM Surya Ghar subsidy!`;
+  }, [name, monthlyBill, monthlyUnits, recommendedKw, subsidyAmount]);
+
+  const applyBillPreset = (presetBill: string, presetUnits: string) => {
+    haptics.selection();
+    setMonthlyBill(presetBill);
+    setMonthlyUnits(presetUnits);
+  };
 
   /**
    * Real-time Consumer Number handler:
@@ -290,8 +326,22 @@ export const LeadCaptureModal: React.FC<LeadCaptureModalProps> = ({
       if (proceedQuote && onProceedToQuote) {
         onProceedToQuote(createdLead);
       } else {
-        Alert.alert('Lead Created', `Prospect ${name} registered successfully (+25 Solar XP).`);
-        onClose();
+        setCreatedLeadRecord(createdLead);
+        setCelebrationData({
+          title: 'Solar Prospect Registered! 🌟',
+          subtitle: `Prospect "${name}" registered with ${recommendedKw} kWp recommended rooftop plant.`,
+          stageName: 'Stage 1: Lead Ingestion & Sizing',
+          xpAwarded: 25,
+          customerName: name.trim(),
+          customerPhone: cleanPhone,
+          capacityKw: recommendedKw,
+          peaceOfMindPoints: [
+            'Contact profile and consumption auto-saved locally and to cloud',
+            `Sized to ${recommendedKw} kWp (~${estimatedAnnualGen} kWh/year clean generation)`,
+            'Next action: 60-Second proposal ready to dispatch',
+          ],
+        });
+        setShowCelebration(true);
       }
     } catch (err: any) {
       Alert.alert('Save Failed', err.message || 'Could not register lead');
@@ -339,6 +389,35 @@ export const LeadCaptureModal: React.FC<LeadCaptureModalProps> = ({
         }
         contentContainerStyle={styles.scrollContent}
       >
+        {/* FORM PROGRESS & PEACE OF MIND INDICATOR */}
+        <View style={styles.formProgressCard}>
+          <View style={styles.formProgressHeader}>
+            <View style={styles.progressPercentRow}>
+              <View style={styles.progressDot} />
+              <Text style={styles.formProgressText}>{completionPct}% READY</Text>
+            </View>
+            <View style={styles.autoSavedBadge}>
+              <ShieldCheck size={13} color="#10B981" />
+              <Text style={styles.autoSavedText}>Peace of mind: Auto-saved</Text>
+            </View>
+          </View>
+          <View style={styles.progressBarTrack}>
+            <View style={[styles.progressBarFill, { width: `${completionPct}%` }]} />
+          </View>
+        </View>
+
+        {/* SOL MASCOT LIVE SIZING COMPANION */}
+        <View style={styles.solCompanionCard}>
+          <GuideCharacter pose={name ? 'point-right' : 'wave'} size={42} animated={false} />
+          <View style={styles.solSpeechBubble}>
+            <View style={styles.solSpeechHeader}>
+              <Sparkles size={12} color="#0066FF" />
+              <Text style={styles.solSpeechTitle}>SOL SIZING ADVISOR</Text>
+            </View>
+            <Text style={styles.solSpeechText}>{solGuidanceMessage}</Text>
+          </View>
+        </View>
+
         {/* SECTION 1: PROSPECT CONTACT DETAILS */}
           <View style={styles.sectionCard}>
             <View style={styles.sectionHeader}>
@@ -534,6 +613,67 @@ export const LeadCaptureModal: React.FC<LeadCaptureModalProps> = ({
               </View>
             </View>
 
+            {/* Quick Bill Preset Chips */}
+            <View style={styles.fieldGroup}>
+              <Text style={styles.label}>1-Tap Monthly Bill Presets</Text>
+              <View style={styles.presetChipRow}>
+                {[
+                  { label: '₹1,500 (1.5 kW)', bill: '1500', units: '180' },
+                  { label: '₹3,500 (3.3 kW)', bill: '3500', units: '410' },
+                  { label: '₹6,000 (5.0 kW)', bill: '6000', units: '700' },
+                  { label: '₹12,000 (10 kW)', bill: '12000', units: '1400' },
+                ].map((p) => {
+                  const isSelected = monthlyBill === p.bill;
+                  return (
+                    <TouchableOpacity
+                      key={p.bill}
+                      style={[styles.presetChip, isSelected && styles.presetChipActive]}
+                      onPress={() => applyBillPreset(p.bill, p.units)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[styles.presetChipText, isSelected && styles.presetChipTextActive]}>
+                        {p.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
+            {/* Visual Roof Type Selector */}
+            <View style={styles.fieldGroup}>
+              <Text style={styles.label}>Installation Roof Type</Text>
+              <View style={styles.roofTypeGrid}>
+                {[
+                  { id: 'Flat RCC Concrete', label: 'Flat RCC Concrete', desc: 'Standard Ballast / HDG Elevated' },
+                  { id: 'Tilted Sheet / Tin', label: 'Tilted Sheet / Tin', desc: 'Direct Mini-Rail Mounting' },
+                  { id: 'Commercial Shed', label: 'Commercial Shed', desc: 'High-Span Industrial Rooftop' },
+                  { id: 'Sloped Tile Roof', label: 'Sloped Tile Roof', desc: 'Tile-Hook Bracket Mounting' },
+                ].map((r) => {
+                  const isSel = roofType === r.id;
+                  return (
+                    <TouchableOpacity
+                      key={r.id}
+                      style={[styles.roofChip, isSel && styles.roofChipActive]}
+                      onPress={() => {
+                        haptics.selection();
+                        setRoofType(r.id);
+                      }}
+                      activeOpacity={0.75}
+                    >
+                      <View style={styles.roofChipRow}>
+                        <Home size={14} color={isSel ? '#0066FF' : '#64748B'} />
+                        <Text style={[styles.roofChipLabel, isSel && styles.roofChipLabelActive]}>
+                          {r.label}
+                        </Text>
+                      </View>
+                      <Text style={styles.roofChipDesc}>{r.desc}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
             {/* Optional Bill Attachment for Records */}
             <View style={styles.attachmentSection}>
               <Text style={styles.attachmentLabel}>Bill Document Attachment (Optional)</Text>
@@ -614,6 +754,32 @@ export const LeadCaptureModal: React.FC<LeadCaptureModalProps> = ({
             </View>
           </View>
       </KeyboardAvoidingContainer>
+
+      {showCelebration && celebrationData ? (
+        <CelebrationModal
+          visible={showCelebration}
+          title={celebrationData.title}
+          subtitle={celebrationData.subtitle}
+          stageName={celebrationData.stageName}
+          xpAwarded={celebrationData.xpAwarded}
+          customerName={celebrationData.customerName}
+          customerPhone={celebrationData.customerPhone}
+          capacityKw={celebrationData.capacityKw}
+          peaceOfMindPoints={celebrationData.peaceOfMindPoints}
+          nextActionLabel="Create 60s Proposal ➔"
+          onNextAction={() => {
+            setShowCelebration(false);
+            if (onProceedToQuote && createdLeadRecord) {
+              onProceedToQuote(createdLeadRecord);
+            }
+            onClose();
+          }}
+          onClose={() => {
+            setShowCelebration(false);
+            onClose();
+          }}
+        />
+      ) : null}
     </Modal>
   );
 };
@@ -964,5 +1130,159 @@ const styles = StyleSheet.create({
   sourceChipTextActive: {
     color: '#2563eb',
     fontWeight: '800',
+  },
+  // GAMIFIED FORM PROGRESS
+  formProgressCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  formProgressHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  progressPercentRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  progressDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#0066FF',
+  },
+  formProgressText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#0F172A',
+    letterSpacing: 0.5,
+  },
+  autoSavedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#F0FDF4',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  autoSavedText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#15803D',
+  },
+  progressBarTrack: {
+    height: 5,
+    backgroundColor: '#F1F5F9',
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  progressBarFill: {
+    height: '100%',
+    backgroundColor: '#0066FF',
+    borderRadius: 3,
+  },
+  // SOL SIZING COMPANION
+  solCompanionCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F0F7FF',
+    borderRadius: 16,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    marginBottom: 14,
+    gap: 12,
+  },
+  solSpeechBubble: {
+    flex: 1,
+  },
+  solSpeechHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: 3,
+  },
+  solSpeechTitle: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: '#0066FF',
+    letterSpacing: 0.5,
+  },
+  solSpeechText: {
+    fontSize: 12,
+    color: '#1E3A8A',
+    fontWeight: '600',
+    lineHeight: 16,
+  },
+  // PRESET CHIPS
+  presetChipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 4,
+  },
+  presetChip: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  presetChipActive: {
+    backgroundColor: '#0066FF',
+    borderColor: '#0066FF',
+  },
+  presetChipText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#334155',
+  },
+  presetChipTextActive: {
+    color: '#FFFFFF',
+  },
+  // ROOF TYPE SELECTOR
+  roofTypeGrid: {
+    gap: 8,
+    marginTop: 4,
+  },
+  roofChip: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 10,
+    padding: 10,
+  },
+  roofChipActive: {
+    backgroundColor: '#EFF6FF',
+    borderColor: '#0066FF',
+    borderWidth: 1.5,
+  },
+  roofChipRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 2,
+  },
+  roofChipLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#334155',
+  },
+  roofChipLabelActive: {
+    color: '#0066FF',
+    fontWeight: '800',
+  },
+  roofChipDesc: {
+    fontSize: 10,
+    color: '#64748B',
+    marginLeft: 20,
   },
 });

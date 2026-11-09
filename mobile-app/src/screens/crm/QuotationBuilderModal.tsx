@@ -23,13 +23,20 @@ import {
   CheckCircle2,
   ArrowRight,
   TrendingDown,
+  TrendingUp,
   Percent,
   Eye,
   Send,
   Package,
+  Plus,
+  Minus,
+  ShieldCheck,
+  Zap,
 } from 'lucide-react-native';
 import { ModalHeader, useDirtyFormWarning } from '../../components/common/ModalHeader';
 import { KeyboardAvoidingContainer } from '../../components/common/KeyboardAvoidingContainer';
+import { GuideCharacter } from '../../components/GuideCharacter';
+import { haptics } from '../../utils/haptics';
 import {
   generateQuotationHtml,
   previewPdf,
@@ -220,6 +227,23 @@ export const QuotationBuilderModal: React.FC<QuotationBuilderModalProps> = ({
     } else {
       setSystemType('On-Grid Rooftop');
     }
+  };
+
+  const adjustCapacity = (delta: number) => {
+    haptics.selection();
+    const current = parseFloat(capacityKw) || 3.3;
+    const next = Math.max(1, Math.min(50, Number((current + delta).toFixed(1))));
+    setCapacityKw(String(next));
+    if (!totalSystemCost || totalSystemCost === '0') {
+      const approxCost = Math.round(next * 58000);
+      setTotalSystemCost(String(approxCost));
+    }
+  };
+
+  const selectCapacityPreset = (kw: number, approxCost: number) => {
+    haptics.selection();
+    setCapacityKw(String(kw));
+    setTotalSystemCost(String(approxCost));
   };
 
   const isDirty = useMemo(() => {
@@ -625,14 +649,79 @@ export const QuotationBuilderModal: React.FC<QuotationBuilderModalProps> = ({
               <Text style={styles.cardSubtitle}>Configure technical capacity & components</Text>
             </View>
 
+            {/* SOL LIVE FINANCIAL COMPANION */}
+            <View style={styles.solQuoteCompanion}>
+              <GuideCharacter pose="guide" size={38} animated={false} />
+              <View style={styles.solQuoteSpeech}>
+                <View style={styles.solQuoteHeader}>
+                  <Sparkles size={12} color="#0066FF" />
+                  <Text style={styles.solQuoteTitle}>SOL FINANCIAL ARCHITECT</Text>
+                </View>
+                <Text style={styles.solQuoteText}>
+                  {`PM Surya Ghar Subsidy: ₹${subsidy.toLocaleString('en-IN')}! Net cost to client: ₹${netCustomerCost.toLocaleString('en-IN')}. Saves ~₹${monthlySavings.toLocaleString('en-IN')}/mo with ~${paybackYears} yrs payback!`}
+                </Text>
+              </View>
+            </View>
+
+            {/* Interactive Capacity Sizer with Stepper */}
+            <View style={styles.capacityStepperCard}>
+              <Text style={styles.capacityLabel}>PLANT CAPACITY (kWP)</Text>
+              <View style={styles.stepperRow}>
+                <TouchableOpacity
+                  style={styles.stepperBtn}
+                  onPress={() => adjustCapacity(-0.5)}
+                  activeOpacity={0.7}
+                >
+                  <Minus size={18} color="#0066FF" />
+                </TouchableOpacity>
+
+                <View style={styles.capacityDisplayBox}>
+                  <Text style={styles.capacityNumberText}>{cap}</Text>
+                  <Text style={styles.capacityUnitText}>kWp Kit</Text>
+                </View>
+
+                <TouchableOpacity
+                  style={styles.stepperBtn}
+                  onPress={() => adjustCapacity(0.5)}
+                  activeOpacity={0.7}
+                >
+                  <Plus size={18} color="#0066FF" />
+                </TouchableOpacity>
+              </View>
+
+              {/* Quick Capacity Presets */}
+              <View style={styles.quickCapPresetRow}>
+                {[
+                  { kw: 3.3, cost: 195000, label: '3.3 kW' },
+                  { kw: 5.0, cost: 285000, label: '5.0 kW' },
+                  { kw: 8.0, cost: 440000, label: '8.0 kW' },
+                  { kw: 10.0, cost: 525000, label: '10 kW' },
+                ].map((preset) => {
+                  const isSel = Math.abs(cap - preset.kw) < 0.1;
+                  return (
+                    <TouchableOpacity
+                      key={preset.kw}
+                      style={[styles.quickCapPill, isSel && styles.quickCapPillActive]}
+                      onPress={() => selectCapacityPreset(preset.kw, preset.cost)}
+                      activeOpacity={0.75}
+                    >
+                      <Text style={[styles.quickCapText, isSel && styles.quickCapTextActive]}>
+                        {preset.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
             <View style={styles.formRow}>
               <View style={styles.formCol}>
-                <Text style={styles.label}>Plant Capacity (kWp)</Text>
+                <Text style={styles.label}>Solar PV Module Brand & Tech</Text>
                 <TextInput
-                  style={styles.inputHighlight}
-                  value={capacityKw}
-                  onChangeText={handleCapacityChange}
-                  keyboardType="decimal-pad"
+                  style={styles.input}
+                  value={panelBrand}
+                  onChangeText={setPanelBrand}
+                  placeholder="Module Make & Wattage"
                 />
               </View>
               <View style={styles.formCol}>
@@ -645,13 +734,31 @@ export const QuotationBuilderModal: React.FC<QuotationBuilderModalProps> = ({
               </View>
             </View>
 
-            <Text style={styles.label}>Solar PV Module Brand & Tech</Text>
-            <TextInput
-              style={styles.input}
-              value={panelBrand}
-              onChangeText={setPanelBrand}
-              placeholder="Module Make & Wattage"
-            />
+            {/* Quick Module Selection Pills */}
+            <View style={styles.fieldGroupPills}>
+              <Text style={styles.subPillLabel}>Popular Tier-1 ALMM Modules:</Text>
+              <View style={styles.brandPillRow}>
+                {[
+                  'Waaree 540W Mono PERC DCR',
+                  'Adani 550W Bifacial DCR',
+                  'RenewSys 545W Mono PERC',
+                ].map((b) => (
+                  <TouchableOpacity
+                    key={b}
+                    style={[styles.brandPill, panelBrand === b && styles.brandPillActive]}
+                    onPress={() => {
+                      haptics.selection();
+                      setPanelBrand(b);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.brandPillText, panelBrand === b && styles.brandPillTextActive]}>
+                      {b.split(' ')[0]} {b.split(' ')[1]}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
 
             <Text style={styles.label}>Solar Inverter Make</Text>
             <TextInput
@@ -660,6 +767,28 @@ export const QuotationBuilderModal: React.FC<QuotationBuilderModalProps> = ({
               onChangeText={setInverterBrand}
               placeholder="Inverter Make & Capacity"
             />
+
+            {/* Quick Inverter Brand Pills */}
+            <View style={styles.fieldGroupPills}>
+              <Text style={styles.subPillLabel}>Tested Inverter Brands:</Text>
+              <View style={styles.brandPillRow}>
+                {['Solis Grid-Tied Inverter', 'Growatt MIN-X', 'Sungrow Residential'].map((inv) => (
+                  <TouchableOpacity
+                    key={inv}
+                    style={[styles.brandPill, inverterBrand === inv && styles.brandPillActive]}
+                    onPress={() => {
+                      haptics.selection();
+                      setInverterBrand(inv);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.brandPillText, inverterBrand === inv && styles.brandPillTextActive]}>
+                      {inv.split(' ')[0]}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
 
             <Text style={styles.label}>Mounting Structure Type</Text>
             <TextInput
@@ -1462,5 +1591,149 @@ const styles = StyleSheet.create({
     fontSize: 8.5,
     color: '#64748b',
     lineHeight: 12,
+  },
+  // SOL LIVE FINANCIAL COMPANION
+  solQuoteCompanion: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F0F9FF',
+    borderRadius: 14,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#BAE6FD',
+    marginBottom: 14,
+    gap: 12,
+  },
+  solQuoteSpeech: {
+    flex: 1,
+  },
+  solQuoteHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: 3,
+  },
+  solQuoteTitle: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: '#0284C7',
+    letterSpacing: 0.5,
+  },
+  solQuoteText: {
+    fontSize: 12,
+    color: '#0C4A6E',
+    fontWeight: '600',
+    lineHeight: 16,
+  },
+  // CAPACITY STEPPER
+  capacityStepperCard: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: 14,
+    alignItems: 'center',
+  },
+  capacityLabel: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#64748B',
+    letterSpacing: 0.5,
+    marginBottom: 8,
+  },
+  stepperRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    marginBottom: 10,
+  },
+  stepperBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  capacityDisplayBox: {
+    alignItems: 'center',
+    minWidth: 100,
+  },
+  capacityNumberText: {
+    fontSize: 26,
+    fontWeight: '900',
+    color: '#0F172A',
+    letterSpacing: -0.5,
+  },
+  capacityUnitText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#0066FF',
+    marginTop: -2,
+  },
+  quickCapPresetRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 4,
+  },
+  quickCapPill: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  quickCapPillActive: {
+    backgroundColor: '#0066FF',
+    borderColor: '#0066FF',
+  },
+  quickCapText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#475569',
+  },
+  quickCapTextActive: {
+    color: '#FFFFFF',
+  },
+  fieldGroupPills: {
+    marginBottom: 12,
+    marginTop: 4,
+  },
+  subPillLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#64748B',
+    marginBottom: 6,
+    textTransform: 'uppercase',
+  },
+  brandPillRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  brandPill: {
+    backgroundColor: '#F1F5F9',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  brandPillActive: {
+    backgroundColor: '#EFF6FF',
+    borderColor: '#0066FF',
+  },
+  brandPillText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#475569',
+  },
+  brandPillTextActive: {
+    color: '#0066FF',
+    fontWeight: '800',
   },
 });

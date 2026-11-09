@@ -52,6 +52,9 @@ import { useAuth } from '../../context/AuthContext';
 import { SafeStorage } from '../../api/client';
 import { tenantApi } from '../../api/endpoints';
 import { BarcodeScannerModal } from '../operations/BarcodeScannerModal';
+import { GuideCharacter } from '../../components/GuideCharacter';
+import { solarGamificationService } from '../../services/solarGamificationService';
+import { haptics } from '../../utils/haptics';
 
 export type DiscomDocType =
   | 'WCR_FULL'
@@ -437,6 +440,13 @@ export const DiscomDocsModal: React.FC<DiscomDocsModalProps> = ({
       const html = generateDiscomHtml(selectedDocId, data, { includeStamp: includeStampGraphic });
       const filename = `${project?.projectNumber || 'Project'}_${selectedDocId}.pdf`;
       await createAndSharePdf(html, filename);
+
+      solarGamificationService.recordAction('STAGE_ADVANCED', {
+        capacityKw: Number(project?.capacity || 3.3),
+        customerName: project?.customer?.name,
+        projectName: `${selectedDocId} Exported`,
+      }).catch(() => {});
+      haptics.notificationSuccess();
     } catch (err: any) {
       Alert.alert('Export Failed', err.message || 'Could not export DISCOM form');
     } finally {
@@ -686,6 +696,22 @@ export const DiscomDocsModal: React.FC<DiscomDocsModalProps> = ({
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
           >
+            {/* SOL LIVE DISCOM COMPANION */}
+            <View style={styles.solDiscomCompanion}>
+              <GuideCharacter pose="inspect" size={36} animated={false} />
+              <View style={styles.solDiscomSpeech}>
+                <View style={styles.solDiscomHeader}>
+                  <Sparkles size={12} color="#10B981" />
+                  <Text style={styles.solDiscomTitle}>SOL STATUTORY COMPLIANCE ASSISTANT</Text>
+                </View>
+                <Text style={styles.solDiscomText}>
+                  {isPipelineVerified
+                    ? 'All statutory data points verified & locked. 100% compliant for DISCOM submittal!'
+                    : 'Auto-filled from project pipeline. Review and verify to unlock zero-defect compliance.'}
+                </Text>
+              </View>
+            </View>
+
             {/* Quick Document Switcher (Scrolls with form so it never steals screen space) */}
             <View style={styles.quickDocBarInScroll}>
               <ScrollView
@@ -3558,5 +3584,38 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#f1f5f9',
     letterSpacing: 0.2,
+  },
+  // SOL LIVE DISCOM COMPANION
+  solDiscomCompanion: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#064e3b33',
+    borderRadius: 12,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#05966955',
+    marginBottom: 10,
+    gap: 10,
+  },
+  solDiscomSpeech: {
+    flex: 1,
+  },
+  solDiscomHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: 2,
+  },
+  solDiscomTitle: {
+    fontSize: 9.5,
+    fontWeight: '900',
+    color: '#34d399',
+    letterSpacing: 0.5,
+  },
+  solDiscomText: {
+    fontSize: 11,
+    color: '#a7f3d0',
+    fontWeight: '600',
+    lineHeight: 15,
   },
 });

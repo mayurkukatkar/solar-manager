@@ -27,6 +27,10 @@ import {
   Sparkles,
 } from 'lucide-react-native';
 import { ModalHeader } from './Header';
+import { CelebrationModal } from './CelebrationModal';
+import { GuideCharacter } from './GuideCharacter';
+import { solarGamificationService } from '../services/solarGamificationService';
+import { haptics } from '../utils/haptics';
 import { financeApi } from '../api/endpoints';
 import { colors } from '../theme/colors';
 
@@ -58,6 +62,9 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
   const [dueDays, setDueDays] = useState('15');
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [celebrationData, setCelebrationData] = useState<any | null>(null);
+  const [showCelebration, setShowCelebration] = useState(false);
+  const [generatedInvoiceRecord, setGeneratedInvoiceRecord] = useState<any | null>(null);
 
   // Sync initial context
   useEffect(() => {
@@ -181,14 +188,45 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
       const res = await financeApi.createInvoice(payload);
       const createdInvoice = res?.invoice || res;
 
-      Alert.alert('Invoice Generated', `Invoice ${createdInvoice.invoiceNumber || 'Created'} for ₹${amt.toLocaleString('en-IN')} has been generated successfully.`);
-      onSuccess(createdInvoice);
-      onClose();
+      let reward: any = null;
+      try {
+        reward = await solarGamificationService.recordAction('STAGE_ADVANCED', {
+          capacityKw: kw,
+          customerName: customerName.trim(),
+          projectName: title.trim(),
+        });
+      } catch (_) {}
+
+      setGeneratedInvoiceRecord(createdInvoice);
+      setCelebrationData({
+        title: 'Commercial Invoice Generated! 🧾',
+        subtitle: `Invoice ${createdInvoice.invoiceNumber || 'INV'} for ₹${amt.toLocaleString('en-IN')} is ready. Accounts ledger synchronized.`,
+        stageName: 'Commercial Billing & Accounts',
+        xpAwarded: reward?.xpGained || 50,
+        customerName: customerName.trim(),
+        customerPhone: customerMobile.trim(),
+        projectName: title.trim(),
+        capacityKw: kw,
+        peaceOfMindPoints: [
+          'Statutory 13.8% composite solar GST formula applied (Notification 11/2017)',
+          'Bank payment remittance details formatted for client dispatch',
+          'Accounts ledger auto-updated with live collection tracking',
+        ],
+      });
+      setShowCelebration(true);
     } catch (err: any) {
       Alert.alert('Creation Failed', err.response?.data?.error || err.message || 'Could not create invoice.');
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleCelebrationDismiss = () => {
+    setShowCelebration(false);
+    if (generatedInvoiceRecord) {
+      onSuccess(generatedInvoiceRecord);
+    }
+    onClose();
   };
 
   return (
@@ -231,6 +269,24 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
                   </TouchableOpacity>
                 );
               })}
+            </View>
+
+            {/* SOL LIVE BILLING COMPANION */}
+            <View style={styles.solBillingCompanion}>
+              <GuideCharacter pose="inspect" size={38} animated={false} />
+              <View style={styles.solBillingSpeech}>
+                <View style={styles.solBillingHeader}>
+                  <Sparkles size={12} color="#059669" />
+                  <Text style={styles.solBillingTitle}>SOL BILLING COMPANION</Text>
+                </View>
+                <Text style={styles.solBillingText}>
+                  {invoiceType === 'ADVANCE_RECEIPT'
+                    ? '20% token advance confirms customer commitment & initiates structure fabrication.'
+                    : invoiceType === 'PROFORMA'
+                    ? 'Proforma invoice formatted for nationalized banks & PM Surya Ghar loan sanction.'
+                    : 'Statutory 13.8% composite solar GST auto-calculated per MoF Notification 11/2017.'}
+                </Text>
+              </View>
             </View>
 
             {/* CLIENT & SYSTEM DETAILS */}
@@ -382,6 +438,24 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
           </TouchableOpacity>
         </View>
       </View>
+
+      {showCelebration && celebrationData ? (
+        <CelebrationModal
+          visible={showCelebration}
+          title={celebrationData.title}
+          subtitle={celebrationData.subtitle}
+          stageName={celebrationData.stageName}
+          xpAwarded={celebrationData.xpAwarded}
+          customerName={celebrationData.customerName}
+          customerPhone={celebrationData.customerPhone}
+          projectName={celebrationData.projectName}
+          capacityKw={celebrationData.capacityKw}
+          peaceOfMindPoints={celebrationData.peaceOfMindPoints}
+          nextActionLabel="Done ➔"
+          onNextAction={handleCelebrationDismiss}
+          onClose={handleCelebrationDismiss}
+        />
+      ) : null}
     </Modal>
   );
 };
@@ -608,5 +682,38 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '900',
     color: '#ffffff',
+  },
+  // SOL LIVE BILLING COMPANION
+  solBillingCompanion: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F0FDF4',
+    borderRadius: 14,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+    marginBottom: 14,
+    gap: 12,
+  },
+  solBillingSpeech: {
+    flex: 1,
+  },
+  solBillingHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: 3,
+  },
+  solBillingTitle: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: '#059669',
+    letterSpacing: 0.5,
+  },
+  solBillingText: {
+    fontSize: 12,
+    color: '#166534',
+    fontWeight: '600',
+    lineHeight: 16,
   },
 });

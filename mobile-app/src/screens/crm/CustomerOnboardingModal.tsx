@@ -37,7 +37,9 @@ import { ModalHeader, useDirtyFormWarning } from '../../components/common/ModalH
 import { KeyboardAvoidingContainer } from '../../components/common/KeyboardAvoidingContainer';
 import { PermissionRationaleModal } from '../../components/common/PermissionRationaleModal';
 import { CelebrationModal } from '../../components/CelebrationModal';
+import { GuideCharacter } from '../../components/GuideCharacter';
 import { solarGamificationService } from '../../services/solarGamificationService';
+import { haptics } from '../../utils/haptics';
 import { crmApi, documentsApi, tenantApi } from '../../api/endpoints';
 
 interface CustomerOnboardingModalProps {
@@ -528,6 +530,26 @@ export const CustomerOnboardingModal: React.FC<CustomerOnboardingModalProps> = (
             </Text>
           </View>
 
+          {/* SOL LIVE ONBOARDING COMPANION */}
+          <View style={styles.solOnboardCompanion}>
+            <GuideCharacter pose="inspect" size={38} animated={false} />
+            <View style={styles.solOnboardSpeech}>
+              <View style={styles.solOnboardHeader}>
+                <Sparkles size={12} color="#0066FF" />
+                <Text style={styles.solOnboardTitle}>SOL CLIENT ONBOARDING ADVISOR</Text>
+              </View>
+              <Text style={styles.solOnboardText}>
+                {activeStep === 1
+                  ? `Converting ${legalName || 'customer'} to active project. Details are auto-filled to save field time!`
+                  : activeStep === 2
+                  ? `Rooftop feasibility confirmed. Structure engineering ready to allocate.`
+                  : activeStep === 3
+                  ? `Documents are auto-encrypted. Attaching Aadhaar & electricity bill speeds up DISCOM approval!`
+                  : `Almost done! Once saved, project moves straight to procurement & dispatch.`}
+              </Text>
+            </View>
+          </View>
+
           {/* SECTION 1: VERIFIED LEGAL PROFILE */}
           <View style={styles.card}>
             <View style={styles.cardHeader}>
@@ -673,6 +695,26 @@ export const CustomerOnboardingModal: React.FC<CustomerOnboardingModalProps> = (
               </Text>
             </View>
 
+            {/* DOCUMENT VAULT HEALTH METER */}
+            <View style={styles.vaultProgressCard}>
+              <View style={styles.vaultProgressHeader}>
+                <Text style={styles.vaultProgressTitle}>
+                  DOCUMENT VAULT: {documents.filter(d => d.uri).length} OF {documents.length} ATTACHED
+                </Text>
+                <Text style={styles.vaultProgressPct}>
+                  {Math.round((documents.filter(d => d.uri).length / documents.length) * 100)}%
+                </Text>
+              </View>
+              <View style={styles.vaultProgressBarTrack}>
+                <View
+                  style={[
+                    styles.vaultProgressBarFill,
+                    { width: `${(documents.filter(d => d.uri).length / documents.length) * 100}%` },
+                  ]}
+                />
+              </View>
+            </View>
+
             <View style={styles.docOptionalBanner}>
               <Info size={14} color="#0284c7" />
               <Text style={styles.docOptionalBannerText}>
@@ -774,6 +816,35 @@ export const CustomerOnboardingModal: React.FC<CustomerOnboardingModalProps> = (
                 />
               </View>
             </View>
+
+            {/* Quick Bank Selector */}
+            <View style={{ marginBottom: 12 }}>
+              <Text style={styles.subPillLabel}>Common Scheduled Banks:</Text>
+              <View style={styles.bankPillRow}>
+                {['HDFC Bank', 'State Bank of India', 'ICICI Bank', 'Axis Bank', 'Bank of Baroda'].map((b) => (
+                  <TouchableOpacity
+                    key={b}
+                    style={[styles.bankPill, bankName === b && styles.bankPillActive]}
+                    onPress={() => {
+                      haptics.selection();
+                      setBankName(b);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.bankPillText, bankName === b && styles.bankPillTextActive]}>
+                      {b.replace(' Bank', '')}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            {ifscCode.length >= 11 ? (
+              <View style={styles.ifscVerifiedRow}>
+                <CheckCircle2 size={13} color="#15803D" />
+                <Text style={styles.ifscVerifiedText}>Validated IFSC: DBT Direct Transfer Eligible</Text>
+              </View>
+            ) : null}
 
             <Text style={styles.label}>Bank Account Number *</Text>
             <TextInput
@@ -1366,5 +1437,124 @@ const styles = StyleSheet.create({
   stepLabelTextActive: {
     color: '#1d4ed8',
     fontWeight: '700',
+  },
+  // SOL LIVE ONBOARDING COMPANION
+  solOnboardCompanion: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F0F9FF',
+    borderRadius: 14,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#BAE6FD',
+    marginBottom: 14,
+    gap: 12,
+  },
+  solOnboardSpeech: {
+    flex: 1,
+  },
+  solOnboardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: 3,
+  },
+  solOnboardTitle: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: '#0284C7',
+    letterSpacing: 0.5,
+  },
+  solOnboardText: {
+    fontSize: 12,
+    color: '#0C4A6E',
+    fontWeight: '600',
+    lineHeight: 16,
+  },
+  // DOCUMENT VAULT HEALTH METER
+  vaultProgressCard: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 10,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: 10,
+  },
+  vaultProgressHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  vaultProgressTitle: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#0F172A',
+    letterSpacing: 0.4,
+  },
+  vaultProgressPct: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#10B981',
+  },
+  vaultProgressBarTrack: {
+    height: 5,
+    backgroundColor: '#E2E8F0',
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  vaultProgressBarFill: {
+    height: '100%',
+    backgroundColor: '#10B981',
+    borderRadius: 3,
+  },
+  // BANK PILLS & IFSC BADGE
+  subPillLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#64748B',
+    marginBottom: 6,
+    textTransform: 'uppercase',
+  },
+  bankPillRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  bankPill: {
+    backgroundColor: '#F1F5F9',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  bankPillActive: {
+    backgroundColor: '#EFF6FF',
+    borderColor: '#0066FF',
+  },
+  bankPillText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#475569',
+  },
+  bankPillTextActive: {
+    color: '#0066FF',
+    fontWeight: '800',
+  },
+  ifscVerifiedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#F0FDF4',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    marginTop: 6,
+  },
+  ifscVerifiedText: {
+    fontSize: 10.5,
+    fontWeight: '700',
+    color: '#15803D',
   },
 });
