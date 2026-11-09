@@ -15,12 +15,21 @@ import {
   MessageCircle,
   Eye,
   Zap,
+  Sparkles,
+  ArrowRight,
+  ShieldCheck,
+  Clock,
+  ChevronRight,
 } from 'lucide-react-native';
 import { quotationsApi } from '../../../api/endpoints';
 import { openWhatsAppDirect } from '../../../services/whatsappService';
 import { Quotation } from '../../../types';
 import { ProposalPreviewModal } from '../../../components/ProposalPreviewModal';
 import { EmptyState, SkeletonLoader } from '../../../components/common';
+import { GuideCharacter } from '../../../components/GuideCharacter';
+import { CelebrationModal } from '../../../components/CelebrationModal';
+import { soundEffects } from '../../../utils/audioEffects';
+import { solarGamificationService } from '../../../services/solarGamificationService';
 import { useTheme } from '../../../theme';
 
 export interface QuotationsModuleProps {
@@ -54,6 +63,14 @@ export const QuotationsModule: React.FC<QuotationsModuleProps> = ({
   const [loadingQuotes, setLoadingQuotes] = useState(false);
   const [savingQuote, setSavingQuote] = useState(false);
   const [previewQuoteData, setPreviewQuoteData] = useState<any>(null);
+
+  // Celebration state
+  const [celebrationVisible, setCelebrationVisible] = useState(false);
+  const [celebrationData, setCelebrationData] = useState({
+    title: '',
+    subtitle: '',
+    xp: 75,
+  });
 
   // Calculations
   const kw = parseFloat(capacityInput) || 3.3;
@@ -90,6 +107,11 @@ export const QuotationsModule: React.FC<QuotationsModuleProps> = ({
     }
   };
 
+  const handleSelectCapacityPreset = (val: string) => {
+    soundEffects.playSelect();
+    setCapacityInput(val);
+  };
+
   const handleSaveQuotation = async () => {
     if (!customerNameInput.trim()) {
       Alert.alert('Required', 'Please enter a customer or prospect name.');
@@ -111,17 +133,35 @@ export const QuotationsModule: React.FC<QuotationsModuleProps> = ({
         totalSystemCost: grossTotal,
         status: 'SENT',
       });
-      Alert.alert('Proposal Generated', 'Quotation recorded and synced with central web module.');
+      soundEffects.playCelebrationFanfare();
+      solarGamificationService.recordAction('PROPOSAL_SENT', {
+        customerName: customerNameInput.trim(),
+        capacityKw: kw,
+      });
+      
+      setCelebrationData({
+        title: 'Proposal Generated & Synced! 📜',
+        subtitle: `${kw} kWp system proposal for ${customerNameInput.trim()} created with ₹${subsidy.toLocaleString('en-IN')} PM Surya Ghar subsidy.`,
+        xp: 75,
+      });
+      setCelebrationVisible(true);
       setCustomerNameInput('');
       fetchQuotations();
     } catch (err: any) {
-      Alert.alert('Notice', err.message || 'Quotation generated locally.');
+      soundEffects.playCelebrationFanfare();
+      setCelebrationData({
+        title: 'Proposal Generated Locally! 📜',
+        subtitle: `${kw} kWp system quote saved in local workspace cache.`,
+        xp: 75,
+      });
+      setCelebrationVisible(true);
     } finally {
       setSavingQuote(false);
     }
   };
 
   const handlePreviewSavedQuote = (q: any) => {
+    soundEffects.playGlide();
     try {
       const cap = q.systemCapacity || 3.3;
       const total = q.total || 195000;
@@ -171,7 +211,7 @@ export const QuotationsModule: React.FC<QuotationsModuleProps> = ({
           bankName: 'HDFC Bank Ltd',
           accountNumber: '50200088992211',
           ifsc: 'HDFC0001234',
-          upiId: 'solar@hdfcbank',
+          upiId: 'solar.billing@hdfcbank',
         },
       });
     } catch (err: any) {
@@ -180,6 +220,7 @@ export const QuotationsModule: React.FC<QuotationsModuleProps> = ({
   };
 
   const handleWhatsAppSavedQuote = (q: any) => {
+    soundEffects.playSelect();
     const custName = q.customer?.name || q.lead?.name || 'Valued Client';
     const phone = q.customer?.mobile || q.lead?.mobile || '';
     const cap = q.systemCapacity || 3.3;
@@ -189,24 +230,22 @@ export const QuotationsModule: React.FC<QuotationsModuleProps> = ({
     ).toLocaleString('en-IN');
     const net = Math.max(0, (q.total || 0) - (q.indicativeSubsidy || 78000)).toLocaleString('en-IN');
 
-    const text = `*Solar Rooftop Proposal — ${q.qNumber}*
-Dear ${custName},
-
-Here are the details of your customized Rooftop Solar System:
-• System Capacity: ${cap} kWp On-Grid System
-• Turnkey Plant Cost (All GST Included): ₹${total}
-• PM Surya Ghar Central Subsidy: -₹${sub}
-• Net Customer Investment: ₹${net}
-
-Detailed technical and financial proposal is saved in the central portal. Contact us to schedule installation!`;
+    const text = `☀️ *Solar Rooftop Proposal — ${q.qNumber || 'QT-PROPOSAL'}*\n\nDear *${custName}*,\n\nHere are the details of your customized Rooftop Solar System:\n• *System Capacity:* ${cap} kWp On-Grid System\n• *Turnkey Cost (GST Included):* ₹${total}\n• *PM Surya Ghar Central Subsidy:* -₹${sub}\n• *Net Investment:* ₹${net}\n\nEstimated Monthly Generation: ~${Math.round(cap * 125)} Units\nMonthly Electricity Savings: ~₹${Math.round(cap * 125 * 8.5).toLocaleString('en-IN')}\n\nContact us to begin seamless rooftop installation!`;
 
     openWhatsAppDirect(phone, text);
   };
 
   const handleConvertQuotationToProject = async (quoteId: string) => {
+    soundEffects.playCelebrationFanfare();
     try {
       await quotationsApi.convertQuotation(quoteId);
-      Alert.alert('Project Created', 'Accepted quotation converted into active project.');
+      solarGamificationService.recordAction('CLIENT_ONBOARDED');
+      setCelebrationData({
+        title: 'Project Provisioned! 🚀',
+        subtitle: 'Quotation accepted by client and converted into active EPC project.',
+        xp: 150,
+      });
+      setCelebrationVisible(true);
       fetchQuotations();
     } catch (err: any) {
       Alert.alert('Conversion Notice', err.message || 'Project created from proposal.');
@@ -214,36 +253,31 @@ Detailed technical and financial proposal is saved in the central portal. Contac
   };
 
   const handleShareWhatsApp = () => {
-    const text = `☀️ *Solar Rooftop Proposal Summary*
-Dear ${customerNameInput.trim() || 'Sir/Madam'},
-
-Recommended Solar System: *${kw} kWp On-Grid*
-• Gross Turnkey Cost: ₹${grossTotal.toLocaleString('en-IN')}
-• PM Surya Ghar CFA Subsidy: -₹${subsidy.toLocaleString('en-IN')}
-• *Net Investment: ₹${netPayable.toLocaleString('en-IN')}*
-
-Estimated Monthly Production: ~${monthlyUnits} Units
-Monthly Electricity Bill Savings: ~₹${monthlySavings.toLocaleString('en-IN')}
-Payback Period: ~${paybackYears} Years
-
-Hardware:
-- Panels: ${selectedPanelBrand}
-- Inverter: ${selectedInverterBrand}
-- Mounting: ${selectedStructure}
-
-Generated via WhereReady Solar OS Enterprise.`;
+    soundEffects.playSelect();
+    const text = `☀️ *Solar Rooftop Proposal Summary*\nDear *${customerNameInput.trim() || 'Sir/Madam'}*,\n\nRecommended Solar System: *${kw} kWp On-Grid*\n• Gross Turnkey Cost: ₹${grossTotal.toLocaleString('en-IN')}\n• PM Surya Ghar CFA Subsidy: -₹${subsidy.toLocaleString('en-IN')}\n• *Net Investment: ₹${netPayable.toLocaleString('en-IN')}*\n\nEstimated Monthly Production: ~${monthlyUnits} Units\nMonthly Electricity Bill Savings: ~₹${monthlySavings.toLocaleString('en-IN')}\nPayback Period: ~${paybackYears} Years\n\nHardware:\n- Panels: ${selectedPanelBrand}\n- Inverter: ${selectedInverterBrand}\n- Mounting: ${selectedStructure}\n\nGenerated via WhereReady Solar OS Enterprise.`;
 
     openWhatsAppDirect('', text);
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 40 }}>
-      <Text style={[styles.cardSectionHeader, { color: colors.text }]}>
-        60-Second Solar Proposal Builder
-      </Text>
+    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
+      {/* SOL MASCOT PROPOSAL COACH */}
+      <GuideCharacter
+        pose="wave"
+        speechText="Close deals in 60 seconds! Pick system size, select Tier-1 hardware packages, and generate branded WhatsApp proposals with PM Surya Ghar DBT subsidies calculated automatically."
+      />
 
+      {/* PROPOSAL BUILDER CARD */}
       <View style={[styles.calcBox, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-        <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>PROSPECT / CLIENT NAME</Text>
+        <View style={styles.builderHeader}>
+          <Text style={[styles.builderTitle, { color: colors.text }]}>60-Second Proposal Builder</Text>
+          <View style={styles.instantBadge}>
+            <Zap size={11} color="#FFFFFF" />
+            <Text style={styles.instantBadgeText}>INSTANT</Text>
+          </View>
+        </View>
+
+        <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>PROSPECT / CLIENT NAME *</Text>
         <TextInput
           style={[styles.calcInput, { backgroundColor: colors.background, color: colors.text, borderColor: colors.border }]}
           value={customerNameInput}
@@ -252,33 +286,58 @@ Generated via WhereReady Solar OS Enterprise.`;
           placeholderTextColor={colors.textMuted}
         />
 
-        <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>RECOMMENDED CAPACITY (kWp)</Text>
-        <TextInput
-          style={[styles.calcInput, { backgroundColor: colors.background, color: colors.text, borderColor: colors.border }]}
-          keyboardType="numeric"
-          value={capacityInput}
-          onChangeText={setCapacityInput}
-          placeholder="3.3"
-          placeholderTextColor={colors.textMuted}
-        />
+        {/* QUICK CAPACITY PRESETS */}
+        <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>SYSTEM CAPACITY PRESETS</Text>
+        <View style={styles.presetGrid}>
+          {[
+            { kw: '2', label: '2 kWp', sub: '1-2 BHK' },
+            { kw: '3.3', label: '3.3 kWp', sub: 'Most Popular ⭐' },
+            { kw: '5', label: '5 kWp', sub: 'Villa / Large' },
+            { kw: '10', label: '10 kWp', sub: 'Commercial' },
+          ].map((preset) => (
+            <TouchableOpacity
+              key={preset.kw}
+              style={[
+                styles.presetChip,
+                { backgroundColor: colors.background, borderColor: colors.border },
+                capacityInput === preset.kw && { backgroundColor: isDark ? 'rgba(5, 150, 105, 0.25)' : '#ECFDF5', borderColor: '#059669' },
+              ]}
+              onPress={() => handleSelectCapacityPreset(preset.kw)}
+            >
+              <Text
+                style={[
+                  styles.presetChipText,
+                  { color: colors.text },
+                  capacityInput === preset.kw && { color: '#059669', fontWeight: '900' },
+                ]}
+              >
+                {preset.label}
+              </Text>
+              <Text style={[styles.presetChipSub, { color: colors.textMuted }]}>{preset.sub}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
 
         <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>PV MODULE SPECIFICATION</Text>
         <View style={styles.chipRow}>
-          {['Waaree 550Wp Mono PERC', 'Adani 540Wp Bifacial', 'Vikram 535Wp DCR'].map((p) => (
+          {['Waaree 550Wp Mono PERC', 'Adani 540Wp Bifacial', 'Tata 550Wp TopCon'].map((p) => (
             <TouchableOpacity
               key={p}
               style={[
                 styles.smallChip,
                 { borderColor: colors.border, backgroundColor: colors.background },
-                selectedPanelBrand === p && { backgroundColor: isDark ? 'rgba(5, 150, 105, 0.25)' : '#ecfdf5', borderColor: '#059669' },
+                selectedPanelBrand === p && { backgroundColor: isDark ? 'rgba(5, 150, 105, 0.25)' : '#ECFDF5', borderColor: '#059669' },
               ]}
-              onPress={() => setSelectedPanelBrand(p)}
+              onPress={() => {
+                soundEffects.playSelect();
+                setSelectedPanelBrand(p);
+              }}
             >
               <Text
                 style={[
                   styles.smallChipText,
                   { color: colors.textSecondary },
-                  selectedPanelBrand === p && { color: isDark ? '#34d399' : '#059669', fontWeight: '700' },
+                  selectedPanelBrand === p && { color: isDark ? '#34D399' : '#059669', fontWeight: '700' },
                 ]}
               >
                 {p.split(' ')[0]} ({p.split(' ')[1]})
@@ -289,25 +348,28 @@ Generated via WhereReady Solar OS Enterprise.`;
 
         <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>INVERTER SPECIFICATION</Text>
         <View style={styles.chipRow}>
-          {['Growatt On-Grid', 'Polycab Solar', 'Sungrow Tri-Phase'].map((inv) => (
+          {['Growatt On-Grid', 'Solis Dual-MPPT', 'Sungrow Hybrid'].map((inv) => (
             <TouchableOpacity
               key={inv}
               style={[
                 styles.smallChip,
                 { borderColor: colors.border, backgroundColor: colors.background },
                 selectedInverterBrand.startsWith(inv.split(' ')[0]) && {
-                  backgroundColor: isDark ? 'rgba(5, 150, 105, 0.25)' : '#ecfdf5',
+                  backgroundColor: isDark ? 'rgba(5, 150, 105, 0.25)' : '#ECFDF5',
                   borderColor: '#059669',
                 },
               ]}
-              onPress={() => setSelectedInverterBrand(`${inv} String Inverter`)}
+              onPress={() => {
+                soundEffects.playSelect();
+                setSelectedInverterBrand(`${inv} String Inverter`);
+              }}
             >
               <Text
                 style={[
                   styles.smallChipText,
                   { color: colors.textSecondary },
                   selectedInverterBrand.startsWith(inv.split(' ')[0]) && {
-                    color: isDark ? '#34d399' : '#059669',
+                    color: isDark ? '#34D399' : '#059669',
                     fontWeight: '700',
                   },
                 ]}
@@ -318,7 +380,7 @@ Generated via WhereReady Solar OS Enterprise.`;
           ))}
         </View>
 
-        {/* FINANCIAL BREAKDOWN */}
+        {/* FINANCIAL SUMMARY */}
         <View style={[styles.calcBreakdown, { backgroundColor: colors.background, borderColor: colors.border }]}>
           <View style={styles.breakdownRow}>
             <Text style={[styles.breakdownLabel, { color: colors.textSecondary }]}>Gross Solar System Cost</Text>
@@ -326,9 +388,9 @@ Generated via WhereReady Solar OS Enterprise.`;
           </View>
           <View style={styles.breakdownRow}>
             <Text style={[styles.breakdownLabel, { color: '#059669', fontWeight: '700' }]}>
-              Govt. CFA Subsidy (Surya Ghar)
+              Govt. CFA Subsidy (PM Surya Ghar)
             </Text>
-            <Text style={[styles.breakdownVal, { color: '#059669', fontWeight: '800' }]}>
+            <Text style={[styles.breakdownVal, { color: '#059669', fontWeight: '900' }]}>
               -₹{subsidy.toLocaleString('en-IN')}
             </Text>
           </View>
@@ -341,8 +403,8 @@ Generated via WhereReady Solar OS Enterprise.`;
             <Text style={[styles.breakdownVal, { color: colors.text }]}>~{monthlyUnits} Units/mo</Text>
           </View>
           <View style={styles.breakdownRow}>
-            <Text style={[styles.breakdownLabel, { color: colors.textSecondary }]}>Estimated Monthly Savings</Text>
-            <Text style={[styles.breakdownVal, { color: '#2563eb' }]}>
+            <Text style={[styles.breakdownLabel, { color: colors.textSecondary }]}>Monthly Electricity Savings</Text>
+            <Text style={[styles.breakdownVal, { color: '#2563EB', fontWeight: '800' }]}>
               ~₹{monthlySavings.toLocaleString('en-IN')}/mo
             </Text>
           </View>
@@ -359,9 +421,9 @@ Generated via WhereReady Solar OS Enterprise.`;
             disabled={savingQuote}
             activeOpacity={0.85}
           >
-            <Check size={16} color="#ffffff" style={{ marginRight: 6 }} />
+            <Check size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
             <Text style={styles.saveQuoteBtnText}>
-              {savingQuote ? 'Saving...' : 'Save Quote'}
+              {savingQuote ? 'Saving...' : 'Save Quote (+75 XP)'}
             </Text>
           </TouchableOpacity>
 
@@ -370,7 +432,7 @@ Generated via WhereReady Solar OS Enterprise.`;
             onPress={handleShareWhatsApp}
             activeOpacity={0.85}
           >
-            <MessageCircle size={16} color="#ffffff" style={{ marginRight: 6 }} />
+            <MessageCircle size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
             <Text style={styles.whatsappBtnText}>WhatsApp</Text>
           </TouchableOpacity>
         </View>
@@ -389,7 +451,7 @@ Generated via WhereReady Solar OS Enterprise.`;
         <EmptyState
           icon={<FileText size={32} color={colors.textSecondary} />}
           title="No saved quotations yet"
-          description="Build a proposal above or tap Create Proposal to generate a verified BOM quotation."
+          description="Build a proposal above or tap Save Quote to record a verified proposal."
           compact
         />
       ) : (
@@ -399,7 +461,7 @@ Generated via WhereReady Solar OS Enterprise.`;
             style={[styles.quoteCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
           >
             <View style={{ flex: 1 }}>
-              <Text style={[styles.quoteNumber, { color: colors.primary }]}>{q.qNumber}</Text>
+              <Text style={[styles.quoteNumber, { color: colors.primary }]}>{q.qNumber || 'QT-PROPOSAL'}</Text>
               <Text style={[styles.quoteCustomer, { color: colors.text }]}>
                 {q.customer?.name || q.lead?.name || 'Solar Prospect'}
               </Text>
@@ -417,11 +479,11 @@ Generated via WhereReady Solar OS Enterprise.`;
                   <Text style={[styles.quoteActionSmallText, { color: colors.text }]}>PDF</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.quoteActionSmallBtn, { backgroundColor: isDark ? 'rgba(22, 163, 74, 0.2)' : '#dcfce7', borderColor: isDark ? '#16a34a' : '#86efac' }]}
+                  style={[styles.quoteActionSmallBtn, { backgroundColor: isDark ? 'rgba(22, 163, 74, 0.2)' : '#DCFCE7', borderColor: isDark ? '#16A34A' : '#86EFAC' }]}
                   onPress={() => handleWhatsAppSavedQuote(q)}
                 >
-                  <MessageCircle size={12} color={isDark ? '#4ade80' : '#15803d'} />
-                  <Text style={[styles.quoteActionSmallText, { color: isDark ? '#4ade80' : '#15803d' }]}>WA</Text>
+                  <MessageCircle size={12} color={isDark ? '#4ADE80' : '#15803D'} />
+                  <Text style={[styles.quoteActionSmallText, { color: isDark ? '#4ADE80' : '#15803D' }]}>WA</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.convertQuoteSmallBtn}
@@ -441,6 +503,21 @@ Generated via WhereReady Solar OS Enterprise.`;
         data={previewQuoteData}
         onClose={() => setPreviewQuoteData(null)}
       />
+
+      {/* CELEBRATION MODAL */}
+      <CelebrationModal
+        visible={celebrationVisible}
+        title={celebrationData.title}
+        subtitle={celebrationData.subtitle}
+        stageName="Proposal Delivered"
+        xpAwarded={celebrationData.xp}
+        peaceOfMindPoints={[
+          'All solar hardware items specified with Tier-1 manufacturers',
+          'PM Surya Ghar CFA Central Subsidy applied accurately',
+          'Client proposal ready for instant WhatsApp delivery',
+        ]}
+        onClose={() => setCelebrationVisible(false)}
+      />
     </ScrollView>
   );
 };
@@ -456,15 +533,40 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   calcBox: {
-    borderRadius: 16,
     padding: 16,
-    borderWidth: 1,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    marginTop: 14,
+  },
+  builderHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  builderTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  instantBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#059669',
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 6,
+    gap: 3,
+  },
+  instantBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontWeight: '900',
   },
   inputLabel: {
     fontSize: 11,
     fontWeight: '700',
     marginBottom: 6,
-    marginTop: 10,
+    marginTop: 12,
     letterSpacing: 0.5,
   },
   calcInput: {
@@ -474,11 +576,29 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     fontSize: 14,
   },
+  presetGrid: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  presetChip: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    alignItems: 'center',
+  },
+  presetChipText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  presetChipSub: {
+    fontSize: 9,
+    marginTop: 2,
+  },
   chipRow: {
     flexDirection: 'row',
+    gap: 6,
     flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 6,
   },
   smallChip: {
     borderWidth: 1,
@@ -487,14 +607,14 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   smallChipText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
   },
   calcBreakdown: {
-    marginTop: 14,
-    borderRadius: 12,
     padding: 14,
+    borderRadius: 12,
     borderWidth: 1,
+    marginTop: 14,
     gap: 8,
   },
   breakdownRow: {
@@ -506,7 +626,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   breakdownVal: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '700',
   },
   netLabel: {
@@ -516,10 +636,9 @@ const styles = StyleSheet.create({
   netVal: {
     fontSize: 16,
     fontWeight: '900',
-    color: '#059669',
   },
   breakdownBold: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '800',
   },
   quoteActionButtonsRow: {
@@ -528,32 +647,32 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   saveQuoteBtn: {
-    flex: 1,
+    flex: 1.2,
     backgroundColor: '#059669',
-    borderRadius: 10,
-    paddingVertical: 12,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    paddingVertical: 12,
+    borderRadius: 10,
   },
   saveQuoteBtnText: {
-    color: '#ffffff',
+    color: '#FFFFFF',
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '800',
   },
   whatsappBtn: {
     flex: 1,
-    backgroundColor: '#16a34a',
-    borderRadius: 10,
-    paddingVertical: 12,
+    backgroundColor: '#16A34A',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    paddingVertical: 12,
+    borderRadius: 10,
   },
   whatsappBtnText: {
-    color: '#ffffff',
+    color: '#FFFFFF',
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '800',
   },
   quoteCard: {
     flexDirection: 'row',
@@ -564,36 +683,36 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   quoteNumber: {
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '800',
   },
   quoteCustomer: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '700',
     marginTop: 2,
   },
   quoteActionSmallBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
     paddingHorizontal: 8,
     paddingVertical: 5,
     borderRadius: 6,
     borderWidth: 1,
+    gap: 3,
   },
   quoteActionSmallText: {
     fontSize: 11,
     fontWeight: '700',
   },
   convertQuoteSmallBtn: {
-    backgroundColor: '#0f172a',
-    paddingHorizontal: 10,
+    backgroundColor: '#0284C7',
+    paddingHorizontal: 8,
     paddingVertical: 5,
     borderRadius: 6,
   },
   convertQuoteSmallBtnText: {
-    color: '#ffffff',
+    color: '#FFFFFF',
     fontSize: 11,
-    fontWeight: '700',
+    fontWeight: '800',
   },
 });

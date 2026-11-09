@@ -42,6 +42,11 @@ import { haptics } from '../../utils/haptics';
 import { offlineSyncService } from '../../services/offlineSyncService';
 import { useTheme } from '../../theme';
 import { EmptyState, SkeletonLoader } from '../../components/common';
+import { SignaturePad } from '../../components/SignaturePad';
+import { GuideCharacter } from '../../components/GuideCharacter';
+import { CelebrationModal } from '../../components/CelebrationModal';
+import { soundEffects } from '../../utils/audioEffects';
+import { solarGamificationService } from '../../services/solarGamificationService';
 
 export const FIELD_TECHNICIANS = [
   { id: 'tech-1', name: 'Ramesh Patil', role: 'Lead Electrician (Master Tech)', phone: '+91 98220 11223' },
@@ -98,6 +103,14 @@ export const OperationsScreen: React.FC<{ navigation?: any }> = ({ navigation })
   const [customerSigned, setCustomerSigned] = useState(false);
   const [signOffTime, setSignOffTime] = useState<string | null>(null);
   const [cameraRationaleVisible, setCameraRationaleVisible] = useState(false);
+  const [celebrationVisible, setCelebrationVisible] = useState(false);
+  const [celebrationData, setCelebrationData] = useState({
+    title: '',
+    subtitle: '',
+    customerName: '',
+    capacityKw: 3.3,
+    xp: 150,
+  });
 
   useEffect(() => {
     fetchOperations();
@@ -214,10 +227,17 @@ export const OperationsScreen: React.FC<{ navigation?: any }> = ({ navigation })
   };
 
   const toggleChecklist = (id: string) => {
+    soundEffects.playSelect();
     haptics.selection();
-    setChecklist((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, completed: !item.completed } : item))
-    );
+    setChecklist((prev) => {
+      const next = prev.map((item) => (item.id === id ? { ...item, completed: !item.completed } : item));
+      const allDone = next.every((item) => item.completed);
+      if (allDone) {
+        soundEffects.playVerificationShield();
+        solarGamificationService.recordAction('QA_CERTIFIED');
+      }
+      return next;
+    });
   };
 
   const handleOpenBarcodeScanner = () => {
@@ -821,6 +841,11 @@ export const OperationsScreen: React.FC<{ navigation?: any }> = ({ navigation })
             </View>
 
             <ScrollView style={{ flex: 1, padding: 16 }} showsVerticalScrollIndicator={false}>
+              <GuideCharacter
+                pose="inspect"
+                speechText="Zero-Defect Installation Protocol! Verify all 7 safety points, scan serials, capture 5 geo-photos, and get customer digital signature on glass."
+              />
+
               {/* 1. CHECKLIST */}
               {activeTab === 'CHECKLIST' && (
                 <View>
@@ -1017,19 +1042,24 @@ export const OperationsScreen: React.FC<{ navigation?: any }> = ({ navigation })
                     ]}
                   >
                     {!customerSigned ? (
-                      <TouchableOpacity
-                        style={styles.touchSignArea}
-                        onPress={() => {
-                          const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                          setSignOffTime(now);
-                          setCustomerSigned(true);
-                          Alert.alert('Digital Sign-Off Recorded', `Handover signed by ${activeJob.customerName} at ${now}.`);
-                        }}
-                      >
-                        <Text style={[styles.touchSignPrompt, { color: colors.textSecondary }]}>
-                          ✍️ Tap to Sign Customer Handover
+                      <View style={{ padding: 12 }}>
+                        <Text style={[styles.touchSignPrompt, { color: colors.textSecondary, marginBottom: 8 }]}>
+                          ✍️ Customer Digital Sign-Off (Draw on Glass)
                         </Text>
-                      </TouchableOpacity>
+                        <SignaturePad
+                          height={150}
+                          strokeColor={isDark ? '#38BDF8' : '#0F172A'}
+                          strokeWidth={3}
+                          onSignatureChange={(path) => {
+                            if (path) {
+                              soundEffects.playSelect();
+                              const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                              setSignOffTime(now);
+                              setCustomerSigned(true);
+                            }
+                          }}
+                        />
+                      </View>
                     ) : (
                       <View style={styles.signedContent}>
                         <CheckCircle2 size={32} color="#10B981" />
@@ -1037,11 +1067,17 @@ export const OperationsScreen: React.FC<{ navigation?: any }> = ({ navigation })
                           {activeJob.customerName}
                         </Text>
                         <Text style={[styles.signedTime, { color: colors.textSecondary }]}>
-                          Signed at {signOffTime || new Date().toLocaleTimeString()}
+                          Signed on Glass at {signOffTime || new Date().toLocaleTimeString()}
                         </Text>
                         <Text style={[styles.signedHash, { color: colors.textMuted }]}>
                           Digital Handover Confirmed • Job #{activeJob.jobId}
                         </Text>
+                        <TouchableOpacity
+                          style={{ marginTop: 8, paddingVertical: 4, paddingHorizontal: 10, borderRadius: 6, backgroundColor: colors.background, borderWidth: 1, borderColor: colors.borderSubtle }}
+                          onPress={() => setCustomerSigned(false)}
+                        >
+                          <Text style={{ fontSize: 11, color: colors.textSecondary, fontWeight: '700' }}>Re-sign</Text>
+                        </TouchableOpacity>
                       </View>
                     )}
                   </View>
@@ -1049,12 +1085,26 @@ export const OperationsScreen: React.FC<{ navigation?: any }> = ({ navigation })
                   <TouchableOpacity
                     style={styles.completeJobBtn}
                     onPress={() => {
+                      soundEffects.playCelebrationFanfare();
+                      solarGamificationService.recordAction('QA_CERTIFIED', {
+                        customerName: activeJob.customerName,
+                        capacityKw: activeJob.capacityKw,
+                      });
                       handleUpdateStatus(activeJob.id, 'COMPLETED');
+                      setCelebrationData({
+                        title: 'Zero-Defect Handover Dossier Certified! 🎉',
+                        subtitle: `${activeJob.customerName}'s ${activeJob.capacityKw || 3.3} kWp plant is fully installed, tested, and ready for DISCOM meter installation.`,
+                        customerName: activeJob.customerName,
+                        capacityKw: activeJob.capacityKw || 3.3,
+                        xp: 150,
+                      });
+                      setCelebrationVisible(true);
                       setActiveJob(null);
                     }}
                     activeOpacity={0.85}
                   >
-                    <Text style={styles.completeJobBtnText}>Complete & Submit Handover Dossier</Text>
+                    <Sparkles size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
+                    <Text style={styles.completeJobBtnText}>Complete & Submit Handover Dossier (+150 XP)</Text>
                   </TouchableOpacity>
                 </View>
               )}
@@ -1170,6 +1220,24 @@ export const OperationsScreen: React.FC<{ navigation?: any }> = ({ navigation })
           </View>
         </Modal>
       )}
+
+      {/* CELEBRATION MODAL */}
+      <CelebrationModal
+        visible={celebrationVisible}
+        title={celebrationData.title}
+        subtitle={celebrationData.subtitle}
+        stageName="Installation QA Passed"
+        xpAwarded={celebrationData.xp}
+        customerName={celebrationData.customerName}
+        capacityKw={celebrationData.capacityKw}
+        peaceOfMindPoints={[
+          'All 7 electrical safety & CEA checklist items verified',
+          'Hardware DCR serial barcodes linked to PM Surya Ghar portal',
+          'Customer digital handover signature recorded on glass',
+          '5 mandatory geo-photos ready for DISCOM meter installation',
+        ]}
+        onClose={() => setCelebrationVisible(false)}
+      />
     </View>
   );
 };

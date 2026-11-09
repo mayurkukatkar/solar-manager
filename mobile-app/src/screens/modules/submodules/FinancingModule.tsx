@@ -10,8 +10,16 @@ import {
 import {
   Banknote,
   MessageCircle,
+  Sparkles,
+  TrendingUp,
+  ShieldCheck,
+  CheckCircle2,
 } from 'lucide-react-native';
 import { openWhatsAppDirect } from '../../../services/whatsappService';
+import { GuideCharacter } from '../../../components/GuideCharacter';
+import { CelebrationModal } from '../../../components/CelebrationModal';
+import { soundEffects } from '../../../utils/audioEffects';
+import { solarGamificationService } from '../../../services/solarGamificationService';
 import { useTheme } from '../../../theme';
 
 export interface FinancingModuleProps {
@@ -28,11 +36,12 @@ export const FinancingModule: React.FC<FinancingModuleProps> = ({
   const [loanCapInput, setLoanCapInput] = useState('3.3');
   const [downPaymentInput, setDownPaymentInput] = useState('20000');
   const [loanTenureYears, setLoanTenureYears] = useState(5);
+  const [celebrationVisible, setCelebrationVisible] = useState(false);
   const loanInterestRate = 7.0;
 
   // Loan Calculator Engine
   const loanKw = parseFloat(loanCapInput) || 3.3;
-  const loanGross = Math.round(loanKw * 60000);
+  const loanGross = Math.round(loanKw * 58000);
   let loanSub = 0;
   if (loanKw <= 1) loanSub = 30000;
   else if (loanKw <= 2) loanSub = 60000;
@@ -47,17 +56,19 @@ export const FinancingModule: React.FC<FinancingModuleProps> = ({
   const monthlyEmi =
     principal > 0 && monthlyRate > 0
       ? Math.round(
-        (principal * monthlyRate * Math.pow(1 + monthlyRate, totalMonths)) /
-        (Math.pow(1 + monthlyRate, totalMonths) - 1)
-      )
+          (principal * monthlyRate * Math.pow(1 + monthlyRate, totalMonths)) /
+            (Math.pow(1 + monthlyRate, totalMonths) - 1)
+        )
       : 0;
 
-  const loanMonthlyUnits = Math.round(loanKw * 125);
+  const loanMonthlyUnits = Math.round(loanKw * 120);
   const loanMonthlySavings = Math.round(loanMonthlyUnits * 8.5);
   const netMonthlyCashBenefit = loanMonthlySavings - monthlyEmi;
+  const isPositiveCashflow = netMonthlyCashBenefit >= 0;
 
   const handleShareLoanWhatsApp = () => {
-    const text = `*PM Surya Ghar 7% Solar Loan Estimate*
+    soundEffects.playSelect();
+    const text = `*PM Surya Ghar 7% Concessional Solar Loan* ☀️
 • Recommended System: *${loanKw} kWp Rooftop Solar*
 • Gross Turnkey Cost: ₹${loanGross.toLocaleString('en-IN')}
 • Govt. CFA Subsidy: -₹${loanSub.toLocaleString('en-IN')}
@@ -65,24 +76,56 @@ export const FinancingModule: React.FC<FinancingModuleProps> = ({
 • Down Payment: ₹${downPay.toLocaleString('en-IN')}
 • Bank Principal Financed: ₹${principal.toLocaleString('en-IN')}
 
-*Monthly Cashflow:*
-• Concessional Bank EMI (7% p.a., ${loanTenureYears} yrs): ₹${monthlyEmi.toLocaleString('en-IN')} / mo
-• Electricity Bill Savings: +₹${loanMonthlySavings.toLocaleString('en-IN')} / mo
-• *Net Monthly In-Pocket Savings: +₹${netMonthlyCashBenefit.toLocaleString('en-IN')} / mo*
+*Monthly Cashflow Analysis:*
+• Electricity Bill Savings: *+₹${loanMonthlySavings.toLocaleString('en-IN')} / mo*
+• Bank EMI (7% p.a., ${loanTenureYears} yrs): *-₹${monthlyEmi.toLocaleString('en-IN')} / mo*
+• *Net In-Pocket Benefit: +₹${netMonthlyCashBenefit.toLocaleString('en-IN')} / mo* 💰
 
-Solar pays for itself from Day 1. Contact us to process collateral-free loan sanction.`;
+Solar pays for its own loan from Day 1. Zero collateral required under PM Surya Ghar.`;
 
     openWhatsAppDirect('', text);
+    solarGamificationService.recordAction('PROPOSAL_SENT', {
+      projectName: '7% Solar Loan Pitch Sent',
+      capacityKw: loanKw,
+    });
+    setCelebrationVisible(true);
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 40 }}>
+    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+      {/* SOL COMPANION */}
+      <View
+        style={[
+          styles.solCompanionCard,
+          {
+            backgroundColor: isDark ? 'rgba(139, 92, 246, 0.12)' : '#F5F3FF',
+            borderColor: isDark ? 'rgba(139, 92, 246, 0.3)' : '#DDD6FE',
+          },
+        ]}
+      >
+        <GuideCharacter pose="guide" size={38} animated={false} />
+        <View style={{ flex: 1 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Text style={[styles.solTitle, { color: isDark ? '#C4B5FD' : '#5B21B6' }]}>
+              Solar Pays Its Own Loan
+            </Text>
+            <View style={styles.solPill}>
+              <Sparkles size={9} color="#7C3AED" />
+              <Text style={styles.solPillText}>7% P.A. CONCESSIONAL</Text>
+            </View>
+          </View>
+          <Text style={[styles.solSub, { color: isDark ? '#DDD6FE' : '#4C1D95' }]}>
+            Under PM Surya Ghar, public sector banks provide collateral-free loans at 7% p.a. Monthly electricity savings exceed the EMI!
+          </Text>
+        </View>
+      </View>
+
       <Text style={[styles.cardSectionHeader, { color: colors.text }]}>
-        PM Surya Ghar 7% p.a. Concessional Solar Loan
+        Concessional Loan & Cashflow Simulator
       </Text>
 
       <View style={[styles.calcBox, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-        <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>SYSTEM CAPACITY (kW)</Text>
+        <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>SOLAR SYSTEM CAPACITY (kWp)</Text>
         <TextInput
           style={[styles.calcInput, { backgroundColor: colors.background, color: colors.text, borderColor: colors.border }]}
           keyboardType="numeric"
@@ -102,7 +145,30 @@ Solar pays for itself from Day 1. Contact us to process collateral-free loan san
           placeholderTextColor={colors.textMuted}
         />
 
-        <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>LOAN TENURE (YEARS)</Text>
+        {/* Down payment presets */}
+        <View style={styles.downPayPresetRow}>
+          {[
+            { label: '₹0 (Zero Down)', val: '0' },
+            { label: '₹15,000', val: '15000' },
+            { label: '₹25,000', val: '25000' },
+            { label: '₹50,000', val: '50000' },
+          ].map((dp) => (
+            <TouchableOpacity
+              key={dp.val}
+              style={[styles.downPayChip, downPaymentInput === dp.val && styles.downPayChipActive]}
+              onPress={() => {
+                soundEffects.playSelect();
+                setDownPaymentInput(dp.val);
+              }}
+            >
+              <Text style={[styles.downPayChipText, downPaymentInput === dp.val && styles.downPayChipTextActive]}>
+                {dp.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <Text style={[styles.inputLabel, { color: colors.textSecondary, marginTop: 12 }]}>LOAN TENURE (YEARS)</Text>
         <View style={styles.chipRow}>
           {[3, 5, 7].map((yr) => (
             <TouchableOpacity
@@ -110,86 +176,84 @@ Solar pays for itself from Day 1. Contact us to process collateral-free loan san
               style={[
                 styles.smallChip,
                 { borderColor: colors.border, backgroundColor: colors.background },
-                loanTenureYears === yr && { backgroundColor: isDark ? 'rgba(124, 58, 237, 0.2)' : '#f5f3ff', borderColor: '#7c3aed' },
+                loanTenureYears === yr && { backgroundColor: isDark ? 'rgba(124, 58, 237, 0.2)' : '#F5F3FF', borderColor: '#7C3AED' },
               ]}
-              onPress={() => setLoanTenureYears(yr)}
+              onPress={() => {
+                soundEffects.playSelect();
+                setLoanTenureYears(yr);
+              }}
             >
               <Text
                 style={[
                   styles.smallChipText,
                   { color: colors.textSecondary },
-                  loanTenureYears === yr && { color: isDark ? '#a78bfa' : '#7c3aed', fontWeight: '700' },
+                  loanTenureYears === yr && { color: '#7C3AED', fontWeight: '800' },
                 ]}
               >
-                {yr} Years ({yr * 12} Mos)
+                {yr} Years ({yr * 12} EMIs)
               </Text>
             </TouchableOpacity>
           ))}
         </View>
+      </View>
 
-        <View style={[styles.calcBreakdown, { backgroundColor: colors.background, borderColor: colors.border }]}>
-          <View style={styles.breakdownRow}>
-            <Text style={[styles.breakdownLabel, { color: colors.textSecondary }]}>Gross Solar Cost</Text>
-            <Text style={[styles.breakdownVal, { color: colors.text }]}>₹{loanGross.toLocaleString('en-IN')}</Text>
-          </View>
-          <View style={styles.breakdownRow}>
-            <Text style={[styles.breakdownLabel, { color: '#059669' }]}>PM Surya Ghar Subsidy</Text>
-            <Text style={[styles.breakdownVal, { color: '#059669', fontWeight: '800' }]}>
-              -₹{loanSub.toLocaleString('en-IN')}
-            </Text>
-          </View>
-          <View style={styles.breakdownRow}>
-            <Text style={[styles.breakdownLabel, { color: colors.textSecondary }]}>Net System Payable</Text>
-            <Text style={[styles.breakdownVal, { color: colors.text }]}>
-              ₹{loanNetInvestment.toLocaleString('en-IN')}
-            </Text>
-          </View>
-          <View style={styles.breakdownRow}>
-            <Text style={[styles.breakdownLabel, { color: colors.textSecondary }]}>Down Payment</Text>
-            <Text style={[styles.breakdownVal, { color: colors.text }]}>-₹{downPay.toLocaleString('en-IN')}</Text>
-          </View>
-          <View style={[styles.breakdownRow, { borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 10 }]}>
-            <Text style={[styles.netLabel, { color: colors.text }]}>Bank Loan Principal</Text>
-            <Text style={[styles.netVal, { color: colors.text }]}>₹{principal.toLocaleString('en-IN')}</Text>
-          </View>
-          <View style={styles.breakdownRow}>
-            <Text style={[styles.breakdownLabel, { color: colors.textSecondary }]}>
-              Interest Rate (Govt. Surcharge)
-            </Text>
-            <Text style={[styles.breakdownBold, { color: colors.text }]}>{loanInterestRate}% p.a.</Text>
-          </View>
-          <View style={styles.breakdownRow}>
-            <Text style={[styles.breakdownLabel, { fontWeight: '700', color: isDark ? '#fbbf24' : '#b45309' }]}>
-              Monthly Bank EMI
-            </Text>
-            <Text style={[styles.breakdownVal, { fontWeight: '900', color: isDark ? '#fbbf24' : '#b45309', fontSize: 16 }]}>
-              ₹{monthlyEmi.toLocaleString('en-IN')} / mo
-            </Text>
-          </View>
-          <View style={styles.breakdownRow}>
-            <Text style={[styles.breakdownLabel, { color: colors.textSecondary }]}>Monthly Bill Savings</Text>
-            <Text style={[styles.breakdownVal, { color: '#2563eb', fontWeight: '800' }]}>
-              +₹{loanMonthlySavings.toLocaleString('en-IN')} / mo
-            </Text>
-          </View>
-
-          <View style={[styles.profitBox, { backgroundColor: isDark ? 'rgba(16, 185, 129, 0.2)' : '#ecfdf5' }]}>
-            <Text style={{ fontSize: 13, fontWeight: '800', color: isDark ? '#34d399' : '#047857' }}>NET MONTHLY PROFIT</Text>
-            <Text style={{ fontSize: 15, fontWeight: '900', color: isDark ? '#34d399' : '#047857' }}>
-              +₹{netMonthlyCashBenefit.toLocaleString('en-IN')} / mo
-            </Text>
+      {/* CASHFLOW DELIGHT BADGE */}
+      <View style={[styles.cashflowCard, isPositiveCashflow ? styles.cashflowPositive : styles.cashflowNeutral]}>
+        <View style={styles.cashflowHeaderRow}>
+          <TrendingUp size={18} color="#15803D" />
+          <Text style={styles.cashflowTitle}>
+            {isPositiveCashflow ? 'Zero Net Out-Of-Pocket' : 'Low Monthly Cost'}
+          </Text>
+          <View style={styles.positiveBadge}>
+            <Text style={styles.positiveBadgeText}>DAY 1 CASHFLOW POSITIVE</Text>
           </View>
         </View>
 
-        <TouchableOpacity
-          style={styles.whatsappBtn}
-          onPress={handleShareLoanWhatsApp}
-          activeOpacity={0.85}
-        >
-          <MessageCircle size={16} color="#ffffff" style={{ marginRight: 6 }} />
-          <Text style={styles.whatsappBtnText}>Share Financing on WhatsApp</Text>
-        </TouchableOpacity>
+        <View style={styles.cashflowRow}>
+          <Text style={styles.cashflowLabel}>Monthly Electricity Bill Savings:</Text>
+          <Text style={[styles.cashflowVal, { color: '#15803D' }]}>+₹{loanMonthlySavings.toLocaleString('en-IN')}/mo</Text>
+        </View>
+        <View style={styles.cashflowRow}>
+          <Text style={styles.cashflowLabel}>Concessional Bank EMI (7% p.a.):</Text>
+          <Text style={[styles.cashflowVal, { color: '#DC2626' }]}>-₹{monthlyEmi.toLocaleString('en-IN')}/mo</Text>
+        </View>
+        <View style={styles.divider} />
+        <View style={styles.cashflowRow}>
+          <Text style={styles.cashflowBoldLabel}>Net Monthly Extra Cash in Customer Pocket:</Text>
+          <Text style={styles.cashflowExtraBold}>
+            +₹{Math.max(0, netMonthlyCashBenefit).toLocaleString('en-IN')}/mo
+          </Text>
+        </View>
       </View>
+
+      {/* 1-TAP WHATSAPP DISPATCH */}
+      <TouchableOpacity
+        style={styles.shareWhatsAppBtn}
+        onPress={handleShareLoanWhatsApp}
+        activeOpacity={0.88}
+      >
+        <MessageCircle size={18} color="#FFFFFF" />
+        <Text style={styles.shareWhatsAppBtnText}>Send 7% Loan Pitch on WhatsApp</Text>
+      </TouchableOpacity>
+
+      {/* CELEBRATION MODAL */}
+      {celebrationVisible && (
+        <CelebrationModal
+          visible={celebrationVisible}
+          title="Loan Pitch Dispatched! 💰"
+          subtitle={`Sent 7% concessional EMI breakdown for ${loanKw} kWp to customer.`}
+          stageName="Solar Loan Proposal Shared"
+          xpAwarded={25}
+          peaceOfMindPoints={[
+            'Collateral-free loan eligible under PM Surya Ghar',
+            'Electricity savings exceed monthly EMI payment',
+            'Zero pre-payment penalty at nationalized banks',
+          ]}
+          nextActionLabel="Done"
+          onNextAction={() => setCelebrationVisible(false)}
+          onClose={() => setCelebrationVisible(false)}
+        />
+      )}
     </ScrollView>
   );
 };
@@ -199,98 +263,190 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 16,
   },
+  solCompanionCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 14,
+    borderRadius: 18,
+    borderWidth: 1,
+    marginBottom: 16,
+  },
+  solTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  solPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: '#EDE9FE',
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 6,
+  },
+  solPillText: {
+    fontSize: 8,
+    fontWeight: '800',
+    color: '#7C3AED',
+  },
+  solSub: {
+    fontSize: 11,
+    marginTop: 2,
+    lineHeight: 15,
+  },
   cardSectionHeader: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '800',
     marginBottom: 12,
   },
   calcBox: {
-    borderRadius: 16,
     padding: 16,
+    borderRadius: 16,
     borderWidth: 1,
+    marginBottom: 16,
   },
   inputLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    marginBottom: 6,
-    marginTop: 10,
+    fontSize: 10,
+    fontWeight: '800',
     letterSpacing: 0.5,
+    marginBottom: 6,
   },
   calcInput: {
+    height: 48,
+    borderRadius: 12,
     borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 14,
+    paddingHorizontal: 14,
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 10,
+  },
+  downPayPresetRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 8,
+  },
+  downPayChip: {
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  downPayChipActive: {
+    backgroundColor: '#EDE9FE',
+    borderColor: '#C4B5FD',
+  },
+  downPayChipText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#475569',
+  },
+  downPayChipTextActive: {
+    color: '#7C3AED',
   },
   chipRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    gap: 8,
+  },
+  smallChip: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    alignItems: 'center',
+  },
+  smallChipText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  cashflowCard: {
+    borderRadius: 16,
+    borderWidth: 1.5,
+    padding: 16,
+    marginBottom: 16,
+    gap: 6,
+  },
+  cashflowPositive: {
+    backgroundColor: '#F0FDF4',
+    borderColor: '#86EFAC',
+  },
+  cashflowNeutral: {
+    backgroundColor: '#F8FAFC',
+    borderColor: '#CBD5E1',
+  },
+  cashflowHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 8,
     marginBottom: 6,
   },
-  smallChip: {
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+  cashflowTitle: {
+    fontSize: 13,
+    fontWeight: '900',
+    color: '#15803D',
   },
-  smallChipText: {
+  positiveBadge: {
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    marginLeft: 'auto',
+  },
+  positiveBadgeText: {
+    fontSize: 8,
+    fontWeight: '800',
+    color: '#15803D',
+  },
+  cashflowRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  cashflowLabel: {
     fontSize: 12,
+    color: '#475569',
     fontWeight: '600',
   },
-  calcBreakdown: {
-    marginTop: 14,
-    borderRadius: 12,
-    padding: 14,
-    borderWidth: 1,
-    gap: 8,
-  },
-  breakdownRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  breakdownLabel: {
-    fontSize: 12,
-  },
-  breakdownVal: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  netLabel: {
-    fontSize: 14,
+  cashflowVal: {
+    fontSize: 13,
     fontWeight: '800',
   },
-  netVal: {
+  divider: {
+    height: 1,
+    backgroundColor: '#E2E8F0',
+    marginVertical: 4,
+  },
+  cashflowBoldLabel: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#0F172A',
+    flex: 1,
+  },
+  cashflowExtraBold: {
     fontSize: 16,
     fontWeight: '900',
-    color: '#059669',
+    color: '#15803D',
   },
-  breakdownBold: {
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  profitBox: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 12,
-    borderRadius: 10,
-    marginTop: 8,
-  },
-  whatsappBtn: {
-    backgroundColor: '#7c3aed',
-    borderRadius: 10,
-    paddingVertical: 14,
+  shareWhatsAppBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 16,
+    gap: 8,
+    backgroundColor: '#25D366',
+    borderRadius: 16,
+    paddingVertical: 15,
+    shadowColor: '#25D366',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 3,
   },
-  whatsappBtnText: {
-    color: '#ffffff',
-    fontSize: 13,
-    fontWeight: '700',
+  shareWhatsAppBtnText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '800',
   },
 });

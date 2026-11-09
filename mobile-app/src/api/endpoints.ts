@@ -381,6 +381,10 @@ export const procurementApi = {
     const res = await apiClient.get(url);
     return res.data;
   },
+  createPurchaseOrder: async (data: any) => {
+    const res = await apiClient.post('/api/tenant/procurement/pos', data);
+    return res.data;
+  },
 };
 
 // ==========================================

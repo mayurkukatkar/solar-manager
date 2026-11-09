@@ -20,9 +20,13 @@ import {
   Layers,
   ChevronRight,
   Sparkles,
+  ArrowRight,
 } from 'lucide-react-native';
 import { Header } from '../../components/Header';
 import { ModalHeader } from '../../components/common/ModalHeader';
+import { GuideCharacter } from '../../components/GuideCharacter';
+import { SeamlessSolarFlowModal } from '../../components/SeamlessSolarFlowModal';
+import { soundEffects } from '../../utils/audioEffects';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../theme';
 import { hasPermission } from '../../utils/rbac';
@@ -189,6 +193,7 @@ export const ModulesScreen: React.FC<{ route?: any; navigation?: any }> = ({
   const [activeSubModule, setActiveSubModule] = useState<string | null>(
     normalizeModuleId(route?.params?.openQuote ? 'QUOTES' : route?.params?.screen || null)
   );
+  const [seamlessFlowVisible, setSeamlessFlowVisible] = useState(false);
 
   useEffect(() => {
     if (route?.params?.openQuote) {
@@ -339,6 +344,68 @@ export const ModulesScreen: React.FC<{ route?: any; navigation?: any }> = ({
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
+        {/* SOL MISSION CONTROL COMPANION */}
+        <View
+          style={[
+            styles.solCompanionCard,
+            {
+              backgroundColor: isDark ? 'rgba(37, 99, 235, 0.12)' : '#EFF6FF',
+              borderColor: isDark ? 'rgba(37, 99, 235, 0.3)' : '#BFDBFE',
+            },
+          ]}
+        >
+          <GuideCharacter pose="guide" size={38} animated={false} />
+          <View style={{ flex: 1 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Text style={[styles.solTitle, { color: isDark ? colors.text : '#0F172A' }]}>
+                Sol Mission Control
+              </Text>
+              <View style={styles.solPill}>
+                <Sparkles size={9} color="#0066FF" />
+                <Text style={styles.solPillText}>8 ENGINES READY</Text>
+              </View>
+            </View>
+            <Text style={styles.solSub}>
+              Specialized engines for PM Surya Ghar DBT subsidies, DISCOM net-metering & 7% loans.
+            </Text>
+          </View>
+        </View>
+
+        {/* 1-FLOW SEAMLESS JOURNEY SHORTCUT */}
+        <TouchableOpacity
+          style={[
+            styles.seamlessFlowBanner,
+            {
+              backgroundColor: isDark ? 'rgba(16, 185, 129, 0.12)' : '#F0FDF4',
+              borderColor: isDark ? 'rgba(16, 185, 129, 0.3)' : '#BBF7D0',
+            },
+          ]}
+          onPress={() => {
+            soundEffects.playSelect();
+            setSeamlessFlowVisible(true);
+          }}
+          activeOpacity={0.88}
+        >
+          <View style={styles.seamlessBannerLeft}>
+            <GuideCharacter pose="celebrate" size={36} animated={false} />
+            <View style={{ flex: 1 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Text style={[styles.seamlessBannerTitle, { color: isDark ? colors.text : '#0F172A' }]}>
+                  ⚡ 1-Flow Solar Journey
+                </Text>
+                <View style={styles.seamlessXpPill}>
+                  <Sparkles size={9} color="#059669" />
+                  <Text style={styles.seamlessXpText}>+300 XP</Text>
+                </View>
+              </View>
+              <Text style={styles.seamlessBannerSub}>
+                Card-glide quest: Lead ➔ 60s Quote ➔ Onboarding ➔ DISCOM ➔ Token!
+              </Text>
+            </View>
+          </View>
+          <ArrowRight size={16} color="#10B981" />
+        </TouchableOpacity>
+
         {authorizedCategories.map((cat) => (
           <View key={cat.title} style={styles.categorySection}>
             <View style={styles.categoryHeaderRow}>
@@ -361,7 +428,10 @@ export const ModulesScreen: React.FC<{ route?: any; navigation?: any }> = ({
                         borderColor: colors.borderSubtle,
                       },
                     ]}
-                    onPress={() => setActiveSubModule(m.id)}
+                    onPress={() => {
+                      soundEffects.playSelect();
+                      setActiveSubModule(m.id);
+                    }}
                     activeOpacity={0.85}
                   >
                     <View
@@ -432,6 +502,12 @@ export const ModulesScreen: React.FC<{ route?: any; navigation?: any }> = ({
           <View style={{ flex: 1 }}>{renderActiveModule()}</View>
         </View>
       </Modal>
+
+      {/* SEAMLESS 1-FLOW SOLAR JOURNEY MODAL */}
+      <SeamlessSolarFlowModal
+        visible={seamlessFlowVisible}
+        onClose={() => setSeamlessFlowVisible(false)}
+      />
     </View>
   );
 };
@@ -446,9 +522,90 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: 16,
     paddingBottom: Platform.OS === 'ios' ? 120 : 100,
+    gap: 12,
+  },
+  solCompanionCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 14,
+    borderRadius: 18,
+    borderWidth: 1,
+    marginBottom: 4,
+  },
+  solTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    letterSpacing: -0.2,
+  },
+  solPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: '#DBEAFE',
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 6,
+  },
+  solPillText: {
+    fontSize: 8,
+    fontWeight: '800',
+    color: '#0066FF',
+    letterSpacing: 0.5,
+  },
+  solSub: {
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 2,
+    lineHeight: 15,
+  },
+  seamlessFlowBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 14,
+    borderRadius: 18,
+    borderWidth: 1.5,
+    marginBottom: 8,
+    shadowColor: '#10B981',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  seamlessBannerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+    marginRight: 8,
+  },
+  seamlessBannerTitle: {
+    fontSize: 14,
+    fontWeight: '900',
+    letterSpacing: -0.2,
+  },
+  seamlessXpPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
+    borderRadius: 6,
+  },
+  seamlessXpText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#15803D',
+  },
+  seamlessBannerSub: {
+    fontSize: 11,
+    color: '#475569',
+    marginTop: 2,
   },
   categorySection: {
-    marginBottom: 20,
+    marginBottom: 16,
   },
   categoryHeaderRow: {
     flexDirection: 'row',
