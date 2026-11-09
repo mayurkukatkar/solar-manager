@@ -64,7 +64,7 @@ app.get('/api/app/version', (req, res) => {
       'Enhanced real-time network detection with instant auto-reconnect & offline banner',
       'Instant local cache hydration for zero-flicker startup'
     ],
-    downloadUrl: process.env.APP_DOWNLOAD_URL || 'https://solar-manager-three.vercel.app/download/whereready-solar-os-latest.apk',
+    downloadUrl: process.env.APP_DOWNLOAD_URL || 'https://expo.dev/artifacts/eas/4BqROJ3suiqnNaoMFZRTgLVuZw6fN--SfIZ0cMnQobk.apk',
     playStoreUrl: 'https://play.google.com/store/apps/details?id=com.whereready.solaros'
   });
 });
