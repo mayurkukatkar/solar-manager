@@ -26,6 +26,7 @@ import {
   Zap,
 } from 'lucide-react-native';
 import { Header } from '../../components/Header';
+import { SeamlessSolarFlowModal } from '../../components/SeamlessSolarFlowModal';
 import { crmApi } from '../../api/endpoints';
 import { Lead } from '../../types';
 
@@ -55,6 +56,9 @@ export const LeadsScreen: React.FC<{ route?: any; navigation?: any }> = ({ route
 
   // Add Lead Modal State
   const [addModalVisible, setAddModalVisible] = useState(route?.params?.openAdd || false);
+  const [seamlessFlowVisible, setSeamlessFlowVisible] = useState(false);
+  const [seamlessInitialLead, setSeamlessInitialLead] = useState<any | null>(null);
+  const [seamlessInitialStep, setSeamlessInitialStep] = useState<number>(0);
   const [savingLead, setSavingLead] = useState(false);
   const [newLeadForm, setNewLeadForm] = useState({
     name: '',
@@ -323,7 +327,11 @@ Let's schedule your 3D site survey today!`;
           </Text>
           <TouchableOpacity
             style={styles.newLeadBtn}
-            onPress={() => setAddModalVisible(true)}
+            onPress={() => {
+              setSeamlessInitialLead(null);
+              setSeamlessInitialStep(0);
+              setSeamlessFlowVisible(true);
+            }}
             activeOpacity={0.85}
           >
             <Plus size={14} color="#ffffff" style={{ marginRight: 4 }} />
@@ -342,7 +350,11 @@ Let's schedule your 3D site survey today!`;
             </Text>
             <TouchableOpacity
               style={styles.emptyAddBtn}
-              onPress={() => setAddModalVisible(true)}
+              onPress={() => {
+                setSeamlessInitialLead(null);
+                setSeamlessInitialStep(0);
+                setSeamlessFlowVisible(true);
+              }}
               activeOpacity={0.85}
             >
               <Text style={styles.emptyAddBtnText}>+ Add Prospect</Text>
@@ -423,25 +435,23 @@ Let's schedule your 3D site survey today!`;
                   {isWon ? (
                     <TouchableOpacity
                       style={styles.primaryActionBtn}
-                      onPress={() => handleConvertLeadToProject(lead)}
-                      disabled={converting}
+                      onPress={() => {
+                        setSeamlessInitialLead(lead);
+                        setSeamlessInitialStep(8);
+                        setSeamlessFlowVisible(true);
+                      }}
                       activeOpacity={0.85}
                     >
                       <CheckCircle2 size={15} color="#ffffff" style={{ marginRight: 6 }} />
-                      <Text style={styles.primaryActionBtnText}>Convert to Project</Text>
+                      <Text style={styles.primaryActionBtnText}>Convert & DISCOM</Text>
                     </TouchableOpacity>
                   ) : (
                     <TouchableOpacity
                       style={styles.primaryActionBtn}
                       onPress={() => {
-                        if (navigation) {
-                          navigation.navigate('Modules', {
-                            screen: 'QUOTES',
-                            openQuote: true,
-                            leadName: lead.name,
-                            capacity: lead.recommendedKw || 3.3,
-                          });
-                        }
+                        setSeamlessInitialLead(lead);
+                        setSeamlessInitialStep(5);
+                        setSeamlessFlowVisible(true);
                       }}
                       activeOpacity={0.85}
                     >
@@ -536,6 +546,19 @@ Let's schedule your 3D site survey today!`;
           </View>
         </View>
       </Modal>
+      {/* SEAMLESS 1-FLOW SOLAR JOURNEY MODAL */}
+      <SeamlessSolarFlowModal
+        visible={seamlessFlowVisible}
+        initialLead={seamlessInitialLead}
+        initialStepIndex={seamlessInitialStep}
+        onClose={() => {
+          setSeamlessFlowVisible(false);
+          setSeamlessInitialLead(null);
+        }}
+        onComplete={() => {
+          fetchLeads();
+        }}
+      />
     </View>
   );
 };

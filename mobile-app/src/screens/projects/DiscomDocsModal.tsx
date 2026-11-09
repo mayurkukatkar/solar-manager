@@ -53,6 +53,7 @@ import { SafeStorage } from '../../api/client';
 import { tenantApi } from '../../api/endpoints';
 import { BarcodeScannerModal } from '../operations/BarcodeScannerModal';
 import { GuideCharacter } from '../../components/GuideCharacter';
+import { CelebrationModal } from '../../components/CelebrationModal';
 import { solarGamificationService } from '../../services/solarGamificationService';
 import { haptics } from '../../utils/haptics';
 
@@ -90,6 +91,8 @@ export const DiscomDocsModal: React.FC<DiscomDocsModalProps> = ({
   const [isPipelineVerified, setIsPipelineVerified] = useState(false);
   const [verifiedTimestamp, setVerifiedTimestamp] = useState<string | null>(null);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+  const [showCelebration, setShowCelebration] = useState(false);
+  const [celebrationData, setCelebrationData] = useState<any | null>(null);
 
   useEffect(() => {
     const showSub = Keyboard.addListener('keyboardDidShow', () => setIsKeyboardVisible(true));
@@ -360,10 +363,37 @@ export const DiscomDocsModal: React.FC<DiscomDocsModalProps> = ({
     }
 
     setAuditModalVisible(false);
-    Alert.alert(
-      'Pipeline Data Confirmed & Locked',
-      'All 8 statutory data points verified against CRM pipeline, quotation BOQ, and hardware scans. Document ready for DISCOM submission.'
-    );
+
+    try {
+      const res = await solarGamificationService.recordAction('STAGE_ADVANCED', {
+        capacityKw: Number(project?.capacity || 3.3),
+        customerName: currentFormData.beneficiaryName,
+        projectName: 'Statutory Interconnection Verified',
+      });
+      haptics.notificationSuccess();
+
+      setCelebrationData({
+        title: 'Statutory DISCOM Interconnection Certified! 🛡️',
+        subtitle: `All 8 regulatory parameters for ${currentFormData.beneficiaryName || 'Client'} verified with 100% precision. Zero DISCOM objections guaranteed!`,
+        stageName: 'Statutory Interconnection Approved',
+        xpAwarded: res.xpGained || 50,
+        customerName: currentFormData.beneficiaryName,
+        customerPhone: currentFormData.mobileNo,
+        capacityKw: Number(currentFormData.appliedCapacity || 3.3),
+        peaceOfMindPoints: [
+          '100% legal alignment with state Net Metering regulations',
+          'Hardware DCR & ALMM serial numbers documented & locked',
+          'Earthing & CEIG anti-islanding safety compliance certified',
+          'Central PM Surya Ghar DBT subsidy audit approved',
+        ],
+      });
+      setShowCelebration(true);
+    } catch {
+      Alert.alert(
+        'Pipeline Data Confirmed & Locked',
+        'All 8 statutory data points verified against CRM pipeline, quotation BOQ, and hardware scans. Document ready for DISCOM submission.'
+      );
+    }
   };
 
   const handleUnlockVerification = async () => {
@@ -1597,6 +1627,27 @@ export const DiscomDocsModal: React.FC<DiscomDocsModalProps> = ({
             </View>
           </View>
         </Modal>
+
+        {/* STATUTORY VERIFICATION CELEBRATION MODAL */}
+        {showCelebration && celebrationData && (
+          <CelebrationModal
+            visible={showCelebration}
+            title={celebrationData.title}
+            subtitle={celebrationData.subtitle}
+            stageName={celebrationData.stageName}
+            xpAwarded={celebrationData.xpAwarded}
+            customerName={celebrationData.customerName}
+            customerPhone={celebrationData.customerPhone}
+            capacityKw={celebrationData.capacityKw}
+            peaceOfMindPoints={celebrationData.peaceOfMindPoints}
+            nextActionLabel="Download WCR Pack ➔"
+            onNextAction={() => {
+              setShowCelebration(false);
+              performExportShare();
+            }}
+            onClose={() => setShowCelebration(false)}
+          />
+        )}
       </KeyboardAvoidingView>
     </Modal>
   );

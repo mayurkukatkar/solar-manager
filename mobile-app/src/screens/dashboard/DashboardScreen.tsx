@@ -25,12 +25,14 @@ import {
   AlertCircle,
   ShieldCheck,
   ChevronRight,
+  Sparkles,
 } from 'lucide-react-native';
 import { Header } from '../../components/Header';
 import { GuideCharacter } from '../../components/GuideCharacter';
 import { InAppProductTour } from '../../components/InAppProductTour';
 import { GamificationPill } from '../../components/GamificationPill';
 import { SolarJourneyRoadmap } from '../../components/SolarJourneyRoadmap';
+import { SeamlessSolarFlowModal } from '../../components/SeamlessSolarFlowModal';
 import { tenantApi, crmApi } from '../../api/endpoints';
 import { openWhatsAppWithPitch } from '../../services/whatsappService';
 import { useAuth } from '../../context/AuthContext';
@@ -70,6 +72,9 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [spotlightVisible, setSpotlightVisible] = useState(false);
+  const [seamlessFlowVisible, setSeamlessFlowVisible] = useState(false);
+  const [seamlessInitialLead, setSeamlessInitialLead] = useState<any | null>(null);
+  const [seamlessInitialStep, setSeamlessInitialStep] = useState<number>(0);
 
   // Role & Permission Checks
   const isTenantAdmin = user?.role === 'TENANT_ADMIN' || user?.role === 'SUPER_ADMIN';
@@ -263,7 +268,11 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
 
             <TouchableOpacity
               style={[styles.quoteButton, { backgroundColor: colors.primary }]}
-              onPress={() => navigation.navigate('QuickQuote')}
+              onPress={() => {
+                setSeamlessInitialLead(null);
+                setSeamlessInitialStep(0);
+                setSeamlessFlowVisible(true);
+              }}
               activeOpacity={0.85}
             >
               <Zap size={14} color="#ffffff" style={{ marginRight: 4 }} />
@@ -313,6 +322,42 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
           </View>
         </View>
 
+        {/* 1.5 CONTINUOUS 1-FLOW SOLAR JOURNEY BANNER */}
+        <TouchableOpacity
+          style={[
+            styles.seamlessFlowBanner,
+            {
+              backgroundColor: isDark ? 'rgba(16, 185, 129, 0.12)' : '#F0FDF4',
+              borderColor: isDark ? 'rgba(16, 185, 129, 0.3)' : '#BBF7D0',
+            },
+          ]}
+          onPress={() => {
+            setSeamlessInitialLead(null);
+            setSeamlessInitialStep(0);
+            setSeamlessFlowVisible(true);
+          }}
+          activeOpacity={0.88}
+        >
+          <View style={styles.seamlessBannerLeft}>
+            <GuideCharacter pose="celebrate" size={40} animated={false} />
+            <View style={{ flex: 1 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                <Text style={[styles.seamlessBannerTitle, { color: isDark ? colors.text : '#0F172A' }]}>
+                  ⚡ 1-Flow Solar Journey
+                </Text>
+                <View style={styles.seamlessXpPill}>
+                  <Sparkles size={10} color="#059669" />
+                  <Text style={styles.seamlessXpText}>+300 XP</Text>
+                </View>
+              </View>
+              <Text style={styles.seamlessBannerSub}>
+                Frictionless card glide: Lead ➔ WhatsApp Quote ➔ KYC ➔ DISCOM Pack ➔ Advance Token!
+              </Text>
+            </View>
+          </View>
+          <ArrowRight size={18} color="#10B981" />
+        </TouchableOpacity>
+
         {/* SOL SPOTLIGHT TOUR BANNER */}
         <TouchableOpacity
           style={[
@@ -348,7 +393,11 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
         <View style={styles.quickActionRow}>
           <TouchableOpacity
             style={[styles.quickActionCard, { backgroundColor: colors.surface, borderColor: colors.borderSubtle }]}
-            onPress={() => navigation.navigate('QuickQuote')}
+            onPress={() => {
+              setSeamlessInitialLead(null);
+              setSeamlessInitialStep(0);
+              setSeamlessFlowVisible(true);
+            }}
             activeOpacity={0.8}
           >
             <View style={[styles.quickActionIconWrap, { backgroundColor: isDark ? 'rgba(0,102,255,0.2)' : '#EFF6FF' }]}>
@@ -359,7 +408,11 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
 
           <TouchableOpacity
             style={[styles.quickActionCard, { backgroundColor: colors.surface, borderColor: colors.borderSubtle }]}
-            onPress={() => navigation.navigate('Pipeline')}
+            onPress={() => {
+              setSeamlessInitialLead(null);
+              setSeamlessInitialStep(0);
+              setSeamlessFlowVisible(true);
+            }}
             activeOpacity={0.8}
           >
             <View style={[styles.quickActionIconWrap, { backgroundColor: isDark ? 'rgba(16,185,129,0.2)' : '#ECFDF5' }]}>
@@ -397,7 +450,15 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
             currentStageId={projects[0].currentStage || projects[0].status || 'DISPATCH'}
             customerName={projects[0].customer?.name || projects[0].name}
             capacityKw={Number(projects[0].capacity || 3.3)}
-            onActionPress={() => navigation.navigate('Projects')}
+            onActionPress={(stage) => {
+              if (stage.id === 'LEAD' || stage.id === 'PROPOSAL' || stage.id === 'ONBOARDING') {
+                setSeamlessInitialLead(projects[0]);
+                setSeamlessInitialStep(stage.id === 'LEAD' ? 0 : stage.id === 'PROPOSAL' ? 5 : 8);
+                setSeamlessFlowVisible(true);
+              } else {
+                navigation.navigate('Projects');
+              }
+            }}
             compact={false}
           />
         ) : recentLeads.length > 0 ? (
@@ -405,7 +466,11 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
             currentStageId="PROPOSAL"
             customerName={recentLeads[0].name}
             capacityKw={Number(recentLeads[0].estimatedCap || 3.3)}
-            onActionPress={() => navigation.navigate('Pipeline')}
+            onActionPress={() => {
+              setSeamlessInitialLead(recentLeads[0]);
+              setSeamlessInitialStep(5);
+              setSeamlessFlowVisible(true);
+            }}
             compact={false}
           />
         ) : null}
@@ -618,6 +683,18 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
         visible={spotlightVisible}
         onClose={() => setSpotlightVisible(false)}
       />
+
+      {/* SEAMLESS 1-FLOW SOLAR JOURNEY MODAL */}
+      <SeamlessSolarFlowModal
+        visible={seamlessFlowVisible}
+        initialLead={seamlessInitialLead}
+        initialStepIndex={seamlessInitialStep}
+        onClose={() => {
+          setSeamlessFlowVisible(false);
+          setSeamlessInitialLead(null);
+        }}
+        onComplete={() => loadDashboard(true)}
+      />
     </View>
   );
 };
@@ -639,6 +716,55 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: spacing[4],
+  },
+
+  // 1-FLOW CONTINUOUS JOURNEY BANNER
+  seamlessFlowBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 14,
+    borderRadius: 18,
+    borderWidth: 1.5,
+    shadowColor: '#10B981',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  seamlessBannerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+    marginRight: 8,
+  },
+  seamlessBannerTitle: {
+    fontSize: 14,
+    fontWeight: '900',
+    letterSpacing: -0.2,
+  },
+  seamlessXpPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#86EFAC',
+  },
+  seamlessXpText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#15803D',
+  },
+  seamlessBannerSub: {
+    fontSize: 11,
+    color: '#475569',
+    marginTop: 2,
+    lineHeight: 15,
   },
 
   // SOL SPOTLIGHT TOUR BANNER

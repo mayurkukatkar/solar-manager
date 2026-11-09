@@ -41,6 +41,7 @@ import { LeadCaptureModal } from './LeadCaptureModal';
 import { QuotationBuilderModal } from './QuotationBuilderModal';
 import { CustomerOnboardingModal } from './CustomerOnboardingModal';
 import { DiscomDocsModal } from '../projects/DiscomDocsModal';
+import { SeamlessSolarFlowModal } from '../../components/SeamlessSolarFlowModal';
 import { InvoicePdfModal } from '../../components/InvoicePdfModal';
 import { CreateInvoiceModal } from '../../components/CreateInvoiceModal';
 import { EmptyState, SkeletonLoader } from '../../components/common';
@@ -80,6 +81,9 @@ export const PipelineScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
   const [quoteModalVisible, setQuoteModalVisible] = useState(false);
   const [onboardingModalVisible, setOnboardingModalVisible] = useState(false);
   const [discomModalVisible, setDiscomModalVisible] = useState(false);
+  const [seamlessFlowVisible, setSeamlessFlowVisible] = useState(false);
+  const [seamlessInitialLead, setSeamlessInitialLead] = useState<any | null>(null);
+  const [seamlessInitialStep, setSeamlessInitialStep] = useState<number>(0);
 
   // PDF Invoice Modal & Commercial Invoicing State
   const [pdfModalVisible, setPdfModalVisible] = useState(false);
@@ -203,7 +207,15 @@ export const PipelineScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
   };
 
   const handleOpenLeadCapture = () => {
-    setLeadModalVisible(true);
+    setSeamlessInitialLead(null);
+    setSeamlessInitialStep(0);
+    setSeamlessFlowVisible(true);
+  };
+
+  const handleOpenSeamlessFlowForLead = (lead: any, stepIndex: number = 0) => {
+    setSeamlessInitialLead(lead);
+    setSeamlessInitialStep(stepIndex);
+    setSeamlessFlowVisible(true);
   };
 
   const handleLeadCreated = (newLead: any) => {
@@ -659,16 +671,35 @@ export const PipelineScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
               </TouchableOpacity>
 
               {isWon ? (
-                <TouchableOpacity
-                  style={styles.actionPillWon}
-                  onPress={() => handleOpenDiscomDocs(item)}
-                  activeOpacity={0.8}
-                >
-                  <Building size={13} color="#D97706" />
-                  <Text style={styles.actionPillWonText}>DISCOM Docs</Text>
-                </TouchableOpacity>
+                <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
+                  <TouchableOpacity
+                    style={styles.actionPillWon}
+                    onPress={() => handleOpenDiscomDocs(item)}
+                    activeOpacity={0.8}
+                  >
+                    <Building size={13} color="#D97706" />
+                    <Text style={styles.actionPillWonText}>DISCOM Docs</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.actionPillSeamless}
+                    onPress={() => handleOpenSeamlessFlowForLead(item, 8)}
+                    activeOpacity={0.8}
+                  >
+                    <Sparkles size={11} color="#059669" />
+                    <Text style={styles.actionPillSeamlessText}>1-Flow</Text>
+                  </TouchableOpacity>
+                </View>
               ) : (
                 <>
+                  <TouchableOpacity
+                    style={styles.actionPillSeamless}
+                    onPress={() => handleOpenSeamlessFlowForLead(item, 5)}
+                    activeOpacity={0.8}
+                  >
+                    <Sparkles size={11} color="#059669" />
+                    <Text style={styles.actionPillSeamlessText}>1-Flow</Text>
+                  </TouchableOpacity>
+
                   <TouchableOpacity
                     style={[
                       styles.actionPillQuote,
@@ -831,6 +862,20 @@ export const PipelineScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
           >
             <Plus size={13} color="#FFFFFF" strokeWidth={3} />
             <Text style={styles.quickAddChipText}>New Lead</Text>
+          </TouchableOpacity>
+
+          {/* Quick Action: 1-Flow Continuous Journey */}
+          <TouchableOpacity
+            style={styles.seamlessQuickChip}
+            onPress={() => {
+              setSeamlessInitialLead(null);
+              setSeamlessInitialStep(0);
+              setSeamlessFlowVisible(true);
+            }}
+            activeOpacity={0.85}
+          >
+            <Sparkles size={12} color="#FFFFFF" strokeWidth={2.5} />
+            <Text style={styles.seamlessQuickChipText}>⚡ 1-Flow</Text>
           </TouchableOpacity>
 
           {/* Quick Action: Ledger */}
@@ -997,6 +1042,20 @@ export const PipelineScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
         onSuccess={() => {
           setCreateInvoiceModalVisible(false);
           setTargetLeadForInvoice(null);
+          fetchLeads();
+        }}
+      />
+
+      {/* SEAMLESS 1-FLOW SOLAR JOURNEY MODAL */}
+      <SeamlessSolarFlowModal
+        visible={seamlessFlowVisible}
+        initialLead={seamlessInitialLead}
+        initialStepIndex={seamlessInitialStep}
+        onClose={() => {
+          setSeamlessFlowVisible(false);
+          setSeamlessInitialLead(null);
+        }}
+        onComplete={() => {
           fetchLeads();
         }}
       />
@@ -1502,6 +1561,25 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#FFFFFF',
   },
+  seamlessQuickChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#10B981',
+    paddingHorizontal: 13,
+    paddingVertical: 7,
+    borderRadius: 20,
+    shadowColor: '#10B981',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  seamlessQuickChipText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
   quickLedgerChip: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1682,6 +1760,23 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '800',
     color: '#D97706',
+  },
+  actionPillSeamless: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    paddingHorizontal: 8,
+    height: 38,
+    borderRadius: 10,
+  },
+  actionPillSeamlessText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#059669',
   },
   actionPillQuote: {
     flex: 1,
