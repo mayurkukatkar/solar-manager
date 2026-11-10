@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -12,6 +12,8 @@ import {
   Platform,
   Linking,
   Image,
+  Keyboard,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import {
   Mail,
@@ -24,8 +26,15 @@ import {
   AlertCircle,
   CheckCircle2,
   X,
+  Check,
+  ShieldCheck,
 } from 'lucide-react-native';
-import { useAuth } from '../../context/AuthContext';
+import {
+  useAuth,
+  STORAGE_REMEMBER_ME_KEY,
+  STORAGE_REMEMBERED_EMAIL_KEY,
+} from '../../context/AuthContext';
+import { SafeStorage } from '../../api/client';
 import { useTheme } from '../../theme';
 import { GuideCharacter } from '../../components/GuideCharacter';
 import { GridBackground } from '../../components/common';
@@ -42,12 +51,18 @@ export const LoginScreen: React.FC = () => {
     clearAccountSuspended,
   } = useAuth();
 
+  const scrollViewRef = useRef<any>(null);
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+
+  // Track keyboard visibility to adapt layout dynamically and prevent hiding fields
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
 
   // Password Reset State for first-time login
   const [requiresReset, setRequiresReset] = useState(false);
@@ -56,6 +71,51 @@ export const LoginScreen: React.FC = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [resetLoading, setResetLoading] = useState(false);
+
+  // 1. Keyboard event listeners to dynamically adjust padding & layout
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const showSub = Keyboard.addListener(showEvent, () => {
+      setIsKeyboardVisible(true);
+    });
+    const hideSub = Keyboard.addListener(hideEvent, () => {
+      setIsKeyboardVisible(false);
+    });
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
+
+  // 2. Load "Remember Me" preferences on mount
+  useEffect(() => {
+    let isMounted = true;
+    (async () => {
+      try {
+        const savedRemember = await SafeStorage.getItem(STORAGE_REMEMBER_ME_KEY);
+        const savedEmail = await SafeStorage.getItem(STORAGE_REMEMBERED_EMAIL_KEY);
+
+        if (!isMounted) return;
+
+        if (savedRemember === 'false') {
+          setRememberMe(false);
+        } else {
+          setRememberMe(true);
+          if (savedEmail) {
+            setEmail(savedEmail);
+          }
+        }
+      } catch (err) {
+        console.warn('Remember Me load notice:', err);
+      }
+    })();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const openWhatsApp = async (text: string) => {
     const url = `https://wa.me/919270201883?text=${encodeURIComponent(text)}`;
@@ -67,12 +127,21 @@ export const LoginScreen: React.FC = () => {
   };
 
   const handleSignIn = async () => {
+    if (loading) return;
+
+    Keyboard.dismiss();
     const cleanEmail = email.trim().toLowerCase();
     setErrorMessage('');
     setSuccessMessage('');
 
+    // Client-side RFC-compliant validation & security checks
     if (!cleanEmail) {
       setErrorMessage('Please enter your account email address.');
+      return;
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(cleanEmail)) {
+      setErrorMessage('Please enter a valid email format (e.g. name@company.com).');
       return;
     }
     if (!password) {
@@ -81,21 +150,31 @@ export const LoginScreen: React.FC = () => {
     }
 
     setLoading(true);
-    const res = await login(cleanEmail, password);
-    setLoading(false);
+    try {
+      const res = await login(cleanEmail, password, rememberMe);
+      setLoading(false);
 
-    if (res.requiresPasswordReset) {
-      setResetEmail(res.email || cleanEmail);
-      setRequiresReset(true);
-      return;
-    }
+      if (res.requiresPasswordReset) {
+        setResetEmail(res.email || cleanEmail);
+        setRequiresReset(true);
+        return;
+      }
 
-    if (!res.success && res.error) {
-      setErrorMessage(res.error || 'Incorrect email or password. Please try again.');
+      if (!res.success && res.error) {
+        setErrorMessage(res.error || 'Incorrect email or password. Please try again.');
+        // Auto scroll to top to see error clearly
+        scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+      }
+    } catch (err: any) {
+      setLoading(false);
+      setErrorMessage(err.message || 'Authentication failed. Please verify your connection.');
     }
   };
 
   const handleForceReset = async () => {
+    if (resetLoading) return;
+
+    Keyboard.dismiss();
     setErrorMessage('');
     setSuccessMessage('');
 
@@ -125,292 +204,350 @@ export const LoginScreen: React.FC = () => {
   };
 
   return (
-    <View style={[styles.rootContainer, { backgroundColor: isDark ? colors.background : '#FFFFFF' }]}>
-      {/* Subtle Engineering Square Grid Background */}
-      <GridBackground isDark={isDark} />
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+      <View style={[styles.rootContainer, { backgroundColor: isDark ? colors.background : '#FFFFFF' }]}>
+        {/* Subtle Engineering Square Grid Background */}
+        <GridBackground isDark={isDark} />
 
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        <ScrollView
-          contentContainerStyle={styles.scrollContainer}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 25}
         >
-          {/* TOP HEADER */}
-          <View style={styles.topHeader}>
-            <View style={styles.brandRow}>
-              <View style={[styles.logoBox, { backgroundColor: '#FFFFFF', borderColor: isDark ? colors.border : '#E2E8F0' }]}>
-                <Image
-                  source={require('../../../assets/logo.png')}
-                  style={styles.brandLogo}
-                  resizeMode="contain"
-                />
-              </View>
-              <View style={styles.brandTextGroup}>
-                <Text style={[styles.brandName, { color: isDark ? colors.text : '#0F172A' }]}>
-                  WhereReady
-                </Text>
-                <Text style={styles.brandBadge}>
-                  SOLAR OS
-                </Text>
-              </View>
-            </View>
-          </View>
-
-          {/* SESSION TIMEOUT BANNER */}
-          {sessionExpired && (
-            <View style={[styles.banner, styles.warningBanner]}>
-              <AlertCircle size={16} color="#B45309" style={{ marginRight: 8, marginTop: 1 }} />
-              <Text style={styles.warningBannerText}>
-                Session timed out. Please sign in again.
-              </Text>
-              <TouchableOpacity onPress={clearSessionExpired} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                <X size={14} color="#B45309" />
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {/* ACCOUNT SUSPENDED BANNER */}
-          {accountSuspended && (
-            <View style={[styles.banner, styles.dangerBanner]}>
-              <AlertCircle size={16} color="#BE123C" style={{ marginRight: 8, marginTop: 1 }} />
-              <View style={{ flex: 1 }}>
-                <Text style={styles.dangerBannerTitle}>ACCOUNT SUSPENDED</Text>
-                <Text style={styles.dangerBannerText}>
-                  {accountSuspendedMessage || 'Your organization account is suspended by platform administrator.'}
-                </Text>
-              </View>
-              <TouchableOpacity onPress={clearAccountSuspended} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                <X size={14} color="#BE123C" />
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {/* MAIN LOGIN CARD */}
-          <View style={[styles.card, { backgroundColor: isDark ? colors.surface : '#FFFFFF', borderColor: isDark ? colors.border : '#E2E8F0' }]}>
-            
-            {/* Friendly Greeting with Sol Character */}
-            <View style={styles.mascotSection}>
-              <GuideCharacter
-                pose="wave"
-                size={70}
-                speechText={requiresReset ? 'Security Check' : 'Welcome back!'}
-              />
-              <Text style={[styles.cardTitle, { color: isDark ? colors.text : '#0F172A' }]}>
-                {requiresReset ? 'Set New Password' : 'Sign In to Solar OS'}
-              </Text>
-              <Text style={styles.cardSubtitle}>
-                {requiresReset
-                  ? 'Please create a permanent password to secure your workspace.'
-                  : 'Enter your account email and password to continue.'}
-              </Text>
-            </View>
-
-            {/* Error and Success Alerts */}
-            {errorMessage ? (
-              <View style={styles.alertError}>
-                <AlertCircle size={15} color="#DC2626" style={{ marginRight: 8, flexShrink: 0 }} />
-                <Text style={styles.alertErrorText}>{errorMessage}</Text>
-              </View>
-            ) : null}
-
-            {successMessage ? (
-              <View style={styles.alertSuccess}>
-                <CheckCircle2 size={15} color="#059669" style={{ marginRight: 8, flexShrink: 0 }} />
-                <Text style={styles.alertSuccessText}>{successMessage}</Text>
-              </View>
-            ) : null}
-
-            {requiresReset ? (
-              /* PASSWORD RESET FORM */
-              <View style={styles.formContainer}>
-                {/* Account Email (Read-Only) */}
-                <Text style={[styles.inputLabel, { color: isDark ? colors.textSecondary : '#334155' }]}>
-                  Account Email
-                </Text>
-                <View style={[styles.inputContainer, styles.inputDisabled, { borderColor: isDark ? colors.border : '#E2E8F0' }]}>
-                  <Mail size={16} color="#94A3B8" />
-                  <TextInput
-                    style={[styles.textInput, { color: '#64748B' }]}
-                    value={resetEmail || email}
-                    editable={false}
+          <ScrollView
+            ref={scrollViewRef}
+            contentContainerStyle={[
+              styles.scrollContainer,
+              {
+                justifyContent: isKeyboardVisible ? 'flex-start' : 'center',
+                paddingTop: isKeyboardVisible ? 16 : 32,
+                paddingBottom: isKeyboardVisible ? 160 : 36,
+              },
+            ]}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
+            showsVerticalScrollIndicator={false}
+          >
+            {/* TOP HEADER */}
+            <View style={[styles.topHeader, isKeyboardVisible && styles.topHeaderCompact]}>
+              <View style={styles.brandRow}>
+                <View style={[styles.logoBox, { backgroundColor: '#FFFFFF', borderColor: isDark ? colors.border : '#E2E8F0' }]}>
+                  <Image
+                    source={require('../../../assets/logo.png')}
+                    style={styles.brandLogo}
+                    resizeMode="contain"
                   />
                 </View>
-
-                {/* New Password */}
-                <Text style={[styles.inputLabel, { color: isDark ? colors.textSecondary : '#334155' }]}>
-                  New Password
-                </Text>
-                <View style={[styles.inputContainer, { backgroundColor: isDark ? colors.surfaceRecessed : '#F8FAFC', borderColor: isDark ? colors.border : '#E2E8F0' }]}>
-                  <Lock size={16} color="#94A3B8" />
-                  <TextInput
-                    style={[styles.textInput, { color: isDark ? colors.text : '#0F172A' }]}
-                    value={newPassword}
-                    onChangeText={setNewPassword}
-                    placeholder="At least 8 characters"
-                    placeholderTextColor="#94A3B8"
-                    secureTextEntry={!showNewPassword}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                  />
-                  <TouchableOpacity
-                    style={styles.eyeBtn}
-                    onPress={() => setShowNewPassword(!showNewPassword)}
-                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                  >
-                    {showNewPassword ? <EyeOff size={16} color="#94A3B8" /> : <Eye size={16} color="#94A3B8" />}
-                  </TouchableOpacity>
-                </View>
-
-                {/* Confirm Password */}
-                <Text style={[styles.inputLabel, { color: isDark ? colors.textSecondary : '#334155' }]}>
-                  Confirm Password
-                </Text>
-                <View style={[styles.inputContainer, { backgroundColor: isDark ? colors.surfaceRecessed : '#F8FAFC', borderColor: isDark ? colors.border : '#E2E8F0' }]}>
-                  <Lock size={16} color="#94A3B8" />
-                  <TextInput
-                    style={[styles.textInput, { color: isDark ? colors.text : '#0F172A' }]}
-                    value={confirmPassword}
-                    onChangeText={setConfirmPassword}
-                    placeholder="Confirm new password"
-                    placeholderTextColor="#94A3B8"
-                    secureTextEntry={!showNewPassword}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                  />
-                </View>
-
-                {/* Save & Continue Button */}
-                <TouchableOpacity
-                  style={[styles.actionBtn, { backgroundColor: '#0F172A' }]}
-                  onPress={handleForceReset}
-                  disabled={resetLoading}
-                  activeOpacity={0.88}
-                >
-                  {resetLoading ? (
-                    <ActivityIndicator size="small" color="#FFFFFF" />
-                  ) : (
-                    <View style={styles.btnInnerRow}>
-                      <Text style={styles.actionBtnText}>Save &amp; Continue</Text>
-                      <ArrowRight size={15} color="#FFFFFF" style={{ marginLeft: 6 }} />
-                    </View>
-                  )}
-                </TouchableOpacity>
-
-                {/* Cancel / Back to Login */}
-                <TouchableOpacity
-                  style={styles.backBtn}
-                  onPress={() => setRequiresReset(false)}
-                  activeOpacity={0.7}
-                >
-                  <ArrowLeft size={14} color="#64748B" style={{ marginRight: 6 }} />
-                  <Text style={styles.backBtnText}>Back to Sign In</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              /* STANDARD LOGIN FORM */
-              <View style={styles.formContainer}>
-                {/* Email Address */}
-                <Text style={[styles.inputLabel, { color: isDark ? colors.textSecondary : '#334155' }]}>
-                  Email Address
-                </Text>
-                <View style={[styles.inputContainer, { backgroundColor: isDark ? colors.surfaceRecessed : '#F8FAFC', borderColor: isDark ? colors.border : '#E2E8F0' }]}>
-                  <Mail size={16} color="#94A3B8" />
-                  <TextInput
-                    style={[styles.textInput, { color: isDark ? colors.text : '#0F172A' }]}
-                    placeholder="name@company.com"
-                    placeholderTextColor="#94A3B8"
-                    value={email}
-                    onChangeText={setEmail}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    keyboardType="email-address"
-                  />
-                </View>
-
-                {/* Password Label Row */}
-                <View style={styles.labelRow}>
-                  <Text style={[styles.inputLabel, { color: isDark ? colors.textSecondary : '#334155', marginBottom: 0 }]}>
-                    Password
+                <View style={styles.brandTextGroup}>
+                  <Text style={[styles.brandName, { color: isDark ? colors.text : '#0F172A' }]}>
+                    WhereReady
                   </Text>
-                  <TouchableOpacity
-                    onPress={() => openWhatsApp('Hi WhereReady, I need help logging into my Solar OS account.')}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={styles.forgotPasswordText}>Forgot password?</Text>
-                  </TouchableOpacity>
+                  <Text style={styles.brandBadge}>
+                    SOLAR OS
+                  </Text>
                 </View>
+              </View>
+            </View>
 
-                {/* Password Input */}
-                <View style={[styles.inputContainer, { backgroundColor: isDark ? colors.surfaceRecessed : '#F8FAFC', borderColor: isDark ? colors.border : '#E2E8F0' }]}>
-                  <Lock size={16} color="#94A3B8" />
-                  <TextInput
-                    style={[styles.textInput, { color: isDark ? colors.text : '#0F172A' }]}
-                    placeholder="••••••••"
-                    placeholderTextColor="#94A3B8"
-                    value={password}
-                    onChangeText={setPassword}
-                    secureTextEntry={!showPassword}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                  />
-                  <TouchableOpacity
-                    style={styles.eyeBtn}
-                    onPress={() => setShowPassword(!showPassword)}
-                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                  >
-                    {showPassword ? <EyeOff size={16} color="#94A3B8" /> : <Eye size={16} color="#94A3B8" />}
-                  </TouchableOpacity>
-                </View>
-
-                {/* Sign In Button */}
-                <TouchableOpacity
-                  style={[styles.actionBtn, styles.signInBtn]}
-                  onPress={handleSignIn}
-                  disabled={loading}
-                  activeOpacity={0.88}
-                >
-                  {loading ? (
-                    <ActivityIndicator size="small" color="#FFFFFF" />
-                  ) : (
-                    <View style={styles.btnInnerRow}>
-                      <Text style={styles.actionBtnText}>Sign In</Text>
-                      <ArrowRight size={15} color="#FFFFFF" style={{ marginLeft: 6 }} />
-                    </View>
-                  )}
+            {/* SESSION TIMEOUT BANNER */}
+            {sessionExpired && (
+              <View style={[styles.banner, styles.warningBanner]}>
+                <AlertCircle size={16} color="#B45309" style={{ marginRight: 8, marginTop: 1 }} />
+                <Text style={styles.warningBannerText}>
+                  Session timed out. Please sign in again.
+                </Text>
+                <TouchableOpacity onPress={clearSessionExpired} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <X size={14} color="#B45309" />
                 </TouchableOpacity>
               </View>
             )}
 
-            {/* Assistance Footer Divider */}
-            <View style={[styles.divider, { backgroundColor: isDark ? colors.borderSubtle : '#F1F5F9' }]} />
+            {/* ACCOUNT SUSPENDED BANNER */}
+            {accountSuspended && (
+              <View style={[styles.banner, styles.dangerBanner]}>
+                <AlertCircle size={16} color="#BE123C" style={{ marginRight: 8, marginTop: 1 }} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.dangerBannerTitle}>ACCOUNT SUSPENDED</Text>
+                  <Text style={styles.dangerBannerText}>
+                    {accountSuspendedMessage || 'Your organization account is suspended by platform administrator.'}
+                  </Text>
+                </View>
+                <TouchableOpacity onPress={clearAccountSuspended} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <X size={14} color="#BE123C" />
+                </TouchableOpacity>
+              </View>
+            )}
 
-            {/* Assistance Row */}
-            <View style={styles.assistanceRow}>
-              <Text style={styles.assistanceLabel}>Need help signing in?</Text>
-              <TouchableOpacity
-                style={styles.whatsappBtn}
-                onPress={() => openWhatsApp('Hi WhereReady, I have a question about logging in.')}
-                activeOpacity={0.7}
-              >
-                <Phone size={12} color="#059669" style={{ marginRight: 4 }} />
-                <Text style={styles.whatsappText}>Chat on WhatsApp</Text>
-              </TouchableOpacity>
+            {/* MAIN LOGIN CARD */}
+            <View
+              style={[
+                styles.card,
+                {
+                  backgroundColor: isDark ? colors.surface : '#FFFFFF',
+                  borderColor: isDark ? colors.border : '#E2E8F0',
+                },
+              ]}
+            >
+              {/* Friendly Greeting with Sol Character (Compact when typing) */}
+              <View style={[styles.mascotSection, isKeyboardVisible && styles.mascotSectionCompact]}>
+                <GuideCharacter
+                  pose={requiresReset ? 'inspect' : 'wave'}
+                  size={isKeyboardVisible ? 44 : 68}
+                  speechText={requiresReset ? 'Security Check' : 'Welcome back!'}
+                />
+                <Text style={[styles.cardTitle, { color: isDark ? colors.text : '#0F172A' }]}>
+                  {requiresReset ? 'Set New Password' : 'Sign In to Solar OS'}
+                </Text>
+                {!isKeyboardVisible && (
+                  <Text style={styles.cardSubtitle}>
+                    {requiresReset
+                      ? 'Please create a permanent password to secure your workspace.'
+                      : 'Enter your account email and password to continue.'}
+                  </Text>
+                )}
+              </View>
+
+              {/* Error and Success Alerts */}
+              {errorMessage ? (
+                <View style={styles.alertError}>
+                  <AlertCircle size={15} color="#DC2626" style={{ marginRight: 8, flexShrink: 0 }} />
+                  <Text style={styles.alertErrorText}>{errorMessage}</Text>
+                </View>
+              ) : null}
+
+              {successMessage ? (
+                <View style={styles.alertSuccess}>
+                  <CheckCircle2 size={15} color="#059669" style={{ marginRight: 8, flexShrink: 0 }} />
+                  <Text style={styles.alertSuccessText}>{successMessage}</Text>
+                </View>
+              ) : null}
+
+              {requiresReset ? (
+                /* PASSWORD RESET FORM */
+                <View style={styles.formContainer}>
+                  {/* Account Email (Read-Only) */}
+                  <Text style={[styles.inputLabel, { color: isDark ? colors.textSecondary : '#334155' }]}>
+                    Account Email
+                  </Text>
+                  <View style={[styles.inputContainer, styles.inputDisabled, { borderColor: isDark ? colors.border : '#E2E8F0' }]}>
+                    <Mail size={16} color="#94A3B8" />
+                    <TextInput
+                      style={[styles.textInput, { color: '#64748B' }]}
+                      value={resetEmail || email}
+                      editable={false}
+                    />
+                  </View>
+
+                  {/* New Password */}
+                  <Text style={[styles.inputLabel, { color: isDark ? colors.textSecondary : '#334155' }]}>
+                    New Password
+                  </Text>
+                  <View style={[styles.inputContainer, { backgroundColor: isDark ? colors.surfaceRecessed : '#F8FAFC', borderColor: isDark ? colors.border : '#E2E8F0' }]}>
+                    <Lock size={16} color="#94A3B8" />
+                    <TextInput
+                      style={[styles.textInput, { color: isDark ? colors.text : '#0F172A' }]}
+                      value={newPassword}
+                      onChangeText={setNewPassword}
+                      placeholder="At least 8 characters"
+                      placeholderTextColor="#94A3B8"
+                      secureTextEntry={!showNewPassword}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      textContentType="newPassword"
+                    />
+                    <TouchableOpacity
+                      style={styles.eyeBtn}
+                      onPress={() => setShowNewPassword(!showNewPassword)}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    >
+                      {showNewPassword ? <EyeOff size={16} color="#94A3B8" /> : <Eye size={16} color="#94A3B8" />}
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Confirm Password */}
+                  <Text style={[styles.inputLabel, { color: isDark ? colors.textSecondary : '#334155' }]}>
+                    Confirm Password
+                  </Text>
+                  <View style={[styles.inputContainer, { backgroundColor: isDark ? colors.surfaceRecessed : '#F8FAFC', borderColor: isDark ? colors.border : '#E2E8F0' }]}>
+                    <Lock size={16} color="#94A3B8" />
+                    <TextInput
+                      style={[styles.textInput, { color: isDark ? colors.text : '#0F172A' }]}
+                      value={confirmPassword}
+                      onChangeText={setConfirmPassword}
+                      placeholder="Confirm new password"
+                      placeholderTextColor="#94A3B8"
+                      secureTextEntry={!showNewPassword}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      textContentType="newPassword"
+                    />
+                  </View>
+
+                  {/* Save & Continue Button */}
+                  <TouchableOpacity
+                    style={[styles.actionBtn, { backgroundColor: '#0F172A' }]}
+                    onPress={handleForceReset}
+                    disabled={resetLoading}
+                    activeOpacity={0.88}
+                  >
+                    {resetLoading ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <View style={styles.btnInnerRow}>
+                        <Text style={styles.actionBtnText}>Save &amp; Continue</Text>
+                        <ArrowRight size={15} color="#FFFFFF" style={{ marginLeft: 6 }} />
+                      </View>
+                    )}
+                  </TouchableOpacity>
+
+                  {/* Cancel / Back to Login */}
+                  <TouchableOpacity
+                    style={styles.backBtn}
+                    onPress={() => setRequiresReset(false)}
+                    activeOpacity={0.7}
+                  >
+                    <ArrowLeft size={14} color="#64748B" style={{ marginRight: 6 }} />
+                    <Text style={styles.backBtnText}>Back to Sign In</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                /* STANDARD LOGIN FORM */
+                <View style={styles.formContainer}>
+                  {/* Email Address */}
+                  <Text style={[styles.inputLabel, { color: isDark ? colors.textSecondary : '#334155' }]}>
+                    Email Address
+                  </Text>
+                  <View style={[styles.inputContainer, { backgroundColor: isDark ? colors.surfaceRecessed : '#F8FAFC', borderColor: isDark ? colors.border : '#E2E8F0' }]}>
+                    <Mail size={16} color="#94A3B8" />
+                    <TextInput
+                      style={[styles.textInput, { color: isDark ? colors.text : '#0F172A' }]}
+                      placeholder="name@company.com"
+                      placeholderTextColor="#94A3B8"
+                      value={email}
+                      onChangeText={setEmail}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      keyboardType="email-address"
+                      textContentType="emailAddress"
+                      autoComplete="email"
+                    />
+                  </View>
+
+                  {/* Password Input */}
+                  <Text style={[styles.inputLabel, { color: isDark ? colors.textSecondary : '#334155' }]}>
+                    Password
+                  </Text>
+                  <View style={[styles.inputContainer, { backgroundColor: isDark ? colors.surfaceRecessed : '#F8FAFC', borderColor: isDark ? colors.border : '#E2E8F0' }]}>
+                    <Lock size={16} color="#94A3B8" />
+                    <TextInput
+                      style={[styles.textInput, { color: isDark ? colors.text : '#0F172A' }]}
+                      placeholder="••••••••"
+                      placeholderTextColor="#94A3B8"
+                      value={password}
+                      onChangeText={setPassword}
+                      secureTextEntry={!showPassword}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      textContentType="password"
+                      autoComplete="password"
+                      onFocus={() => {
+                        // Ensure password input and sign in button are smoothly scrolled into view
+                        setTimeout(() => {
+                          scrollViewRef.current?.scrollTo({ y: 120, animated: true });
+                        }, 100);
+                      }}
+                    />
+                    <TouchableOpacity
+                      style={styles.eyeBtn}
+                      onPress={() => setShowPassword(!showPassword)}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    >
+                      {showPassword ? <EyeOff size={16} color="#94A3B8" /> : <Eye size={16} color="#94A3B8" />}
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* REMEMBER ME & FORGOT PASSWORD ROW */}
+                  <View style={styles.rememberForgotRow}>
+                    <TouchableOpacity
+                      style={styles.rememberBtn}
+                      onPress={() => setRememberMe(!rememberMe)}
+                      activeOpacity={0.75}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <View
+                        style={[
+                          styles.checkbox,
+                          {
+                            borderColor: rememberMe ? colors.primary : (isDark ? colors.border : '#CBD5E1'),
+                            backgroundColor: rememberMe ? colors.primary : 'transparent',
+                          },
+                        ]}
+                      >
+                        {rememberMe && <Check size={11} color="#FFFFFF" strokeWidth={3} />}
+                      </View>
+                      <Text style={[styles.rememberLabel, { color: isDark ? colors.textSecondary : '#475569' }]}>
+                        Remember me
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      onPress={() => openWhatsApp('Hi WhereReady, I need help logging into my Solar OS account.')}
+                      activeOpacity={0.7}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <Text style={styles.forgotPasswordText}>Forgot password?</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Sign In Button */}
+                  <TouchableOpacity
+                    style={[styles.actionBtn, styles.signInBtn]}
+                    onPress={handleSignIn}
+                    disabled={loading}
+                    activeOpacity={0.88}
+                  >
+                    {loading ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <View style={styles.btnInnerRow}>
+                        <Text style={styles.actionBtnText}>Sign In</Text>
+                        <ArrowRight size={15} color="#FFFFFF" style={{ marginLeft: 6 }} />
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              {/* Assistance Footer Divider */}
+              <View style={[styles.divider, { backgroundColor: isDark ? colors.borderSubtle : '#F1F5F9' }]} />
+
+              {/* Assistance Row */}
+              <View style={styles.assistanceRow}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                  <ShieldCheck size={13} color="#059669" />
+                  <Text style={styles.assistanceLabel}>256-Bit Encrypted</Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.whatsappBtn}
+                  onPress={() => openWhatsApp('Hi WhereReady, I have a question about logging in.')}
+                  activeOpacity={0.7}
+                >
+                  <Phone size={12} color="#059669" style={{ marginRight: 4 }} />
+                  <Text style={styles.whatsappText}>Support on WhatsApp</Text>
+                </TouchableOpacity>
+              </View>
             </View>
 
-          </View>
-
-          {/* MINIMAL FOOTER */}
-          <View style={styles.pageFooter}>
-            <Text style={styles.pageFooterText}>
-              © {new Date().getFullYear()} WhereReady Solar OS • Nagpur, Maharashtra
-            </Text>
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </View>
+            {/* MINIMAL FOOTER */}
+            <View style={styles.pageFooter}>
+              <Text style={styles.pageFooterText}>
+                © {new Date().getFullYear()} WhereReady Solar OS • Nagpur, Maharashtra
+              </Text>
+            </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </View>
+    </TouchableWithoutFeedback>
   );
 };
 
@@ -420,13 +557,14 @@ const styles = StyleSheet.create({
   },
   scrollContainer: {
     flexGrow: 1,
-    justifyContent: 'center',
     paddingHorizontal: 20,
-    paddingVertical: 32,
   },
   topHeader: {
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 16,
+  },
+  topHeaderCompact: {
+    marginBottom: 8,
   },
   brandRow: {
     flexDirection: 'row',
@@ -450,79 +588,70 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   brandName: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '800',
-    letterSpacing: -0.3,
-    lineHeight: 16,
+    letterSpacing: -0.2,
   },
   brandBadge: {
     fontSize: 9,
-    fontWeight: '800',
-    color: '#2563EB',
-    letterSpacing: 0.8,
-    textTransform: 'uppercase',
+    fontWeight: '900',
+    color: '#059669',
+    letterSpacing: 1.2,
   },
   banner: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
     borderRadius: 12,
     borderWidth: 1,
-    marginBottom: 16,
-    width: '100%',
-    maxWidth: 420,
-    alignSelf: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 12,
   },
   warningBanner: {
-    backgroundColor: '#FFFBEB',
+    backgroundColor: '#FEF3C7',
     borderColor: '#FDE68A',
   },
   warningBannerText: {
     flex: 1,
     fontSize: 12,
-    color: '#92400E',
     fontWeight: '600',
+    color: '#92400E',
   },
   dangerBanner: {
-    backgroundColor: '#FFF1F2',
+    backgroundColor: '#FFE4E6',
     borderColor: '#FECDD3',
   },
   dangerBannerTitle: {
-    fontSize: 10,
-    fontWeight: '900',
-    color: '#BE123C',
-    letterSpacing: 0.5,
-    marginBottom: 2,
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#9F1239',
   },
   dangerBannerText: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#9F1239',
-    fontWeight: '500',
+    marginTop: 2,
   },
   card: {
-    width: '100%',
-    maxWidth: 420,
-    alignSelf: 'center',
-    borderRadius: 28,
+    borderRadius: 20,
     borderWidth: 1,
-    paddingHorizontal: 24,
-    paddingTop: 28,
-    paddingBottom: 22,
+    padding: 22,
     shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.07,
-    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.08,
+    shadowRadius: 18,
     elevation: 4,
   },
   mascotSection: {
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 16,
+  },
+  mascotSectionCompact: {
+    marginBottom: 10,
   },
   cardTitle: {
-    fontSize: 22,
+    fontSize: 18,
     fontWeight: '800',
-    letterSpacing: -0.4,
-    marginTop: 10,
+    marginTop: 8,
     textAlign: 'center',
   },
   cardSubtitle: {
@@ -530,8 +659,7 @@ const styles = StyleSheet.create({
     color: '#64748B',
     textAlign: 'center',
     marginTop: 4,
-    paddingHorizontal: 12,
-    lineHeight: 17,
+    lineHeight: 16,
   },
   alertError: {
     flexDirection: 'row',
@@ -542,13 +670,13 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    marginBottom: 16,
+    marginBottom: 14,
   },
   alertErrorText: {
     flex: 1,
     fontSize: 12,
     color: '#B91C1C',
-    fontWeight: '500',
+    fontWeight: '600',
   },
   alertSuccess: {
     flexDirection: 'row',
@@ -559,13 +687,13 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    marginBottom: 16,
+    marginBottom: 14,
   },
   alertSuccessText: {
     flex: 1,
     fontSize: 12,
     color: '#065F46',
-    fontWeight: '500',
+    fontWeight: '600',
   },
   formContainer: {
     width: '100%',
@@ -576,17 +704,6 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     letterSpacing: 0.1,
   },
-  labelRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 6,
-  },
-  forgotPasswordText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#2563EB',
-  },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -594,7 +711,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     paddingHorizontal: 12,
     height: 48,
-    marginBottom: 14,
+    marginBottom: 12,
   },
   inputDisabled: {
     backgroundColor: '#F1F5F9',
@@ -611,12 +728,40 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  rememberForgotRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 2,
+    marginBottom: 16,
+  },
+  rememberBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  checkbox: {
+    width: 18,
+    height: 18,
+    borderRadius: 5,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rememberLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  forgotPasswordText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#2563EB',
+  },
   actionBtn: {
     height: 48,
     borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 4,
   },
   signInBtn: {
     backgroundColor: '#2563EB',
@@ -651,7 +796,7 @@ const styles = StyleSheet.create({
   },
   divider: {
     height: 1,
-    marginTop: 22,
+    marginTop: 20,
     marginBottom: 14,
   },
   assistanceRow: {
@@ -662,7 +807,7 @@ const styles = StyleSheet.create({
   assistanceLabel: {
     fontSize: 11,
     color: '#64748B',
-    fontWeight: '500',
+    fontWeight: '600',
   },
   whatsappBtn: {
     flexDirection: 'row',
@@ -676,7 +821,7 @@ const styles = StyleSheet.create({
   },
   pageFooter: {
     alignItems: 'center',
-    marginTop: 20,
+    marginTop: 18,
   },
   pageFooterText: {
     fontSize: 11,

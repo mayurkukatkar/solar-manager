@@ -24,6 +24,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
   
   // Password Reset State for first-time login
   const [requiresReset, setRequiresReset] = useState(false);
@@ -34,6 +35,22 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
+  // Load Remember Me preferences on mount
+  React.useEffect(() => {
+    try {
+      const savedRemember = localStorage.getItem("@solar_remember_me");
+      const savedEmail = localStorage.getItem("@solar_remembered_email");
+      if (savedRemember === "false") {
+        setRememberMe(false);
+      } else {
+        setRememberMe(true);
+        if (savedEmail) {
+          setEmail(savedEmail);
+        }
+      }
+    } catch {}
+  }, []);
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -42,9 +59,17 @@ export default function LoginPage() {
     try {
       const res = await axios.post(
         `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"}/api/auth/login`,
-        { email: email.trim(), password },
+        { email: email.trim(), password, rememberMe },
         { withCredentials: true }
       );
+      
+      if (rememberMe) {
+        localStorage.setItem("@solar_remember_me", "true");
+        localStorage.setItem("@solar_remembered_email", email.trim().toLowerCase());
+      } else {
+        localStorage.removeItem("@solar_remember_me");
+        localStorage.removeItem("@solar_remembered_email");
+      }
       
       if (res.data.requiresPasswordReset) {
         setRequiresReset(true);
@@ -302,6 +327,20 @@ export default function LoginPage() {
                       {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                     </button>
                   </div>
+                </div>
+
+                {/* Remember Me Checkbox */}
+                <div className="flex items-center gap-2 pt-0.5">
+                  <input
+                    type="checkbox"
+                    id="webRememberMe"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                    className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                  />
+                  <label htmlFor="webRememberMe" className="text-xs font-semibold text-slate-600 select-none cursor-pointer">
+                    Remember me on this device (90 days)
+                  </label>
                 </div>
 
                 <button

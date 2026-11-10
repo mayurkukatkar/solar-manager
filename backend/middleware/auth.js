@@ -8,7 +8,7 @@ const requireSuperAdmin = (req, res, next) => {
   if (!token) return res.status(401).json({ error: 'Unauthorized: Platform Access Required' });
   
   try {
-    const payload = jwt.verify(token, JWT_SECRET);
+    const payload = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] });
     if (payload.role !== 'SUPER_ADMIN') return res.status(403).json({ error: 'Forbidden: Super Admin only' });
     req.user = { id: payload.userId || payload.id, userId: payload.userId || payload.id, ...payload };
     next();
@@ -53,7 +53,7 @@ const requireTenantAuth = async (req, res, next) => {
   if (!token) return res.status(401).json({ error: 'Unauthorized: Tenant Access Required' });
   
   try {
-    const payload = jwt.verify(token, JWT_SECRET);
+    const payload = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] });
     if (payload.role !== 'TENANT_ADMIN' && payload.role !== 'TENANT_SUB_ADMIN') {
       return res.status(403).json({ error: 'Forbidden: Tenant only' });
     }

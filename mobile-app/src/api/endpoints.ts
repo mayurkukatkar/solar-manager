@@ -5,10 +5,11 @@ import { Lead, Project, InstallationJob } from '../types';
 // 1. AUTHENTICATION SERVICE
 // ==========================================
 export const authApi = {
-  login: async (email: string, password: string) => {
+  login: async (email: string, password: string, rememberMe: boolean = true) => {
     const res = await apiClient.post('/api/auth/login', {
       email: email.trim().toLowerCase(),
       password,
+      rememberMe,
     });
     return res.data;
   },

@@ -28,7 +28,7 @@ interface AuthContextType {
   accountSuspended: boolean;
   accountSuspendedMessage: string | null;
   backendStatus: BackendConnectionStatus;
-  login: (email: string, password: string) => Promise<LoginResult>;
+  login: (email: string, password: string, rememberMe?: boolean) => Promise<LoginResult>;
   forceResetPassword: (
     email: string,
     tempPassword: string,
@@ -43,6 +43,8 @@ interface AuthContextType {
 
 const STORAGE_AUTH_TOKEN_KEY = '@solar_user_token';
 const STORAGE_USER_PROFILE_KEY = '@solar_user_profile';
+export const STORAGE_REMEMBER_ME_KEY = '@solar_remember_me';
+export const STORAGE_REMEMBERED_EMAIL_KEY = '@solar_remembered_email';
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
@@ -171,7 +173,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               designation: meData.user.staffProfile?.designation || null,
             };
             setUser(verifiedProfile);
-            setToken(storedToken);
+            // Sliding session renewal: persist freshly renewed 90-day token
+            if (meData.token) {
+              setToken(meData.token);
+              await SafeStorage.setItem(STORAGE_AUTH_TOKEN_KEY, meData.token);
+            } else {
+              setToken(storedToken);
+            }
             setAccountSuspended(false);
             setAccountSuspendedMessage(null);
             await SafeStorage.setItem(STORAGE_USER_PROFILE_KEY, JSON.stringify(verifiedProfile));
@@ -238,14 +246,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setAccountSuspendedMessage(null);
   };
 
-  const login = async (email: string, password: string): Promise<LoginResult> => {
+  const login = async (email: string, password: string, rememberMe: boolean = true): Promise<LoginResult> => {
     setIsLoading(true);
     setSessionExpired(false);
     setAccountSuspended(false);
     setAccountSuspendedMessage(null);
 
     try {
-      const res = await authApi.login(email, password);
+      const res = await authApi.login(email, password, rememberMe);
 
       // 1. Check if temporary password needs reset
       if (res.requiresPasswordReset) {
@@ -322,6 +330,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         setUser(profile);
         await SafeStorage.setItem(STORAGE_USER_PROFILE_KEY, JSON.stringify(profile));
+
+        // Manage Remember Me preferences
+        if (rememberMe) {
+          await SafeStorage.setItem(STORAGE_REMEMBER_ME_KEY, 'true');
+          await SafeStorage.setItem(STORAGE_REMEMBERED_EMAIL_KEY, email.trim().toLowerCase());
+        } else {
+          await SafeStorage.removeItem(STORAGE_REMEMBER_ME_KEY);
+          await SafeStorage.removeItem(STORAGE_REMEMBERED_EMAIL_KEY);
+        }
+
         offlineSyncService.syncQueue({ tenantId: profile.tenantId || undefined }).catch(() => { });
         setIsLoading(false);
         return { success: true };
