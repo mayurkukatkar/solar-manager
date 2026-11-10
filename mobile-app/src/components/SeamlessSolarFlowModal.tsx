@@ -53,6 +53,7 @@ import {
 } from 'lucide-react-native';
 import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
 import { GuideCharacter } from './GuideCharacter';
 import { CelebrationModal } from './CelebrationModal';
 import { SignaturePad } from './SignaturePad';
@@ -229,6 +230,14 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
   const [taxReceiptUploadStatus, setTaxReceiptUploadStatus] = useState<'idle' | 'uploading' | 'synced' | 'failed'>('idle');
   const [chequeUploadStatus, setChequeUploadStatus] = useState<'idle' | 'uploading' | 'synced' | 'failed'>('idle');
   const [terracePhotoUploadStatus, setTerracePhotoUploadStatus] = useState<'idle' | 'uploading' | 'synced' | 'failed'>('idle');
+
+  // Document file names (for display & multi-format support including PDF)
+  const [billDocName, setBillDocName] = useState<string>('electricity_bill.pdf');
+  const [aadhaarDocName, setAadhaarDocName] = useState<string>('aadhaar_card.pdf');
+  const [panDocName, setPanDocName] = useState<string>('pan_card.pdf');
+  const [taxReceiptDocName, setTaxReceiptDocName] = useState<string>('property_tax.pdf');
+  const [chequeDocName, setChequeDocName] = useState<string>('bank_cheque.pdf');
+  const [terracePhotoName, setTerracePhotoName] = useState<string>('terrace_premises.jpg');
 
   // Bank & DBT State
   const [bankName, setBankName] = useState('State Bank of India');
@@ -760,12 +769,12 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
       }
 
       // Upload attached KYC documents to project vault
-      if (billDocUri) uploadDocumentToCloud('bill', billDocUri);
-      if (aadhaarDocUri) uploadDocumentToCloud('aadhaar', aadhaarDocUri);
-      if (panDocUri) uploadDocumentToCloud('pan', panDocUri);
-      if (taxReceiptDocUri) uploadDocumentToCloud('taxReceipt', taxReceiptDocUri);
-      if (chequeDocUri) uploadDocumentToCloud('cheque', chequeDocUri);
-      if (terracePhotoUri) uploadDocumentToCloud('terracePhoto', terracePhotoUri);
+      if (billDocUri) uploadDocumentToCloud('bill', billDocUri, billDocName);
+      if (aadhaarDocUri) uploadDocumentToCloud('aadhaar', aadhaarDocUri, aadhaarDocName);
+      if (panDocUri) uploadDocumentToCloud('pan', panDocUri, panDocName);
+      if (taxReceiptDocUri) uploadDocumentToCloud('taxReceipt', taxReceiptDocUri, taxReceiptDocName);
+      if (chequeDocUri) uploadDocumentToCloud('cheque', chequeDocUri, chequeDocName);
+      if (terracePhotoUri) uploadDocumentToCloud('terracePhoto', terracePhotoUri, terracePhotoName);
 
       try {
         const reward = await solarGamificationService.recordAction('CLIENT_ONBOARDED', {
@@ -948,14 +957,32 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
   // Statutory KYC Document Slot Type
   type DocSlotType = 'bill' | 'aadhaar' | 'pan' | 'taxReceipt' | 'cheque' | 'terracePhoto';
 
-  const setDocUriBySlot = (slot: DocSlotType, uri: string | null) => {
+  const setDocUriBySlot = (slot: DocSlotType, uri: string | null, name?: string) => {
     switch (slot) {
-      case 'bill': setBillDocUri(uri); break;
-      case 'aadhaar': setAadhaarDocUri(uri); break;
-      case 'pan': setPanDocUri(uri); break;
-      case 'taxReceipt': setTaxReceiptDocUri(uri); break;
-      case 'cheque': setChequeDocUri(uri); break;
-      case 'terracePhoto': setTerracePhotoUri(uri); break;
+      case 'bill':
+        setBillDocUri(uri);
+        if (name) setBillDocName(name);
+        break;
+      case 'aadhaar':
+        setAadhaarDocUri(uri);
+        if (name) setAadhaarDocName(name);
+        break;
+      case 'pan':
+        setPanDocUri(uri);
+        if (name) setPanDocName(name);
+        break;
+      case 'taxReceipt':
+        setTaxReceiptDocUri(uri);
+        if (name) setTaxReceiptDocName(name);
+        break;
+      case 'cheque':
+        setChequeDocUri(uri);
+        if (name) setChequeDocName(name);
+        break;
+      case 'terracePhoto':
+        setTerracePhotoUri(uri);
+        if (name) setTerracePhotoName(name);
+        break;
     }
   };
 
@@ -970,33 +997,38 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
     }
   };
 
-  // Cloud Document Upload Pipeline for all 6 Statutory KYC slots
-  const uploadDocumentToCloud = async (docType: DocSlotType, fileUri: string) => {
+  // Cloud Document Upload Pipeline for all 6 Statutory KYC slots (Images & PDFs)
+  const uploadDocumentToCloud = async (
+    docType: DocSlotType,
+    fileUri: string,
+    customFilename?: string,
+    mimeType?: string
+  ) => {
     setUploadStatusBySlot(docType, 'uploading');
 
     const metaMap: Record<DocSlotType, { filename: string; title: string; category: string }> = {
       bill: {
-        filename: 'electricity_bill.jpg',
+        filename: 'electricity_bill.pdf',
         title: `${customerName} - Latest Electricity Bill`,
         category: 'Electricity / DISCOM',
       },
       aadhaar: {
-        filename: 'aadhaar_card.jpg',
+        filename: 'aadhaar_card.pdf',
         title: `${customerName} - Customer Aadhaar Card`,
         category: 'Customer KYC',
       },
       pan: {
-        filename: 'pan_card.jpg',
+        filename: 'pan_card.pdf',
         title: `${customerName} - Customer PAN Card`,
         category: 'Customer KYC',
       },
       taxReceipt: {
-        filename: 'property_tax_receipt.jpg',
+        filename: 'property_tax_receipt.pdf',
         title: `${customerName} - Property Tax / Index II`,
         category: 'Premises Ownership',
       },
       cheque: {
-        filename: 'cancelled_cheque.jpg',
+        filename: 'cancelled_cheque.pdf',
         title: `${customerName} - Cancelled Cheque / Bank Passbook`,
         category: 'DBT Subsidy Banking',
       },
@@ -1008,13 +1040,20 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
     };
 
     const docMeta = metaMap[docType];
+    const isPdf =
+      customFilename?.toLowerCase().endsWith('.pdf') ||
+      fileUri.toLowerCase().endsWith('.pdf') ||
+      mimeType === 'application/pdf';
+
+    const effectiveFilename = customFilename || (isPdf ? docMeta.filename.replace(/\.jpg$/, '.pdf') : docMeta.filename);
+    const effectiveMime = mimeType || (isPdf ? 'application/pdf' : 'image/jpeg');
 
     try {
       const formData = new FormData();
       formData.append('file', {
         uri: Platform.OS === 'ios' ? fileUri.replace('file://', '') : fileUri,
-        name: docMeta.filename,
-        type: 'image/jpeg',
+        name: effectiveFilename,
+        type: effectiveMime,
       } as any);
       formData.append('title', docMeta.title);
       formData.append('category', docMeta.category);
@@ -1030,20 +1069,43 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
     }
   };
 
-  // Attach Document via Library
+  // Attach Document / Image via Photo Library (No deprecation warning)
   const handlePickDocument = async (docType: DocSlotType) => {
     try {
       const res = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ['images'],
         quality: 0.85,
       });
       if (!res.canceled && res.assets && res.assets.length > 0) {
         soundEffects.playSelect();
-        const uri = res.assets[0].uri;
-        setDocUriBySlot(docType, uri);
-        uploadDocumentToCloud(docType, uri);
+        const asset = res.assets[0];
+        const uri = asset.uri;
+        const name = asset.fileName || `${docType}_photo_${Date.now().toString().slice(-4)}.jpg`;
+        setDocUriBySlot(docType, uri, name);
+        uploadDocumentToCloud(docType, uri, name, 'image/jpeg');
       }
     } catch (_) {}
+  };
+
+  // Attach Statutory PDF / Digital Document via DocumentPicker
+  const handlePickPdfDocument = async (docType: DocSlotType) => {
+    try {
+      soundEffects.playSelect();
+      const res = await DocumentPicker.getDocumentAsync({
+        type: ['application/pdf', 'image/*'],
+        copyToCacheDirectory: true,
+      });
+      if (!res.canceled && res.assets && res.assets.length > 0) {
+        const asset = res.assets[0];
+        const uri = asset.uri;
+        const name = asset.name || `${docType}_document.pdf`;
+        const mime = asset.mimeType || (name.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'image/jpeg');
+        setDocUriBySlot(docType, uri, name);
+        uploadDocumentToCloud(docType, uri, name, mime);
+      }
+    } catch (err: any) {
+      Alert.alert('PDF Upload', err?.message || 'Could not select PDF file.');
+    }
   };
 
   // Snap Document via Camera
@@ -1057,9 +1119,11 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
       const res = await ImagePicker.launchCameraAsync({ quality: 0.85 });
       if (!res.canceled && res.assets && res.assets.length > 0) {
         soundEffects.playSelect();
-        const uri = res.assets[0].uri;
-        setDocUriBySlot(docType, uri);
-        uploadDocumentToCloud(docType, uri);
+        const asset = res.assets[0];
+        const uri = asset.uri;
+        const name = `${docType}_camera_${Date.now().toString().slice(-4)}.jpg`;
+        setDocUriBySlot(docType, uri, name);
+        uploadDocumentToCloud(docType, uri, name, 'image/jpeg');
       }
     } catch (_) {}
   };
@@ -2345,28 +2409,39 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
                   </View>
                   {billDocUri ? (
                     <View style={styles.attachedPreview}>
-                      <Image source={{ uri: billDocUri }} style={styles.attachedThumb} />
+                      {billDocName?.toLowerCase().endsWith('.pdf') || billDocUri.toLowerCase().endsWith('.pdf') ? (
+                        <View style={styles.pdfThumbnailBox}>
+                          <FileText size={18} color="#DC2626" />
+                          <Text style={styles.pdfBadgeText}>PDF</Text>
+                        </View>
+                      ) : (
+                        <Image source={{ uri: billDocUri }} style={styles.attachedThumb} />
+                      )}
                       <View style={{ flex: 1, marginLeft: 10 }}>
                         <Text style={styles.attachedSuccessText}>✓ Encrypted in DISCOM Vault</Text>
-                        <Text style={styles.attachedFilenameText}>electricity_bill.jpg</Text>
+                        <Text style={styles.attachedFilenameText} numberOfLines={1}>{billDocName}</Text>
                       </View>
                       <TouchableOpacity
                         style={styles.retakeBtn}
                         onPress={() => setBillDocUri(null)}
                       >
                         <RotateCcw size={14} color="#64748B" />
-                        <Text style={styles.retakeBtnText}>Retake</Text>
+                        <Text style={styles.retakeBtnText}>Change</Text>
                       </TouchableOpacity>
                     </View>
                   ) : (
                     <View style={styles.docActionRow}>
                       <TouchableOpacity style={styles.snapBtn} onPress={() => handleSnapCamera('bill')}>
-                        <Camera size={14} color="#FFFFFF" />
-                        <Text style={styles.snapBtnText}>Camera Snap</Text>
+                        <Camera size={13} color="#FFFFFF" />
+                        <Text style={styles.snapBtnText}>Camera</Text>
                       </TouchableOpacity>
                       <TouchableOpacity style={styles.galleryBtn} onPress={() => handlePickDocument('bill')}>
-                        <UploadCloud size={14} color="#0066FF" />
+                        <UploadCloud size={13} color="#0066FF" />
                         <Text style={styles.galleryBtnText}>Gallery</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={styles.pdfDocBtn} onPress={() => handlePickPdfDocument('bill')}>
+                        <FileText size={13} color="#DC2626" />
+                        <Text style={styles.pdfDocBtnText}>Upload PDF</Text>
                       </TouchableOpacity>
                     </View>
                   )}
@@ -2389,28 +2464,39 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
                   </View>
                   {aadhaarDocUri ? (
                     <View style={styles.attachedPreview}>
-                      <Image source={{ uri: aadhaarDocUri }} style={styles.attachedThumb} />
+                      {aadhaarDocName?.toLowerCase().endsWith('.pdf') || aadhaarDocUri.toLowerCase().endsWith('.pdf') ? (
+                        <View style={styles.pdfThumbnailBox}>
+                          <FileText size={18} color="#DC2626" />
+                          <Text style={styles.pdfBadgeText}>PDF</Text>
+                        </View>
+                      ) : (
+                        <Image source={{ uri: aadhaarDocUri }} style={styles.attachedThumb} />
+                      )}
                       <View style={{ flex: 1, marginLeft: 10 }}>
                         <Text style={styles.attachedSuccessText}>✓ Encrypted in DISCOM Vault</Text>
-                        <Text style={styles.attachedFilenameText}>aadhaar_card.jpg</Text>
+                        <Text style={styles.attachedFilenameText} numberOfLines={1}>{aadhaarDocName}</Text>
                       </View>
                       <TouchableOpacity
                         style={styles.retakeBtn}
                         onPress={() => setAadhaarDocUri(null)}
                       >
                         <RotateCcw size={14} color="#64748B" />
-                        <Text style={styles.retakeBtnText}>Retake</Text>
+                        <Text style={styles.retakeBtnText}>Change</Text>
                       </TouchableOpacity>
                     </View>
                   ) : (
                     <View style={styles.docActionRow}>
                       <TouchableOpacity style={styles.snapBtn} onPress={() => handleSnapCamera('aadhaar')}>
-                        <Camera size={14} color="#FFFFFF" />
-                        <Text style={styles.snapBtnText}>Camera Snap</Text>
+                        <Camera size={13} color="#FFFFFF" />
+                        <Text style={styles.snapBtnText}>Camera</Text>
                       </TouchableOpacity>
                       <TouchableOpacity style={styles.galleryBtn} onPress={() => handlePickDocument('aadhaar')}>
-                        <UploadCloud size={14} color="#0066FF" />
+                        <UploadCloud size={13} color="#0066FF" />
                         <Text style={styles.galleryBtnText}>Gallery</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={styles.pdfDocBtn} onPress={() => handlePickPdfDocument('aadhaar')}>
+                        <FileText size={13} color="#DC2626" />
+                        <Text style={styles.pdfDocBtnText}>Upload PDF</Text>
                       </TouchableOpacity>
                     </View>
                   )}
@@ -2433,28 +2519,39 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
                   </View>
                   {panDocUri ? (
                     <View style={styles.attachedPreview}>
-                      <Image source={{ uri: panDocUri }} style={styles.attachedThumb} />
+                      {panDocName?.toLowerCase().endsWith('.pdf') || panDocUri.toLowerCase().endsWith('.pdf') ? (
+                        <View style={styles.pdfThumbnailBox}>
+                          <FileText size={18} color="#DC2626" />
+                          <Text style={styles.pdfBadgeText}>PDF</Text>
+                        </View>
+                      ) : (
+                        <Image source={{ uri: panDocUri }} style={styles.attachedThumb} />
+                      )}
                       <View style={{ flex: 1, marginLeft: 10 }}>
                         <Text style={styles.attachedSuccessText}>✓ Encrypted in DISCOM Vault</Text>
-                        <Text style={styles.attachedFilenameText}>pan_card.jpg</Text>
+                        <Text style={styles.attachedFilenameText} numberOfLines={1}>{panDocName}</Text>
                       </View>
                       <TouchableOpacity
                         style={styles.retakeBtn}
                         onPress={() => setPanDocUri(null)}
                       >
                         <RotateCcw size={14} color="#64748B" />
-                        <Text style={styles.retakeBtnText}>Retake</Text>
+                        <Text style={styles.retakeBtnText}>Change</Text>
                       </TouchableOpacity>
                     </View>
                   ) : (
                     <View style={styles.docActionRow}>
                       <TouchableOpacity style={styles.snapBtn} onPress={() => handleSnapCamera('pan')}>
-                        <Camera size={14} color="#FFFFFF" />
-                        <Text style={styles.snapBtnText}>Camera Snap</Text>
+                        <Camera size={13} color="#FFFFFF" />
+                        <Text style={styles.snapBtnText}>Camera</Text>
                       </TouchableOpacity>
                       <TouchableOpacity style={styles.galleryBtn} onPress={() => handlePickDocument('pan')}>
-                        <UploadCloud size={14} color="#0066FF" />
+                        <UploadCloud size={13} color="#0066FF" />
                         <Text style={styles.galleryBtnText}>Gallery</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={styles.pdfDocBtn} onPress={() => handlePickPdfDocument('pan')}>
+                        <FileText size={13} color="#DC2626" />
+                        <Text style={styles.pdfDocBtnText}>Upload PDF</Text>
                       </TouchableOpacity>
                     </View>
                   )}
@@ -2477,28 +2574,39 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
                   </View>
                   {taxReceiptDocUri ? (
                     <View style={styles.attachedPreview}>
-                      <Image source={{ uri: taxReceiptDocUri }} style={styles.attachedThumb} />
+                      {taxReceiptDocName?.toLowerCase().endsWith('.pdf') || taxReceiptDocUri.toLowerCase().endsWith('.pdf') ? (
+                        <View style={styles.pdfThumbnailBox}>
+                          <FileText size={18} color="#DC2626" />
+                          <Text style={styles.pdfBadgeText}>PDF</Text>
+                        </View>
+                      ) : (
+                        <Image source={{ uri: taxReceiptDocUri }} style={styles.attachedThumb} />
+                      )}
                       <View style={{ flex: 1, marginLeft: 10 }}>
                         <Text style={styles.attachedSuccessText}>✓ Encrypted in DISCOM Vault</Text>
-                        <Text style={styles.attachedFilenameText}>property_tax_receipt.jpg</Text>
+                        <Text style={styles.attachedFilenameText} numberOfLines={1}>{taxReceiptDocName}</Text>
                       </View>
                       <TouchableOpacity
                         style={styles.retakeBtn}
                         onPress={() => setTaxReceiptDocUri(null)}
                       >
                         <RotateCcw size={14} color="#64748B" />
-                        <Text style={styles.retakeBtnText}>Retake</Text>
+                        <Text style={styles.retakeBtnText}>Change</Text>
                       </TouchableOpacity>
                     </View>
                   ) : (
                     <View style={styles.docActionRow}>
                       <TouchableOpacity style={styles.snapBtn} onPress={() => handleSnapCamera('taxReceipt')}>
-                        <Camera size={14} color="#FFFFFF" />
-                        <Text style={styles.snapBtnText}>Camera Snap</Text>
+                        <Camera size={13} color="#FFFFFF" />
+                        <Text style={styles.snapBtnText}>Camera</Text>
                       </TouchableOpacity>
                       <TouchableOpacity style={styles.galleryBtn} onPress={() => handlePickDocument('taxReceipt')}>
-                        <UploadCloud size={14} color="#0066FF" />
+                        <UploadCloud size={13} color="#0066FF" />
                         <Text style={styles.galleryBtnText}>Gallery</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={styles.pdfDocBtn} onPress={() => handlePickPdfDocument('taxReceipt')}>
+                        <FileText size={13} color="#DC2626" />
+                        <Text style={styles.pdfDocBtnText}>Upload PDF</Text>
                       </TouchableOpacity>
                     </View>
                   )}
@@ -2521,28 +2629,39 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
                   </View>
                   {chequeDocUri ? (
                     <View style={styles.attachedPreview}>
-                      <Image source={{ uri: chequeDocUri }} style={styles.attachedThumb} />
+                      {chequeDocName?.toLowerCase().endsWith('.pdf') || chequeDocUri.toLowerCase().endsWith('.pdf') ? (
+                        <View style={styles.pdfThumbnailBox}>
+                          <FileText size={18} color="#DC2626" />
+                          <Text style={styles.pdfBadgeText}>PDF</Text>
+                        </View>
+                      ) : (
+                        <Image source={{ uri: chequeDocUri }} style={styles.attachedThumb} />
+                      )}
                       <View style={{ flex: 1, marginLeft: 10 }}>
                         <Text style={styles.attachedSuccessText}>✓ Encrypted in DISCOM Vault</Text>
-                        <Text style={styles.attachedFilenameText}>cancelled_cheque.jpg</Text>
+                        <Text style={styles.attachedFilenameText} numberOfLines={1}>{chequeDocName}</Text>
                       </View>
                       <TouchableOpacity
                         style={styles.retakeBtn}
                         onPress={() => setChequeDocUri(null)}
                       >
                         <RotateCcw size={14} color="#64748B" />
-                        <Text style={styles.retakeBtnText}>Retake</Text>
+                        <Text style={styles.retakeBtnText}>Change</Text>
                       </TouchableOpacity>
                     </View>
                   ) : (
                     <View style={styles.docActionRow}>
                       <TouchableOpacity style={styles.snapBtn} onPress={() => handleSnapCamera('cheque')}>
-                        <Camera size={14} color="#FFFFFF" />
-                        <Text style={styles.snapBtnText}>Camera Snap</Text>
+                        <Camera size={13} color="#FFFFFF" />
+                        <Text style={styles.snapBtnText}>Camera</Text>
                       </TouchableOpacity>
                       <TouchableOpacity style={styles.galleryBtn} onPress={() => handlePickDocument('cheque')}>
-                        <UploadCloud size={14} color="#0066FF" />
+                        <UploadCloud size={13} color="#0066FF" />
                         <Text style={styles.galleryBtnText}>Gallery</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={styles.pdfDocBtn} onPress={() => handlePickPdfDocument('cheque')}>
+                        <FileText size={13} color="#DC2626" />
+                        <Text style={styles.pdfDocBtnText}>Upload PDF</Text>
                       </TouchableOpacity>
                     </View>
                   )}
@@ -2565,28 +2684,39 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
                   </View>
                   {terracePhotoUri ? (
                     <View style={styles.attachedPreview}>
-                      <Image source={{ uri: terracePhotoUri }} style={styles.attachedThumb} />
+                      {terracePhotoName?.toLowerCase().endsWith('.pdf') || terracePhotoUri.toLowerCase().endsWith('.pdf') ? (
+                        <View style={styles.pdfThumbnailBox}>
+                          <FileText size={18} color="#DC2626" />
+                          <Text style={styles.pdfBadgeText}>PDF</Text>
+                        </View>
+                      ) : (
+                        <Image source={{ uri: terracePhotoUri }} style={styles.attachedThumb} />
+                      )}
                       <View style={{ flex: 1, marginLeft: 10 }}>
                         <Text style={styles.attachedSuccessText}>✓ Encrypted in DISCOM Vault</Text>
-                        <Text style={styles.attachedFilenameText}>terrace_site_survey.jpg</Text>
+                        <Text style={styles.attachedFilenameText} numberOfLines={1}>{terracePhotoName}</Text>
                       </View>
                       <TouchableOpacity
                         style={styles.retakeBtn}
                         onPress={() => setTerracePhotoUri(null)}
                       >
                         <RotateCcw size={14} color="#64748B" />
-                        <Text style={styles.retakeBtnText}>Retake</Text>
+                        <Text style={styles.retakeBtnText}>Change</Text>
                       </TouchableOpacity>
                     </View>
                   ) : (
                     <View style={styles.docActionRow}>
                       <TouchableOpacity style={styles.snapBtn} onPress={() => handleSnapCamera('terracePhoto')}>
-                        <Camera size={14} color="#FFFFFF" />
-                        <Text style={styles.snapBtnText}>Camera Snap</Text>
+                        <Camera size={13} color="#FFFFFF" />
+                        <Text style={styles.snapBtnText}>Camera</Text>
                       </TouchableOpacity>
                       <TouchableOpacity style={styles.galleryBtn} onPress={() => handlePickDocument('terracePhoto')}>
-                        <UploadCloud size={14} color="#0066FF" />
+                        <UploadCloud size={13} color="#0066FF" />
                         <Text style={styles.galleryBtnText}>Gallery</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={styles.pdfDocBtn} onPress={() => handlePickPdfDocument('terracePhoto')}>
+                        <FileText size={13} color="#DC2626" />
+                        <Text style={styles.pdfDocBtnText}>Upload PDF</Text>
                       </TouchableOpacity>
                     </View>
                   )}
@@ -3704,21 +3834,21 @@ const styles = StyleSheet.create({
   },
   docActionRow: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 6,
   },
   snapBtn: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
+    gap: 4,
     backgroundColor: '#0066FF',
     borderRadius: 10,
-    paddingVertical: 10,
+    paddingVertical: 9,
   },
   snapBtnText: {
     color: '#FFFFFF',
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
   },
   galleryBtn: {
@@ -3726,16 +3856,33 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
+    gap: 4,
     backgroundColor: '#EFF6FF',
     borderWidth: 1,
     borderColor: '#BFDBFE',
     borderRadius: 10,
-    paddingVertical: 10,
+    paddingVertical: 9,
   },
   galleryBtnText: {
     color: '#0066FF',
-    fontSize: 12,
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  pdfDocBtn: {
+    flex: 1.1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    borderRadius: 10,
+    paddingVertical: 9,
+  },
+  pdfDocBtnText: {
+    color: '#DC2626',
+    fontSize: 11,
     fontWeight: '700',
   },
   attachedPreview: {
@@ -3750,6 +3897,22 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 6,
+  },
+  pdfThumbnailBox: {
+    width: 38,
+    height: 38,
+    borderRadius: 6,
+    backgroundColor: '#FEE2E2',
+    borderWidth: 1,
+    borderColor: '#FCA5A5',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pdfBadgeText: {
+    fontSize: 8,
+    fontWeight: '900',
+    color: '#DC2626',
+    marginTop: -2,
   },
   attachedSuccessText: {
     fontSize: 12,

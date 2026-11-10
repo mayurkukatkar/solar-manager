@@ -215,7 +215,7 @@ export const LeadCaptureModal: React.FC<LeadCaptureModalProps> = ({
         return;
       }
       const res = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ['images'],
         quality: 0.85,
       });
       if (!res.canceled && res.assets && res.assets.length > 0) {
