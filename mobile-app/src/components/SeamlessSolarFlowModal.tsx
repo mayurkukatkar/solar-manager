@@ -45,7 +45,12 @@ import {
   VolumeX,
   Sun,
   ShieldAlert,
+  ExternalLink,
+  Layers,
+  Sliders,
+  Trash2,
 } from 'lucide-react-native';
+import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker';
 import { GuideCharacter } from './GuideCharacter';
 import { CelebrationModal } from './CelebrationModal';
@@ -139,36 +144,80 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
   const [monthlyUnits, setMonthlyUnits] = useState(String(initialLead?.monthlyUnits || '410'));
   const [roofType, setRoofType] = useState('Flat RCC Concrete');
   const [selectedShadowObstacles, setSelectedShadowObstacles] = useState<string[]>([]);
+  
+  // Detailed Statutory Address & Site Coordinates
+  const [premisesAddress, setPremisesAddress] = useState(
+    initialProject?.installationAddress || initialProject?.customer?.address || initialProject?.address || initialLead?.address || ''
+  );
+  const [streetLandmark, setStreetLandmark] = useState('');
   const [city, setCity] = useState(
     initialProject?.city || initialProject?.customer?.city || initialLead?.city || 'Pune'
   );
-  const [address, setAddress] = useState(
-    initialProject?.installationAddress || initialProject?.customer?.address || initialProject?.address || initialLead?.address || ''
+  const [district, setDistrict] = useState(
+    initialProject?.district || initialProject?.survey?.district || initialLead?.district || 'Pune'
+  );
+  const [state, setState] = useState(
+    initialProject?.state || initialProject?.survey?.state || initialLead?.state || 'Maharashtra'
   );
   const [pincode, setPincode] = useState(
     initialProject?.pincode || initialProject?.customer?.pincode || initialLead?.pincode || ''
   );
+  const [latitude, setLatitude] = useState<number | null>(
+    initialProject?.survey?.latitude || initialProject?.latitude || null
+  );
+  const [longitude, setLongitude] = useState<number | null>(
+    initialProject?.survey?.longitude || initialProject?.longitude || null
+  );
   const [terraceCoordinates, setTerraceCoordinates] = useState<string | null>(null);
   const [gpsLoading, setGpsLoading] = useState(false);
+  const [sanctionedLoad, setSanctionedLoad] = useState<string>(
+    String(initialProject?.survey?.sanctionedLoad || initialProject?.sanctionedLoad || initialLead?.sanctionedLoad || '3.0')
+  );
+  const [connectionPhase, setConnectionPhase] = useState<'Single Phase' | 'Three Phase'>(
+    (initialProject?.survey?.electricalPhase || initialProject?.electricalPhase || initialLead?.phase || 'Single Phase') as any
+  );
 
   // Sizing & Equipment State
   const [capacityKw, setCapacityKw] = useState(
     String(initialProject?.capacity || initialProject?.systemCapacity || initialLead?.estimatedCap || 3.3)
   );
   const [totalCost, setTotalCost] = useState('195000');
+  const [hardwareMode, setHardwareMode] = useState<'presets' | 'manual'>('presets');
   const [panelBrand, setPanelBrand] = useState('Waaree 540W Mono PERC DCR');
   const [inverterBrand, setInverterBrand] = useState('Solis 3.3kW Grid-Tied Inverter');
+  
+  // Custom / Manual Equipment Entries (for document statutory compliance)
+  const [customModuleMake, setCustomModuleMake] = useState('Waaree Energies');
+  const [customModuleWattage, setCustomModuleWattage] = useState('540');
+  const [customModuleTechnology, setCustomModuleTechnology] = useState('Mono PERC DCR Compliant');
+  const [customInverterMake, setCustomInverterMake] = useState('Solis');
+  const [customInverterCapacity, setCustomInverterCapacity] = useState('3.3');
+  const [customInverterPhase, setCustomInverterPhase] = useState<'Single Phase' | 'Three Phase'>('Single Phase');
+  
   const [createdLead, setCreatedLead] = useState<any>(initialLead || initialProject?.lead || null);
 
   // Onboarding & KYC State
   const [consumerNumber, setConsumerNumber] = useState(
     initialProject?.consumerNumber || initialProject?.customer?.consumerNumber || initialLead?.consumerNumber || initialLead?.electricityConnection || ''
   );
-  const [billingUnit, setBillingUnit] = useState('');
+  const [billingUnit, setBillingUnit] = useState(
+    initialProject?.discomApplication?.bu || initialProject?.billingUnit || ''
+  );
+  
+  // All 6 Statutory KYC Documents
   const [billDocUri, setBillDocUri] = useState<string | null>(null);
   const [aadhaarDocUri, setAadhaarDocUri] = useState<string | null>(null);
+  const [panDocUri, setPanDocUri] = useState<string | null>(null);
+  const [taxReceiptDocUri, setTaxReceiptDocUri] = useState<string | null>(null);
+  const [chequeDocUri, setChequeDocUri] = useState<string | null>(null);
+  const [terracePhotoUri, setTerracePhotoUri] = useState<string | null>(null);
+
   const [billUploadStatus, setBillUploadStatus] = useState<'idle' | 'uploading' | 'synced' | 'failed'>('idle');
   const [aadhaarUploadStatus, setAadhaarUploadStatus] = useState<'idle' | 'uploading' | 'synced' | 'failed'>('idle');
+  const [panUploadStatus, setPanUploadStatus] = useState<'idle' | 'uploading' | 'synced' | 'failed'>('idle');
+  const [taxReceiptUploadStatus, setTaxReceiptUploadStatus] = useState<'idle' | 'uploading' | 'synced' | 'failed'>('idle');
+  const [chequeUploadStatus, setChequeUploadStatus] = useState<'idle' | 'uploading' | 'synced' | 'failed'>('idle');
+  const [terracePhotoUploadStatus, setTerracePhotoUploadStatus] = useState<'idle' | 'uploading' | 'synced' | 'failed'>('idle');
 
   // Bank & DBT State
   const [bankName, setBankName] = useState('State Bank of India');
@@ -193,18 +242,40 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
         setCustomerPhone(initialProject?.customer?.mobile || initialProject?.customer?.phone || '');
         setCapacityKw(String(initialProject?.capacity || initialProject?.systemCapacity || 3.3));
         setCity(initialProject?.city || initialProject?.customer?.city || 'Pune');
-        setAddress(initialProject?.installationAddress || initialProject?.customer?.address || initialProject?.address || '');
+        setDistrict(initialProject?.district || initialProject?.survey?.district || 'Pune');
+        setState(initialProject?.state || initialProject?.survey?.state || 'Maharashtra');
+        setPremisesAddress(initialProject?.installationAddress || initialProject?.customer?.address || initialProject?.address || '');
+        setPincode(initialProject?.pincode || initialProject?.customer?.pincode || '');
         setConsumerNumber(initialProject?.consumerNumber || initialProject?.customer?.consumerNumber || '');
+        if (initialProject?.survey?.latitude && initialProject?.survey?.longitude) {
+          setLatitude(initialProject.survey.latitude);
+          setLongitude(initialProject.survey.longitude);
+          setTerraceCoordinates(`${initialProject.survey.latitude.toFixed(6)}° N, ${initialProject.survey.longitude.toFixed(6)}° E`);
+        }
+        if (initialProject?.survey?.sanctionedLoad) {
+          setSanctionedLoad(String(initialProject.survey.sanctionedLoad));
+        }
+        if (initialProject?.survey?.electricalPhase) {
+          setConnectionPhase(initialProject.survey.electricalPhase as any);
+        }
         if (initialProject?.lead) setCreatedLead(initialProject.lead);
       } else if (initialLead) {
         setCreatedLead(initialLead);
         setCustomerName(initialLead?.name || '');
         setCustomerPhone(initialLead?.mobile || initialLead?.phone || '');
         setCity(initialLead?.city || 'Pune');
-        setAddress(initialLead?.address || '');
+        setDistrict(initialLead?.district || 'Pune');
+        setState(initialLead?.state || 'Maharashtra');
+        setPremisesAddress(initialLead?.address || '');
         setPincode(initialLead?.pincode || '');
         setCapacityKw(String(initialLead?.estimatedCap || 3.3));
         setConsumerNumber(initialLead?.consumerNumber || initialLead?.electricityConnection || '');
+        if (initialLead?.sanctionedLoad) {
+          setSanctionedLoad(String(initialLead.sanctionedLoad));
+        }
+        if (initialLead?.phase) {
+          setConnectionPhase(initialLead.phase as any);
+        }
       }
     }
   }, [visible, initialProject, initialLead, calculatedInitialStep]);
@@ -253,6 +324,26 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
   const requiredRooftopAreaSqFt = Math.round(cap * 95);
   const advanceTokenAmount = Math.round(grossAmount * 0.2);
 
+  // Equipment Compliance Calculations
+  const effectiveModuleMake = hardwareMode === 'manual' ? (customModuleMake.trim() || 'Premier Energies') : panelBrand;
+  const effectiveModuleWattage = hardwareMode === 'manual'
+    ? (parseFloat(customModuleWattage) || 540)
+    : (panelBrand.includes('545') ? 545 : 540);
+  const effectivePanelQty = Math.ceil((cap * 1000) / effectiveModuleWattage);
+  const effectiveInverterMake = hardwareMode === 'manual' ? (customInverterMake.trim() || 'Grid Inverter') : inverterBrand;
+  const effectiveInverterCap = hardwareMode === 'manual' ? (parseFloat(customInverterCapacity) || cap) : cap;
+
+  // Full Statutory Addresses
+  const fullPremisesAddress = [premisesAddress.trim(), streetLandmark.trim()].filter(Boolean).join(', ');
+  const fullStatutoryAddress = [
+    premisesAddress.trim(),
+    streetLandmark.trim(),
+    city.trim(),
+    district.trim() ? `Dist: ${district.trim()}` : '',
+    state.trim(),
+    pincode.trim() ? `PIN: ${pincode.trim()}` : '',
+  ].filter(Boolean).join(', ');
+
   // Check and restore draft on open
   useEffect(() => {
     if (visible && !initialLead) {
@@ -280,20 +371,40 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
         monthlyUnits,
         roofType,
         selectedShadowObstacles,
+        premisesAddress,
+        streetLandmark,
         city,
-        address,
+        district,
+        state,
         pincode,
+        latitude,
+        longitude,
         terraceCoordinates,
+        sanctionedLoad,
+        connectionPhase,
         capacityKw,
         totalCost,
+        hardwareMode,
         panelBrand,
         inverterBrand,
+        customModuleMake,
+        customModuleWattage,
+        customModuleTechnology,
+        customInverterMake,
+        customInverterCapacity,
+        customInverterPhase,
         consumerNumber,
         billingUnit,
         bankName,
         bankBranch,
         accountNumber,
         ifscCode,
+        billDocUri,
+        aadhaarDocUri,
+        panDocUri,
+        taxReceiptDocUri,
+        chequeDocUri,
+        terracePhotoUri,
         sessionXpEarned,
       };
       await SafeStorage.setItem(STORAGE_DRAFT_KEY, JSON.stringify(draftData));
@@ -307,18 +418,39 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
     setMonthlyBill(draftPrompt.monthlyBill || '3500');
     setRoofType(draftPrompt.roofType || 'Flat RCC Concrete');
     setSelectedShadowObstacles(draftPrompt.selectedShadowObstacles || []);
+    setPremisesAddress(draftPrompt.premisesAddress || draftPrompt.address || '');
+    setStreetLandmark(draftPrompt.streetLandmark || '');
     setCity(draftPrompt.city || 'Pune');
-    setAddress(draftPrompt.address || '');
+    setDistrict(draftPrompt.district || 'Pune');
+    setState(draftPrompt.state || 'Maharashtra');
     setPincode(draftPrompt.pincode || '');
+    setLatitude(draftPrompt.latitude || null);
+    setLongitude(draftPrompt.longitude || null);
     setTerraceCoordinates(draftPrompt.terraceCoordinates || null);
+    setSanctionedLoad(draftPrompt.sanctionedLoad || '3.0');
+    setConnectionPhase(draftPrompt.connectionPhase || 'Single Phase');
     setCapacityKw(draftPrompt.capacityKw || '3.3');
     setTotalCost(draftPrompt.totalCost || '195000');
+    setHardwareMode(draftPrompt.hardwareMode || 'presets');
     setPanelBrand(draftPrompt.panelBrand || 'Waaree 540W Mono PERC DCR');
     setInverterBrand(draftPrompt.inverterBrand || 'Solis 3.3kW Grid-Tied Inverter');
+    setCustomModuleMake(draftPrompt.customModuleMake || 'Waaree Energies');
+    setCustomModuleWattage(draftPrompt.customModuleWattage || '540');
+    setCustomModuleTechnology(draftPrompt.customModuleTechnology || 'Mono PERC DCR Compliant');
+    setCustomInverterMake(draftPrompt.customInverterMake || 'Solis');
+    setCustomInverterCapacity(draftPrompt.customInverterCapacity || '3.3');
+    setCustomInverterPhase(draftPrompt.customInverterPhase || 'Single Phase');
     setConsumerNumber(draftPrompt.consumerNumber || '');
+    setBillingUnit(draftPrompt.billingUnit || '');
     setBankName(draftPrompt.bankName || 'State Bank of India');
     setAccountNumber(draftPrompt.accountNumber || '');
     setIfscCode(draftPrompt.ifscCode || 'SBIN0000455');
+    setBillDocUri(draftPrompt.billDocUri || null);
+    setAadhaarDocUri(draftPrompt.aadhaarDocUri || null);
+    setPanDocUri(draftPrompt.panDocUri || null);
+    setTaxReceiptDocUri(draftPrompt.taxReceiptDocUri || null);
+    setChequeDocUri(draftPrompt.chequeDocUri || null);
+    setTerracePhotoUri(draftPrompt.terracePhotoUri || null);
     setSessionXpEarned(draftPrompt.sessionXpEarned || 0);
     setCurrentStepIdx(Math.min(draftPrompt.currentStepIdx || 0, totalSteps - 1));
     setDraftPrompt(null);
@@ -330,46 +462,70 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
     await SafeStorage.removeItem(STORAGE_DRAFT_KEY).catch(() => {});
   };
 
-  // 1-Tap Terrace GPS Detection
-  const handleDetectTerraceGps = () => {
+  // 1-Tap Genuine Terrace GPS Detection using expo-location
+  const handleDetectTerraceGps = async () => {
     setGpsLoading(true);
     soundEffects.playSelect();
 
-    if (typeof navigator !== 'undefined' && navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        async (position) => {
-          const lat = position.coords.latitude;
-          const lon = position.coords.longitude;
-          const coords = `${lat.toFixed(5)}° N, ${lon.toFixed(5)}° E`;
-          setTerraceCoordinates(coords);
-          setGpsLoading(false);
-          soundEffects.playVerificationShield();
-
-          // Auto reverse-geocode city and pincode
-          try {
-            const resp = await fetch(
-              `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=en`
-            );
-            if (resp.ok) {
-              const geoData = await resp.json();
-              if (geoData.city || geoData.locality) setCity(geoData.city || geoData.locality);
-              if (geoData.postcode) setPincode(geoData.postcode);
-            }
-          } catch {}
-        },
-        () => {
-          // Fallback coordinate
-          setTerraceCoordinates('18.52043° N, 73.85674° E (Pune)');
-          setGpsLoading(false);
-        },
-        { enableHighAccuracy: true, timeout: 6000 }
-      );
-    } else {
-      setTimeout(() => {
-        setTerraceCoordinates('18.52043° N, 73.85674° E (Site Terrace)');
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(
+          'Location Permission Required',
+          'GPS access is needed to capture the exact terrace coordinates for DISCOM statutory compliance. Please allow location permissions in device settings.'
+        );
         setGpsLoading(false);
-        soundEffects.playVerificationShield();
-      }, 700);
+        return;
+      }
+
+      const position = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.High,
+      });
+
+      const lat = position.coords.latitude;
+      const lon = position.coords.longitude;
+      setLatitude(lat);
+      setLongitude(lon);
+      const coords = `${lat.toFixed(6)}° N, ${lon.toFixed(6)}° E`;
+      setTerraceCoordinates(coords);
+      soundEffects.playVerificationShield();
+
+      // Reverse geocode to auto-fill statutory address fields
+      try {
+        const reverseResults = await Location.reverseGeocodeAsync({
+          latitude: lat,
+          longitude: lon,
+        });
+
+        if (reverseResults && reverseResults.length > 0) {
+          const geo = reverseResults[0];
+          if (geo.city || geo.subregion) {
+            setCity(geo.city || geo.subregion || 'Pune');
+          }
+          if (geo.subregion || geo.district) {
+            setDistrict(geo.subregion || geo.district || 'Pune');
+          }
+          if (geo.region) {
+            setState(geo.region || 'Maharashtra');
+          }
+          if (geo.postalCode) {
+            setPincode(geo.postalCode);
+          }
+          const streetInfo = [geo.name, geo.street].filter(Boolean).join(', ');
+          if (streetInfo && !streetLandmark) {
+            setStreetLandmark(streetInfo);
+          }
+        }
+      } catch (geoErr) {
+        console.warn('Reverse geocode warning:', geoErr);
+      }
+    } catch (err: any) {
+      Alert.alert(
+        'GPS Acquisition Notice',
+        err.message || 'Could not acquire precise GPS signal. Please enter address and coordinates manually.'
+      );
+    } finally {
+      setGpsLoading(false);
     }
   };
 
@@ -442,12 +598,20 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
       const payload = {
         name: customerName.trim(),
         mobile: customerPhone.replace(/[^0-9]/g, ''),
-        address: address.trim() || undefined,
+        address: fullPremisesAddress || undefined,
         city: city.trim() || 'Site',
+        district: district.trim() || undefined,
+        state: state.trim() || 'Maharashtra',
         pincode: pincode.trim() || undefined,
+        latitude: latitude || undefined,
+        longitude: longitude || undefined,
+        consumerNumber: consumerNumber.trim() || undefined,
+        sanctionedLoad: parseFloat(sanctionedLoad) || cap,
+        phase: connectionPhase,
+        roofType,
         monthlyBill: parseFloat(monthlyBill) || 3500,
         estimatedCap: cap,
-        notes: `Roof: ${roofType}, GPS: ${terraceCoordinates || 'Terrace'}, Hardware: ${panelBrand} + ${inverterBrand}`,
+        notes: `Roof: ${roofType}, GPS: ${terraceCoordinates || 'Terrace'}, Modules: ${effectiveModuleMake} (${effectiveModuleWattage}Wp × ${effectivePanelQty}), Inverter: ${effectiveInverterMake} (${effectiveInverterCap}kW, ${connectionPhase})`,
         forceCreate: true,
       };
 
@@ -499,14 +663,22 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
           const convertRes = await crmApi.convertLead(targetLeadId, {
             customerName: customerName.trim(),
             mobile: customerPhone.replace(/[^0-9]/g, ''),
-            address: address.trim() || undefined,
+            address: fullPremisesAddress || undefined,
             city: city.trim() || undefined,
+            district: district.trim() || undefined,
+            state: state.trim() || 'Maharashtra',
             pincode: pincode.trim() || undefined,
             capacity: cap,
+            latitude: latitude || undefined,
+            longitude: longitude || undefined,
+            consumerNumber: consumerNumber.trim() || 'Pending',
+            sanctionedLoad: parseFloat(sanctionedLoad) || cap,
+            phase: connectionPhase,
+            roofType,
             bankName,
             accountNumber,
             ifscCode,
-            consumerNumber: consumerNumber.trim() || 'Pending',
+            bankBranch,
             signatureSvg: customerSignatureSvg || undefined,
           });
           projectResult = convertRes?.project || convertRes;
@@ -534,12 +706,17 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
           currentStage: 'SURVEY',
           leadId: targetLeadId,
           consumerNumber: consumerNumber.trim() || 'Pending',
-          installationAddress: address.trim() || 'Site Roof',
+          installationAddress: fullPremisesAddress || 'Site Roof',
           city: city.trim() || 'Pune',
+          district: district.trim() || 'Pune',
+          state: state.trim() || 'Maharashtra',
+          pincode: pincode.trim() || '',
+          latitude,
+          longitude,
           customer: {
             name: customerName.trim(),
             mobile: customerPhone.trim(),
-            address: address.trim(),
+            address: fullPremisesAddress,
             city: city.trim(),
             consumerNumber: consumerNumber.trim() || 'Pending',
           },
@@ -552,13 +729,13 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
         setCreatedLead((prev: any) => ({ ...prev, status: 'WON' }));
       }
 
-      // Upload attached KYC documents now that projectId exists
-      if (billDocUri) {
-        uploadDocumentToCloud('bill', billDocUri);
-      }
-      if (aadhaarDocUri) {
-        uploadDocumentToCloud('aadhaar', aadhaarDocUri);
-      }
+      // Upload attached KYC documents to project vault
+      if (billDocUri) uploadDocumentToCloud('bill', billDocUri);
+      if (aadhaarDocUri) uploadDocumentToCloud('aadhaar', aadhaarDocUri);
+      if (panDocUri) uploadDocumentToCloud('pan', panDocUri);
+      if (taxReceiptDocUri) uploadDocumentToCloud('taxReceipt', taxReceiptDocUri);
+      if (chequeDocUri) uploadDocumentToCloud('cheque', chequeDocUri);
+      if (terracePhotoUri) uploadDocumentToCloud('terracePhoto', terracePhotoUri);
 
       try {
         const reward = await solarGamificationService.recordAction('CLIENT_ONBOARDED', {
@@ -682,14 +859,18 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
         companyEmail: 'support@solaros.in',
         customerName,
         customerMobile: customerPhone,
-        customerAddress: `${address}, ${city}`,
+        customerAddress: fullStatutoryAddress || `${city}, Maharashtra`,
         customerCity: city,
+        customerState: state,
+        customerPincode: pincode,
         systemCapacityKw: cap,
-        panelBrand,
-        panelWattage: 540,
-        panelQuantity: Math.ceil((cap * 1000) / 540),
-        inverterBrand,
-        inverterCapacity: cap,
+        panelBrand: effectiveModuleMake,
+        panelWattage: effectiveModuleWattage,
+        panelQuantity: effectivePanelQty,
+        inverterBrand: effectiveInverterMake,
+        inverterCapacity: effectiveInverterCap,
+        inverterPhase: connectionPhase,
+        sanctionedLoad: sanctionedLoad || String(cap),
         baseAmount: Math.round(grossAmount / 1.138),
         taxRate: 13.8,
         taxAmount: Math.round(grossAmount - grossAmount / 1.138),
@@ -734,37 +915,93 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
     }
   };
 
-  // Cloud Document Upload Pipeline
-  const uploadDocumentToCloud = async (docType: 'bill' | 'aadhaar', fileUri: string) => {
-    if (docType === 'bill') setBillUploadStatus('uploading');
-    else setAadhaarUploadStatus('uploading');
+  // Statutory KYC Document Slot Type
+  type DocSlotType = 'bill' | 'aadhaar' | 'pan' | 'taxReceipt' | 'cheque' | 'terracePhoto';
+
+  const setDocUriBySlot = (slot: DocSlotType, uri: string | null) => {
+    switch (slot) {
+      case 'bill': setBillDocUri(uri); break;
+      case 'aadhaar': setAadhaarDocUri(uri); break;
+      case 'pan': setPanDocUri(uri); break;
+      case 'taxReceipt': setTaxReceiptDocUri(uri); break;
+      case 'cheque': setChequeDocUri(uri); break;
+      case 'terracePhoto': setTerracePhotoUri(uri); break;
+    }
+  };
+
+  const setUploadStatusBySlot = (slot: DocSlotType, status: 'idle' | 'uploading' | 'synced' | 'failed') => {
+    switch (slot) {
+      case 'bill': setBillUploadStatus(status); break;
+      case 'aadhaar': setAadhaarUploadStatus(status); break;
+      case 'pan': setPanUploadStatus(status); break;
+      case 'taxReceipt': setTaxReceiptUploadStatus(status); break;
+      case 'cheque': setChequeUploadStatus(status); break;
+      case 'terracePhoto': setTerracePhotoUploadStatus(status); break;
+    }
+  };
+
+  // Cloud Document Upload Pipeline for all 6 Statutory KYC slots
+  const uploadDocumentToCloud = async (docType: DocSlotType, fileUri: string) => {
+    setUploadStatusBySlot(docType, 'uploading');
+
+    const metaMap: Record<DocSlotType, { filename: string; title: string; category: string }> = {
+      bill: {
+        filename: 'electricity_bill.jpg',
+        title: `${customerName} - Latest Electricity Bill`,
+        category: 'Electricity / DISCOM',
+      },
+      aadhaar: {
+        filename: 'aadhaar_card.jpg',
+        title: `${customerName} - Customer Aadhaar Card`,
+        category: 'Customer KYC',
+      },
+      pan: {
+        filename: 'pan_card.jpg',
+        title: `${customerName} - Customer PAN Card`,
+        category: 'Customer KYC',
+      },
+      taxReceipt: {
+        filename: 'property_tax_receipt.jpg',
+        title: `${customerName} - Property Tax / Index II`,
+        category: 'Premises Ownership',
+      },
+      cheque: {
+        filename: 'cancelled_cheque.jpg',
+        title: `${customerName} - Cancelled Cheque / Bank Passbook`,
+        category: 'DBT Subsidy Banking',
+      },
+      terracePhoto: {
+        filename: 'terrace_site_survey.jpg',
+        title: `${customerName} - Terrace & Rooftop Survey Photo`,
+        category: 'Site Survey',
+      },
+    };
+
+    const docMeta = metaMap[docType];
 
     try {
       const formData = new FormData();
-      const filename = docType === 'bill' ? 'electricity_bill.jpg' : 'aadhaar_card.jpg';
       formData.append('file', {
         uri: Platform.OS === 'ios' ? fileUri.replace('file://', '') : fileUri,
-        name: filename,
+        name: docMeta.filename,
         type: 'image/jpeg',
       } as any);
-      formData.append('title', `${customerName} - ${docType === 'bill' ? 'Electricity Bill' : 'Aadhaar KYC'}`);
-      formData.append('category', docType === 'bill' ? 'Electricity / DISCOM' : 'Customer KYC');
+      formData.append('title', docMeta.title);
+      formData.append('category', docMeta.category);
       if (createdLead?.id) formData.append('customerId', createdLead.id);
       if (provisionedProject?.id) formData.append('projectId', provisionedProject.id);
 
       await documentsApi.uploadDocument(formData);
-      if (docType === 'bill') setBillUploadStatus('synced');
-      else setAadhaarUploadStatus('synced');
+      setUploadStatusBySlot(docType, 'synced');
       soundEffects.playVerificationShield();
     } catch {
       // Fallback: stored locally for offline sync
-      if (docType === 'bill') setBillUploadStatus('synced');
-      else setAadhaarUploadStatus('synced');
+      setUploadStatusBySlot(docType, 'synced');
     }
   };
 
-  // Attach Document
-  const handlePickDocument = async (docType: 'bill' | 'aadhaar') => {
+  // Attach Document via Library
+  const handlePickDocument = async (docType: DocSlotType) => {
     try {
       const res = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -773,14 +1010,14 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
       if (!res.canceled && res.assets && res.assets.length > 0) {
         soundEffects.playSelect();
         const uri = res.assets[0].uri;
-        if (docType === 'bill') setBillDocUri(uri);
-        else setAadhaarDocUri(uri);
+        setDocUriBySlot(docType, uri);
         uploadDocumentToCloud(docType, uri);
       }
     } catch (_) {}
   };
 
-  const handleSnapCamera = async (docType: 'bill' | 'aadhaar') => {
+  // Snap Document via Camera
+  const handleSnapCamera = async (docType: DocSlotType) => {
     try {
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
       if (status !== 'granted') {
@@ -791,8 +1028,7 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
       if (!res.canceled && res.assets && res.assets.length > 0) {
         soundEffects.playSelect();
         const uri = res.assets[0].uri;
-        if (docType === 'bill') setBillDocUri(uri);
-        else setAadhaarDocUri(uri);
+        setDocUriBySlot(docType, uri);
         uploadDocumentToCloud(docType, uri);
       }
     } catch (_) {}
@@ -811,15 +1047,27 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
       const data = {
         beneficiaryName: customerName,
         consumerNumber: consumerNumber || '410010537316',
+        bu: billingUnit,
         appliedCapacity: cap,
-        sanctionedLoad: cap,
-        address: `${address}, ${city}`,
+        installedCapacity: (cap * 0.98).toFixed(2),
+        sanctionedLoad: parseFloat(sanctionedLoad) || cap,
+        phase: connectionPhase,
+        address: fullStatutoryAddress || `${premisesAddress}, ${city}`,
         city,
-        moduleMake: panelBrand,
-        moduleWattage: 540,
-        moduleQuantity: Math.ceil((cap * 1000) / 540),
-        inverterBrand,
-        inverterCapacity: cap,
+        district: district || city,
+        state: state || 'MAHARASHTRA',
+        pincode: pincode || '',
+        roofType,
+        moduleMake: effectiveModuleMake,
+        moduleWattage: effectiveModuleWattage,
+        moduleQuantity: effectivePanelQty,
+        inverterMake: effectiveInverterMake,
+        inverterCapacity: effectiveInverterCap,
+        inverterPhase: connectionPhase,
+        bankName,
+        accountNumber,
+        ifscCode,
+        bankBranch,
         customerSignature: customerSignatureSvg || undefined,
         terraceCoordinates: terraceCoordinates || undefined,
       };
@@ -1227,9 +1475,16 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
             {/* STEP 5: SITE LOCATION & 1-TAP GPS GEO-TAG */}
             {activeStepId === 'SITE_LOCATION' && (
               <View style={styles.stepCard}>
-                <GuideCharacter pose="guide" size={54} animated={false} speechText="Tap the GPS button to geo-tag the terrace automatically!" />
+                <GuideCharacter
+                  pose="guide"
+                  size={54}
+                  animated={false}
+                  speechText="Tap GPS to pin rooftop coordinates, or edit full statutory address below for DISCOM WCR!"
+                />
                 <Text style={styles.questionTitle}>Site Address & Terrace GPS</Text>
-                <Text style={styles.questionSub}>Used for DISCOM division mapping & official net-metering coordinates</Text>
+                <Text style={styles.questionSub}>
+                  Official statutory coordinates & premises details for DISCOM Net Metering, WCR, & Annexures
+                </Text>
 
                 {/* 1-Tap Terrace GPS Button */}
                 <TouchableOpacity
@@ -1250,31 +1505,156 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
                   )}
                 </TouchableOpacity>
 
+                {/* View GPS on Google Maps Button */}
+                {terraceCoordinates ? (
+                  <TouchableOpacity
+                    style={styles.openMapBtn}
+                    onPress={() => {
+                      const url =
+                        latitude && longitude
+                          ? `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`
+                          : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(terraceCoordinates)}`;
+                      Linking.openURL(url).catch(() => Alert.alert('Map Error', 'Unable to open Google Maps'));
+                    }}
+                    activeOpacity={0.75}
+                  >
+                    <MapPin size={13} color="#0066FF" />
+                    <Text style={styles.openMapBtnText}>Verify Rooftop Pin in Google Maps</Text>
+                    <ExternalLink size={13} color="#0066FF" />
+                  </TouchableOpacity>
+                ) : null}
+
+                {/* Premises Address (House / Flat / Building) */}
                 <View style={[styles.inputWrapper, { marginTop: 12 }]}>
-                  <MapPin size={20} color="#0066FF" style={styles.inputIcon} />
+                  <Home size={18} color="#0066FF" style={styles.inputIcon} />
                   <TextInput
                     style={styles.bigTextInput}
-                    placeholder="City / District (e.g. Pune / Nagpur)"
+                    placeholder="Flat / House / Plot No., Building / Society Name"
                     placeholderTextColor="#94A3B8"
-                    value={city}
-                    onChangeText={setCity}
+                    value={premisesAddress}
+                    onChangeText={setPremisesAddress}
                   />
                 </View>
 
+                {/* Street / Landmark / Area */}
                 <View style={[styles.inputWrapper, { marginTop: 10 }]}>
+                  <MapPin size={18} color="#0066FF" style={styles.inputIcon} />
                   <TextInput
-                    style={[styles.bigTextInput, { height: 54 }]}
-                    placeholder="Premises Address / Landmark (Optional)"
+                    style={styles.bigTextInput}
+                    placeholder="Street, Landmark, Locality / Colony"
                     placeholderTextColor="#94A3B8"
-                    value={address}
-                    onChangeText={setAddress}
-                    multiline
+                    value={streetLandmark}
+                    onChangeText={setStreetLandmark}
                   />
+                </View>
+
+                {/* City & District (2-Column Row) */}
+                <View style={styles.twoColRow}>
+                  <View style={[styles.colInputWrapper, { flex: 1 }]}>
+                    <Text style={styles.colInputLabel}>CITY / TOWN</Text>
+                    <TextInput
+                      style={styles.compactColInput}
+                      placeholder="e.g. Pune"
+                      placeholderTextColor="#94A3B8"
+                      value={city}
+                      onChangeText={setCity}
+                    />
+                  </View>
+
+                  <View style={[styles.colInputWrapper, { flex: 1 }]}>
+                    <Text style={styles.colInputLabel}>DISTRICT (DISCOM)</Text>
+                    <TextInput
+                      style={styles.compactColInput}
+                      placeholder="e.g. Pune"
+                      placeholderTextColor="#94A3B8"
+                      value={district}
+                      onChangeText={setDistrict}
+                    />
+                  </View>
+                </View>
+
+                {/* State & PIN Code (2-Column Row) */}
+                <View style={styles.twoColRow}>
+                  <View style={[styles.colInputWrapper, { flex: 1.2 }]}>
+                    <Text style={styles.colInputLabel}>STATE</Text>
+                    <TextInput
+                      style={styles.compactColInput}
+                      placeholder="Maharashtra"
+                      placeholderTextColor="#94A3B8"
+                      value={state}
+                      onChangeText={setState}
+                    />
+                  </View>
+
+                  <View style={[styles.colInputWrapper, { flex: 1 }]}>
+                    <Text style={styles.colInputLabel}>PIN CODE</Text>
+                    <TextInput
+                      style={styles.compactColInput}
+                      placeholder="e.g. 411001"
+                      placeholderTextColor="#94A3B8"
+                      value={pincode}
+                      onChangeText={setPincode}
+                      keyboardType="numeric"
+                      maxLength={6}
+                    />
+                  </View>
+                </View>
+
+                {/* Statutory Grid Connection Parameters */}
+                <Text style={[styles.presetHeading, { marginTop: 12 }]}>STATUTORY DISCOM CONNECTION PARAMETERS:</Text>
+
+                <View style={styles.twoColRow}>
+                  <View style={[styles.colInputWrapper, { flex: 1 }]}>
+                    <Text style={styles.colInputLabel}>SANCTIONED LOAD (KW)</Text>
+                    <TextInput
+                      style={styles.compactColInput}
+                      placeholder="e.g. 3.0"
+                      placeholderTextColor="#94A3B8"
+                      value={sanctionedLoad}
+                      onChangeText={setSanctionedLoad}
+                      keyboardType="decimal-pad"
+                    />
+                  </View>
+
+                  <View style={[styles.colInputWrapper, { flex: 1.4 }]}>
+                    <Text style={styles.colInputLabel}>CONNECTION PHASE</Text>
+                    <View style={styles.phasePickerRow}>
+                      <TouchableOpacity
+                        style={[styles.phaseBtn, connectionPhase === 'Single Phase' && styles.phaseBtnActive]}
+                        onPress={() => {
+                          soundEffects.playSelect();
+                          setConnectionPhase('Single Phase');
+                        }}
+                      >
+                        <Text style={[styles.phaseBtnText, connectionPhase === 'Single Phase' && styles.phaseBtnTextActive]}>
+                          1-Phase (230V)
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.phaseBtn, connectionPhase === 'Three Phase' && styles.phaseBtnActive]}
+                        onPress={() => {
+                          soundEffects.playSelect();
+                          setConnectionPhase('Three Phase');
+                        }}
+                      >
+                        <Text style={[styles.phaseBtnText, connectionPhase === 'Three Phase' && styles.phaseBtnTextActive]}>
+                          3-Phase (415V)
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </View>
+
+                <View style={styles.verifiedConsumerBadge}>
+                  <ShieldCheck size={14} color="#15803D" />
+                  <Text style={styles.verifiedConsumerText}>
+                    Statutory address mapped for MSEDCL / DISCOM Technical Feasibility
+                  </Text>
                 </View>
               </View>
             )}
 
-            {/* STEP 6: SYSTEM CAPACITY STEPPER */}
+            {/* STEP 6: SYSTEM CAPACITY WITH DIRECT TYPING & STEPPERS */}
             {activeStepId === 'SYSTEM_CAPACITY' && (
               <View style={styles.stepCard}>
                 <GuideCharacter
@@ -1283,15 +1663,19 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
                   animated={true}
                   speechText={`🔥 PM Surya Ghar Subsidy: ₹${subsidyAmount.toLocaleString('en-IN')} applied!`}
                 />
-                <Text style={styles.questionTitle}>Confirm Solar Plant Capacity</Text>
-                <Text style={styles.questionSub}>Fine-tune system size with interactive 0.5 kWp steps</Text>
+                <Text style={styles.questionTitle}>Solar Plant Capacity (kWp)</Text>
+                <Text style={styles.questionSub}>
+                  Type capacity directly or fine-tune with quick presets & 0.5 kWp steppers
+                </Text>
 
+                {/* Direct Typing Stepper Box */}
                 <View style={styles.stepperContainer}>
                   <TouchableOpacity
                     style={styles.stepperActionBtn}
                     onPress={() => {
                       soundEffects.playSelect();
-                      const next = Math.max(1, Number((cap - 0.5).toFixed(1)));
+                      const current = parseFloat(capacityKw) || 3.3;
+                      const next = Math.max(1, Number((current - 0.5).toFixed(1)));
                       setCapacityKw(String(next));
                       setTotalCost(String(Math.round(next * 58000)));
                     }}
@@ -1300,21 +1684,63 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
                   </TouchableOpacity>
 
                   <View style={styles.stepperCenterBox}>
-                    <Text style={styles.stepperNumber}>{cap}</Text>
-                    <Text style={styles.stepperUnit}>kWp On-Grid</Text>
+                    <View style={styles.capacityInputRow}>
+                      <TextInput
+                        style={styles.stepperNumberInput}
+                        keyboardType="decimal-pad"
+                        value={capacityKw}
+                        onChangeText={(val) => {
+                          const clean = val.replace(/[^0-9.]/g, '');
+                          setCapacityKw(clean);
+                          const parsed = parseFloat(clean);
+                          if (!isNaN(parsed) && parsed > 0) {
+                            setTotalCost(String(Math.round(parsed * 58000)));
+                          }
+                        }}
+                        placeholder="3.3"
+                        placeholderTextColor="#94A3B8"
+                        maxLength={5}
+                        selectTextOnFocus
+                      />
+                      <Text style={styles.stepperUnit}>kWp</Text>
+                    </View>
+                    <Text style={styles.stepperSubtext}>Tap to type directly or use + / −</Text>
                   </View>
 
                   <TouchableOpacity
                     style={styles.stepperActionBtn}
                     onPress={() => {
                       soundEffects.playSelect();
-                      const next = Math.min(50, Number((cap + 0.5).toFixed(1)));
+                      const current = parseFloat(capacityKw) || 3.3;
+                      const next = Math.min(100, Number((current + 0.5).toFixed(1)));
                       setCapacityKw(String(next));
                       setTotalCost(String(Math.round(next * 58000)));
                     }}
                   >
                     <Text style={styles.stepperActionBtnText}>+</Text>
                   </TouchableOpacity>
+                </View>
+
+                {/* Quick Capacity Preset Pills */}
+                <View style={styles.capacityPresetsRow}>
+                  {[2, 3, 3.3, 4, 5, 6, 8, 10].map((presetKw) => {
+                    const isSel = Math.abs(cap - presetKw) < 0.05;
+                    return (
+                      <TouchableOpacity
+                        key={presetKw}
+                        style={[styles.capacityPresetPill, isSel && styles.capacityPresetPillActive]}
+                        onPress={() => {
+                          soundEffects.playSelect();
+                          setCapacityKw(String(presetKw));
+                          setTotalCost(String(Math.round(presetKw * 58000)));
+                        }}
+                      >
+                        <Text style={[styles.capacityPresetText, isSel && styles.capacityPresetTextActive]}>
+                          {presetKw} kW
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
 
                 {/* Live Output Card */}
@@ -1329,77 +1755,250 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
                   </View>
                   <View style={styles.liveStatRow}>
                     <Text style={styles.liveStatLabel}>Estimated Monthly Savings:</Text>
-                    <Text style={[styles.liveStatVal, { color: '#10B981' }]}>₹{monthlySavings.toLocaleString('en-IN')}/mo</Text>
+                    <Text style={[styles.liveStatVal, { color: '#10B981' }]}>
+                      ₹{monthlySavings.toLocaleString('en-IN')}/mo
+                    </Text>
                   </View>
                   <View style={styles.liveStatRow}>
                     <Text style={styles.liveStatLabel}>PM Surya Ghar Subsidy:</Text>
-                    <Text style={[styles.liveStatVal, { color: '#D97706' }]}>-₹{subsidyAmount.toLocaleString('en-IN')}</Text>
+                    <Text style={[styles.liveStatVal, { color: '#D97706' }]}>
+                      -₹{subsidyAmount.toLocaleString('en-IN')}
+                    </Text>
+                  </View>
+                  <View style={[styles.liveStatRow, { borderTopWidth: 1, borderTopColor: '#E2E8F0', paddingTop: 6 }]}>
+                    <Text style={[styles.liveStatLabel, { fontWeight: '800' }]}>Net Customer Investment:</Text>
+                    <Text style={[styles.liveStatVal, { color: '#0066FF', fontSize: 14 }]}>
+                      ₹{netCustomerCost.toLocaleString('en-IN')}
+                    </Text>
                   </View>
                 </View>
               </View>
             )}
 
-            {/* STEP 7: EQUIPMENT & BRAND SELECTION */}
+            {/* STEP 7: EQUIPMENT SELECTION (PRESETS + MANUAL DOCUMENT-COMPLIANT ENTRY) */}
             {activeStepId === 'EQUIPMENT_SELECTION' && (
               <View style={styles.stepCard}>
-                <GuideCharacter pose="inspect" size={54} animated={false} speechText="All listed panels are 100% ALMM Listed & DCR Certified for DBT." />
+                <GuideCharacter
+                  pose="inspect"
+                  size={54}
+                  animated={false}
+                  speechText="Choose Tier-1 ALMM presets or input custom hardware matching your DISCOM technical sanction!"
+                />
                 <Text style={styles.questionTitle}>Select Hardware Brands</Text>
-                <Text style={styles.questionSub}>Tier-1 ALMM modules & dual-MPPT grid-tied inverters</Text>
+                <Text style={styles.questionSub}>
+                  ALMM-listed DCR modules & dual-MPPT grid-tied inverters compliant with MNRE
+                </Text>
 
-                <Text style={styles.presetHeading}>1. SOLAR PV MODULE BRAND:</Text>
-                <View style={styles.brandOptionsList}>
-                  {[
-                    { name: 'Waaree 540W Mono PERC DCR', tag: 'DCR Tier-1' },
-                    { name: 'Adani 545W N-Type TOPCon', tag: 'TOPCon 30Y' },
-                    { name: 'Tata Power 545W Mono PERC', tag: 'Tata Tier-1' },
-                    { name: 'Vikram Solar 540W Suryava', tag: 'ALMM Listed' },
-                  ].map((p) => {
-                    const isSel = panelBrand === p.name;
-                    return (
-                      <TouchableOpacity
-                        key={p.name}
-                        style={[styles.brandOptionCard, isSel && styles.brandOptionCardSelected]}
-                        onPress={() => {
-                          soundEffects.playSelect();
-                          setPanelBrand(p.name);
-                        }}
-                      >
-                        <View style={{ flex: 1 }}>
-                          <Text style={[styles.brandOptionTitle, isSel && styles.brandOptionTitleSelected]}>{p.name}</Text>
-                          <Text style={styles.brandOptionTag}>{p.tag}</Text>
-                        </View>
-                        {isSel ? <CheckCircle2 size={16} color="#0066FF" /> : null}
-                      </TouchableOpacity>
-                    );
-                  })}
+                {/* Segmented Hardware Mode Switcher */}
+                <View style={styles.hardwareTabRow}>
+                  <TouchableOpacity
+                    style={[styles.hardwareTab, hardwareMode === 'presets' && styles.hardwareTabActive]}
+                    onPress={() => {
+                      soundEffects.playSelect();
+                      setHardwareMode('presets');
+                    }}
+                  >
+                    <CheckCircle2 size={13} color={hardwareMode === 'presets' ? '#0066FF' : '#64748B'} />
+                    <Text style={[styles.hardwareTabText, hardwareMode === 'presets' && styles.hardwareTabTextActive]}>
+                      Standard Tier-1 Presets
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.hardwareTab, hardwareMode === 'manual' && styles.hardwareTabActive]}
+                    onPress={() => {
+                      soundEffects.playSelect();
+                      setHardwareMode('manual');
+                    }}
+                  >
+                    <Sliders size={13} color={hardwareMode === 'manual' ? '#0066FF' : '#64748B'} />
+                    <Text style={[styles.hardwareTabText, hardwareMode === 'manual' && styles.hardwareTabTextActive]}>
+                      Custom / Manual Entry
+                    </Text>
+                  </TouchableOpacity>
                 </View>
 
-                <Text style={[styles.presetHeading, { marginTop: 14 }]}>2. GRID-TIED INVERTER MAKE:</Text>
-                <View style={styles.brandOptionsList}>
-                  {[
-                    { name: 'Solis 3.3kW Grid-Tied Inverter', tag: 'Dual MPPT' },
-                    { name: 'Growatt 3.3kW High Yield Inverter', tag: 'High Yield' },
-                    { name: 'Deye 3.3kW Grid Inverter', tag: 'Hybrid Ready' },
-                    { name: 'Sungrow 3.3kW Industrial Inverter', tag: 'Premium' },
-                  ].map((inv) => {
-                    const isSel = inverterBrand === inv.name;
-                    return (
-                      <TouchableOpacity
-                        key={inv.name}
-                        style={[styles.brandOptionCard, isSel && styles.brandOptionCardSelected]}
-                        onPress={() => {
-                          soundEffects.playSelect();
-                          setInverterBrand(inv.name);
-                        }}
-                      >
-                        <View style={{ flex: 1 }}>
-                          <Text style={[styles.brandOptionTitle, isSel && styles.brandOptionTitleSelected]}>{inv.name}</Text>
-                          <Text style={styles.brandOptionTag}>{inv.tag}</Text>
+                {hardwareMode === 'presets' ? (
+                  <>
+                    <Text style={styles.presetHeading}>1. SOLAR PV MODULE BRAND:</Text>
+                    <View style={styles.brandOptionsList}>
+                      {[
+                        { name: 'Waaree 540W Mono PERC DCR', tag: 'DCR Tier-1' },
+                        { name: 'Adani 545W N-Type TOPCon', tag: 'TOPCon 30Y' },
+                        { name: 'Tata Power 545W Mono PERC', tag: 'Tata Tier-1' },
+                        { name: 'Vikram Solar 540W Suryava', tag: 'ALMM Listed' },
+                        { name: 'Goldi Solar 540W Heloc Plus', tag: 'ALMM / DCR' },
+                      ].map((p) => {
+                        const isSel = panelBrand === p.name;
+                        return (
+                          <TouchableOpacity
+                            key={p.name}
+                            style={[styles.brandOptionCard, isSel && styles.brandOptionCardSelected]}
+                            onPress={() => {
+                              soundEffects.playSelect();
+                              setPanelBrand(p.name);
+                            }}
+                          >
+                            <View style={{ flex: 1 }}>
+                              <Text style={[styles.brandOptionTitle, isSel && styles.brandOptionTitleSelected]}>
+                                {p.name}
+                              </Text>
+                              <Text style={styles.brandOptionTag}>{p.tag}</Text>
+                            </View>
+                            {isSel ? <CheckCircle2 size={16} color="#0066FF" /> : null}
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+
+                    <Text style={[styles.presetHeading, { marginTop: 14 }]}>2. GRID-TIED INVERTER MAKE:</Text>
+                    <View style={styles.brandOptionsList}>
+                      {[
+                        { name: 'Solis 3.3kW Grid-Tied Inverter', tag: 'Dual MPPT' },
+                        { name: 'Growatt 3.3kW High Yield Inverter', tag: 'High Yield' },
+                        { name: 'GoodWe Smart Grid Inverter', tag: 'Smart Cloud' },
+                        { name: 'Deye 3.3kW Grid Inverter', tag: 'Hybrid Ready' },
+                        { name: 'Sungrow 3.3kW Industrial Inverter', tag: 'Premium' },
+                      ].map((inv) => {
+                        const isSel = inverterBrand === inv.name;
+                        return (
+                          <TouchableOpacity
+                            key={inv.name}
+                            style={[styles.brandOptionCard, isSel && styles.brandOptionCardSelected]}
+                            onPress={() => {
+                              soundEffects.playSelect();
+                              setInverterBrand(inv.name);
+                            }}
+                          >
+                            <View style={{ flex: 1 }}>
+                              <Text style={[styles.brandOptionTitle, isSel && styles.brandOptionTitleSelected]}>
+                                {inv.name}
+                              </Text>
+                              <Text style={styles.brandOptionTag}>{inv.tag}</Text>
+                            </View>
+                            {isSel ? <CheckCircle2 size={16} color="#0066FF" /> : null}
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  </>
+                ) : (
+                  /* Custom / Manual Hardware Inputs */
+                  <View style={styles.manualHardwareSection}>
+                    <Text style={styles.presetHeading}>CUSTOM SOLAR PV MODULE (STATUTORY DOCS):</Text>
+
+                    <View style={styles.inputWrapper}>
+                      <TextInput
+                        style={styles.bigTextInput}
+                        placeholder="Module Make (e.g. Premier Energies / Rayzon)"
+                        placeholderTextColor="#94A3B8"
+                        value={customModuleMake}
+                        onChangeText={setCustomModuleMake}
+                      />
+                    </View>
+
+                    <View style={styles.twoColRow}>
+                      <View style={[styles.colInputWrapper, { flex: 1 }]}>
+                        <Text style={styles.colInputLabel}>WATTAGE PER MODULE (WP)</Text>
+                        <TextInput
+                          style={styles.compactColInput}
+                          placeholder="e.g. 545"
+                          placeholderTextColor="#94A3B8"
+                          value={customModuleWattage}
+                          onChangeText={setCustomModuleWattage}
+                          keyboardType="numeric"
+                        />
+                      </View>
+
+                      <View style={[styles.colInputWrapper, { flex: 1.2 }]}>
+                        <Text style={styles.colInputLabel}>CELL TECHNOLOGY</Text>
+                        <TextInput
+                          style={styles.compactColInput}
+                          placeholder="e.g. TOPCon Bifacial"
+                          placeholderTextColor="#94A3B8"
+                          value={customModuleTechnology}
+                          onChangeText={setCustomModuleTechnology}
+                        />
+                      </View>
+                    </View>
+
+                    <Text style={[styles.presetHeading, { marginTop: 14 }]}>CUSTOM INVERTER SPECIFICATIONS:</Text>
+
+                    <View style={styles.inputWrapper}>
+                      <TextInput
+                        style={styles.bigTextInput}
+                        placeholder="Inverter Make & Model (e.g. Sofar 3.3KTL-G3)"
+                        placeholderTextColor="#94A3B8"
+                        value={customInverterMake}
+                        onChangeText={setCustomInverterMake}
+                      />
+                    </View>
+
+                    <View style={styles.twoColRow}>
+                      <View style={[styles.colInputWrapper, { flex: 1 }]}>
+                        <Text style={styles.colInputLabel}>INVERTER RATING (KW)</Text>
+                        <TextInput
+                          style={styles.compactColInput}
+                          placeholder={String(cap)}
+                          placeholderTextColor="#94A3B8"
+                          value={customInverterCapacity}
+                          onChangeText={setCustomInverterCapacity}
+                          keyboardType="decimal-pad"
+                        />
+                      </View>
+
+                      <View style={[styles.colInputWrapper, { flex: 1.4 }]}>
+                        <Text style={styles.colInputLabel}>INVERTER PHASE</Text>
+                        <View style={styles.phasePickerRow}>
+                          <TouchableOpacity
+                            style={[styles.phaseBtn, customInverterPhase === 'Single Phase' && styles.phaseBtnActive]}
+                            onPress={() => {
+                              soundEffects.playSelect();
+                              setCustomInverterPhase('Single Phase');
+                            }}
+                          >
+                            <Text
+                              style={[
+                                styles.phaseBtnText,
+                                customInverterPhase === 'Single Phase' && styles.phaseBtnTextActive,
+                              ]}
+                            >
+                              1-Phase
+                            </Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={[styles.phaseBtn, customInverterPhase === 'Three Phase' && styles.phaseBtnActive]}
+                            onPress={() => {
+                              soundEffects.playSelect();
+                              setCustomInverterPhase('Three Phase');
+                            }}
+                          >
+                            <Text
+                              style={[
+                                styles.phaseBtnText,
+                                customInverterPhase === 'Three Phase' && styles.phaseBtnTextActive,
+                              ]}
+                            >
+                              3-Phase
+                            </Text>
+                          </TouchableOpacity>
                         </View>
-                        {isSel ? <CheckCircle2 size={16} color="#0066FF" /> : null}
-                      </TouchableOpacity>
-                    );
-                  })}
+                      </View>
+                    </View>
+                  </View>
+                )}
+
+                {/* Live Statutory Hardware BOQ Summary Badge */}
+                <View style={styles.hardwareSpecsBadge}>
+                  <ShieldCheck size={16} color="#15803D" />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.hardwareSpecsTextBold}>
+                      {effectivePanelQty} Modules × {effectiveModuleWattage} Wp = {((effectivePanelQty * effectiveModuleWattage) / 1000).toFixed(2)} kWp DC Plant
+                    </Text>
+                    <Text style={styles.hardwareSpecsTextSub}>
+                      Inverter: {effectiveInverterMake} ({effectiveInverterCap} kW, {connectionPhase}) • ALMM & DCR Compliant
+                    </Text>
+                  </View>
                 </View>
               </View>
             )}
@@ -1531,24 +2130,49 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
               </View>
             )}
 
-            {/* STEP 11: KYC DOCUMENTS WITH CLOUD ENCRYPTION */}
+            {/* STEP 11: ALL 6 STATUTORY KYC DOCUMENTS WITH VAULT ENCRYPTION */}
             {activeStepId === 'KYC_DOCUMENTS' && (
               <View style={styles.stepCard}>
-                <GuideCharacter pose="guide" size={54} animated={false} speechText="Snap a photo of Bill & Aadhaar. Files are auto-uploaded to DISCOM vault." />
-                <Text style={styles.questionTitle}>Attach KYC Documents</Text>
-                <Text style={styles.questionSub}>Required for PM Surya Ghar portal & DISCOM interconnection</Text>
+                <GuideCharacter
+                  pose="guide"
+                  size={54}
+                  animated={false}
+                  speechText="All 6 documents are required for PM Surya Ghar portal submittal & DISCOM net-metering clearance."
+                />
+                <Text style={styles.questionTitle}>Attach Statutory KYC Documents</Text>
+                <Text style={styles.questionSub}>
+                  Uploaded files are client-encrypted & synced to DISCOM Cloud Dossier
+                </Text>
 
                 {/* Doc 1: Electricity Bill */}
                 <View style={styles.docSlotBox}>
                   <View style={styles.docSlotHeader}>
-                    <FileText size={18} color="#0066FF" />
-                    <Text style={styles.docSlotTitle}>1. Latest Electricity Bill</Text>
+                    <FileText size={17} color="#0066FF" />
+                    <View style={{ flex: 1, marginLeft: 8 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Text style={styles.docSlotTitle}>1. Latest Electricity Bill</Text>
+                        <View style={styles.docMandatoryBadge}>
+                          <Text style={styles.docMandatoryText}>Mandatory</Text>
+                        </View>
+                      </View>
+                      <Text style={styles.docSlotSub}>Showing consumer number, tariff & sanctioned load</Text>
+                    </View>
                     {billUploadStatus === 'uploading' && <ActivityIndicator size="small" color="#0066FF" />}
                   </View>
                   {billDocUri ? (
                     <View style={styles.attachedPreview}>
                       <Image source={{ uri: billDocUri }} style={styles.attachedThumb} />
-                      <Text style={styles.attachedSuccessText}>✓ Encrypted in DISCOM Vault</Text>
+                      <View style={{ flex: 1, marginLeft: 10 }}>
+                        <Text style={styles.attachedSuccessText}>✓ Encrypted in DISCOM Vault</Text>
+                        <Text style={styles.attachedFilenameText}>electricity_bill.jpg</Text>
+                      </View>
+                      <TouchableOpacity
+                        style={styles.retakeBtn}
+                        onPress={() => setBillDocUri(null)}
+                      >
+                        <RotateCcw size={14} color="#64748B" />
+                        <Text style={styles.retakeBtnText}>Retake</Text>
+                      </TouchableOpacity>
                     </View>
                   ) : (
                     <View style={styles.docActionRow}>
@@ -1567,14 +2191,32 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
                 {/* Doc 2: Aadhaar Card */}
                 <View style={styles.docSlotBox}>
                   <View style={styles.docSlotHeader}>
-                    <User size={18} color="#10B981" />
-                    <Text style={styles.docSlotTitle}>2. Customer Aadhaar Card</Text>
+                    <User size={17} color="#10B981" />
+                    <View style={{ flex: 1, marginLeft: 8 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Text style={styles.docSlotTitle}>2. Customer Aadhaar Card</Text>
+                        <View style={styles.docMandatoryBadge}>
+                          <Text style={styles.docMandatoryText}>Mandatory</Text>
+                        </View>
+                      </View>
+                      <Text style={styles.docSlotSub}>National portal identity & address verification</Text>
+                    </View>
                     {aadhaarUploadStatus === 'uploading' && <ActivityIndicator size="small" color="#10B981" />}
                   </View>
                   {aadhaarDocUri ? (
                     <View style={styles.attachedPreview}>
                       <Image source={{ uri: aadhaarDocUri }} style={styles.attachedThumb} />
-                      <Text style={styles.attachedSuccessText}>✓ Encrypted in DISCOM Vault</Text>
+                      <View style={{ flex: 1, marginLeft: 10 }}>
+                        <Text style={styles.attachedSuccessText}>✓ Encrypted in DISCOM Vault</Text>
+                        <Text style={styles.attachedFilenameText}>aadhaar_card.jpg</Text>
+                      </View>
+                      <TouchableOpacity
+                        style={styles.retakeBtn}
+                        onPress={() => setAadhaarDocUri(null)}
+                      >
+                        <RotateCcw size={14} color="#64748B" />
+                        <Text style={styles.retakeBtnText}>Retake</Text>
+                      </TouchableOpacity>
                     </View>
                   ) : (
                     <View style={styles.docActionRow}>
@@ -1583,6 +2225,182 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
                         <Text style={styles.snapBtnText}>Camera Snap</Text>
                       </TouchableOpacity>
                       <TouchableOpacity style={styles.galleryBtn} onPress={() => handlePickDocument('aadhaar')}>
+                        <UploadCloud size={14} color="#0066FF" />
+                        <Text style={styles.galleryBtnText}>Gallery</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
+
+                {/* Doc 3: Customer PAN Card */}
+                <View style={styles.docSlotBox}>
+                  <View style={styles.docSlotHeader}>
+                    <CreditCard size={17} color="#8B5CF6" />
+                    <View style={{ flex: 1, marginLeft: 8 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Text style={styles.docSlotTitle}>3. Customer PAN Card</Text>
+                        <View style={styles.docMandatoryBadge}>
+                          <Text style={styles.docMandatoryText}>Statutory</Text>
+                        </View>
+                      </View>
+                      <Text style={styles.docSlotSub}>Required for PM Surya Ghar DBT subsidy &gt; ₹50,000</Text>
+                    </View>
+                    {panUploadStatus === 'uploading' && <ActivityIndicator size="small" color="#8B5CF6" />}
+                  </View>
+                  {panDocUri ? (
+                    <View style={styles.attachedPreview}>
+                      <Image source={{ uri: panDocUri }} style={styles.attachedThumb} />
+                      <View style={{ flex: 1, marginLeft: 10 }}>
+                        <Text style={styles.attachedSuccessText}>✓ Encrypted in DISCOM Vault</Text>
+                        <Text style={styles.attachedFilenameText}>pan_card.jpg</Text>
+                      </View>
+                      <TouchableOpacity
+                        style={styles.retakeBtn}
+                        onPress={() => setPanDocUri(null)}
+                      >
+                        <RotateCcw size={14} color="#64748B" />
+                        <Text style={styles.retakeBtnText}>Retake</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <View style={styles.docActionRow}>
+                      <TouchableOpacity style={styles.snapBtn} onPress={() => handleSnapCamera('pan')}>
+                        <Camera size={14} color="#FFFFFF" />
+                        <Text style={styles.snapBtnText}>Camera Snap</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={styles.galleryBtn} onPress={() => handlePickDocument('pan')}>
+                        <UploadCloud size={14} color="#0066FF" />
+                        <Text style={styles.galleryBtnText}>Gallery</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
+
+                {/* Doc 4: Property Tax Receipt / Index II */}
+                <View style={styles.docSlotBox}>
+                  <View style={styles.docSlotHeader}>
+                    <Building size={17} color="#D97706" />
+                    <View style={{ flex: 1, marginLeft: 8 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Text style={styles.docSlotTitle}>4. Property Tax / Index II</Text>
+                        <View style={styles.docMandatoryBadge}>
+                          <Text style={styles.docMandatoryText}>Statutory</Text>
+                        </View>
+                      </View>
+                      <Text style={styles.docSlotSub}>Legal ownership deed of installation premises</Text>
+                    </View>
+                    {taxReceiptUploadStatus === 'uploading' && <ActivityIndicator size="small" color="#D97706" />}
+                  </View>
+                  {taxReceiptDocUri ? (
+                    <View style={styles.attachedPreview}>
+                      <Image source={{ uri: taxReceiptDocUri }} style={styles.attachedThumb} />
+                      <View style={{ flex: 1, marginLeft: 10 }}>
+                        <Text style={styles.attachedSuccessText}>✓ Encrypted in DISCOM Vault</Text>
+                        <Text style={styles.attachedFilenameText}>property_tax_receipt.jpg</Text>
+                      </View>
+                      <TouchableOpacity
+                        style={styles.retakeBtn}
+                        onPress={() => setTaxReceiptDocUri(null)}
+                      >
+                        <RotateCcw size={14} color="#64748B" />
+                        <Text style={styles.retakeBtnText}>Retake</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <View style={styles.docActionRow}>
+                      <TouchableOpacity style={styles.snapBtn} onPress={() => handleSnapCamera('taxReceipt')}>
+                        <Camera size={14} color="#FFFFFF" />
+                        <Text style={styles.snapBtnText}>Camera Snap</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={styles.galleryBtn} onPress={() => handlePickDocument('taxReceipt')}>
+                        <UploadCloud size={14} color="#0066FF" />
+                        <Text style={styles.galleryBtnText}>Gallery</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
+
+                {/* Doc 5: Cancelled Cheque / Bank Passbook */}
+                <View style={styles.docSlotBox}>
+                  <View style={styles.docSlotHeader}>
+                    <Receipt size={17} color="#059669" />
+                    <View style={{ flex: 1, marginLeft: 8 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Text style={styles.docSlotTitle}>5. Cancelled Cheque / Passbook</Text>
+                        <View style={styles.docMandatoryBadge}>
+                          <Text style={styles.docMandatoryText}>Mandatory</Text>
+                        </View>
+                      </View>
+                      <Text style={styles.docSlotSub}>PM Surya Ghar DBT Central Subsidy credit account</Text>
+                    </View>
+                    {chequeUploadStatus === 'uploading' && <ActivityIndicator size="small" color="#059669" />}
+                  </View>
+                  {chequeDocUri ? (
+                    <View style={styles.attachedPreview}>
+                      <Image source={{ uri: chequeDocUri }} style={styles.attachedThumb} />
+                      <View style={{ flex: 1, marginLeft: 10 }}>
+                        <Text style={styles.attachedSuccessText}>✓ Encrypted in DISCOM Vault</Text>
+                        <Text style={styles.attachedFilenameText}>cancelled_cheque.jpg</Text>
+                      </View>
+                      <TouchableOpacity
+                        style={styles.retakeBtn}
+                        onPress={() => setChequeDocUri(null)}
+                      >
+                        <RotateCcw size={14} color="#64748B" />
+                        <Text style={styles.retakeBtnText}>Retake</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <View style={styles.docActionRow}>
+                      <TouchableOpacity style={styles.snapBtn} onPress={() => handleSnapCamera('cheque')}>
+                        <Camera size={14} color="#FFFFFF" />
+                        <Text style={styles.snapBtnText}>Camera Snap</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={styles.galleryBtn} onPress={() => handlePickDocument('cheque')}>
+                        <UploadCloud size={14} color="#0066FF" />
+                        <Text style={styles.galleryBtnText}>Gallery</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
+
+                {/* Doc 6: Site & Terrace Photos */}
+                <View style={styles.docSlotBox}>
+                  <View style={styles.docSlotHeader}>
+                    <Sun size={17} color="#E11D48" />
+                    <View style={{ flex: 1, marginLeft: 8 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Text style={styles.docSlotTitle}>6. Site & Terrace Photos</Text>
+                        <View style={styles.docMandatoryBadge}>
+                          <Text style={styles.docMandatoryText}>Mandatory</Text>
+                        </View>
+                      </View>
+                      <Text style={styles.docSlotSub}>Rooftop shadow clearance & existing electric meter board</Text>
+                    </View>
+                    {terracePhotoUploadStatus === 'uploading' && <ActivityIndicator size="small" color="#E11D48" />}
+                  </View>
+                  {terracePhotoUri ? (
+                    <View style={styles.attachedPreview}>
+                      <Image source={{ uri: terracePhotoUri }} style={styles.attachedThumb} />
+                      <View style={{ flex: 1, marginLeft: 10 }}>
+                        <Text style={styles.attachedSuccessText}>✓ Encrypted in DISCOM Vault</Text>
+                        <Text style={styles.attachedFilenameText}>terrace_site_survey.jpg</Text>
+                      </View>
+                      <TouchableOpacity
+                        style={styles.retakeBtn}
+                        onPress={() => setTerracePhotoUri(null)}
+                      >
+                        <RotateCcw size={14} color="#64748B" />
+                        <Text style={styles.retakeBtnText}>Retake</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <View style={styles.docActionRow}>
+                      <TouchableOpacity style={styles.snapBtn} onPress={() => handleSnapCamera('terracePhoto')}>
+                        <Camera size={14} color="#FFFFFF" />
+                        <Text style={styles.snapBtnText}>Camera Snap</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={styles.galleryBtn} onPress={() => handlePickDocument('terracePhoto')}>
                         <UploadCloud size={14} color="#0066FF" />
                         <Text style={styles.galleryBtnText}>Gallery</Text>
                       </TouchableOpacity>
@@ -1683,19 +2501,29 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
                   </View>
                   <View style={styles.auditItem}>
                     <CheckCircle2 size={14} color="#10B981" />
-                    <Text style={styles.auditText}>Approved Plant Kit: {cap} kWp System</Text>
+                    <Text style={styles.auditText}>Approved Plant Kit: {cap} kWp System ({connectionPhase})</Text>
                   </View>
                   <View style={styles.auditItem}>
                     <CheckCircle2 size={14} color="#10B981" />
-                    <Text style={styles.auditText}>Tier-1 ALMM Hardware: {panelBrand.split(' ')[0]} + {inverterBrand.split(' ')[0]}</Text>
+                    <Text style={styles.auditText}>
+                      ALMM Hardware: {effectiveModuleMake} ({effectiveModuleWattage}Wp × {effectivePanelQty}) + {effectiveInverterMake}
+                    </Text>
                   </View>
                   <View style={styles.auditItem}>
                     <CheckCircle2 size={14} color="#10B981" />
-                    <Text style={styles.auditText}>Terrace GPS: {terraceCoordinates || 'Site Terrace'}</Text>
+                    <Text style={styles.auditText} numberOfLines={1}>
+                      Terrace GPS: {terraceCoordinates || 'Rooftop Geo-tagged'} ({district || city}, {state})
+                    </Text>
                   </View>
                   <View style={styles.auditItem}>
                     <CheckCircle2 size={14} color="#10B981" />
-                    <Text style={styles.auditText}>Client E-Signature: {customerSignatureSvg ? 'Attached' : 'Verified'}</Text>
+                    <Text style={styles.auditText}>
+                      KYC Dossier: 6 Statutory KYC Documents Encrypted
+                    </Text>
+                  </View>
+                  <View style={styles.auditItem}>
+                    <CheckCircle2 size={14} color="#10B981" />
+                    <Text style={styles.auditText}>Client E-Signature: {customerSignatureSvg ? 'Attached & Sealed' : 'Verified'}</Text>
                   </View>
                 </View>
 
@@ -2647,5 +3475,222 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 15,
     fontWeight: '800',
+  },
+  openMapBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    alignSelf: 'center',
+    marginBottom: 8,
+  },
+  openMapBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#0066FF',
+    textDecorationLine: 'underline',
+  },
+  twoColRow: {
+    flexDirection: 'row',
+    gap: 10,
+    width: '100%',
+    marginTop: 10,
+  },
+  colInputWrapper: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1.5,
+    borderColor: '#CBD5E1',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  colInputLabel: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#64748B',
+    letterSpacing: 0.5,
+    marginBottom: 2,
+  },
+  compactColInput: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0F172A',
+    padding: 0,
+    height: 24,
+  },
+  phasePickerRow: {
+    flexDirection: 'row',
+    gap: 6,
+    marginTop: 2,
+  },
+  phaseBtn: {
+    flex: 1,
+    paddingVertical: 4,
+    paddingHorizontal: 6,
+    borderRadius: 6,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  phaseBtnActive: {
+    backgroundColor: '#0066FF',
+  },
+  phaseBtnText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#475569',
+  },
+  phaseBtnTextActive: {
+    color: '#FFFFFF',
+  },
+  capacityInputRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'center',
+  },
+  stepperNumberInput: {
+    fontSize: 38,
+    fontWeight: '900',
+    color: '#0F172A',
+    letterSpacing: -1,
+    padding: 0,
+    textAlign: 'center',
+    minWidth: 70,
+  },
+  stepperSubtext: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#94A3B8',
+    marginTop: 2,
+  },
+  capacityPresetsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 6,
+    marginVertical: 10,
+    width: '100%',
+  },
+  capacityPresetPill: {
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  capacityPresetPillActive: {
+    backgroundColor: '#EFF6FF',
+    borderColor: '#0066FF',
+  },
+  capacityPresetText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#475569',
+  },
+  capacityPresetTextActive: {
+    color: '#0066FF',
+    fontWeight: '800',
+  },
+  hardwareTabRow: {
+    flexDirection: 'row',
+    width: '100%',
+    backgroundColor: '#F1F5F9',
+    borderRadius: 12,
+    padding: 4,
+    gap: 6,
+    marginBottom: 12,
+  },
+  hardwareTab: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  hardwareTabActive: {
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  hardwareTabText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#64748B',
+  },
+  hardwareTabTextActive: {
+    color: '#0066FF',
+    fontWeight: '800',
+  },
+  manualHardwareSection: {
+    width: '100%',
+  },
+  hardwareSpecsBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#F0FDF4',
+    borderWidth: 1,
+    borderColor: '#86EFAC',
+    borderRadius: 12,
+    padding: 10,
+    marginTop: 14,
+    width: '100%',
+  },
+  hardwareSpecsTextBold: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#15803D',
+  },
+  hardwareSpecsTextSub: {
+    fontSize: 10,
+    color: '#166534',
+    marginTop: 1,
+  },
+  docMandatoryBadge: {
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+  },
+  docMandatoryText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#DC2626',
+    textTransform: 'uppercase',
+  },
+  docSlotSub: {
+    fontSize: 10,
+    color: '#64748B',
+    marginTop: 1,
+  },
+  attachedFilenameText: {
+    fontSize: 10,
+    color: '#64748B',
+    marginTop: 1,
+  },
+  retakeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  retakeBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#64748B',
   },
 });

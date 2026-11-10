@@ -525,7 +525,18 @@ router.post('/api/tenant/leads/:id/convert', requireTenantAuth, async (req, res)
             customerId: customer.id,
             leadId: id,
             surveyDate,
-            status: 'SCHEDULED'
+            status: 'SCHEDULED',
+            address: body.address || lead.address,
+            city: body.city || lead.city,
+            state: body.state || lead.state || 'Maharashtra',
+            pincode: body.pincode || lead.pincode,
+            latitude: body.latitude ? parseFloat(body.latitude) : null,
+            longitude: body.longitude ? parseFloat(body.longitude) : null,
+            googleMapsUrl: body.latitude && body.longitude ? `https://www.google.com/maps/search/?api=1&query=${body.latitude},${body.longitude}` : (body.address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(body.address)}` : null),
+            discomConsumerNo: body.consumerNumber || lead.consumerNumber,
+            sanctionedLoad: body.sanctionedLoad ? parseFloat(body.sanctionedLoad) : undefined,
+            electricalPhase: body.phase || undefined,
+            roofType: body.roofType || undefined,
           }
         });
       }
@@ -1232,6 +1243,22 @@ router.get('/api/tenant/projects', requireTenantAuth, async (req, res) => {
         },
         projectOwner: {
           select: { id: true, name: true, email: true }
+        },
+        survey: {
+          select: {
+            id: true,
+            latitude: true,
+            longitude: true,
+            googleMapsUrl: true,
+            address: true,
+            city: true,
+            state: true,
+            pincode: true,
+            sanctionedLoad: true,
+            electricalPhase: true,
+            roofType: true,
+            discomConsumerNo: true
+          }
         },
         discomApplication: true,
         subsidies: true,

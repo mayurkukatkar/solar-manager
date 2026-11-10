@@ -111,6 +111,47 @@ export const FieldProjectsScreen: React.FC<{ navigation?: any }> = ({ navigation
     setSeamlessFlowVisible(true);
   };
 
+  const handleOpenProjectLocation = (proj: any) => {
+    const lat = proj.survey?.latitude || proj.siteSurvey?.latitude || proj.latitude;
+    const lon = proj.survey?.longitude || proj.siteSurvey?.longitude || proj.longitude;
+    const gUrl = proj.survey?.googleMapsUrl || proj.siteSurvey?.googleMapsUrl;
+
+    if (gUrl) {
+      Linking.openURL(gUrl).catch(() => {
+        Alert.alert('Map Navigation', 'Unable to open Google Maps link.');
+      });
+      return;
+    }
+
+    if (lat && lon) {
+      const url = `https://www.google.com/maps/search/?api=1&query=${lat},${lon}`;
+      Linking.openURL(url).catch(() => {
+        Alert.alert('Map Navigation', 'Unable to open Google Maps coordinates.');
+      });
+      return;
+    }
+
+    const addr =
+      proj.installationAddress ||
+      proj.survey?.address ||
+      proj.customer?.address ||
+      proj.address ||
+      `${proj.city || ''} ${proj.pincode || ''}`.trim();
+
+    if (addr) {
+      const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr)}`;
+      Linking.openURL(url).catch(() => {
+        Alert.alert('Map Navigation', 'Unable to open Google Maps search.');
+      });
+      return;
+    }
+
+    Alert.alert(
+      'Site Location Required',
+      'No GPS coordinates or installation address recorded yet. Launch 1-Flow to geo-tag this site.'
+    );
+  };
+
   // Stage Advancement Modal State
   const [advanceModalVisible, setAdvanceModalVisible] = useState(false);
   const [projectToAdvance, setProjectToAdvance] = useState<any | null>(null);
@@ -615,6 +656,22 @@ export const FieldProjectsScreen: React.FC<{ navigation?: any }> = ({ navigation
                   Cons: {consumerNo}
                 </Text>
               </View>
+
+              {p.city || p.installationAddress || p.survey?.city ? (
+                <>
+                  <Text style={[styles.metadataDivider, { color: colors.textMuted }]}>•</Text>
+                  <TouchableOpacity
+                    style={styles.metadataItem}
+                    onPress={() => handleOpenProjectLocation(p)}
+                    activeOpacity={0.7}
+                  >
+                    <MapPin size={11} color="#0284C7" />
+                    <Text style={[styles.metadataText, { color: '#0284C7', fontWeight: '600' }]} numberOfLines={1}>
+                      {p.city || p.survey?.city || 'Site Map'}
+                    </Text>
+                  </TouchableOpacity>
+                </>
+              ) : null}
             </View>
           </View>
 
@@ -722,6 +779,21 @@ export const FieldProjectsScreen: React.FC<{ navigation?: any }> = ({ navigation
               >
                 <Building size={12} color="#D97706" />
                 <Text style={[styles.toolBtnText, { color: colors.textSecondary }]}>DISCOM</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.toolBtn,
+                  {
+                    backgroundColor: isDark ? 'rgba(2, 132, 199, 0.15)' : '#F0F9FF',
+                    borderColor: isDark ? 'rgba(2, 132, 199, 0.35)' : '#BAE6FD',
+                  },
+                ]}
+                onPress={() => handleOpenProjectLocation(p)}
+                activeOpacity={0.75}
+              >
+                <MapPin size={12} color="#0284C7" />
+                <Text style={[styles.toolBtnText, { color: '#0284C7', fontWeight: '700' }]}>Map</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
