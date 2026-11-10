@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import {
   Platform,
   Keyboard,
   KeyboardAvoidingView,
+  Linking,
 } from 'react-native';
 import {
   X,
@@ -40,7 +41,10 @@ import {
   Lock,
   CheckSquare,
   Info,
+  MessageCircle,
+  ArrowLeft,
 } from 'lucide-react-native';
+import { useTheme, ThemeColors } from '../../theme';
 import {
   generateDiscomHtml,
   createAndSharePdf,
@@ -80,6 +84,8 @@ export const DiscomDocsModal: React.FC<DiscomDocsModalProps> = ({
   initialDocType = 'WCR_FULL',
 }) => {
   const { user } = useAuth();
+  const { colors, isDark } = useTheme();
+  const styles = useMemo(() => getStyles(colors, isDark), [colors, isDark]);
   const [activeTab, setActiveTab] = useState<'CONTROLS' | 'PREVIEW'>('CONTROLS');
   const [selectedDocId, setSelectedDocId] = useState<DiscomDocType>(initialDocType);
   const [includeStampGraphic, setIncludeStampGraphic] = useState(true);
@@ -577,6 +583,41 @@ export const DiscomDocsModal: React.FC<DiscomDocsModalProps> = ({
     performPrint();
   };
 
+  const handleShareWhatsApp = async () => {
+    try {
+      const data = getDiscomFormData(discomCustomOverrides);
+      const docName = docOptions.find((d) => d.id === selectedDocId)?.title || 'Work Completion Report';
+      const text =
+        `🏛️ *DISCOM STATUTORY DOSSIER — MSEDCL / PM SURYA GHAR*\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+        `👤 *Beneficiary:* ${data.beneficiaryName}\n` +
+        `⚡ *Consumer Account No:* ${data.consumerNumber}\n` +
+        `📍 *Premises:* ${data.address}, ${data.city}\n` +
+        `☀️ *Plant Capacity:* ${data.appliedCapacity} kWp (${data.phase})\n` +
+        `📦 *Hardware:* ${data.moduleQuantity}x ${data.moduleWattage}Wp (${data.moduleMake}) + ${data.inverterMake}\n` +
+        `📋 *Document Pack:* ${docName}\n` +
+        `🏛️ *Sub-Division:* ${data.subDivision || data.city}\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+        `✅ *Status:* Statutory Pack Verified & Compliant for Net-Metering Interconnection.\n\n` +
+        `Generated via WhereReady Solar OS Studio.`;
+
+      const phone = (data.mobileNo || '').replace(/[^0-9]/g, '');
+      const encodedMsg = encodeURIComponent(text);
+      const url = phone.length >= 10
+        ? `whatsapp://send?phone=91${phone.slice(-10)}&text=${encodedMsg}`
+        : `whatsapp://send?text=${encodedMsg}`;
+
+      const canOpen = await Linking.canOpenURL(url).catch(() => false);
+      if (canOpen) {
+        await Linking.openURL(url);
+      } else {
+        await Linking.openURL(`https://wa.me/${phone.length >= 10 ? `91${phone.slice(-10)}` : ''}?text=${encodedMsg}`);
+      }
+    } catch {
+      Alert.alert('WhatsApp', 'Could not open WhatsApp.');
+    }
+  };
+
   return (
     <Modal visible={visible} animationType="slide" transparent={false} onRequestClose={onClose}>
       <KeyboardAvoidingView
@@ -589,7 +630,7 @@ export const DiscomDocsModal: React.FC<DiscomDocsModalProps> = ({
         <View style={styles.header}>
           <View style={styles.headerLeft}>
             <View style={styles.iconCircle}>
-              <FileText size={16} color="#10b981" />
+              <Building size={16} color="#0066FF" />
             </View>
             <View style={{ flex: 1 }}>
               <View style={styles.headerTitleRow}>
@@ -638,7 +679,7 @@ export const DiscomDocsModal: React.FC<DiscomDocsModalProps> = ({
           </View>
 
           <TouchableOpacity style={styles.closeBtn} onPress={onClose} activeOpacity={0.7}>
-            <X size={18} color="#cbd5e1" />
+            <X size={18} color={colors.text} />
           </TouchableOpacity>
         </View>
 
@@ -651,7 +692,7 @@ export const DiscomDocsModal: React.FC<DiscomDocsModalProps> = ({
             onPress={() => setActiveTab('CONTROLS')}
             activeOpacity={0.8}
           >
-            <Sliders size={14} color={activeTab === 'CONTROLS' ? '#10b981' : '#64748b'} />
+            <Sliders size={14} color={activeTab === 'CONTROLS' ? '#0066FF' : colors.textMuted} />
             <Text style={[styles.tabBtnText, activeTab === 'CONTROLS' && styles.tabBtnTextActive]}>
               Studio Controls & Fields
             </Text>
@@ -662,7 +703,7 @@ export const DiscomDocsModal: React.FC<DiscomDocsModalProps> = ({
             onPress={() => setActiveTab('PREVIEW')}
             activeOpacity={0.8}
           >
-            <Eye size={14} color={activeTab === 'PREVIEW' ? '#10b981' : '#64748b'} />
+            <Eye size={14} color={activeTab === 'PREVIEW' ? '#0066FF' : colors.textMuted} />
             <Text style={[styles.tabBtnText, activeTab === 'PREVIEW' && styles.tabBtnTextActive]}>
               Live Document Preview
             </Text>
@@ -1314,7 +1355,7 @@ export const DiscomDocsModal: React.FC<DiscomDocsModalProps> = ({
         )}
 
         {/* ========================================================================= */}
-        {/* BOTTOM ACTION BAR (Direct Print & Export PDF - ONLY IN PREVIEW TAB) */}
+        {/* BOTTOM ACTION BAR (Direct Print, Export PDF & WhatsApp Share) */}
         {/* ========================================================================= */}
         {activeTab === 'PREVIEW' && !isKeyboardVisible && (
           <View style={styles.bottomBar}>
@@ -1325,10 +1366,10 @@ export const DiscomDocsModal: React.FC<DiscomDocsModalProps> = ({
               activeOpacity={0.8}
             >
               {printing ? (
-                <ActivityIndicator color="#0f172a" size="small" />
+                <ActivityIndicator color={colors.text} size="small" />
               ) : (
                 <>
-                  <Printer size={16} color="#0f172a" />
+                  <Printer size={16} color={colors.text} />
                   <Text style={styles.printBtnText}>Direct Print</Text>
                 </>
               )}
@@ -1345,9 +1386,18 @@ export const DiscomDocsModal: React.FC<DiscomDocsModalProps> = ({
               ) : (
                 <>
                   <Download size={16} color="#ffffff" />
-                  <Text style={styles.exportShareText}>Download / Share PDF</Text>
+                  <Text style={styles.exportShareText}>Export PDF</Text>
                 </>
               )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.whatsappShareBtn}
+              onPress={handleShareWhatsApp}
+              activeOpacity={0.85}
+            >
+              <MessageCircle size={16} color="#ffffff" />
+              <Text style={styles.whatsappShareText}>WhatsApp</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -1652,6 +1702,365 @@ export const DiscomDocsModal: React.FC<DiscomDocsModalProps> = ({
     </Modal>
   );
 };
+
+// ============================================================================
+// SIMULATED LEGAL A4 DOCUMENT PREVIEW STYLES (Printed on Physical White Paper)
+// ============================================================================
+const paperStyles = StyleSheet.create({
+  paperSheet: {
+    width: '100%',
+    maxWidth: 440,
+    backgroundColor: '#ffffff',
+    borderRadius: 4,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.18,
+    shadowRadius: 10,
+    elevation: 8,
+  },
+  stampGraphicBox: {
+    borderWidth: 3,
+    borderStyle: 'solid',
+    borderColor: '#8b1e42',
+    backgroundColor: '#fdf2f4',
+    padding: 8,
+    marginBottom: 16,
+  },
+  stampGraphicInner: {
+    borderWidth: 1,
+    borderColor: '#aa3355',
+    padding: 6,
+  },
+  stampTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  stampHindiText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#8b1e42',
+  },
+  stampRupeeBig: {
+    fontSize: 16,
+    fontWeight: '900',
+    color: '#8b1e42',
+  },
+  stampGairNyayik: {
+    fontSize: 12,
+    fontWeight: '900',
+    color: '#7a1232',
+  },
+  stampNonJudicialEng: {
+    fontSize: 7.5,
+    fontWeight: '800',
+    letterSpacing: 1,
+    color: '#a83250',
+  },
+  stampRupeeWord: {
+    fontSize: 8,
+    fontWeight: '800',
+    color: '#8b1e42',
+  },
+  stampEmblemRow: {
+    alignItems: 'center',
+    marginVertical: 4,
+  },
+  stampEmblemBox: {
+    borderWidth: 1,
+    borderColor: '#8b1e42',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    backgroundColor: 'rgba(255,255,255,0.8)',
+  },
+  stampEmblemText: {
+    fontSize: 6.5,
+    fontWeight: '800',
+    color: '#8b1e42',
+  },
+  stampBharatIndia: {
+    textAlign: 'center',
+    fontSize: 16,
+    fontWeight: '900',
+    letterSpacing: 3,
+    color: '#8b1e42',
+    marginTop: 2,
+  },
+  stampSubIndia: {
+    textAlign: 'center',
+    fontSize: 8,
+    fontWeight: '800',
+    letterSpacing: 2,
+    color: '#7a1232',
+    textTransform: 'uppercase',
+  },
+  stampTreasuryBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingTop: 4,
+    borderTopWidth: 1,
+    borderTopColor: '#e2e8f0',
+    marginTop: 4,
+  },
+  stampTreasuryText: {
+    fontSize: 8,
+    fontWeight: '800',
+    color: '#1e293b',
+  },
+  stampBlankMargin: {
+    height: 90,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderColor: '#94a3b8',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 12,
+    marginBottom: 16,
+    backgroundColor: '#f8fafc',
+  },
+  stampBlankTitle: {
+    fontSize: 9.5,
+    fontWeight: '800',
+    color: '#475569',
+    textAlign: 'center',
+  },
+  stampBlankSub: {
+    fontSize: 8,
+    color: '#94a3b8',
+    textAlign: 'center',
+    marginTop: 3,
+  },
+  docHeader: {
+    alignItems: 'center',
+    marginBottom: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#000000',
+    paddingBottom: 8,
+  },
+  docOrgText: {
+    fontSize: 10,
+    fontWeight: '800',
+    textAlign: 'center',
+    color: '#000000',
+    textTransform: 'uppercase',
+  },
+  docMainTitle: {
+    fontSize: 10.5,
+    fontWeight: '900',
+    textAlign: 'center',
+    color: '#000000',
+    marginTop: 2,
+  },
+  paperTable: {
+    borderWidth: 1,
+    borderColor: '#000000',
+    marginBottom: 10,
+  },
+  tableHeadRow: {
+    backgroundColor: '#f3f4f6',
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#000000',
+  },
+  tableHeadText: {
+    fontSize: 9.5,
+    fontWeight: '800',
+    color: '#000000',
+  },
+  tableRow: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+  },
+  tableColLabel: {
+    width: '42%',
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#000000',
+  },
+  tableColVal: {
+    width: '58%',
+    fontSize: 9,
+    color: '#000000',
+  },
+  tableColValBold: {
+    width: '58%',
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#000000',
+  },
+  serialsTableList: {
+    padding: 6,
+  },
+  serialsTableRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 2,
+    borderBottomWidth: 0.5,
+    borderBottomColor: '#e5e7eb',
+  },
+  serialsIndex: {
+    fontSize: 8.5,
+    fontWeight: '700',
+    width: 20,
+    color: '#000000',
+  },
+  serialsText: {
+    fontSize: 8.5,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    fontWeight: '700',
+    flex: 1,
+    color: '#000000',
+  },
+  serialsWatt: {
+    fontSize: 8.5,
+    color: '#64748b',
+  },
+  statutoryTextBlock: {
+    marginVertical: 8,
+  },
+  statutoryText: {
+    fontSize: 9,
+    color: '#000000',
+    lineHeight: 13,
+    textAlign: 'justify',
+  },
+  bulletItem: {
+    fontSize: 8.5,
+    color: '#000000',
+    marginVertical: 1.5,
+    lineHeight: 12,
+  },
+  clauseHeading: {
+    fontSize: 9.5,
+    fontWeight: '800',
+    color: '#000000',
+    marginTop: 6,
+    marginBottom: 2,
+  },
+  clauseP: {
+    fontSize: 8.5,
+    color: '#000000',
+    lineHeight: 12,
+    textAlign: 'justify',
+    marginBottom: 4,
+  },
+  quotationBigTitle: {
+    textAlign: 'center',
+    fontWeight: '900',
+    fontSize: 18,
+    letterSpacing: 2,
+    color: '#000000',
+    marginBottom: 12,
+  },
+  quoteMetaText: {
+    fontSize: 9,
+    color: '#475569',
+    marginTop: 1,
+  },
+  totalBox: {
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    padding: 8,
+    marginVertical: 6,
+  },
+  totalBoxText: {
+    fontSize: 9.5,
+    fontWeight: '800',
+    color: '#000000',
+  },
+  signaturesRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 16,
+    paddingTop: 8,
+  },
+  sigBox: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  sigName: {
+    fontSize: 9,
+    fontStyle: 'italic',
+    color: '#334155',
+    marginBottom: 4,
+  },
+  sigLine: {
+    width: '80%',
+    height: 1,
+    backgroundColor: '#000000',
+    marginBottom: 2,
+  },
+  sigLabel: {
+    fontSize: 8,
+    fontWeight: '800',
+    color: '#000000',
+    textAlign: 'center',
+  },
+  sigSubLabel: {
+    fontSize: 7.5,
+    color: '#64748b',
+    textAlign: 'center',
+  },
+  vendorSeal: {
+    borderWidth: 1,
+    borderColor: '#1e40af',
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: 2,
+    marginBottom: 4,
+    alignItems: 'center',
+  },
+  vendorSealText: {
+    fontSize: 7,
+    fontWeight: '800',
+    color: '#1e40af',
+  },
+  vendorSealSub: {
+    fontSize: 6,
+    color: '#1e40af',
+  },
+  msedclSeal: {
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: '#94a3b8',
+    paddingHorizontal: 4,
+    paddingVertical: 4,
+    borderRadius: 2,
+    marginBottom: 4,
+  },
+  msedclSealText: {
+    fontSize: 6.5,
+    color: '#94a3b8',
+    fontWeight: '700',
+  },
+  pageBreakBanner: {
+    width: '100%',
+    maxWidth: 780,
+    backgroundColor: '#0f172a',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    marginBottom: 8,
+    marginTop: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pageBreakBannerText: {
+    color: '#94a3b8',
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+});
+
+const styles = paperStyles;
 
 // ============================================================================
 // SUBCOMPONENT: STAMP PAPER HEADER (100% Parity with web StampPaperHeader)
@@ -2245,1428 +2654,1125 @@ const StandardQuotationView: React.FC<{ data: any }> = ({ data }) => (
   </View>
 );
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#090d16',
-  },
-  header: {
-    backgroundColor: '#0f172a',
-    paddingHorizontal: 14,
-    paddingTop: Platform.OS === 'ios' ? 44 : 12,
-    paddingBottom: 8,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: '#1e293b',
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    flex: 1,
-  },
-  iconCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',
-    borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.3)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  headerTitle: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#ffffff',
-    letterSpacing: -0.2,
-  },
-  headerAuditPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-    borderWidth: 1,
-  },
-  headerAuditPillVerified: {
-    backgroundColor: 'rgba(16, 185, 129, 0.2)',
-    borderColor: '#10b981',
-  },
-  headerAuditPillReady: {
-    backgroundColor: 'rgba(59, 130, 246, 0.2)',
-    borderColor: '#3b82f6',
-  },
-  headerAuditPillWarning: {
-    backgroundColor: 'rgba(245, 158, 11, 0.2)',
-    borderColor: '#f59e0b',
-  },
-  headerAuditPillText: {
-    fontSize: 9.5,
-    fontWeight: '800',
-  },
-  headerAuditPillTextVerified: {
-    color: '#34d399',
-  },
-  headerAuditPillTextReady: {
-    color: '#60a5fa',
-  },
-  headerAuditPillTextWarning: {
-    color: '#fbbf24',
-  },
-  liveBadge: {
-    backgroundColor: 'rgba(16, 185, 129, 0.25)',
-    borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.4)',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  liveBadgeText: {
-    fontSize: 9,
-    fontWeight: '800',
-    color: '#34d399',
-    textTransform: 'uppercase',
-  },
-  headerSubtitle: {
-    fontSize: 10,
-    color: '#94a3b8',
-    marginTop: 1,
-    fontWeight: '500',
-  },
-  closeBtn: {
-    width: 30,
-    height: 30,
-    borderRadius: 8,
-    backgroundColor: '#1e293b',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: 6,
-  },
-  tabBar: {
-    flexDirection: 'row',
-    backgroundColor: '#0f172a',
-    borderBottomWidth: 1,
-    borderBottomColor: '#1e293b',
-    paddingHorizontal: 8,
-    paddingTop: 2,
-  },
-  tabBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 8,
-    borderBottomWidth: 2,
-    borderBottomColor: 'transparent',
-  },
-  tabBtnActive: {
-    borderBottomColor: '#10b981',
-  },
-  tabBtnText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#64748b',
-  },
-  tabBtnTextActive: {
-    color: '#10b981',
-  },
-  body: {
-    flex: 1,
-    backgroundColor: '#090d16',
-  },
-  scrollContent: {
-    padding: 16,
-    paddingBottom: 40,
-  },
-  sectionHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  sectionHeading: {
-    fontSize: 11.5,
-    fontWeight: '800',
-    color: '#cbd5e1',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  badgeHint: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#10b981',
-  },
-  templateList: {
-    marginBottom: 16,
-  },
-  docCard: {
-    backgroundColor: '#0f172a',
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 8,
-    borderWidth: 1.5,
-    borderColor: '#1e293b',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  docCardActive: {
-    borderColor: '#10b981',
-    backgroundColor: 'rgba(16, 185, 129, 0.08)',
-  },
-  docCardLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    flex: 1,
-  },
-  docIconCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  docIconCircleActive: {
-    backgroundColor: '#059669',
-  },
-  docMeta: {
-    flex: 1,
-  },
-  docTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  docTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#f1f5f9',
-  },
-  docTitleActive: {
-    color: '#34d399',
-    fontWeight: '800',
-  },
-  docSubtitle: {
-    fontSize: 11,
-    color: '#94a3b8',
-    marginTop: 2,
-    lineHeight: 14,
-  },
-  radioCircle: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    borderWidth: 2,
-    borderColor: '#475569',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: 6,
-  },
-  radioCircleActive: {
-    borderColor: '#10b981',
-  },
-  radioDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#10b981',
-  },
-  stampToggleCard: {
-    backgroundColor: 'rgba(147, 51, 234, 0.08)',
-    borderRadius: 14,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(147, 51, 234, 0.25)',
-    marginBottom: 16,
-  },
-  stampToggleHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  stampToggleTitleBox: {
-    flex: 1,
-    marginRight: 12,
-  },
-  stampToggleTitle: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: '#d8b4fe',
-  },
-  stampToggleDesc: {
-    fontSize: 11,
-    color: '#c084fc',
-    marginTop: 3,
-    lineHeight: 15,
-  },
-  fieldsContainer: {
-    backgroundColor: '#0f172a',
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#1e293b',
-    marginBottom: 16,
-  },
-  fieldsHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: '#1e293b',
-    paddingBottom: 10,
-  },
-  fieldsHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  fieldsTitle: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#ffffff',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  fieldsSubtitle: {
-    fontSize: 10.5,
-    color: '#64748b',
-    fontWeight: '600',
-  },
-  inputGroup: {
-    marginBottom: 12,
-  },
-  inputLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#94a3b8',
-    marginBottom: 5,
-  },
-  inputLabelBold: {
-    fontSize: 11.5,
-    fontWeight: '800',
-    color: '#ffffff',
-  },
-  textInput: {
-    backgroundColor: '#1e293b',
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#334155',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 12.5,
-    color: '#ffffff',
-  },
-  monoFont: {
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-    fontWeight: '600',
-  },
-  rowTwo: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  serialsCard: {
-    backgroundColor: '#090d16',
-    borderRadius: 12,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: '#1e293b',
-    marginTop: 4,
-  },
-  serialsHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  scanHardwareBtnPrimary: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: '#2563eb',
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    marginTop: 10,
-  },
-  scanHardwareBtnPrimaryText: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#ffffff',
-  },
-  unscannedPromptBox: {
-    backgroundColor: '#0f172a',
-    borderRadius: 8,
-    padding: 14,
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    borderColor: '#334155',
-    alignItems: 'center',
-  },
-  unscannedPromptTop: {
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  unscannedPromptTitle: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#f8fafc',
-    textAlign: 'center',
-  },
-  unscannedPromptDesc: {
-    fontSize: 10.5,
-    color: '#94a3b8',
-    textAlign: 'center',
-    marginTop: 3,
-    lineHeight: 15,
-  },
-  autoFilledStatusRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    marginTop: 6,
-  },
-  scanBarcodesBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#2563eb',
-    paddingHorizontal: 8,
-    paddingVertical: 3.5,
-    borderRadius: 6,
-  },
-  scanBarcodesBtnText: {
-    fontSize: 10.5,
-    fontWeight: '800',
-    color: '#ffffff',
-  },
-  serialsCountBadge: {
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',
-    paddingHorizontal: 6,
-    paddingVertical: 1.5,
-    borderRadius: 10,
-  },
-  serialsCountBadgeText: {
-    fontSize: 9.5,
-    fontWeight: '800',
-    color: '#10b981',
-  },
-  serialsInput: {
-    backgroundColor: '#1e293b',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#334155',
-    padding: 10,
-    fontSize: 11.5,
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-    color: '#a7f3d0',
-    minHeight: 70,
-    textAlignVertical: 'top',
-  },
-  serialsSubText: {
-    fontSize: 10,
-    color: '#64748b',
-    marginTop: 6,
-  },
-  jumpToPreviewBtn: {
-    backgroundColor: '#059669',
-    borderRadius: 12,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    marginTop: 4,
-  },
-  jumpToPreviewText: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: '#ffffff',
-  },
-  previewContainer: {
-    flex: 1,
-    backgroundColor: '#1e293b',
-  },
-  previewScrollContent: {
-    padding: 12,
-    paddingBottom: 40,
-    alignItems: 'center',
-  },
-  pageBreakBanner: {
-    backgroundColor: '#334155',
-    paddingVertical: 4,
-    paddingHorizontal: 12,
-    borderRadius: 6,
-    marginVertical: 8,
-  },
-  pageBreakBannerText: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#94a3b8',
-    textTransform: 'uppercase',
-  },
-  paperSheet: {
-    width: '100%',
-    maxWidth: 440,
-    backgroundColor: '#ffffff',
-    borderRadius: 4,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 8,
-  },
-  stampGraphicBox: {
-    borderWidth: 3,
-    borderStyle: 'solid',
-    borderColor: '#8b1e42',
-    backgroundColor: '#fdf2f4',
-    padding: 8,
-    marginBottom: 16,
-  },
-  stampGraphicInner: {
-    borderWidth: 1,
-    borderColor: '#aa3355',
-    padding: 6,
-  },
-  stampTopRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  stampHindiText: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#8b1e42',
-  },
-  stampRupeeBig: {
-    fontSize: 16,
-    fontWeight: '900',
-    color: '#8b1e42',
-  },
-  stampGairNyayik: {
-    fontSize: 12,
-    fontWeight: '900',
-    color: '#7a1232',
-  },
-  stampNonJudicialEng: {
-    fontSize: 7.5,
-    fontWeight: '800',
-    letterSpacing: 1,
-    color: '#a83250',
-  },
-  stampRupeeWord: {
-    fontSize: 8,
-    fontWeight: '800',
-    color: '#8b1e42',
-  },
-  stampEmblemRow: {
-    alignItems: 'center',
-    marginVertical: 4,
-  },
-  stampEmblemBox: {
-    borderWidth: 1,
-    borderColor: '#8b1e42',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    backgroundColor: 'rgba(255,255,255,0.8)',
-  },
-  stampEmblemText: {
-    fontSize: 6.5,
-    fontWeight: '800',
-    color: '#8b1e42',
-  },
-  stampBharatIndia: {
-    textAlign: 'center',
-    fontSize: 16,
-    fontWeight: '900',
-    letterSpacing: 3,
-    color: '#8b1e42',
-    marginTop: 2,
-  },
-  stampSubIndia: {
-    textAlign: 'center',
-    fontSize: 8,
-    fontWeight: '800',
-    letterSpacing: 2,
-    color: '#7a1232',
-    textTransform: 'uppercase',
-  },
-  stampTreasuryBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingTop: 4,
-    borderTopWidth: 1,
-    borderTopColor: '#e2e8f0',
-    marginTop: 4,
-  },
-  stampTreasuryText: {
-    fontSize: 8,
-    fontWeight: '800',
-    color: '#1e293b',
-  },
-  stampBlankMargin: {
-    height: 90,
-    borderWidth: 1.5,
-    borderStyle: 'dashed',
-    borderColor: '#94a3b8',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 12,
-    marginBottom: 16,
-    backgroundColor: '#f8fafc',
-  },
-  stampBlankTitle: {
-    fontSize: 9.5,
-    fontWeight: '800',
-    color: '#475569',
-    textAlign: 'center',
-  },
-  stampBlankSub: {
-    fontSize: 8,
-    color: '#94a3b8',
-    textAlign: 'center',
-    marginTop: 3,
-  },
-  docHeader: {
-    alignItems: 'center',
-    marginBottom: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: '#000000',
-    paddingBottom: 8,
-  },
-  docOrgText: {
-    fontSize: 10,
-    fontWeight: '800',
-    textAlign: 'center',
-    color: '#000000',
-    textTransform: 'uppercase',
-  },
-  docMainTitle: {
-    fontSize: 10.5,
-    fontWeight: '900',
-    textAlign: 'center',
-    color: '#000000',
-    marginTop: 2,
-  },
-  paperTable: {
-    borderWidth: 1,
-    borderColor: '#000000',
-    marginBottom: 10,
-  },
-  tableHeadRow: {
-    backgroundColor: '#f3f4f6',
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#000000',
-  },
-  tableHeadText: {
-    fontSize: 9.5,
-    fontWeight: '800',
-    color: '#000000',
-  },
-  tableRow: {
-    flexDirection: 'row',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
-    paddingVertical: 3,
-    paddingHorizontal: 8,
-  },
-  tableColLabel: {
-    width: '42%',
-    fontSize: 9,
-    fontWeight: '700',
-    color: '#000000',
-  },
-  tableColVal: {
-    width: '58%',
-    fontSize: 9,
-    color: '#000000',
-  },
-  tableColValBold: {
-    width: '58%',
-    fontSize: 9,
-    fontWeight: '800',
-    color: '#000000',
-  },
-  serialsTableList: {
-    padding: 6,
-  },
-  serialsTableRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 2,
-    borderBottomWidth: 0.5,
-    borderBottomColor: '#e5e7eb',
-  },
-  serialsIndex: {
-    fontSize: 8.5,
-    fontWeight: '700',
-    width: 20,
-    color: '#000000',
-  },
-  serialsText: {
-    fontSize: 8.5,
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-    fontWeight: '700',
-    flex: 1,
-    color: '#000000',
-  },
-  serialsWatt: {
-    fontSize: 8.5,
-    color: '#64748b',
-  },
-  statutoryTextBlock: {
-    marginVertical: 8,
-  },
-  statutoryText: {
-    fontSize: 9,
-    color: '#000000',
-    lineHeight: 13,
-    textAlign: 'justify',
-  },
-  bulletItem: {
-    fontSize: 8.5,
-    color: '#000000',
-    marginVertical: 1.5,
-    lineHeight: 12,
-  },
-  clauseHeading: {
-    fontSize: 9.5,
-    fontWeight: '800',
-    color: '#000000',
-    marginTop: 6,
-    marginBottom: 2,
-  },
-  clauseP: {
-    fontSize: 8.5,
-    color: '#000000',
-    lineHeight: 12,
-    textAlign: 'justify',
-    marginBottom: 4,
-  },
-  quotationBigTitle: {
-    textAlign: 'center',
-    fontWeight: '900',
-    fontSize: 18,
-    letterSpacing: 2,
-    color: '#000000',
-    marginBottom: 12,
-  },
-  quoteMetaText: {
-    fontSize: 9,
-    color: '#475569',
-    marginTop: 1,
-  },
-  totalBox: {
-    backgroundColor: '#f8fafc',
-    borderWidth: 1,
-    borderColor: '#cbd5e1',
-    padding: 8,
-    marginVertical: 6,
-  },
-  totalBoxText: {
-    fontSize: 9.5,
-    fontWeight: '800',
-    color: '#000000',
-  },
-  signaturesRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 16,
-    paddingTop: 8,
-  },
-  sigBox: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  sigName: {
-    fontSize: 9,
-    fontStyle: 'italic',
-    color: '#334155',
-    marginBottom: 4,
-  },
-  sigLine: {
-    width: '80%',
-    height: 1,
-    backgroundColor: '#000000',
-    marginBottom: 2,
-  },
-  sigLabel: {
-    fontSize: 8,
-    fontWeight: '800',
-    color: '#000000',
-    textAlign: 'center',
-  },
-  sigSubLabel: {
-    fontSize: 7.5,
-    color: '#64748b',
-    textAlign: 'center',
-  },
-  vendorSeal: {
-    borderWidth: 1,
-    borderColor: '#1e40af',
-    paddingHorizontal: 4,
-    paddingVertical: 1,
-    borderRadius: 2,
-    marginBottom: 4,
-    alignItems: 'center',
-  },
-  vendorSealText: {
-    fontSize: 7,
-    fontWeight: '800',
-    color: '#1e40af',
-  },
-  vendorSealSub: {
-    fontSize: 6,
-    color: '#1e40af',
-  },
-  msedclSeal: {
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    borderColor: '#94a3b8',
-    paddingHorizontal: 4,
-    paddingVertical: 4,
-    borderRadius: 2,
-    marginBottom: 4,
-  },
-  msedclSealText: {
-    fontSize: 6.5,
-    color: '#94a3b8',
-    fontWeight: '700',
-  },
-  bottomBar: {
-    backgroundColor: '#0f172a',
-    borderTopWidth: 1,
-    borderTopColor: '#1e293b',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    paddingBottom: Platform.OS === 'ios' ? 30 : 12,
-    flexDirection: 'row',
-    gap: 10,
-  },
-  printBtn: {
-    flex: 1,
-    backgroundColor: '#f1f5f9',
-    borderRadius: 10,
-    paddingVertical: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-  },
-  printBtnText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#0f172a',
-  },
-  exportShareBtn: {
-    flex: 1.6,
-    backgroundColor: '#059669',
-    borderRadius: 10,
-    paddingVertical: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-  },
-  exportShareText: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: '#ffffff',
-  },
+function getStyles(colors: ThemeColors, isDark: boolean) {
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    header: {
+      backgroundColor: isDark ? colors.surface : '#ffffff',
+      paddingHorizontal: 14,
+      paddingTop: Platform.OS === 'ios' ? 44 : 12,
+      paddingBottom: 8,
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    headerLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      flex: 1,
+    },
+    iconCircle: {
+      width: 32,
+      height: 32,
+      borderRadius: 8,
+      backgroundColor: isDark ? 'rgba(0, 102, 255, 0.15)' : '#EFF6FF',
+      borderWidth: 1,
+      borderColor: isDark ? 'rgba(0, 102, 255, 0.3)' : '#BFDBFE',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    headerTitleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+    },
+    headerTitle: {
+      fontSize: 14,
+      fontWeight: '800',
+      color: colors.text,
+      letterSpacing: -0.2,
+    },
+    headerAuditPill: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+      borderRadius: 6,
+      borderWidth: 1,
+    },
+    headerAuditPillVerified: {
+      backgroundColor: isDark ? 'rgba(16, 185, 129, 0.2)' : '#DCFCE7',
+      borderColor: '#10b981',
+    },
+    headerAuditPillReady: {
+      backgroundColor: isDark ? 'rgba(0, 102, 255, 0.2)' : '#DBEAFE',
+      borderColor: colors.primary,
+    },
+    headerAuditPillWarning: {
+      backgroundColor: isDark ? 'rgba(245, 158, 11, 0.2)' : '#FEF3C7',
+      borderColor: '#f59e0b',
+    },
+    headerAuditPillText: {
+      fontSize: 9.5,
+      fontWeight: '800',
+    },
+    headerAuditPillTextVerified: {
+      color: isDark ? '#34d399' : '#059669',
+    },
+    headerAuditPillTextReady: {
+      color: isDark ? '#60a5fa' : colors.primary,
+    },
+    headerAuditPillTextWarning: {
+      color: isDark ? '#fbbf24' : '#D97706',
+    },
+    liveBadge: {
+      backgroundColor: isDark ? 'rgba(16, 185, 129, 0.25)' : '#D1FAE5',
+      borderWidth: 1,
+      borderColor: isDark ? 'rgba(16, 185, 129, 0.4)' : '#A7F3D0',
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+      borderRadius: 4,
+    },
+    liveBadgeText: {
+      fontSize: 9,
+      fontWeight: '800',
+      color: isDark ? '#34d399' : '#059669',
+      textTransform: 'uppercase',
+    },
+    headerSubtitle: {
+      fontSize: 10,
+      color: colors.textSecondary,
+      marginTop: 1,
+      fontWeight: '500',
+    },
+    closeBtn: {
+      width: 30,
+      height: 30,
+      borderRadius: 8,
+      backgroundColor: isDark ? colors.surfaceElevated : '#F1F5F9',
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginLeft: 6,
+    },
+    tabBar: {
+      flexDirection: 'row',
+      backgroundColor: isDark ? colors.surface : '#ffffff',
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+      paddingHorizontal: 8,
+      paddingTop: 2,
+    },
+    tabBtn: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      paddingVertical: 8,
+      borderBottomWidth: 2,
+      borderBottomColor: 'transparent',
+    },
+    tabBtnActive: {
+      borderBottomColor: colors.primary,
+    },
+    tabBtnText: {
+      fontSize: 11,
+      fontWeight: '700',
+      color: colors.textMuted,
+    },
+    tabBtnTextActive: {
+      color: colors.primary,
+    },
+    body: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    scrollContent: {
+      padding: 16,
+      paddingBottom: 40,
+    },
+    sectionHeaderRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 10,
+    },
+    sectionHeading: {
+      fontSize: 11.5,
+      fontWeight: '800',
+      color: colors.textSecondary,
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+    },
+    badgeHint: {
+      fontSize: 10,
+      fontWeight: '700',
+      color: colors.primary,
+    },
+    templateList: {
+      marginBottom: 16,
+    },
+    docCard: {
+      backgroundColor: isDark ? colors.surface : '#ffffff',
+      borderRadius: 12,
+      padding: 12,
+      marginBottom: 8,
+      borderWidth: 1.5,
+      borderColor: colors.border,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    docCardActive: {
+      borderColor: colors.primary,
+      backgroundColor: isDark ? 'rgba(0, 102, 255, 0.08)' : '#EFF6FF',
+    },
+    docCardLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      flex: 1,
+    },
+    docIconCircle: {
+      width: 36,
+      height: 36,
+      borderRadius: 8,
+      backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#F1F5F9',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    docIconCircleActive: {
+      backgroundColor: colors.primary,
+    },
+    docMeta: {
+      flex: 1,
+    },
+    docTitleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+    },
+    docTitle: {
+      fontSize: 13,
+      fontWeight: '700',
+      color: colors.text,
+    },
+    docTitleActive: {
+      color: colors.primary,
+      fontWeight: '800',
+    },
+    docSubtitle: {
+      fontSize: 11,
+      color: colors.textSecondary,
+      marginTop: 2,
+      lineHeight: 14,
+    },
+    radioCircle: {
+      width: 18,
+      height: 18,
+      borderRadius: 9,
+      borderWidth: 2,
+      borderColor: isDark ? '#475569' : '#CBD5E1',
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginLeft: 6,
+    },
+    radioCircleActive: {
+      borderColor: colors.primary,
+    },
+    radioDot: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: colors.primary,
+    },
+    stampToggleCard: {
+      backgroundColor: isDark ? 'rgba(147, 51, 234, 0.12)' : '#FAF5FF',
+      borderRadius: 14,
+      padding: 14,
+      borderWidth: 1,
+      borderColor: isDark ? 'rgba(147, 51, 234, 0.3)' : '#E9D5FF',
+      marginBottom: 16,
+    },
+    stampToggleHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+    stampToggleTitleBox: {
+      flex: 1,
+      marginRight: 12,
+    },
+    stampToggleTitle: {
+      fontSize: 13,
+      fontWeight: '800',
+      color: isDark ? '#d8b4fe' : '#7E22CE',
+    },
+    stampToggleDesc: {
+      fontSize: 11,
+      color: isDark ? '#c084fc' : '#9333EA',
+      marginTop: 3,
+      lineHeight: 15,
+    },
+    fieldsContainer: {
+      backgroundColor: isDark ? colors.surface : '#ffffff',
+      borderRadius: 16,
+      padding: 16,
+      borderWidth: 1,
+      borderColor: colors.border,
+      marginBottom: 16,
+    },
+    fieldsHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 14,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.borderSubtle,
+      paddingBottom: 10,
+    },
+    fieldsHeaderLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    fieldsTitle: {
+      fontSize: 12,
+      fontWeight: '800',
+      color: colors.text,
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+    },
+    fieldsSubtitle: {
+      fontSize: 10.5,
+      color: colors.textSecondary,
+      fontWeight: '600',
+    },
+    inputGroup: {
+      marginBottom: 12,
+    },
+    inputLabel: {
+      fontSize: 11,
+      fontWeight: '700',
+      color: colors.textSecondary,
+      marginBottom: 5,
+    },
+    inputLabelBold: {
+      fontSize: 11.5,
+      fontWeight: '800',
+      color: colors.text,
+    },
+    textInput: {
+      backgroundColor: isDark ? colors.surfaceElevated : '#F8FAFC',
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: colors.border,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      fontSize: 12.5,
+      color: colors.text,
+    },
+    monoFont: {
+      fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+      fontWeight: '600',
+    },
+    rowTwo: {
+      flexDirection: 'row',
+      gap: 10,
+    },
+    serialsCard: {
+      backgroundColor: isDark ? colors.surfaceRecessed : '#F8FAFC',
+      borderRadius: 12,
+      padding: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+      marginTop: 4,
+    },
+    serialsHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 8,
+    },
+    scanHardwareBtnPrimary: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      backgroundColor: colors.primary,
+      paddingVertical: 10,
+      paddingHorizontal: 16,
+      borderRadius: 8,
+      marginTop: 10,
+    },
+    scanHardwareBtnPrimaryText: {
+      fontSize: 12,
+      fontWeight: '800',
+      color: '#ffffff',
+    },
+    unscannedPromptBox: {
+      backgroundColor: isDark ? colors.surfaceElevated : '#F1F5F9',
+      borderRadius: 8,
+      padding: 14,
+      borderWidth: 1,
+      borderStyle: 'dashed',
+      borderColor: colors.border,
+      alignItems: 'center',
+    },
+    unscannedPromptTop: {
+      alignItems: 'center',
+      marginBottom: 4,
+    },
+    unscannedPromptTitle: {
+      fontSize: 12,
+      fontWeight: '800',
+      color: colors.text,
+      textAlign: 'center',
+    },
+    unscannedPromptDesc: {
+      fontSize: 10.5,
+      color: colors.textSecondary,
+      textAlign: 'center',
+      marginTop: 3,
+      lineHeight: 15,
+    },
+    autoFilledStatusRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+      marginTop: 6,
+    },
+    scanBarcodesBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      backgroundColor: colors.primary,
+      paddingHorizontal: 8,
+      paddingVertical: 3.5,
+      borderRadius: 6,
+    },
+    scanBarcodesBtnText: {
+      fontSize: 10.5,
+      fontWeight: '800',
+      color: '#ffffff',
+    },
+    serialsCountBadge: {
+      backgroundColor: isDark ? 'rgba(16, 185, 129, 0.15)' : '#DCFCE7',
+      paddingHorizontal: 6,
+      paddingVertical: 1.5,
+      borderRadius: 10,
+    },
+    serialsCountBadgeText: {
+      fontSize: 9.5,
+      fontWeight: '800',
+      color: isDark ? '#10b981' : '#059669',
+    },
+    serialsInput: {
+      backgroundColor: isDark ? colors.surfaceElevated : '#FFFFFF',
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: colors.border,
+      padding: 10,
+      fontSize: 11.5,
+      fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+      color: isDark ? '#34d399' : '#059669',
+      minHeight: 70,
+      textAlignVertical: 'top',
+    },
+    serialsSubText: {
+      fontSize: 10,
+      color: colors.textMuted,
+      marginTop: 6,
+    },
+    jumpToPreviewBtn: {
+      backgroundColor: colors.primary,
+      borderRadius: 12,
+      paddingVertical: 14,
+      paddingHorizontal: 16,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      marginTop: 4,
+    },
+    jumpToPreviewText: {
+      fontSize: 13,
+      fontWeight: '800',
+      color: '#ffffff',
+    },
+    previewContainer: {
+      flex: 1,
+      backgroundColor: isDark ? '#090d16' : '#E2E8F0',
+    },
+    previewScrollContent: {
+      padding: 12,
+      paddingBottom: 40,
+      alignItems: 'center',
+    },
+    pageBreakBanner: {
+      backgroundColor: isDark ? '#1e293b' : '#CBD5E1',
+      paddingVertical: 4,
+      paddingHorizontal: 12,
+      borderRadius: 6,
+      marginVertical: 8,
+    },
+    pageBreakBannerText: {
+      fontSize: 10,
+      fontWeight: '800',
+      color: isDark ? '#94a3b8' : '#334155',
+      textTransform: 'uppercase',
+    },
+    paperSheet: {
+      width: '100%',
+      maxWidth: 440,
+      backgroundColor: '#ffffff',
+      borderRadius: 4,
+      padding: 16,
+      marginBottom: 12,
+      shadowColor: '#000000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: isDark ? 0.4 : 0.15,
+      shadowRadius: 10,
+      elevation: 8,
+    },
+    bottomBar: {
+      flexDirection: 'row',
+      gap: 8,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      paddingBottom: Platform.OS === 'ios' ? 24 : 10,
+      backgroundColor: isDark ? colors.surface : '#ffffff',
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+      alignItems: 'center',
+    },
+    printBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      backgroundColor: isDark ? colors.surfaceElevated : '#F1F5F9',
+      borderWidth: 1,
+      borderColor: colors.border,
+      paddingVertical: 12,
+      paddingHorizontal: 14,
+      borderRadius: 10,
+    },
+    printBtnText: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: colors.text,
+    },
+    exportShareBtn: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      backgroundColor: colors.primary,
+      paddingVertical: 12,
+      borderRadius: 10,
+    },
+    exportShareText: {
+      fontSize: 12.5,
+      fontWeight: '800',
+      color: '#ffffff',
+    },
+    whatsappShareBtn: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      backgroundColor: '#16a34a',
+      paddingVertical: 12,
+      borderRadius: 10,
+    },
+    whatsappShareText: {
+      fontSize: 12.5,
+      fontWeight: '800',
+      color: '#ffffff',
+    },
+    verificationBanner: {
+      marginHorizontal: 16,
+      marginTop: 10,
+      marginBottom: 4,
+      borderRadius: 12,
+      padding: 12,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      borderWidth: 1,
+    },
+    verificationBannerVerified: {
+      backgroundColor: isDark ? 'rgba(16, 185, 129, 0.12)' : '#F0FDF4',
+      borderColor: '#10b981',
+    },
+    verificationBannerReady: {
+      backgroundColor: isDark ? 'rgba(0, 102, 255, 0.12)' : '#EFF6FF',
+      borderColor: colors.primary,
+    },
+    verificationBannerWarning: {
+      backgroundColor: isDark ? 'rgba(245, 158, 11, 0.12)' : '#FFFBEB',
+      borderColor: '#f59e0b',
+    },
+    verificationBannerLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      flex: 1,
+    },
+    verificationBannerIconCircle: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    verificationIconCircleVerified: {
+      backgroundColor: isDark ? 'rgba(16, 185, 129, 0.2)' : '#DCFCE7',
+    },
+    verificationIconCircleReady: {
+      backgroundColor: isDark ? 'rgba(0, 102, 255, 0.2)' : '#DBEAFE',
+    },
+    verificationIconCircleWarning: {
+      backgroundColor: isDark ? 'rgba(245, 158, 11, 0.2)' : '#FEF3C7',
+    },
+    verificationBannerTitle: {
+      fontSize: 12.5,
+      fontWeight: '800',
+      color: colors.text,
+    },
+    verificationBannerSubtitle: {
+      fontSize: 10.5,
+      color: colors.textSecondary,
+      marginTop: 1,
+    },
+    verificationActionBtn: {
+      backgroundColor: isDark ? 'rgba(245, 158, 11, 0.15)' : '#FEF3C7',
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: '#f59e0b44',
+    },
+    verificationActionBtnVerified: {
+      backgroundColor: isDark ? 'rgba(5, 150, 105, 0.15)' : '#DCFCE7',
+      borderColor: '#05966944',
+    },
+    verificationActionBtnText: {
+      fontSize: 11.5,
+      fontWeight: '700',
+      color: '#f59e0b',
+    },
+    verificationActionBtnTextVerified: {
+      color: isDark ? '#10b981' : '#059669',
+    },
 
-  // PIPELINE VERIFICATION BANNER
-  verificationBanner: {
-    marginHorizontal: 0,
-    marginTop: 0,
-    marginBottom: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 8,
-  },
-  verificationBannerVerified: {
-    backgroundColor: '#064e3b18',
-    borderColor: '#059669',
-  },
-  verificationBannerReady: {
-    backgroundColor: '#1e3a8a18',
-    borderColor: '#3b82f6',
-  },
-  verificationBannerWarning: {
-    backgroundColor: '#78350f22',
-    borderColor: '#f59e0b',
-  },
-  verificationBannerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    flex: 1,
-  },
-  verificationBannerIconCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  verificationIconCircleVerified: {
-    backgroundColor: '#05966922',
-  },
-  verificationIconCircleReady: {
-    backgroundColor: '#3b82f622',
-  },
-  verificationIconCircleWarning: {
-    backgroundColor: '#f59e0b22',
-  },
-  verificationBannerTitle: {
-    fontSize: 12.5,
-    fontWeight: '800',
-    color: '#f8fafc',
-  },
-  verificationBannerSubtitle: {
-    fontSize: 11,
-    color: '#94a3b8',
-    marginTop: 1,
-  },
-  verificationActionBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#f59e0b1a',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#f59e0b44',
-  },
-  verificationActionBtnVerified: {
-    backgroundColor: '#0596691a',
-    borderColor: '#05966944',
-  },
-  verificationActionBtnText: {
-    fontSize: 11.5,
-    fontWeight: '700',
-    color: '#f59e0b',
-  },
-  verificationActionBtnTextVerified: {
-    color: '#10b981',
-  },
-
-  // AUDIT MODAL STYLES
-  auditModalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.75)',
-    justifyContent: 'flex-end',
-  },
-  auditModalContainer: {
-    backgroundColor: '#0f172a',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    maxHeight: '90%',
-    paddingBottom: Platform.OS === 'ios' ? 34 : 20,
-  },
-  auditModalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 18,
-    paddingTop: 18,
-    paddingBottom: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: '#1e293b',
-  },
-  auditModalHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    flex: 1,
-  },
-  auditIconCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#05966922',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  auditModalTitle: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: '#f8fafc',
-  },
-  auditModalSubtitle: {
-    fontSize: 11.5,
-    color: '#94a3b8',
-    marginTop: 2,
-  },
-  auditCloseBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#1e293b',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  auditSummaryCard: {
-    marginHorizontal: 18,
-    marginTop: 14,
-    marginBottom: 8,
-    backgroundColor: '#1e293b',
-    borderRadius: 12,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: '#334155',
-  },
-  auditSummaryTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  auditSummaryLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#94a3b8',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  auditSummaryScore: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: '#ffffff',
-    marginTop: 2,
-  },
-  auditStatusBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
-  },
-  auditStatusBadgeVerified: {
-    backgroundColor: '#05966926',
-    borderWidth: 1,
-    borderColor: '#059669',
-  },
-  auditStatusBadgeReady: {
-    backgroundColor: '#3b82f626',
-    borderWidth: 1,
-    borderColor: '#3b82f6',
-  },
-  auditStatusBadgeWarning: {
-    backgroundColor: '#f59e0b26',
-    borderWidth: 1,
-    borderColor: '#f59e0b',
-  },
-  auditStatusBadgeText: {
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-  },
-  auditStatusBadgeTextVerified: {
-    color: '#10b981',
-  },
-  auditStatusBadgeTextReady: {
-    color: '#60a5fa',
-  },
-  auditStatusBadgeTextWarning: {
-    color: '#fbbf24',
-  },
-  auditProgressTrack: {
-    height: 6,
-    backgroundColor: '#334155',
-    borderRadius: 3,
-    marginTop: 12,
-    overflow: 'hidden',
-  },
-  auditProgressBar: {
-    height: '100%',
-    borderRadius: 3,
-  },
-  auditProgressPercent: {
-    fontSize: 10.5,
-    color: '#94a3b8',
-    marginTop: 6,
-    textAlign: 'right',
-  },
-  auditListScroll: {
-    maxHeight: 380,
-    paddingHorizontal: 18,
-  },
-  auditListContent: {
-    paddingVertical: 8,
-    gap: 10,
-  },
-  auditItemCard: {
-    backgroundColor: '#1e293b70',
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#334155',
-    padding: 12,
-  },
-  auditItemCardVerified: {
-    borderColor: '#05966944',
-  },
-  auditItemCardRequired: {
-    borderColor: '#f59e0b44',
-  },
-  auditItemCardOptional: {
-    borderColor: '#334155',
-  },
-  auditItemTopRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
-  auditItemIconBox: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  auditItemIconBoxVerified: {
-    backgroundColor: '#05966922',
-  },
-  auditItemIconBoxRequired: {
-    backgroundColor: '#f59e0b22',
-  },
-  auditItemIconBoxOptional: {
-    backgroundColor: '#334155',
-  },
-  auditItemTitle: {
-    fontSize: 12.5,
-    fontWeight: '700',
-    color: '#f8fafc',
-  },
-  requiredPill: {
-    backgroundColor: '#dc262622',
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-    borderRadius: 4,
-    borderWidth: 1,
-    borderColor: '#dc262644',
-  },
-  requiredPillText: {
-    fontSize: 9,
-    fontWeight: '700',
-    color: '#f87171',
-  },
-  auditItemSource: {
-    fontSize: 10,
-    color: '#10b981',
-    marginTop: 1,
-  },
-  auditActionBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#059669',
-    paddingHorizontal: 9,
-    paddingVertical: 5,
-    borderRadius: 6,
-  },
-  auditActionBtnText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#ffffff',
-  },
-  auditActionBtnSecondary: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#05966918',
-    borderWidth: 1,
-    borderColor: '#05966944',
-    paddingHorizontal: 9,
-    paddingVertical: 5,
-    borderRadius: 6,
-  },
-  auditActionBtnSecondaryText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#10b981',
-  },
-  auditValueBox: {
-    backgroundColor: '#090d16',
-    borderRadius: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    marginTop: 8,
-    borderWidth: 1,
-    borderColor: '#1e293b',
-  },
-  auditValueBoxMissing: {
-    borderColor: '#f59e0b44',
-    backgroundColor: '#78350f14',
-  },
-  auditValueText: {
-    fontSize: 11.5,
-    color: '#e2e8f0',
-    fontWeight: '600',
-  },
-  auditValueTextMissing: {
-    color: '#fbbf24',
-    fontStyle: 'italic',
-  },
-  auditItemHint: {
-    fontSize: 9.5,
-    color: '#64748b',
-    marginTop: 4,
-  },
-  auditModalFooter: {
-    paddingHorizontal: 18,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#1e293b',
-  },
-  auditConfirmLockBtn: {
-    backgroundColor: '#059669',
-    borderRadius: 12,
-    paddingVertical: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  auditConfirmLockBtnDisabled: {
-    backgroundColor: '#f59e0b',
-  },
-  auditConfirmLockBtnText: {
-    fontSize: 13.5,
-    fontWeight: '800',
-    color: '#ffffff',
-  },
-  auditUnlockBtn: {
-    flex: 1,
-    backgroundColor: '#1e293b',
-    borderRadius: 10,
-    paddingVertical: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    borderWidth: 1,
-    borderColor: '#334155',
-  },
-  auditUnlockBtnText: {
-    fontSize: 12.5,
-    fontWeight: '700',
-    color: '#94a3b8',
-  },
-  auditDoneBtn: {
-    flex: 1.5,
-    backgroundColor: '#059669',
-    borderRadius: 10,
-    paddingVertical: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-  },
-  auditDoneBtnText: {
-    fontSize: 12.5,
-    fontWeight: '800',
-    color: '#ffffff',
-  },
-  quickDocBar: {
-    backgroundColor: '#0f172a',
-    borderBottomWidth: 1,
-    borderBottomColor: '#1e293b',
-    paddingVertical: 5,
-  },
-  quickDocScrollContent: {
-    paddingHorizontal: 12,
-    gap: 6,
-    alignItems: 'center',
-  },
-  quickDocBarInScroll: {
-    marginBottom: 8,
-  },
-  quickDocScrollContentInScroll: {
-    gap: 6,
-    alignItems: 'center',
-    paddingBottom: 2,
-  },
-  quickDocPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: '#1e293b',
-    borderRadius: 16,
-    paddingHorizontal: 10,
-    paddingVertical: 4.5,
-    borderWidth: 1,
-    borderColor: '#334155',
-  },
-  quickDocPillActive: {
-    backgroundColor: '#05966922',
-    borderColor: '#10b981',
-  },
-  quickDocPillText: {
-    fontSize: 11.5,
-    fontWeight: '600',
-    color: '#94a3b8',
-  },
-  quickDocPillTextActive: {
-    color: '#34d399',
-    fontWeight: '700',
-  },
-  quickDocPillBadge: {
-    backgroundColor: '#334155',
-    borderRadius: 10,
-    paddingHorizontal: 5,
-    paddingVertical: 1,
-  },
-  quickDocPillBadgeActive: {
-    backgroundColor: '#10b981',
-  },
-  quickDocPillBadgeText: {
-    fontSize: 9,
-    fontWeight: '800',
-    color: '#cbd5e1',
-  },
-  quickDocPillBadgeTextActive: {
-    color: '#ffffff',
-  },
-  previewConvenienceBar: {
-    backgroundColor: '#1e293b',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    marginBottom: 12,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#334155',
-    width: '100%',
-    maxWidth: 820,
-    alignSelf: 'center',
-  },
-  previewDocInfoLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    flex: 1,
-    marginRight: 8,
-  },
-  previewDocDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
-    backgroundColor: '#10b981',
-  },
-  previewDocTitleText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#f8fafc',
-    flexShrink: 1,
-  },
-  previewDocPagesBadge: {
-    backgroundColor: '#0f172a',
-    borderRadius: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderWidth: 1,
-    borderColor: '#334155',
-  },
-  previewDocPagesText: {
-    fontSize: 9.5,
-    fontWeight: '800',
-    color: '#38bdf8',
-  },
-  previewStampToggleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#0f172a',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#475569',
-  },
-  previewStampToggleLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#d8b4fe',
-  },
-  fieldsSectionCard: {
-    backgroundColor: '#1e293b60',
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#334155',
-    padding: 12,
-    marginBottom: 12,
-    gap: 10,
-  },
-  fieldsSectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 4,
-    paddingBottom: 6,
-    borderBottomWidth: 1,
-    borderBottomColor: '#33415555',
-  },
-  fieldsSectionTitle: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#f1f5f9',
-    letterSpacing: 0.2,
-  },
-  // SOL LIVE DISCOM COMPANION
-  solDiscomCompanion: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#064e3b33',
-    borderRadius: 12,
-    padding: 10,
-    borderWidth: 1,
-    borderColor: '#05966955',
-    marginBottom: 10,
-    gap: 10,
-  },
-  solDiscomSpeech: {
-    flex: 1,
-  },
-  solDiscomHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginBottom: 2,
-  },
-  solDiscomTitle: {
-    fontSize: 9.5,
-    fontWeight: '900',
-    color: '#34d399',
-    letterSpacing: 0.5,
-  },
-  solDiscomText: {
-    fontSize: 11,
-    color: '#a7f3d0',
-    fontWeight: '600',
-    lineHeight: 15,
-  },
-});
+    // AUDIT MODAL STYLES
+    auditModalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0, 0, 0, 0.75)',
+      justifyContent: 'flex-end',
+    },
+    auditModalContainer: {
+      backgroundColor: isDark ? colors.surface : '#ffffff',
+      borderTopLeftRadius: 20,
+      borderTopRightRadius: 20,
+      maxHeight: '90%',
+      paddingBottom: Platform.OS === 'ios' ? 34 : 20,
+    },
+    auditModalHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 18,
+      paddingTop: 18,
+      paddingBottom: 14,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    auditModalHeaderLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      flex: 1,
+    },
+    auditIconCircle: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: isDark ? 'rgba(0, 102, 255, 0.15)' : '#DBEAFE',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    auditModalTitle: {
+      fontSize: 15,
+      fontWeight: '800',
+      color: colors.text,
+    },
+    auditModalSubtitle: {
+      fontSize: 11.5,
+      color: colors.textSecondary,
+      marginTop: 2,
+    },
+    auditCloseBtn: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      backgroundColor: isDark ? colors.surfaceElevated : '#F1F5F9',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    auditSummaryCard: {
+      marginHorizontal: 18,
+      marginTop: 14,
+      marginBottom: 8,
+      backgroundColor: isDark ? colors.surfaceElevated : '#F8FAFC',
+      borderRadius: 12,
+      padding: 14,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    auditSummaryTop: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+    auditSummaryLabel: {
+      fontSize: 11,
+      fontWeight: '600',
+      color: colors.textSecondary,
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+    },
+    auditSummaryScore: {
+      fontSize: 16,
+      fontWeight: '800',
+      color: colors.text,
+      marginTop: 2,
+    },
+    auditStatusBadge: {
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      borderRadius: 8,
+    },
+    auditStatusBadgeVerified: {
+      backgroundColor: isDark ? 'rgba(5, 150, 105, 0.2)' : '#DCFCE7',
+      borderWidth: 1,
+      borderColor: '#059669',
+    },
+    auditStatusBadgeReady: {
+      backgroundColor: isDark ? 'rgba(0, 102, 255, 0.2)' : '#DBEAFE',
+      borderWidth: 1,
+      borderColor: colors.primary,
+    },
+    auditStatusBadgeWarning: {
+      backgroundColor: isDark ? 'rgba(245, 158, 11, 0.2)' : '#FEF3C7',
+      borderWidth: 1,
+      borderColor: '#f59e0b',
+    },
+    auditStatusBadgeText: {
+      fontSize: 10,
+      fontWeight: '800',
+      letterSpacing: 0.5,
+    },
+    auditStatusBadgeTextVerified: {
+      color: isDark ? '#10b981' : '#059669',
+    },
+    auditStatusBadgeTextReady: {
+      color: isDark ? '#60a5fa' : colors.primary,
+    },
+    auditStatusBadgeTextWarning: {
+      color: isDark ? '#fbbf24' : '#D97706',
+    },
+    auditProgressTrack: {
+      height: 6,
+      backgroundColor: isDark ? colors.surfaceRecessed : '#E2E8F0',
+      borderRadius: 3,
+      marginTop: 12,
+      overflow: 'hidden',
+    },
+    auditProgressBar: {
+      height: '100%',
+      borderRadius: 3,
+    },
+    auditProgressPercent: {
+      fontSize: 10.5,
+      color: colors.textSecondary,
+      marginTop: 6,
+      textAlign: 'right',
+    },
+    auditListScroll: {
+      maxHeight: 380,
+      paddingHorizontal: 18,
+    },
+    auditListContent: {
+      paddingVertical: 8,
+      gap: 10,
+    },
+    auditItemCard: {
+      backgroundColor: isDark ? colors.surfaceElevated : '#F8FAFC',
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: colors.border,
+      padding: 12,
+    },
+    auditItemCardVerified: {
+      borderColor: isDark ? 'rgba(5, 150, 105, 0.4)' : '#A7F3D0',
+    },
+    auditItemCardRequired: {
+      borderColor: isDark ? 'rgba(245, 158, 11, 0.4)' : '#FDE68A',
+    },
+    auditItemCardOptional: {
+      borderColor: colors.borderSubtle,
+    },
+    auditItemTopRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'flex-start',
+    },
+    auditItemIconBox: {
+      width: 26,
+      height: 26,
+      borderRadius: 13,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    auditItemIconBoxVerified: {
+      backgroundColor: isDark ? 'rgba(5, 150, 105, 0.2)' : '#DCFCE7',
+    },
+    auditItemIconBoxRequired: {
+      backgroundColor: isDark ? 'rgba(245, 158, 11, 0.2)' : '#FEF3C7',
+    },
+    auditItemIconBoxOptional: {
+      backgroundColor: isDark ? colors.surfaceRecessed : '#F1F5F9',
+    },
+    auditItemTitle: {
+      fontSize: 12.5,
+      fontWeight: '700',
+      color: colors.text,
+    },
+    requiredPill: {
+      backgroundColor: isDark ? 'rgba(220, 38, 38, 0.2)' : '#FEE2E2',
+      paddingHorizontal: 6,
+      paddingVertical: 1,
+      borderRadius: 4,
+      borderWidth: 1,
+      borderColor: isDark ? 'rgba(220, 38, 38, 0.4)' : '#FECACA',
+    },
+    requiredPillText: {
+      fontSize: 9,
+      fontWeight: '700',
+      color: isDark ? '#f87171' : '#DC2626',
+    },
+    auditItemSource: {
+      fontSize: 9.5,
+      color: colors.textMuted,
+      marginTop: 2,
+    },
+    auditActionBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      backgroundColor: colors.primary,
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      borderRadius: 6,
+    },
+    auditActionBtnText: {
+      fontSize: 11,
+      fontWeight: '700',
+      color: '#ffffff',
+    },
+    auditActionBtnSecondary: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      backgroundColor: isDark ? 'rgba(5, 150, 105, 0.15)' : '#DCFCE7',
+      borderWidth: 1,
+      borderColor: isDark ? 'rgba(5, 150, 105, 0.35)' : '#A7F3D0',
+      paddingHorizontal: 9,
+      paddingVertical: 5,
+      borderRadius: 6,
+    },
+    auditActionBtnSecondaryText: {
+      fontSize: 11,
+      fontWeight: '700',
+      color: isDark ? '#34d399' : '#059669',
+    },
+    auditValueBox: {
+      marginTop: 8,
+      padding: 8,
+      borderRadius: 6,
+      borderWidth: 1,
+      borderColor: colors.borderSubtle,
+      backgroundColor: isDark ? colors.surfaceRecessed : '#FFFFFF',
+    },
+    auditValueBoxMissing: {
+      borderColor: isDark ? 'rgba(245, 158, 11, 0.4)' : '#FDE68A',
+      backgroundColor: isDark ? 'rgba(120, 53, 15, 0.15)' : '#FFFBEB',
+    },
+    auditValueText: {
+      fontSize: 11.5,
+      color: colors.text,
+      fontWeight: '600',
+    },
+    auditValueTextMissing: {
+      color: isDark ? '#fbbf24' : '#D97706',
+      fontStyle: 'italic',
+    },
+    auditItemHint: {
+      fontSize: 9.5,
+      color: colors.textMuted,
+      marginTop: 4,
+      fontStyle: 'italic',
+    },
+    auditModalFooter: {
+      paddingHorizontal: 18,
+      paddingTop: 12,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+      flexDirection: 'row',
+      gap: 10,
+    },
+    auditConfirmLockBtn: {
+      flex: 2,
+      backgroundColor: colors.primary,
+      borderRadius: 10,
+      paddingVertical: 12,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+    },
+    auditConfirmLockBtnDisabled: {
+      backgroundColor: '#f59e0b',
+    },
+    auditConfirmLockBtnText: {
+      fontSize: 13.5,
+      fontWeight: '800',
+      color: '#ffffff',
+    },
+    auditUnlockBtn: {
+      flex: 1,
+      backgroundColor: isDark ? colors.surfaceElevated : '#F1F5F9',
+      borderRadius: 10,
+      paddingVertical: 12,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    auditUnlockBtnText: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: colors.textSecondary,
+    },
+    auditDoneBtn: {
+      flex: 1,
+      backgroundColor: colors.primary,
+      borderRadius: 10,
+      paddingVertical: 12,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+    },
+    auditDoneBtnText: {
+      fontSize: 12.5,
+      fontWeight: '800',
+      color: '#ffffff',
+    },
+    quickDocBar: {
+      backgroundColor: isDark ? colors.surface : '#ffffff',
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+      paddingVertical: 6,
+    },
+    quickDocScrollContent: {
+      paddingHorizontal: 12,
+      gap: 8,
+      alignItems: 'center',
+    },
+    quickDocBarInScroll: {
+      backgroundColor: isDark ? colors.surface : '#ffffff',
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+      paddingVertical: 6,
+      marginBottom: 12,
+    },
+    quickDocScrollContentInScroll: {
+      paddingHorizontal: 8,
+      gap: 8,
+      alignItems: 'center',
+    },
+    quickDocPill: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+      backgroundColor: isDark ? colors.surfaceElevated : '#F1F5F9',
+      borderRadius: 16,
+      paddingHorizontal: 10,
+      paddingVertical: 4.5,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    quickDocPillActive: {
+      backgroundColor: isDark ? 'rgba(0, 102, 255, 0.15)' : '#EFF6FF',
+      borderColor: colors.primary,
+    },
+    quickDocPillText: {
+      fontSize: 11,
+      fontWeight: '600',
+      color: colors.textSecondary,
+    },
+    quickDocPillTextActive: {
+      color: colors.primary,
+      fontWeight: '800',
+    },
+    quickDocPillBadge: {
+      backgroundColor: isDark ? colors.surfaceRecessed : '#E2E8F0',
+      paddingHorizontal: 5,
+      paddingVertical: 1,
+      borderRadius: 8,
+    },
+    quickDocPillBadgeActive: {
+      backgroundColor: colors.primary,
+    },
+    quickDocPillBadgeText: {
+      fontSize: 9,
+      fontWeight: '800',
+      color: colors.textMuted,
+    },
+    quickDocPillBadgeTextActive: {
+      color: '#ffffff',
+    },
+    previewConvenienceBar: {
+      backgroundColor: isDark ? colors.surfaceElevated : '#FFFFFF',
+      borderRadius: 10,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      width: '100%',
+      maxWidth: 440,
+      marginBottom: 10,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    previewDocInfoLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      flex: 1,
+      marginRight: 8,
+    },
+    previewDocDot: {
+      width: 7,
+      height: 7,
+      borderRadius: 3.5,
+      backgroundColor: colors.primary,
+    },
+    previewDocTitleText: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: colors.text,
+      flexShrink: 1,
+    },
+    previewDocPagesBadge: {
+      backgroundColor: isDark ? colors.surfaceRecessed : '#F1F5F9',
+      paddingHorizontal: 6,
+      paddingVertical: 1.5,
+      borderRadius: 6,
+    },
+    previewDocPagesText: {
+      fontSize: 9.5,
+      fontWeight: '700',
+      color: colors.textSecondary,
+    },
+    previewStampToggleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      backgroundColor: isDark ? colors.surfaceRecessed : '#FAF5FF',
+      paddingHorizontal: 8,
+      paddingVertical: 2,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: isDark ? colors.border : '#E9D5FF',
+    },
+    previewStampToggleLabel: {
+      fontSize: 10,
+      fontWeight: '700',
+      color: isDark ? '#d8b4fe' : '#7E22CE',
+    },
+    fieldsSectionCard: {
+      backgroundColor: isDark ? colors.surfaceRecessed : '#F8FAFC',
+      borderRadius: 12,
+      padding: 12,
+      borderWidth: 1,
+      borderColor: colors.borderSubtle,
+      marginBottom: 12,
+    },
+    fieldsSectionHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      marginBottom: 10,
+      paddingBottom: 6,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.borderSubtle,
+    },
+    fieldsSectionTitle: {
+      fontSize: 12,
+      fontWeight: '800',
+      color: colors.text,
+      letterSpacing: 0.2,
+    },
+    // SOL LIVE DISCOM COMPANION
+    solDiscomCompanion: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: isDark ? 'rgba(5, 150, 105, 0.15)' : '#ECFDF5',
+      borderRadius: 12,
+      padding: 10,
+      borderWidth: 1,
+      borderColor: isDark ? 'rgba(5, 150, 105, 0.35)' : '#A7F3D0',
+      marginBottom: 12,
+      gap: 10,
+    },
+    solDiscomSpeech: {
+      flex: 1,
+    },
+    solDiscomHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      marginBottom: 2,
+    },
+    solDiscomTitle: {
+      fontSize: 9.5,
+      fontWeight: '900',
+      color: isDark ? '#34d399' : '#059669',
+      letterSpacing: 0.5,
+    },
+    solDiscomText: {
+      fontSize: 11,
+      color: isDark ? '#a7f3d0' : '#065F46',
+      fontWeight: '600',
+      lineHeight: 15,
+    },
+  });
+}

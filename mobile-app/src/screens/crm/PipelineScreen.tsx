@@ -671,14 +671,14 @@ export const PipelineScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
               </TouchableOpacity>
 
               {isWon ? (
-                <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
+                <>
                   <TouchableOpacity
                     style={styles.actionPillWon}
                     onPress={() => handleOpenDiscomDocs(item)}
                     activeOpacity={0.8}
                   >
                     <Building size={13} color="#D97706" />
-                    <Text style={styles.actionPillWonText}>DISCOM Docs</Text>
+                    <Text style={styles.actionPillWonText} numberOfLines={1}>DISCOM</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={styles.actionPillSeamless}
@@ -686,9 +686,9 @@ export const PipelineScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
                     activeOpacity={0.8}
                   >
                     <Sparkles size={11} color="#059669" />
-                    <Text style={styles.actionPillSeamlessText}>1-Flow</Text>
+                    <Text style={styles.actionPillSeamlessText} numberOfLines={1}>1-Flow</Text>
                   </TouchableOpacity>
-                </View>
+                </>
               ) : (
                 <>
                   <TouchableOpacity
@@ -696,8 +696,8 @@ export const PipelineScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
                     onPress={() => handleOpenSeamlessFlowForLead(item, 5)}
                     activeOpacity={0.8}
                   >
-                    <Sparkles size={11} color="#059669" />
-                    <Text style={styles.actionPillSeamlessText}>1-Flow</Text>
+                    <Sparkles size={11} color="#059669" strokeWidth={2.4} />
+                    <Text style={styles.actionPillSeamlessText} numberOfLines={1}>1-Flow</Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity
@@ -711,24 +711,8 @@ export const PipelineScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
                     onPress={() => handleOpenQuoteBuilder(item)}
                     activeOpacity={0.8}
                   >
-                    <Zap size={12} color="#0066FF" strokeWidth={2.5} />
-                    <Text style={styles.actionPillQuoteText}>Quote</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={styles.actionPillOnboard}
-                    onPress={() =>
-                      handleProceedToOnboarding(item, {
-                        capacityKw: cap,
-                        grossTotal: gross,
-                        subsidy,
-                        netCustomerCost: net,
-                      })
-                    }
-                    activeOpacity={0.8}
-                  >
-                    <ShieldCheck size={12} color="#FFFFFF" strokeWidth={2.5} />
-                    <Text style={styles.actionPillOnboardText}>Onboard</Text>
+                    <Zap size={12} color="#0066FF" strokeWidth={2.4} />
+                    <Text style={styles.actionPillQuoteText} numberOfLines={1}>Quote</Text>
                   </TouchableOpacity>
                 </>
               )}
@@ -744,7 +728,7 @@ export const PipelineScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
                 onPress={() => handleOpenLeadDetail(item)}
                 activeOpacity={0.8}
               >
-                <Text style={[styles.actionPillProfileText, { color: colors.textSecondary }]}>
+                <Text style={[styles.actionPillProfileText, { color: colors.textSecondary }]} numberOfLines={1}>
                   Details
                 </Text>
                 <ChevronRight size={12} color={colors.textMuted} />
@@ -1551,7 +1535,8 @@ const styles = StyleSheet.create({
 
   // STAGE TABS
   stageTabsWrapper: {
-    marginBottom: 6,
+    marginBottom: 10,
+    paddingBottom: 4,
   },
   stageTabsContent: {
     paddingHorizontal: 16,
@@ -1639,7 +1624,7 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingHorizontal: 16,
-    paddingTop: 4,
+    paddingTop: 8,
     paddingBottom: Platform.OS === 'ios' ? 120 : 100,
   },
   skeletonContainer: {
@@ -1760,18 +1745,17 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   actionPillWon: {
-    flex: 1,
-    minWidth: 0,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 5,
+    gap: 4,
     backgroundColor: '#FEF3C7',
     borderWidth: 1,
     borderColor: '#FDE68A',
-    paddingHorizontal: 8,
+    paddingHorizontal: 10,
     height: 38,
     borderRadius: 10,
+    flexShrink: 0,
   },
   actionPillWonText: {
     fontSize: 11,
@@ -1786,9 +1770,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#ECFDF5',
     borderWidth: 1,
     borderColor: '#A7F3D0',
-    paddingHorizontal: 8,
+    paddingHorizontal: 10,
     height: 38,
     borderRadius: 10,
+    flexShrink: 0,
   },
   actionPillSeamlessText: {
     fontSize: 11,
@@ -1796,38 +1781,20 @@ const styles = StyleSheet.create({
     color: '#059669',
   },
   actionPillQuote: {
-    flex: 1,
-    minWidth: 0,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 4,
     borderWidth: 1,
-    paddingHorizontal: 6,
+    paddingHorizontal: 10,
     height: 38,
     borderRadius: 10,
+    flexShrink: 0,
   },
   actionPillQuoteText: {
     fontSize: 11,
     fontWeight: '800',
     color: '#0066FF',
-  },
-  actionPillOnboard: {
-    flex: 1,
-    minWidth: 0,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-    backgroundColor: '#10B981',
-    paddingHorizontal: 6,
-    height: 38,
-    borderRadius: 10,
-  },
-  actionPillOnboardText: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#FFFFFF',
   },
   actionPillProfile: {
     flexDirection: 'row',
@@ -1835,10 +1802,11 @@ const styles = StyleSheet.create({
     gap: 3,
     marginLeft: 'auto',
     paddingHorizontal: 10,
-    height: 42,
-    borderRadius: 11,
+    height: 38,
+    borderRadius: 10,
     borderWidth: 1,
     justifyContent: 'center',
+    flexShrink: 0,
   },
   actionPillProfileText: {
     fontSize: 11,

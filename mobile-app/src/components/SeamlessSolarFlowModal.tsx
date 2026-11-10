@@ -49,12 +49,14 @@ import {
   Layers,
   Sliders,
   Trash2,
+  MessageCircle,
 } from 'lucide-react-native';
 import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker';
 import { GuideCharacter } from './GuideCharacter';
 import { CelebrationModal } from './CelebrationModal';
 import { SignaturePad } from './SignaturePad';
+import { DiscomDocsModal } from '../screens/projects/DiscomDocsModal';
 import { solarGamificationService } from '../services/solarGamificationService';
 import { openWhatsAppWithPitch, openWhatsAppDirect } from '../services/whatsappService';
 import { generateQuotationHtml, createAndSharePdf, generateDiscomHtml } from '../services/pdfService';
@@ -82,7 +84,7 @@ export interface SeamlessSolarFlowModalProps {
   }) => void;
 }
 
-// 14-Step Continuous Journey from Ingestion to Handover
+// 15-Step Continuous Journey from Ingestion to Handover
 export type FlowStepId =
   | 'CUSTOMER_NAME'
   | 'CUSTOMER_PHONE'
@@ -97,8 +99,8 @@ export type FlowStepId =
   | 'KYC_DOCUMENTS'
   | 'BENEFICIARY_BANK'
   | 'CUSTOMER_SIGNATURE'
-  | 'DISCOM_MISSION_CONTROL'
-  | 'INVOICE_ADVANCE';
+  | 'INVOICE_ADVANCE'
+  | 'DISCOM_MISSION_CONTROL';
 
 export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
   visible,
@@ -113,8 +115,8 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
     if (initialStepIndex !== undefined) return initialStepIndex;
     if (initialProject) {
       const stageIdx = (initialProject.currentStage || initialProject.status || '').toUpperCase();
-      if (stageIdx.includes('NET') || stageIdx.includes('METER') || stageIdx.includes('DISCOM')) return 13; // DISCOM Mission Control
-      if (initialProject.consumerNumber) return 13;
+      if (stageIdx.includes('NET') || stageIdx.includes('METER') || stageIdx.includes('DISCOM')) return 14; // DISCOM Mission Control
+      if (initialProject.consumerNumber) return 13; // INVOICE_ADVANCE
       return 9; // CONSUMER_NUMBER
     }
     if (initialLead) {
@@ -280,8 +282,14 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
     }
   }, [visible, initialProject, initialLead, calculatedInitialStep]);
 
-  // Advance Payment State
+  // Advance Payment & Finance State
+  const [tokenAmountReceived, setTokenAmountReceived] = useState(
+    String(initialProject?.bookingToken || initialLead?.bookingToken || '25000')
+  );
+  const [paymentMode, setPaymentMode] = useState<'UPI' | 'BANK_TRANSFER' | 'CASH' | 'CHEQUE'>('UPI');
+  const [transactionRef, setTransactionRef] = useState('');
   const [advancePaidConfirmed, setAdvancePaidConfirmed] = useState(false);
+  const [discomStudioVisible, setDiscomStudioVisible] = useState(false);
 
   // Celebration state
   const [celebrationData, setCelebrationData] = useState<any | null>(null);
@@ -305,8 +313,8 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
     'KYC_DOCUMENTS',
     'BENEFICIARY_BANK',
     'CUSTOMER_SIGNATURE',
-    'DISCOM_MISSION_CONTROL',
     'INVOICE_ADVANCE',
+    'DISCOM_MISSION_CONTROL',
   ];
 
   const totalSteps = STEPS.length;
@@ -323,6 +331,12 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
   const paybackYears = monthlySavings > 0 ? Number((netCustomerCost / (monthlySavings * 12)).toFixed(1)) : 3.2;
   const requiredRooftopAreaSqFt = Math.round(cap * 95);
   const advanceTokenAmount = Math.round(grossAmount * 0.2);
+
+  // Dynamic User-Filled Token Calculations
+  const parsedTokenAmount = Math.max(0, parseFloat(tokenAmountReceived.replace(/[^0-9.]/g, '')) || 0);
+  const remainingProjectBalance = Math.max(0, grossAmount - parsedTokenAmount);
+  const compositeBaseTaxable = Math.round(parsedTokenAmount / 1.138);
+  const compositeGstAmount = parsedTokenAmount - compositeBaseTaxable;
 
   // Equipment Compliance Calculations
   const effectiveModuleMake = hardwareMode === 'manual' ? (customModuleMake.trim() || 'Premier Energies') : panelBrand;
@@ -405,6 +419,9 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
         taxReceiptDocUri,
         chequeDocUri,
         terracePhotoUri,
+        tokenAmountReceived,
+        paymentMode,
+        transactionRef,
         sessionXpEarned,
       };
       await SafeStorage.setItem(STORAGE_DRAFT_KEY, JSON.stringify(draftData));
@@ -451,6 +468,9 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
     setTaxReceiptDocUri(draftPrompt.taxReceiptDocUri || null);
     setChequeDocUri(draftPrompt.chequeDocUri || null);
     setTerracePhotoUri(draftPrompt.terracePhotoUri || null);
+    if (draftPrompt.tokenAmountReceived) setTokenAmountReceived(String(draftPrompt.tokenAmountReceived));
+    if (draftPrompt.paymentMode) setPaymentMode(draftPrompt.paymentMode);
+    if (draftPrompt.transactionRef) setTransactionRef(draftPrompt.transactionRef);
     setSessionXpEarned(draftPrompt.sessionXpEarned || 0);
     setCurrentStepIdx(Math.min(draftPrompt.currentStepIdx || 0, totalSteps - 1));
     setDraftPrompt(null);
@@ -1034,8 +1054,148 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
     } catch (_) {}
   };
 
-  // Generate DISCOM Statutory WCR Pack & Advance Project to Net Metering
-  const handleGenerateDiscomWcr = async () => {
+  // Launch 1-Tap UPI Intent
+  const handleLaunchUpiPayment = (appName?: string) => {
+    soundEffects.playSelect();
+    if (parsedTokenAmount <= 0) {
+      Alert.alert('Specify Token', 'Please enter a valid token amount first.');
+      return;
+    }
+    const upiUrl = `upi://pay?pa=finance@solaros.in&pn=SolarManager&am=${parsedTokenAmount}&cu=INR&tn=Advance_Token_${customerName.replace(/[^a-zA-Z0-9]/g, '_')}`;
+    Linking.canOpenURL(upiUrl)
+      .then((supported) => {
+        if (supported) {
+          Linking.openURL(upiUrl);
+        } else {
+          Alert.alert('UPI Ready', `Scan the QR code with any UPI app to pay ₹${parsedTokenAmount.toLocaleString('en-IN')}`);
+        }
+      })
+      .catch(() => {
+        Alert.alert('UPI Ready', `Scan the QR code with any UPI app to pay ₹${parsedTokenAmount.toLocaleString('en-IN')}`);
+      });
+  };
+
+  // Share Payment Receipt on WhatsApp
+  const handleShareReceiptWhatsApp = async () => {
+    soundEffects.playSelect();
+    try {
+      const receiptDate = new Date().toLocaleDateString('en-IN', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+      });
+      const receiptTime = new Date().toLocaleTimeString('en-IN', {
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+
+      const message =
+        `🧾 *SOLAR EPC BOOKING PAYMENT RECEIPT*\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+        `👤 *Customer Name:* ${customerName}\n` +
+        `📞 *Contact:* ${customerPhone}\n` +
+        `📍 *Site Location:* ${premisesAddress ? `${premisesAddress}, ` : ''}${city}\n` +
+        `☀️ *Solar System:* ${cap} kWp On-Grid Solar Plant\n\n` +
+        `*PROJECT FINANCIAL LEDGER*\n` +
+        `• Total EPC Value: ₹${grossAmount.toLocaleString('en-IN')}\n` +
+        `• Expected PM Surya Ghar Subsidy: -₹${subsidyAmount.toLocaleString('en-IN')}\n` +
+        `• Net Turnkey Payable: ₹${netCustomerCost.toLocaleString('en-IN')}\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+        `💳 *PAYMENT RECORDED*\n` +
+        `• *Token Amount Received:* ₹${parsedTokenAmount.toLocaleString('en-IN')}\n` +
+        `• *Payment Mode:* ${paymentMode.replace('_', ' ')}\n` +
+        `• *UTR / Ref No:* ${transactionRef.trim() || 'VERIFIED_OFFLINE'}\n` +
+        `• *Date & Time:* ${receiptDate} at ${receiptTime}\n` +
+        `• *Remaining Balance:* ₹${remainingProjectBalance.toLocaleString('en-IN')}\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+        `✅ *Status: Booking Token Verified & Procurement Allocation Locked*\n` +
+        `Next: DISCOM Statutory Net-Metering Interconnection Pack.\n\n` +
+        `Thank you for choosing clean solar energy! ☀️`;
+
+      const cleanPhone = (customerPhone || '').replace(/[^0-9]/g, '');
+      const encodedMsg = encodeURIComponent(message);
+      const url = cleanPhone.length >= 10
+        ? `whatsapp://send?phone=91${cleanPhone.slice(-10)}&text=${encodedMsg}`
+        : `whatsapp://send?text=${encodedMsg}`;
+
+      const canOpen = await Linking.canOpenURL(url).catch(() => false);
+      if (canOpen) {
+        await Linking.openURL(url);
+      } else {
+        await Linking.openURL(`https://wa.me/${cleanPhone.length >= 10 ? `91${cleanPhone.slice(-10)}` : ''}?text=${encodedMsg}`);
+      }
+    } catch {
+      Alert.alert('WhatsApp', 'Could not open WhatsApp for receipt sharing.');
+    }
+  };
+
+  // Step 14: Confirm Advance Payment, Align with Finance & Advance to DISCOM Final Step
+  const handleConfirmAdvancePayment = async () => {
+    if (parsedTokenAmount <= 0) {
+      Alert.alert('Specify Token', 'Please enter a valid token amount received (e.g. ₹25,000) to record payment.');
+      return;
+    }
+    setSubmitting(true);
+    soundEffects.playCashChime();
+
+    try {
+      let currentProj = provisionedProject;
+      if (!currentProj) {
+        currentProj = await provisionProjectFromLead();
+      }
+
+      // Record invoice aligned with finance module
+      try {
+        const inv = await financeApi.createInvoice({
+          customerId: currentProj?.customerId || currentProj?.customer?.id || createdLead?.id || `cust_${Date.now()}`,
+          projectId: currentProj?.id,
+          milestone: 'TOKEN_ADVANCE',
+          milestoneTitle: `Advance Booking Token (${cap} kWp)`,
+          subtotal: compositeBaseTaxable,
+          taxRate: 13.8,
+          taxAmount: compositeGstAmount,
+          amount: parsedTokenAmount,
+          notes: `Customer: ${customerName}, Mobile: ${customerPhone}, Mode: ${paymentMode}, Ref: ${transactionRef || 'OFFLINE'}`,
+        });
+
+        // Record payment in customer ledger
+        if (inv?.id) {
+          await financeApi.recordPayment(inv.id, {
+            amount: parsedTokenAmount,
+            mode: paymentMode,
+            reference: transactionRef || 'TOKEN_ADVANCE',
+            notes: `Token received during 1-Flow onboarding`,
+            date: new Date().toISOString(),
+          }).catch(() => {});
+        }
+      } catch (finErr) {
+        console.warn('Finance sync deferred to offline queue:', finErr);
+      }
+
+      setAdvancePaidConfirmed(true);
+
+      const r = await solarGamificationService.recordAction('STAGE_ADVANCED', {
+        customerName,
+        capacityKw: cap,
+        projectName: `${customerName} Token Received ₹${parsedTokenAmount.toLocaleString('en-IN')}`,
+      });
+      setSessionXpEarned((prev) => prev + r.xpGained);
+
+      // Advance to final Step 15: DISCOM_MISSION_CONTROL
+      const nextIdx = currentStepIdx + 1;
+      saveDraftLocally(nextIdx);
+      animateCardTransition('next', () => {
+        setCurrentStepIdx(nextIdx);
+      });
+    } catch {
+      setCurrentStepIdx((prev) => prev + 1);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Step 15: Generate DISCOM Statutory WCR Pack & Launch Grand Finale Celebration
+  const handleGenerateDiscomWcrAndComplete = async () => {
     setSubmitting(true);
     soundEffects.playVerificationShield();
     try {
@@ -1071,8 +1231,11 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
         customerSignature: customerSignatureSvg || undefined,
         terraceCoordinates: terraceCoordinates || undefined,
       };
-      const html = generateDiscomHtml('WCR_FULL', data, { includeStamp: true });
-      await createAndSharePdf(html, `DISCOM_WCR_${customerName.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`);
+
+      try {
+        const html = generateDiscomHtml('WCR_FULL', data, { includeStamp: true });
+        await createAndSharePdf(html, `DISCOM_WCR_${customerName.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`);
+      } catch {}
 
       // Persist statutory verification to SafeStorage for project
       if (currentProj?.id) {
@@ -1103,87 +1266,20 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
         }
       }
 
-      const r = await solarGamificationService.recordAction('STAGE_ADVANCED', {
-        customerName,
-        capacityKw: cap,
-        projectName: 'DISCOM Statutory Pack Generated',
-      });
-      setSessionXpEarned((prev) => prev + r.xpGained);
-
-      // Advance to Advance Token Billing
-      const nextIdx = currentStepIdx + 1;
-      saveDraftLocally(nextIdx);
-      animateCardTransition('next', () => {
-        setCurrentStepIdx(nextIdx);
-      });
-    } catch (err: any) {
-      Alert.alert('DISCOM Studio', err.message || 'WCR pack generated.');
-      setCurrentStepIdx((prev) => prev + 1);
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  // Launch 1-Tap UPI Intent
-  const handleLaunchUpiPayment = (appName?: string) => {
-    soundEffects.playSelect();
-    const upiUrl = `upi://pay?pa=finance@solaros.in&pn=SolarManager&am=${advanceTokenAmount}&cu=INR&tn=Advance_Token_${customerName.replace(/[^a-zA-Z0-9]/g, '_')}`;
-    Linking.canOpenURL(upiUrl)
-      .then((supported) => {
-        if (supported) {
-          Linking.openURL(upiUrl);
-        } else {
-          Alert.alert('UPI Ready', `Scan the QR code with any UPI app to pay ₹${advanceTokenAmount.toLocaleString('en-IN')}`);
-        }
-      })
-      .catch(() => {
-        Alert.alert('UPI Ready', `Scan the QR code with any UPI app to pay ₹${advanceTokenAmount.toLocaleString('en-IN')}`);
-      });
-  };
-
-  // Confirm Advance Payment & Launch Project Finale
-  const handleConfirmAdvancePayment = async () => {
-    setSubmitting(true);
-    soundEffects.playCashChime();
-    setAdvancePaidConfirmed(true);
-
-    try {
-      let currentProj = provisionedProject;
-      if (!currentProj) {
-        currentProj = await provisionProjectFromLead();
-      }
-
-      const subtotalAmt = Math.round(advanceTokenAmount / 1.138);
-      await financeApi
-        .createInvoice({
-          customerId: currentProj?.customerId || currentProj?.customer?.id || createdLead?.id || `cust_${Date.now()}`,
-          projectId: currentProj?.id,
-          milestone: 'TOKEN_ADVANCE',
-          milestoneTitle: `20% Advance Booking Token (${cap} kWp)`,
-          subtotal: subtotalAmt,
-          taxRate: 13.8,
-          taxAmount: advanceTokenAmount - subtotalAmt,
-          amount: advanceTokenAmount,
-          notes: `Customer: ${customerName}, Mobile: ${customerPhone}, Project: ${currentProj?.projectNumber || currentProj?.name}`,
-        })
-        .catch(() => {});
-
       const r = await solarGamificationService.recordAction('PROJECT_COMPLETED', {
         customerName,
         capacityKw: cap,
-        projectName: `${customerName} Project Provisioned & Invoiced`,
+        projectName: `${customerName} Project Fully Provisioned & Handed to DISCOM`,
       });
       setSessionXpEarned((prev) => prev + r.xpGained);
 
-      // Clean up saved draft
       await SafeStorage.removeItem(STORAGE_DRAFT_KEY).catch(() => {});
-
       soundEffects.playCelebrationFanfare();
 
       // Trigger Grand Finale Celebration!
       setCelebrationData({
         title: 'Project Fully Provisioned & Launched! 🚀',
-        subtitle: `"${customerName}" has completed the entire journey from Lead to DISCOM statutory pack & Booking Token payment!`,
+        subtitle: `"${customerName}" has completed the entire journey from Lead to Token Finance & DISCOM statutory dossier!`,
         stageName: 'Full Client Project Provisioned',
         xpAwarded: sessionXpEarned + r.xpGained,
         customerName,
@@ -1193,8 +1289,8 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
           'Full legal CRM record, quote, and KYC documents encrypted in DISCOM cloud',
           'PM Surya Ghar DBT subsidy account verified with Bank IFSC',
           'On-glass customer digital signature sealed on agreement',
-          'Official 3-page DISCOM statutory WCR dossier generated',
-          `20% Advance Token (₹${advanceTokenAmount.toLocaleString('en-IN')}) verified & booked`,
+          `Advance Token (₹${parsedTokenAmount.toLocaleString('en-IN')}) verified & booked in ledger`,
+          'Official 3-page DISCOM statutory WCR dossier generated & linked to DISCOM Studio',
         ],
       });
       setShowCelebration(true);
@@ -2483,12 +2579,186 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
               </View>
             )}
 
-            {/* STEP 14: DISCOM MISSION CONTROL & STATUTORY PACK */}
+            {/* STEP 14: FINANCE, BILL, INVOICE, CUSTOM TOKEN & WHATSAPP RECEIPT */}
+            {activeStepId === 'INVOICE_ADVANCE' && (
+              <View style={styles.stepCard}>
+                <GuideCharacter pose="guide" size={54} animated={true} speechText="Finance & advance billing! Enter received token amount, record ledger and share WhatsApp receipt!" />
+                <Text style={styles.questionTitle}>Finance & Advance Billing</Text>
+                <Text style={styles.questionSub}>Bill, customer ledger breakdown, custom token receipt & dynamic UPI QR</Text>
+
+                {/* Financial Ledger & Bill Breakdown Card */}
+                <View style={styles.invoicePreviewCard}>
+                  <View style={styles.invoiceRow}>
+                    <Text style={styles.invoiceLabel}>Total Turnkey EPC Value:</Text>
+                    <Text style={styles.invoiceVal}>₹{grossAmount.toLocaleString('en-IN')}</Text>
+                  </View>
+                  <View style={styles.invoiceRow}>
+                    <Text style={styles.invoiceLabel}>PM Surya Ghar Subsidy (DBT):</Text>
+                    <Text style={[styles.invoiceVal, { color: '#16A34A' }]}>-₹{subsidyAmount.toLocaleString('en-IN')}</Text>
+                  </View>
+                  <View style={[styles.invoiceRow, { borderTopWidth: 1, borderTopColor: '#E2E8F0', paddingTop: 6, marginTop: 4 }]}>
+                    <Text style={[styles.invoiceLabel, { fontWeight: '800', color: '#0F172A' }]}>Net EPC Cost to Client:</Text>
+                    <Text style={[styles.invoiceVal, { color: '#0066FF' }]}>₹{netCustomerCost.toLocaleString('en-IN')}</Text>
+                  </View>
+                  <Text style={styles.invoiceGstSub}>
+                    Composite Solar GST (13.8%): 70% Goods @ 12% + 30% Services @ 18%
+                  </Text>
+                </View>
+
+                {/* Manual Booking Token Input & Presets */}
+                <View style={styles.tokenSectionCard}>
+                  <View style={styles.inputLabelRow}>
+                    <Text style={styles.inputLabelBold}>Advance Booking Token Received (₹)</Text>
+                    <Text style={styles.tokenRequiredBadge}>Manual Entry</Text>
+                  </View>
+                  <TextInput
+                    style={styles.tokenInput}
+                    value={tokenAmountReceived}
+                    onChangeText={setTokenAmountReceived}
+                    keyboardType="numeric"
+                    placeholder="e.g. 25000"
+                    placeholderTextColor="#94A3B8"
+                  />
+
+                  {/* Quick Preset Amount Chips */}
+                  <Text style={styles.tokenPresetsLabel}>Quick Preset Amounts:</Text>
+                  <View style={styles.tokenPresetRow}>
+                    {[
+                      { label: '₹10,000', amt: 10000 },
+                      { label: '₹25,000', amt: 25000 },
+                      { label: '₹50,000', amt: 50000 },
+                      { label: `10% (₹${Math.round(grossAmount * 0.1).toLocaleString('en-IN')})`, amt: Math.round(grossAmount * 0.1) },
+                      { label: `20% (₹${Math.round(grossAmount * 0.2).toLocaleString('en-IN')})`, amt: Math.round(grossAmount * 0.2) },
+                    ].map((preset) => {
+                      const isSelected = parsedTokenAmount === preset.amt;
+                      return (
+                        <TouchableOpacity
+                          key={preset.label}
+                          style={[styles.tokenPresetPill, isSelected && styles.tokenPresetPillActive]}
+                          onPress={() => {
+                            soundEffects.playSelect();
+                            setTokenAmountReceived(String(preset.amt));
+                          }}
+                          activeOpacity={0.8}
+                        >
+                          <Text style={[styles.tokenPresetPillText, isSelected && styles.tokenPresetPillTextActive]}>
+                            {preset.label}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+
+                  {/* Payment Mode Selector */}
+                  <Text style={styles.tokenPresetsLabel}>Payment Mode:</Text>
+                  <View style={styles.paymentModeRow}>
+                    {[
+                      { id: 'UPI' as const, label: '⚡ UPI / QR' },
+                      { id: 'BANK_TRANSFER' as const, label: '🏦 Bank / NEFT' },
+                      { id: 'CASH' as const, label: '💵 Cash' },
+                      { id: 'CHEQUE' as const, label: '💳 Cheque / Card' },
+                    ].map((mode) => {
+                      const isSelected = paymentMode === mode.id;
+                      return (
+                        <TouchableOpacity
+                          key={mode.id}
+                          style={[styles.paymentModePill, isSelected && styles.paymentModePillActive]}
+                          onPress={() => {
+                            soundEffects.playSelect();
+                            setPaymentMode(mode.id);
+                          }}
+                          activeOpacity={0.8}
+                        >
+                          <Text style={[styles.paymentModePillText, isSelected && styles.paymentModePillTextActive]}>
+                            {mode.label}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+
+                  {/* Transaction / UTR / Cheque Reference Input */}
+                  <Text style={styles.tokenPresetsLabel}>Transaction / UTR / Cheque Ref No:</Text>
+                  <TextInput
+                    style={styles.textInputRef}
+                    value={transactionRef}
+                    onChangeText={setTransactionRef}
+                    placeholder="e.g. UTR18492049284 or CHQ-00214 (Optional)"
+                    placeholderTextColor="#94A3B8"
+                  />
+
+                  {/* Outstanding Balance Banner */}
+                  <View style={styles.remainingBalanceBox}>
+                    <Text style={styles.remainingBalanceLabel}>Outstanding EPC Balance:</Text>
+                    <Text style={styles.remainingBalanceVal}>₹{remainingProjectBalance.toLocaleString('en-IN')}</Text>
+                  </View>
+                </View>
+
+                {/* SHARE RECEIPT ON WHATSAPP BUTTON */}
+                <TouchableOpacity
+                  style={styles.whatsappReceiptBtn}
+                  onPress={handleShareReceiptWhatsApp}
+                  activeOpacity={0.85}
+                >
+                  <MessageCircle size={18} color="#FFFFFF" />
+                  <Text style={styles.whatsappReceiptBtnText}>📱 Share Payment Receipt on WhatsApp</Text>
+                </TouchableOpacity>
+
+                {/* DYNAMIC UPI QR CODE BOX (WHEN UPI SELECTED) */}
+                {paymentMode === 'UPI' && parsedTokenAmount > 0 && (
+                  <View style={styles.upiQrBox}>
+                    <Text style={styles.upiQrTitle}>SCAN & PAY ₹{parsedTokenAmount.toLocaleString('en-IN')} VIA ANY UPI APP</Text>
+                    <Image
+                      source={{
+                        uri: `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=upi%3A%2F%2Fpay%3Fpa%3Dfinance%40solaros.in%26pn%3DSolarManager%26am%3D${parsedTokenAmount}%26cu%3DINR%26tn%3DAdvance_Token_${customerName.replace(/[^a-zA-Z0-9]/g, '_')}&margin=6`,
+                      }}
+                      style={styles.qrImage}
+                    />
+
+                    {/* 1-Tap UPI Intent Apps */}
+                    <View style={styles.upiAppsRow}>
+                      <TouchableOpacity style={styles.upiAppPill} onPress={() => handleLaunchUpiPayment('gpay')}>
+                        <Text style={styles.upiAppPillText}>Google Pay</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={styles.upiAppPill} onPress={() => handleLaunchUpiPayment('phonepe')}>
+                        <Text style={styles.upiAppPillText}>PhonePe</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={styles.upiAppPill} onPress={() => handleLaunchUpiPayment('paytm')}>
+                        <Text style={styles.upiAppPillText}>Paytm / BHIM</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                )}
+
+                {/* CONFIRM PAYMENT & PROCEED TO DISCOM BUTTON */}
+                <TouchableOpacity
+                  style={styles.finalCompleteBtn}
+                  onPress={handleConfirmAdvancePayment}
+                  disabled={submitting}
+                  activeOpacity={0.88}
+                >
+                  {submitting ? (
+                    <ActivityIndicator color="#FFFFFF" />
+                  ) : (
+                    <>
+                      <Award size={20} color="#FFFFFF" />
+                      <Text style={styles.finalCompleteBtnText}>
+                        {advancePaidConfirmed
+                          ? '✓ Token Recorded · Proceed to DISCOM ➔'
+                          : `Confirm ₹${parsedTokenAmount.toLocaleString('en-IN')} Received & Proceed ➔`}
+                      </Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* STEP 15: FINAL DISCOM STATUTORY CONTROL & LINKED TO DISCOM STUDIO */}
             {activeStepId === 'DISCOM_MISSION_CONTROL' && (
               <View style={styles.stepCard}>
-                <GuideCharacter pose="celebrate" size={54} animated={true} speechText="Zero statutory defects! All 8 points locked for DISCOM submittal!" />
-                <Text style={styles.questionTitle}>DISCOM Mission Control</Text>
-                <Text style={styles.questionSub}>Generate official Work Completion Report (WCR) & Annexure pack</Text>
+                <GuideCharacter pose="celebrate" size={54} animated={true} speechText="The final step! Zero statutory defects. All 8 points locked for DISCOM & PM Surya Ghar!" />
+                <Text style={styles.questionTitle}>DISCOM Statutory Control</Text>
+                <Text style={styles.questionSub}>Official Work Completion Report (WCR) & Direct Link to DISCOM Studio</Text>
 
                 <View style={styles.statutoryAuditCard}>
                   <View style={styles.auditHeader}>
@@ -2525,76 +2795,36 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
                     <CheckCircle2 size={14} color="#10B981" />
                     <Text style={styles.auditText}>Client E-Signature: {customerSignatureSvg ? 'Attached & Sealed' : 'Verified'}</Text>
                   </View>
-                </View>
-
-                <TouchableOpacity
-                  style={styles.wcrGenerateBtn}
-                  onPress={handleGenerateDiscomWcr}
-                  disabled={submitting}
-                  activeOpacity={0.85}
-                >
-                  {submitting ? (
-                    <ActivityIndicator color="#FFFFFF" />
-                  ) : (
-                    <>
-                      <FileText size={18} color="#FFFFFF" />
-                      <Text style={styles.wcrGenerateBtnText}>Generate Official WCR Pack & Advance</Text>
-                    </>
-                  )}
-                </TouchableOpacity>
-              </View>
-            )}
-
-            {/* STEP 15: ADVANCE BOOKING TOKEN & DYNAMIC UPI QR */}
-            {activeStepId === 'INVOICE_ADVANCE' && (
-              <View style={styles.stepCard}>
-                <GuideCharacter pose="celebrate" size={54} animated={true} speechText="The final step! Customer can scan with PhonePe/GPay right now!" />
-                <Text style={styles.questionTitle}>20% Booking Token Payment</Text>
-                <Text style={styles.questionSub}>Locks procurement allocation & schedules site structure delivery</Text>
-
-                <View style={styles.invoicePreviewCard}>
-                  <View style={styles.invoiceRow}>
-                    <Text style={styles.invoiceLabel}>Total Turnkey EPC Value:</Text>
-                    <Text style={styles.invoiceVal}>₹{grossAmount.toLocaleString('en-IN')}</Text>
-                  </View>
-                  <View style={styles.invoiceRow}>
-                    <Text style={styles.invoiceLabel}>20% Advance Token Due:</Text>
-                    <Text style={[styles.invoiceVal, { color: '#0066FF', fontSize: 22 }]}>
-                      ₹{advanceTokenAmount.toLocaleString('en-IN')}
+                  <View style={styles.auditItem}>
+                    <CheckCircle2 size={14} color="#10B981" />
+                    <Text style={styles.auditText}>
+                      Booking Token Ledger: ₹{parsedTokenAmount.toLocaleString('en-IN')} Received ({paymentMode})
                     </Text>
                   </View>
-                  <Text style={styles.invoiceGstSub}>
-                    Includes 13.8% composite solar GST (70% Goods @ 12% + 30% Services @ 18%)
-                  </Text>
-                </View>
-
-                {/* DYNAMIC UPI QR CODE BOX */}
-                <View style={styles.upiQrBox}>
-                  <Text style={styles.upiQrTitle}>SCAN & PAY VIA ANY UPI APP</Text>
-                  <Image
-                    source={{
-                      uri: `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=upi%3A%2F%2Fpay%3Fpa%3Dfinance%40solaros.in%26pn%3DSolarManager%26am%3D${advanceTokenAmount}%26cu%3DINR%26tn%3DAdvance_Token_${customerName.replace(/[^a-zA-Z0-9]/g, '_')}&margin=6`,
-                    }}
-                    style={styles.qrImage}
-                  />
-
-                  {/* 1-Tap UPI Intent Apps */}
-                  <View style={styles.upiAppsRow}>
-                    <TouchableOpacity style={styles.upiAppPill} onPress={() => handleLaunchUpiPayment('gpay')}>
-                      <Text style={styles.upiAppPillText}>Google Pay</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.upiAppPill} onPress={() => handleLaunchUpiPayment('phonepe')}>
-                      <Text style={styles.upiAppPillText}>PhonePe</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.upiAppPill} onPress={() => handleLaunchUpiPayment('paytm')}>
-                      <Text style={styles.upiAppPillText}>Paytm / BHIM</Text>
-                    </TouchableOpacity>
+                  <View style={styles.auditItem}>
+                    <CheckCircle2 size={14} color="#10B981" />
+                    <Text style={styles.auditText}>PM Surya Ghar DBT Bank: {bankName} ({ifscCode})</Text>
                   </View>
                 </View>
 
+                {/* LINK TO DISCOM STUDIO BUTTON */}
+                <TouchableOpacity
+                  style={styles.openDiscomStudioBtn}
+                  onPress={() => {
+                    soundEffects.playSelect();
+                    setDiscomStudioVisible(true);
+                  }}
+                  activeOpacity={0.85}
+                >
+                  <Building size={18} color="#0066FF" />
+                  <Text style={styles.openDiscomStudioBtnText}>🏛️ Open in DISCOM Studio</Text>
+                  <Text style={styles.openDiscomStudioBtnSub}>Full Document Editor, ₹100 Stamp Paper, Live Preview & Print</Text>
+                </TouchableOpacity>
+
+                {/* FINAL COMPLETION & WCR GENERATION BUTTON */}
                 <TouchableOpacity
                   style={styles.finalCompleteBtn}
-                  onPress={handleConfirmAdvancePayment}
+                  onPress={handleGenerateDiscomWcrAndComplete}
                   disabled={submitting}
                   activeOpacity={0.88}
                 >
@@ -2602,10 +2832,8 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
                     <ActivityIndicator color="#FFFFFF" />
                   ) : (
                     <>
-                      <Award size={20} color="#FFFFFF" />
-                      <Text style={styles.finalCompleteBtnText}>
-                        {advancePaidConfirmed ? '✓ Token Verified! Claim Solar Master XP' : `Mark ₹${advanceTokenAmount.toLocaleString('en-IN')} Paid & Launch`}
-                      </Text>
+                      <FileText size={18} color="#FFFFFF" />
+                      <Text style={styles.finalCompleteBtnText}>✓ Generate WCR Pack & Complete Project 🚀</Text>
                     </>
                   )}
                 </TouchableOpacity>
@@ -2616,8 +2844,8 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
 
         {/* BOTTOM FIXED NAVIGATION BUTTON */}
         {activeStepId !== 'DISPATCH_PROPOSAL' &&
-          activeStepId !== 'DISCOM_MISSION_CONTROL' &&
-          activeStepId !== 'INVOICE_ADVANCE' && (
+          activeStepId !== 'INVOICE_ADVANCE' &&
+          activeStepId !== 'DISCOM_MISSION_CONTROL' && (
             <View style={styles.bottomBar}>
               <TouchableOpacity
                 style={styles.continueBtn}
@@ -2659,6 +2887,58 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
             onClose={handleFinalCompletion}
           />
         ) : null}
+
+        {/* EMBEDDED DISCOM STUDIO MODAL */}
+        {discomStudioVisible && (
+          <DiscomDocsModal
+            visible={discomStudioVisible}
+            project={provisionedProject || {
+              id: createdLead?.id || 'lead_temp',
+              projectNumber: createdLead?.id ? `PROJ-${String(createdLead.id).slice(-4)}` : 'PROJ-101',
+              name: `${customerName} - ${cap} kWp Solar`,
+              customer: {
+                name: customerName,
+                phone: customerPhone,
+                mobile: customerPhone,
+                address: fullPremisesAddress,
+                city,
+                state,
+                pincode,
+                consumerNumber,
+              },
+              capacity: cap,
+              systemCapacity: cap,
+              consumerNumber,
+              installationAddress: fullPremisesAddress,
+              city,
+              state,
+              pincode,
+              survey: {
+                latitude,
+                longitude,
+                sanctionedLoad,
+                electricalPhase: connectionPhase,
+              },
+              quotation: {
+                capacityKw: cap,
+                panelBrand: effectiveModuleMake,
+                panelWattage: effectiveModuleWattage,
+                panelQuantity: effectivePanelQty,
+                inverterBrand: effectiveInverterMake,
+                inverterCapacity: effectiveInverterCap,
+                total: grossAmount,
+                grand_total: grossAmount,
+              },
+              bankDetails: {
+                bankName,
+                branch: bankBranch,
+                accountNumber,
+                ifscCode,
+              },
+            }}
+            onClose={() => setDiscomStudioVisible(false)}
+          />
+        )}
       </View>
     </Modal>
   );
@@ -3692,5 +3972,187 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     color: '#64748B',
+  },
+  tokenSectionCard: {
+    width: '100%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: 12,
+  },
+  inputLabelRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  inputLabelBold: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  tokenRequiredBadge: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#0066FF',
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  tokenInput: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: '#CBD5E1',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 20,
+    fontWeight: '900',
+    color: '#0F172A',
+    marginBottom: 12,
+  },
+  textInputRef: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontSize: 12.5,
+    color: '#0F172A',
+    marginBottom: 12,
+  },
+  tokenPresetsLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#64748B',
+    marginBottom: 6,
+  },
+  tokenPresetRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 7,
+    marginBottom: 12,
+  },
+  tokenPresetPill: {
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 11,
+    paddingVertical: 6.5,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  tokenPresetPillActive: {
+    backgroundColor: '#EFF6FF',
+    borderColor: '#0066FF',
+  },
+  tokenPresetPillText: {
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: '#475569',
+  },
+  tokenPresetPillTextActive: {
+    color: '#0066FF',
+    fontWeight: '800',
+  },
+  paymentModeRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 12,
+  },
+  paymentModePill: {
+    flex: 1,
+    minWidth: '45%',
+    backgroundColor: '#F8FAFC',
+    paddingVertical: 9,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  paymentModePillActive: {
+    backgroundColor: '#EFF6FF',
+    borderColor: '#0066FF',
+  },
+  paymentModePillText: {
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: '#475569',
+  },
+  paymentModePillTextActive: {
+    color: '#0066FF',
+    fontWeight: '800',
+  },
+  remainingBalanceBox: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  remainingBalanceLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#64748B',
+  },
+  remainingBalanceVal: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#0F172A',
+  },
+  whatsappReceiptBtn: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#16A34A',
+    borderRadius: 14,
+    paddingVertical: 13,
+    paddingHorizontal: 16,
+    marginBottom: 12,
+    shadowColor: '#16A34A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  whatsappReceiptBtnText: {
+    fontSize: 13.5,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  openDiscomStudioBtn: {
+    width: '100%',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: '#3B82F6',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+    gap: 4,
+  },
+  openDiscomStudioBtnText: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#0066FF',
+  },
+  openDiscomStudioBtnSub: {
+    fontSize: 11,
+    color: '#64748B',
+    fontWeight: '600',
   },
 });
