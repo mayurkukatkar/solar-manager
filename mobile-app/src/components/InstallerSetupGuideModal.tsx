@@ -9,7 +9,6 @@ import {
   useWindowDimensions,
   Animated,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   ArrowRight,
   ArrowLeft,
@@ -25,8 +24,10 @@ import {
 } from 'lucide-react-native';
 import { GuideCharacter, CharacterPose } from './GuideCharacter';
 import { useTheme } from '../theme';
+import { useAuth } from '../context/AuthContext';
+import { tourService, INSTALLER_GUIDE_STORAGE_KEY } from '../services/tourService';
 
-const STORAGE_GUIDE_KEY = '@solar_installer_guide_completed_v1';
+const STORAGE_GUIDE_KEY = INSTALLER_GUIDE_STORAGE_KEY;
 
 export interface InstallerSetupGuideModalProps {
   visible?: boolean;
@@ -152,6 +153,7 @@ export const InstallerSetupGuideModal: React.FC<InstallerSetupGuideModalProps> =
   forceShow = false,
 }) => {
   const { colors, isDark } = useTheme();
+  const { user } = useAuth();
   const { width } = useWindowDimensions();
 
   const [visible, setVisible] = useState(false);
@@ -169,10 +171,11 @@ export const InstallerSetupGuideModal: React.FC<InstallerSetupGuideModalProps> =
       return;
     }
 
+    let isMounted = true;
     const checkFirstTime = async () => {
       try {
-        const completed = await AsyncStorage.getItem(STORAGE_GUIDE_KEY);
-        if (!completed) {
+        const completed = await tourService.isTourCompleted(user?.id);
+        if (!completed && isMounted) {
           setVisible(true);
         }
       } catch {
@@ -180,11 +183,15 @@ export const InstallerSetupGuideModal: React.FC<InstallerSetupGuideModalProps> =
       }
     };
     checkFirstTime();
-  }, [propVisible, forceShow]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [propVisible, forceShow, user?.id]);
 
   const handleDismiss = async () => {
     try {
-      await AsyncStorage.setItem(STORAGE_GUIDE_KEY, 'true');
+      await tourService.markTourCompleted(user?.id);
     } catch {
       // Ignore
     }

@@ -12,7 +12,6 @@ import {
   NativeScrollEvent,
   Platform,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   ArrowRight,
   ArrowLeft,
@@ -32,8 +31,10 @@ import {
 import { GuideCharacter, CharacterPose } from './GuideCharacter';
 import { GridBackground } from './common/GridBackground';
 import { useTheme } from '../theme';
+import { useAuth } from '../context/AuthContext';
+import { tourService, APP_ONBOARDING_STORAGE_KEY } from '../services/tourService';
 
-export const APP_ONBOARDING_STORAGE_KEY = '@solar_app_onboarding_completed_v1';
+export { APP_ONBOARDING_STORAGE_KEY };
 
 export interface AppOnboardingModalProps {
   visible?: boolean;
@@ -189,13 +190,14 @@ export const AppOnboardingModal: React.FC<AppOnboardingModalProps> = ({
   forceShow = false,
 }) => {
   const { colors, isDark } = useTheme();
+  const { user } = useAuth();
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
 
   const [visible, setVisible] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
   const scrollRef = useRef<any>(null);
 
-  // Auto-trigger on first app launch if not completed yet
+  // Auto-trigger ONLY for genuine first-time users if not completed yet
   useEffect(() => {
     if (forceShow) {
       setVisible(true);
@@ -207,22 +209,27 @@ export const AppOnboardingModal: React.FC<AppOnboardingModalProps> = ({
       return;
     }
 
+    let isMounted = true;
     const checkOnboardingState = async () => {
       try {
-        const completed = await AsyncStorage.getItem(APP_ONBOARDING_STORAGE_KEY);
-        if (!completed) {
+        const completed = await tourService.isTourCompleted(user?.id);
+        if (!completed && isMounted) {
           setVisible(true);
         }
       } catch {
-        // Fallback safely
+        // Fallback safely to not showing if error
       }
     };
     checkOnboardingState();
-  }, [propVisible, forceShow]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [propVisible, forceShow, user?.id]);
 
   const handleDismiss = async () => {
     try {
-      await AsyncStorage.setItem(APP_ONBOARDING_STORAGE_KEY, 'true');
+      await tourService.markTourCompleted(user?.id);
     } catch {
       // Ignore
     }

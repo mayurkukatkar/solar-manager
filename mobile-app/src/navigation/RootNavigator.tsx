@@ -41,7 +41,6 @@ import { AccountSuspendedModal } from '../components/AccountSuspendedModal';
 import { SessionExpiredModal } from '../components/SessionExpiredModal';
 import { OfflineBanner } from '../components/OfflineBanner';
 import { SolLoadingScreen } from '../components/SolLoadingScreen';
-import { InstallerSetupGuideModal } from '../components/InstallerSetupGuideModal';
 import { AppOnboardingModal } from '../components/AppOnboardingModal';
 import { AppUpdateModal } from '../components/AppUpdateModal';
 import { haptics } from '../utils/haptics';
@@ -452,9 +451,6 @@ export const RootNavigator: React.FC = () => {
 
       {/* GLOBAL FIRST-TIME APP ONBOARDING & PRODUCT TOUR */}
       <AppOnboardingModal />
-
-      {/* FIRST-TIME INSTALLER SETUP GUIDE WITH SOL */}
-      {user ? <InstallerSetupGuideModal /> : null}
 
       {/* GLOBAL SESSION EXPIRED MODAL (HTTP 401) */}
       <SessionExpiredModal

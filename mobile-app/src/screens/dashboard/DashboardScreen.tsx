@@ -26,6 +26,7 @@ import {
   ShieldCheck,
   ChevronRight,
   Sparkles,
+  X,
 } from 'lucide-react-native';
 import { Header } from '../../components/Header';
 import { GuideCharacter } from '../../components/GuideCharacter';
@@ -33,6 +34,7 @@ import { InAppProductTour } from '../../components/InAppProductTour';
 import { GamificationPill } from '../../components/GamificationPill';
 import { SolarJourneyRoadmap } from '../../components/SolarJourneyRoadmap';
 import { SeamlessSolarFlowModal } from '../../components/SeamlessSolarFlowModal';
+import { tourService } from '../../services/tourService';
 import { tenantApi, crmApi } from '../../api/endpoints';
 import { openWhatsAppWithPitch } from '../../services/whatsappService';
 import { useAuth } from '../../context/AuthContext';
@@ -72,9 +74,23 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [spotlightVisible, setSpotlightVisible] = useState(false);
+  const [tourBannerVisible, setTourBannerVisible] = useState(false);
   const [seamlessFlowVisible, setSeamlessFlowVisible] = useState(false);
   const [seamlessInitialLead, setSeamlessInitialLead] = useState<any | null>(null);
   const [seamlessInitialStep, setSeamlessInitialStep] = useState<number>(0);
+
+  // Check if button tour banner was previously dismissed
+  useEffect(() => {
+    let isMounted = true;
+    tourService.isDashboardBannerDismissed().then((dismissed) => {
+      if (!dismissed && isMounted) {
+        setTourBannerVisible(true);
+      }
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // Role & Permission Checks
   const isTenantAdmin = user?.role === 'TENANT_ADMIN' || user?.role === 'SUPER_ADMIN';
@@ -359,35 +375,60 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
         </TouchableOpacity>
 
         {/* SOL SPOTLIGHT TOUR BANNER */}
-        <TouchableOpacity
-          style={[
-            styles.spotlightTourBanner,
-            {
-              backgroundColor: isDark ? 'rgba(37, 99, 235, 0.12)' : '#EFF6FF',
-              borderColor: isDark ? 'rgba(37, 99, 235, 0.3)' : '#BFDBFE',
-            },
-          ]}
-          onPress={() => setSpotlightVisible(true)}
-          activeOpacity={0.85}
-        >
-          <View style={styles.spotlightBannerLeft}>
-            <GuideCharacter pose="guide" size={34} animated={false} />
-            <View style={{ flex: 1 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Text style={[styles.spotlightBannerTitle, { color: isDark ? colors.text : '#0F172A' }]}>
-                  Explore Every Button
-                </Text>
-                <View style={styles.spotlightPill}>
-                  <Text style={styles.spotlightPillText}>BUTTON TOUR</Text>
+        {tourBannerVisible ? (
+          <View
+            style={[
+              styles.spotlightTourBanner,
+              {
+                backgroundColor: isDark ? 'rgba(37, 99, 235, 0.12)' : '#EFF6FF',
+                borderColor: isDark ? 'rgba(37, 99, 235, 0.3)' : '#BFDBFE',
+              },
+            ]}
+          >
+            <TouchableOpacity
+              style={styles.spotlightBannerLeft}
+              onPress={() => setSpotlightVisible(true)}
+              activeOpacity={0.85}
+            >
+              <GuideCharacter pose="guide" size={34} animated={false} />
+              <View style={{ flex: 1 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Text style={[styles.spotlightBannerTitle, { color: isDark ? colors.text : '#0F172A' }]}>
+                    Explore Every Button
+                  </Text>
+                  <View style={styles.spotlightPill}>
+                    <Text style={styles.spotlightPillText}>BUTTON TOUR</Text>
+                  </View>
                 </View>
+                <Text style={styles.spotlightBannerSub}>
+                  Tap Sol for an interactive walkthrough explaining every button and tool
+                </Text>
               </View>
-              <Text style={styles.spotlightBannerSub}>
-                Tap Sol for an interactive walkthrough explaining every button and tool
-              </Text>
+            </TouchableOpacity>
+
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <TouchableOpacity
+                onPress={() => setSpotlightVisible(true)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                accessibilityLabel="Launch Button Tour"
+              >
+                <ChevronRight size={16} color="#2563EB" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={async () => {
+                  setTourBannerVisible(false);
+                  await tourService.dismissDashboardBanner();
+                }}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                style={styles.spotlightCloseBtn}
+                accessibilityRole="button"
+                accessibilityLabel="Dismiss Button Tour Banner"
+              >
+                <X size={15} color={isDark ? '#94A3B8' : '#64748B'} />
+              </TouchableOpacity>
             </View>
           </View>
-          <ChevronRight size={16} color="#2563EB" />
-        </TouchableOpacity>
+        ) : null}
 
         {/* 2. QUICK ACTION LAUNCHER */}
         <View style={styles.quickActionRow}>
@@ -805,6 +846,10 @@ const styles = StyleSheet.create({
     color: '#64748B',
     marginTop: 2,
     lineHeight: 15,
+  },
+  spotlightCloseBtn: {
+    padding: 6,
+    borderRadius: 8,
   },
 
   // 1. HERO OPERATIONAL RADAR CARD

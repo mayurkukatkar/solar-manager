@@ -729,26 +729,26 @@ export const FieldProfileScreen: React.FC<{ navigation?: any }> = ({ navigation 
               borderColor: colors.borderSubtle,
             },
           ]}
-          onPress={() => setSpotlightTourVisible(true)}
+          onPress={() => setOnboardingModalVisible(true)}
           activeOpacity={0.85}
         >
           <View style={styles.guideCardLeft}>
             <GuideCharacter
-              pose="guide"
+              pose="celebrate"
               size={56}
-              speechText="Tour!"
+              speechText="Features!"
               animated={true}
             />
             <View style={styles.guideTextGroup}>
               <View style={styles.guideBadgeRow}>
-                <Text style={styles.guideBadgeText}>INTERACTIVE WALKTHROUGH</Text>
-                <Zap size={12} color="#2563EB" />
+                <Text style={styles.guideBadgeText}>PRODUCT TOUR & LIFECYCLE</Text>
+                <Sparkles size={12} color="#10B981" />
               </View>
               <Text style={[styles.guideTitle, { color: colors.text }]}>
-                Interactive Spotlight Tour
+                Replay App Onboarding &amp; Features
               </Text>
               <Text style={[styles.guideDesc, { color: colors.textSecondary }]}>
-                Step-by-step interactive explanation of the Radar, Pipeline, and Tools
+                Review offline-first architecture, CRM proposal flow, and DISCOM commissioning
               </Text>
             </View>
           </View>
