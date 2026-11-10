@@ -33,6 +33,7 @@ import {
   Check,
   X,
   Sparkles,
+  Receipt,
 } from 'lucide-react-native';
 import { Header } from '../../components/Header';
 import { tenantApi } from '../../api/endpoints';
@@ -809,6 +810,24 @@ export const FieldProjectsScreen: React.FC<{ navigation?: any }> = ({ navigation
               >
                 <Sparkles size={12} color="#059669" />
                 <Text style={[styles.toolBtnText, { color: '#059669', fontWeight: '800' }]}>1-Flow</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.toolBtn,
+                  {
+                    backgroundColor: isDark ? 'rgba(16, 185, 129, 0.15)' : '#ECFDF5',
+                    borderColor: isDark ? 'rgba(16, 185, 129, 0.35)' : '#A7F3D0',
+                  },
+                ]}
+                onPress={() => {
+                  haptics.impactLight();
+                  navigation?.navigate('Finance', { customerName: custName });
+                }}
+                activeOpacity={0.75}
+              >
+                <Receipt size={12} color="#10B981" />
+                <Text style={[styles.toolBtnText, { color: '#10B981', fontWeight: '800' }]}>Ledger</Text>
               </TouchableOpacity>
             </View>
 

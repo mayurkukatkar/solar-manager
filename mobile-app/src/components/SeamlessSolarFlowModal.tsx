@@ -59,12 +59,20 @@ import { SignaturePad } from './SignaturePad';
 import { DiscomDocsModal } from '../screens/projects/DiscomDocsModal';
 import { solarGamificationService } from '../services/solarGamificationService';
 import { openWhatsAppWithPitch, openWhatsAppDirect } from '../services/whatsappService';
-import { generateQuotationHtml, createAndSharePdf, generateDiscomHtml } from '../services/pdfService';
+import {
+  generateQuotationHtml,
+  createAndSharePdf,
+  generateDiscomHtml,
+  generateInvoiceHtml,
+  sharePdfFile,
+  printDirectly,
+} from '../services/pdfService';
 import { crmApi, tenantApi, documentsApi, financeApi } from '../api/endpoints';
 import { offlineSyncService } from '../services/offlineSyncService';
 import { SafeStorage } from '../api/client';
 import { haptics } from '../utils/haptics';
 import { soundEffects } from '../utils/audioEffects';
+import { useAuth } from '../context/AuthContext';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -110,6 +118,7 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
   onClose,
   onComplete,
 }) => {
+  const { user } = useAuth();
   // Determine smart starting step based on lead or project state
   const calculatedInitialStep = useMemo(() => {
     if (initialStepIndex !== undefined) return initialStepIndex;
@@ -233,6 +242,7 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
   // Customer Signature & Execution
   const [customerSignatureSvg, setCustomerSignatureSvg] = useState<string>('');
   const [provisionedProject, setProvisionedProject] = useState<any>(initialProject || null);
+  const [recordedInvoiceNumber, setRecordedInvoiceNumber] = useState<string>('');
 
   // Keep state synced when modal becomes visible or targets change
   useEffect(() => {
@@ -1129,6 +1139,78 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
     }
   };
 
+  const buildReceiptPdfHtml = () => {
+    const today = new Date().toLocaleDateString('en-IN');
+    const invoiceNum = recordedInvoiceNumber || `ADV-${Date.now().toString().slice(-6)}`;
+    return generateInvoiceHtml({
+      invoiceNumber: invoiceNum,
+      invoiceDate: today,
+      dueDate: today,
+      invoiceType: 'ADVANCE_RECEIPT',
+      companyName: user?.tenantName || (user as any)?.company || 'WhereReady Solar OS',
+      companyAddress: (user as any)?.tenantAddress || (user as any)?.address || '',
+      companyPhone: (user as any)?.tenantPhone || (user as any)?.phone || '',
+      companyEmail: user?.email || '',
+      companyGstin: (user as any)?.tenantGstin || '',
+      customerName: customerName.trim(),
+      customerPhone: customerPhone.trim(),
+      customerAddress: fullPremisesAddress,
+      customerEmail: '',
+      consumerNumber: consumerNumber.trim(),
+      projectName: `${customerName.trim()} - ${cap} kWp Rooftop Solar System`,
+      projectCapacityKw: cap,
+      milestoneTitle: 'Advance Booking Token for Rooftop Solar EPC Procurement',
+      milestoneKey: 'BOOKING_ADVANCE',
+      subtotal: compositeBaseTaxable,
+      taxRate: 13.8,
+      taxAmount: compositeGstAmount,
+      grossTotal: parsedTokenAmount,
+      totalPaid: parsedTokenAmount,
+      balanceDue: 0,
+      status: 'PAID',
+      items: [
+        {
+          description: `Advance Token Booking for ${cap} kWp Turnkey Solar System (${effectiveModuleMake} Modules + ${effectiveInverterMake} Inverter)`,
+          hsn: '9954',
+          qty: 1,
+          unit: 'Lot',
+          rate: compositeBaseTaxable,
+          amount: parsedTokenAmount,
+          gstRate: 13.8,
+        },
+      ],
+      payments: [
+        {
+          amount: parsedTokenAmount,
+          mode: paymentMode,
+          date: new Date().toISOString(),
+          reference: transactionRef.trim() || 'VERIFIED_OFFLINE',
+        },
+      ],
+    });
+  };
+
+  const handleShareReceiptPdf = async () => {
+    try {
+      soundEffects.playSelect();
+      const html = buildReceiptPdfHtml();
+      const fileName = `Payment_Receipt_${customerName.replace(/[^a-zA-Z0-9]/g, '_')}_${parsedTokenAmount}.pdf`;
+      await sharePdfFile(html, fileName, customerPhone);
+    } catch {
+      Alert.alert('PDF Receipt', 'Could not generate and share PDF receipt.');
+    }
+  };
+
+  const handlePrintReceiptPdf = async () => {
+    try {
+      soundEffects.playSelect();
+      const html = buildReceiptPdfHtml();
+      await printDirectly(html);
+    } catch {
+      Alert.alert('Print Receipt', 'Could not print PDF receipt.');
+    }
+  };
+
   // Step 14: Confirm Advance Payment, Align with Finance & Advance to DISCOM Final Step
   const handleConfirmAdvancePayment = async () => {
     if (parsedTokenAmount <= 0) {
@@ -1157,6 +1239,12 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
           amount: parsedTokenAmount,
           notes: `Customer: ${customerName}, Mobile: ${customerPhone}, Mode: ${paymentMode}, Ref: ${transactionRef || 'OFFLINE'}`,
         });
+
+        if (inv?.invoiceNumber) {
+          setRecordedInvoiceNumber(inv.invoiceNumber);
+        } else {
+          setRecordedInvoiceNumber(`ADV-${Date.now().toString().slice(-6)}`);
+        }
 
         // Record payment in customer ledger
         if (inv?.id) {
@@ -1206,7 +1294,7 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
 
       const data = {
         beneficiaryName: customerName,
-        consumerNumber: consumerNumber || '410010537316',
+        consumerNumber: consumerNumber.trim() || undefined,
         bu: billingUnit,
         appliedCapacity: cap,
         installedCapacity: (cap * 0.98).toFixed(2),
@@ -1356,8 +1444,8 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
           </TouchableOpacity>
         </View>
 
-        {/* DRAFT RESUME PROMPT BANNER */}
-        {draftPrompt && (
+        {/* DRAFT RESUME PROMPT BANNER (Only on Step 0 when starting fresh) */}
+        {currentStepIdx === 0 && draftPrompt && (
           <View style={styles.draftResumeBanner}>
             <View style={{ flex: 1 }}>
               <Text style={styles.draftResumeTitle}>⚡ Saved Draft Found</Text>
@@ -2649,32 +2737,62 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
                     })}
                   </View>
 
-                  {/* Payment Mode Selector */}
+                  {/* Payment Mode Selector: Explicit 2x2 Grid (No flexWrap Yoga collapse) */}
                   <Text style={styles.tokenPresetsLabel}>Payment Mode:</Text>
-                  <View style={styles.paymentModeRow}>
-                    {[
-                      { id: 'UPI' as const, label: '⚡ UPI / QR' },
-                      { id: 'BANK_TRANSFER' as const, label: '🏦 Bank / NEFT' },
-                      { id: 'CASH' as const, label: '💵 Cash' },
-                      { id: 'CHEQUE' as const, label: '💳 Cheque / Card' },
-                    ].map((mode) => {
-                      const isSelected = paymentMode === mode.id;
-                      return (
-                        <TouchableOpacity
-                          key={mode.id}
-                          style={[styles.paymentModePill, isSelected && styles.paymentModePillActive]}
-                          onPress={() => {
-                            soundEffects.playSelect();
-                            setPaymentMode(mode.id);
-                          }}
-                          activeOpacity={0.8}
-                        >
-                          <Text style={[styles.paymentModePillText, isSelected && styles.paymentModePillTextActive]}>
-                            {mode.label}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
+                  <View style={styles.paymentGridRow}>
+                    <TouchableOpacity
+                      style={[styles.paymentGridPill, paymentMode === 'UPI' && styles.paymentGridPillActive]}
+                      onPress={() => {
+                        soundEffects.playSelect();
+                        setPaymentMode('UPI');
+                      }}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={[styles.paymentGridPillText, paymentMode === 'UPI' && styles.paymentGridPillTextActive]}>
+                        ⚡ UPI / QR
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[styles.paymentGridPill, paymentMode === 'BANK_TRANSFER' && styles.paymentGridPillActive]}
+                      onPress={() => {
+                        soundEffects.playSelect();
+                        setPaymentMode('BANK_TRANSFER');
+                      }}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={[styles.paymentGridPillText, paymentMode === 'BANK_TRANSFER' && styles.paymentGridPillTextActive]}>
+                        🏦 Bank / NEFT
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  <View style={styles.paymentGridRow}>
+                    <TouchableOpacity
+                      style={[styles.paymentGridPill, paymentMode === 'CASH' && styles.paymentGridPillActive]}
+                      onPress={() => {
+                        soundEffects.playSelect();
+                        setPaymentMode('CASH');
+                      }}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={[styles.paymentGridPillText, paymentMode === 'CASH' && styles.paymentGridPillTextActive]}>
+                        💵 Cash
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[styles.paymentGridPill, paymentMode === 'CHEQUE' && styles.paymentGridPillActive]}
+                      onPress={() => {
+                        soundEffects.playSelect();
+                        setPaymentMode('CHEQUE');
+                      }}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={[styles.paymentGridPillText, paymentMode === 'CHEQUE' && styles.paymentGridPillTextActive]}>
+                        💳 Cheque / Card
+                      </Text>
+                    </TouchableOpacity>
                   </View>
 
                   {/* Transaction / UTR / Cheque Reference Input */}
@@ -2694,15 +2812,30 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
                   </View>
                 </View>
 
-                {/* SHARE RECEIPT ON WHATSAPP BUTTON */}
-                <TouchableOpacity
-                  style={styles.whatsappReceiptBtn}
-                  onPress={handleShareReceiptWhatsApp}
-                  activeOpacity={0.85}
-                >
-                  <MessageCircle size={18} color="#FFFFFF" />
-                  <Text style={styles.whatsappReceiptBtnText}>📱 Share Payment Receipt on WhatsApp</Text>
-                </TouchableOpacity>
+                {/* SHARE RECEIPT ACTIONS ROW (WHATSAPP + PDF RECEIPT) */}
+                <View style={styles.receiptActionsRowStep14}>
+                  <TouchableOpacity
+                    style={styles.whatsappReceiptBtn}
+                    onPress={handleShareReceiptWhatsApp}
+                    activeOpacity={0.85}
+                  >
+                    <MessageCircle size={16} color="#FFFFFF" />
+                    <Text style={styles.whatsappReceiptBtnText} numberOfLines={1}>
+                      Share on WhatsApp
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.pdfReceiptBtn}
+                    onPress={handleShareReceiptPdf}
+                    activeOpacity={0.85}
+                  >
+                    <FileText size={16} color="#0066FF" />
+                    <Text style={styles.pdfReceiptBtnText} numberOfLines={1}>
+                      📄 PDF Receipt
+                    </Text>
+                  </TouchableOpacity>
+                </View>
 
                 {/* DYNAMIC UPI QR CODE BOX (WHEN UPI SELECTED) */}
                 {paymentMode === 'UPI' && parsedTokenAmount > 0 && (
@@ -2767,7 +2900,7 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
                   </View>
                   <View style={styles.auditItem}>
                     <CheckCircle2 size={14} color="#10B981" />
-                    <Text style={styles.auditText}>Consumer Account: {consumerNumber || '410010537316'}</Text>
+                    <Text style={styles.auditText}>Consumer Account: {consumerNumber || 'Not Specified'}</Text>
                   </View>
                   <View style={styles.auditItem}>
                     <CheckCircle2 size={14} color="#10B981" />
@@ -2804,6 +2937,45 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
                   <View style={styles.auditItem}>
                     <CheckCircle2 size={14} color="#10B981" />
                     <Text style={styles.auditText}>PM Surya Ghar DBT Bank: {bankName} ({ifscCode})</Text>
+                  </View>
+                </View>
+
+                {/* STEP 15: OFFICIAL PAYMENT RECEIPT (PDF) CARD */}
+                <View style={styles.step15ReceiptCard}>
+                  <View style={styles.step15ReceiptHeader}>
+                    <Receipt size={18} color="#10B981" />
+                    <View style={{ flex: 1, marginLeft: 8 }}>
+                      <Text style={styles.step15ReceiptTitle}>Official Payment Receipt (PDF)</Text>
+                      <Text style={styles.step15ReceiptSub}>
+                        {parsedTokenAmount > 0
+                          ? `₹${parsedTokenAmount.toLocaleString('en-IN')} Received (${paymentMode.replace('_', ' ')}) • Ref: ${transactionRef.trim() || 'Verified'}`
+                          : 'GST-compliant advance token payment receipt'}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.step15ReceiptBtnRow}>
+                    <TouchableOpacity
+                      style={styles.step15ReceiptWaBtn}
+                      onPress={handleShareReceiptPdf}
+                      activeOpacity={0.85}
+                    >
+                      <MessageCircle size={15} color="#FFFFFF" />
+                      <Text style={styles.step15ReceiptWaBtnText} numberOfLines={1}>
+                        Send PDF Receipt on WhatsApp
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={styles.step15ReceiptPrintBtn}
+                      onPress={handlePrintReceiptPdf}
+                      activeOpacity={0.85}
+                    >
+                      <FileText size={15} color="#0066FF" />
+                      <Text style={styles.step15ReceiptPrintBtnText} numberOfLines={1}>
+                        Print / Save PDF
+                      </Text>
+                    </TouchableOpacity>
                   </View>
                 </View>
 
@@ -2892,11 +3064,13 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
         {discomStudioVisible && (
           <DiscomDocsModal
             visible={discomStudioVisible}
-            project={provisionedProject || {
-              id: createdLead?.id || 'lead_temp',
-              projectNumber: createdLead?.id ? `PROJ-${String(createdLead.id).slice(-4)}` : 'PROJ-101',
+            project={{
+              ...(provisionedProject || {}),
+              id: provisionedProject?.id || createdLead?.id || 'lead_temp',
+              projectNumber: provisionedProject?.projectNumber || (createdLead?.id ? `PROJ-${String(createdLead.id).slice(-4)}` : 'PROJ-101'),
               name: `${customerName} - ${cap} kWp Solar`,
               customer: {
+                ...(provisionedProject?.customer || {}),
                 name: customerName,
                 phone: customerPhone,
                 mobile: customerPhone,
@@ -2904,22 +3078,33 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
                 city,
                 state,
                 pincode,
-                consumerNumber,
+                consumerNumber: consumerNumber.trim(),
+                caNumber: consumerNumber.trim(),
               },
               capacity: cap,
               systemCapacity: cap,
-              consumerNumber,
+              consumerNumber: consumerNumber.trim(),
+              discomConsumerNo: consumerNumber.trim(),
+              electricityConnection: consumerNumber.trim(),
               installationAddress: fullPremisesAddress,
               city,
               state,
               pincode,
               survey: {
+                ...(provisionedProject?.survey || {}),
                 latitude,
                 longitude,
                 sanctionedLoad,
                 electricalPhase: connectionPhase,
+                discomConsumerNo: consumerNumber.trim(),
+              },
+              lead: {
+                ...(provisionedProject?.lead || {}),
+                electricityConnection: consumerNumber.trim(),
+                consumerNumber: consumerNumber.trim(),
               },
               quotation: {
+                ...(provisionedProject?.quotation || {}),
                 capacityKw: cap,
                 panelBrand: effectiveModuleMake,
                 panelWattage: effectiveModuleWattage,
@@ -2928,6 +3113,7 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
                 inverterCapacity: effectiveInverterCap,
                 total: grossAmount,
                 grand_total: grossAmount,
+                consumerNumber: consumerNumber.trim(),
               },
               bankDetails: {
                 bankName,
@@ -2935,6 +3121,13 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
                 accountNumber,
                 ifscCode,
               },
+              subsidies: [
+                {
+                  consumerNumber: consumerNumber.trim(),
+                  nationalPortalAppNo: provisionedProject?.subsidies?.[0]?.nationalPortalAppNo || '',
+                  discomName: 'MSEDCL',
+                },
+              ],
             }}
             onClose={() => setDiscomStudioVisible(false)}
           />
@@ -4058,34 +4251,32 @@ const styles = StyleSheet.create({
     color: '#0066FF',
     fontWeight: '800',
   },
-  paymentModeRow: {
+  paymentGridRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     gap: 8,
-    marginBottom: 12,
+    marginBottom: 8,
   },
-  paymentModePill: {
+  paymentGridPill: {
     flex: 1,
-    minWidth: '45%',
     backgroundColor: '#F8FAFC',
-    paddingVertical: 9,
-    paddingHorizontal: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
     borderRadius: 10,
     borderWidth: 1,
     borderColor: '#E2E8F0',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  paymentModePillActive: {
+  paymentGridPillActive: {
     backgroundColor: '#EFF6FF',
     borderColor: '#0066FF',
   },
-  paymentModePillText: {
+  paymentGridPillText: {
     fontSize: 11.5,
     fontWeight: '700',
     color: '#475569',
   },
-  paymentModePillTextActive: {
+  paymentGridPillTextActive: {
     color: '#0066FF',
     fontWeight: '800',
   },
@@ -4099,6 +4290,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderWidth: 1,
     borderColor: '#E2E8F0',
+    marginTop: 4,
   },
   remainingBalanceLabel: {
     fontSize: 12,
@@ -4110,17 +4302,21 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     color: '#0F172A',
   },
+  receiptActionsRowStep14: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 12,
+  },
   whatsappReceiptBtn: {
-    width: '100%',
+    flex: 1.2,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: 6,
     backgroundColor: '#16A34A',
-    borderRadius: 14,
-    paddingVertical: 13,
-    paddingHorizontal: 16,
-    marginBottom: 12,
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
     shadowColor: '#16A34A',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
@@ -4128,9 +4324,90 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   whatsappReceiptBtnText: {
-    fontSize: 13.5,
+    fontSize: 12.5,
     fontWeight: '800',
     color: '#FFFFFF',
+  },
+  pdfReceiptBtn: {
+    flex: 0.85,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#EFF6FF',
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: '#0066FF',
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+  },
+  pdfReceiptBtnText: {
+    fontSize: 12.5,
+    fontWeight: '800',
+    color: '#0066FF',
+  },
+  step15ReceiptCard: {
+    width: '100%',
+    backgroundColor: '#F0FDF4',
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: '#86EFAC',
+    padding: 14,
+    marginBottom: 12,
+  },
+  step15ReceiptHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  step15ReceiptTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#15803D',
+  },
+  step15ReceiptSub: {
+    fontSize: 11,
+    color: '#166534',
+    marginTop: 2,
+    fontWeight: '600',
+  },
+  step15ReceiptBtnRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  step15ReceiptWaBtn: {
+    flex: 1.2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#16A34A',
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+  },
+  step15ReceiptWaBtnText: {
+    fontSize: 11.5,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  step15ReceiptPrintBtn: {
+    flex: 0.8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#0066FF',
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+  },
+  step15ReceiptPrintBtnText: {
+    fontSize: 11.5,
+    fontWeight: '800',
+    color: '#0066FF',
   },
   openDiscomStudioBtn: {
     width: '100%',

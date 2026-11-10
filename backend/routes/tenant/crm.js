@@ -201,7 +201,9 @@ router.get('/api/tenant/leads/:id', requireTenantAuth, async (req, res) => {
 
 router.post('/api/tenant/leads', requireTenantAuth, requirePermission('leads.create'), validate(createLeadSchema), async (req, res) => {
   try {
-    const { mobile, email, forceCreate, name, ...rest } = req.body;
+    const { mobile, email, forceCreate, name, consumerNumber, ...rest } = req.body;
+    const electConn = consumerNumber || rest.electricityConnection || undefined;
+    if (electConn) rest.electricityConnection = electConn;
     
     // Duplicate Detection
     const duplicate = await prisma.lead.findFirst({
@@ -262,9 +264,14 @@ router.post('/api/tenant/leads', requireTenantAuth, requirePermission('leads.cre
 
 router.patch('/api/tenant/leads/:id', requireTenantAuth, requirePermission('leads.edit'), async (req, res) => {
   try {
+    const updateData = { ...req.body };
+    if (updateData.consumerNumber) {
+      updateData.electricityConnection = updateData.consumerNumber;
+      delete updateData.consumerNumber;
+    }
     const lead = await prisma.lead.update({
       where: { id: req.params.id, tenantId: req.user.tenantId },
-      data: req.body
+      data: updateData
     });
     
     if (req.body.status) {
@@ -356,7 +363,7 @@ router.post('/api/tenant/leads/:id/convert', requireTenantAuth, async (req, res)
     });
 
     if (existingProject) {
-      if (body.customerName || body.mobile || body.address) {
+      if (body.customerName || body.mobile || body.address || body.consumerNumber) {
         if (existingProject.customerId) {
           await prisma.customer.update({
             where: { id: existingProject.customerId },
@@ -368,11 +375,30 @@ router.post('/api/tenant/leads/:id/convert', requireTenantAuth, async (req, res)
             }
           }).catch(() => {});
         }
+        if (body.consumerNumber) {
+          await prisma.lead.update({
+            where: { id, tenantId },
+            data: { electricityConnection: body.consumerNumber }
+          }).catch(() => {});
+          if (existingProject.surveyId) {
+            await prisma.siteSurvey.update({
+              where: { id: existingProject.surveyId },
+              data: { discomConsumerNo: body.consumerNumber }
+            }).catch(() => {});
+          }
+        }
       }
+      const cNum = body.consumerNumber || existingProject.survey?.discomConsumerNo || existingLead.electricityConnection || '';
+      const enrichedProject = {
+        ...existingProject,
+        consumerNumber: cNum,
+        discomConsumerNo: cNum,
+        customer: existingProject.customer ? { ...existingProject.customer, consumerNumber: cNum } : null,
+      };
       return res.status(200).json({
-        lead: existingLead,
+        lead: { ...existingLead, electricityConnection: cNum, consumerNumber: cNum },
         customer: existingProject.customer,
-        project: existingProject
+        project: enrichedProject
       });
     }
 
@@ -473,10 +499,13 @@ router.post('/api/tenant/leads/:id/convert', requireTenantAuth, async (req, res)
         };
       }
 
-      // Mark Lead as WON
+      // Mark Lead as WON and store consumer number in electricityConnection
       const updatedLead = await tx.lead.update({
         where: { id, tenantId },
-        data: { status: 'WON' }
+        data: {
+          status: 'WON',
+          ...(body.consumerNumber ? { electricityConnection: body.consumerNumber } : {})
+        }
       });
 
       // Get or Create Customer
@@ -652,12 +681,30 @@ router.post('/api/tenant/leads/:id/convert', requireTenantAuth, async (req, res)
         }
       });
 
+      const cNum = body.consumerNumber || lead.electricityConnection || '';
       const fullProject = {
         ...project,
-        customer,
-        lead: updatedLead,
+        consumerNumber: cNum,
+        discomConsumerNo: cNum,
+        customer: {
+          ...customer,
+          consumerNumber: cNum,
+        },
+        lead: {
+          ...updatedLead,
+          consumerNumber: cNum,
+        },
+        survey: {
+          ...survey,
+          discomConsumerNo: cNum,
+        },
         quotation: latestQuote,
-        subsidies: [],
+        subsidies: [
+          {
+            consumerNumber: cNum,
+            discomName: body.discomName || 'MSEDCL',
+          }
+        ],
         Document: []
       };
 
@@ -1298,7 +1345,17 @@ router.get('/api/tenant/projects', requireTenantAuth, async (req, res) => {
       expectedProfit: allTenantProjects.reduce((acc, p) => acc + ((p.estimatedValue || 0) - (p.estimatedCost || 0)), 0),
     };
 
-    res.json({ projects, metrics });
+    const enrichedProjects = projects.map(p => {
+      const cNum = p.survey?.discomConsumerNo || p.lead?.electricityConnection || p.subsidies?.[0]?.consumerNumber || '';
+      return {
+        ...p,
+        consumerNumber: cNum,
+        discomConsumerNo: cNum,
+        customer: p.customer ? { ...p.customer, consumerNumber: cNum } : null,
+      };
+    });
+
+    res.json({ projects: enrichedProjects, metrics });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Failed to fetch projects' });
@@ -1513,7 +1570,15 @@ router.get('/api/tenant/projects/:id', requireTenantAuth, async (req, res) => {
       }
     });
     if (!project) return res.status(404).json({ error: 'Project not found' });
-    res.json({ project });
+    const cNum = project.survey?.discomConsumerNo || project.lead?.electricityConnection || project.subsidies?.[0]?.consumerNumber || '';
+    const enriched = {
+      ...project,
+      consumerNumber: cNum,
+      discomConsumerNo: cNum,
+      customer: project.customer ? { ...project.customer, consumerNumber: cNum } : null,
+      lead: project.lead ? { ...project.lead, consumerNumber: cNum } : null,
+    };
+    res.json({ project: enriched });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Failed to fetch project details' });
@@ -1527,6 +1592,21 @@ router.patch('/api/tenant/projects/:id', requireTenantAuth, async (req, res) => 
     // Prevent changing stage or status via this generic endpoint
     delete updateData.currentStage;
     delete updateData.status;
+
+    if (updateData.consumerNumber) {
+      const cNum = updateData.consumerNumber;
+      delete updateData.consumerNumber;
+      const prj = await prisma.project.findUnique({ where: { id: req.params.id, tenantId: req.user.tenantId } });
+      if (prj) {
+        if (prj.leadId) {
+          await prisma.lead.update({ where: { id: prj.leadId }, data: { electricityConnection: cNum } }).catch(() => {});
+        }
+        if (prj.surveyId) {
+          await prisma.siteSurvey.update({ where: { id: prj.surveyId }, data: { discomConsumerNo: cNum } }).catch(() => {});
+        }
+        await prisma.subsidyApplication.updateMany({ where: { projectId: prj.id }, data: { consumerNumber: cNum } }).catch(() => {});
+      }
+    }
 
     if (updateData.startDate) updateData.startDate = new Date(updateData.startDate);
     if (updateData.expectedCompletionDate) updateData.expectedCompletionDate = new Date(updateData.expectedCompletionDate);

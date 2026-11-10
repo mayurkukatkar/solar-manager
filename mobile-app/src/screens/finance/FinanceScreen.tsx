@@ -40,6 +40,7 @@ import {
 import { Header } from '../../components/Header';
 import { InvoicePdfModal } from '../../components/InvoicePdfModal';
 import { CreateInvoiceModal } from '../../components/CreateInvoiceModal';
+import { SeamlessSolarFlowModal } from '../../components/SeamlessSolarFlowModal';
 import { financeApi } from '../../api/endpoints';
 import { useTheme } from '../../theme';
 import { useDebounce } from '../../hooks/useDebounce';
@@ -59,6 +60,12 @@ export const FinanceScreen: React.FC<{ navigation?: any; route?: any }> = ({ nav
   // PDF Invoice Modal State
   const [pdfModalVisible, setPdfModalVisible] = useState(false);
   const [pdfTargetInvoice, setPdfTargetInvoice] = useState<any | null>(null);
+
+  // 1-Flow Seamless Deal Modal State
+  const [oneFlowModalVisible, setOneFlowModalVisible] = useState(false);
+  const [oneFlowTargetProject, setOneFlowTargetProject] = useState<any | null>(null);
+  const [oneFlowTargetLead, setOneFlowTargetLead] = useState<any | null>(null);
+  const [oneFlowInitialStep, setOneFlowInitialStep] = useState<number>(0);
 
   // Financial Stats
   const [stats, setStats] = useState({
@@ -578,6 +585,72 @@ export const FinanceScreen: React.FC<{ navigation?: any; route?: any }> = ({ nav
             </View>
           )}
 
+          {/* CROSS-MODULE CONTEXT & DEAL JUMP */}
+          <View style={styles.cardCrossModuleRow}>
+            {(inv.projectId || inv.project) && (
+              <TouchableOpacity
+                style={[
+                  styles.crossModuleChip,
+                  {
+                    backgroundColor: isDark ? '#1E293B' : '#F5F3FF',
+                    borderColor: isDark ? '#4C1D95' : '#DDD6FE',
+                  },
+                ]}
+                onPress={() => {
+                  haptics.impactLight();
+                  navigation?.navigate('Projects', { projectId: inv.projectId || inv.project?.id });
+                }}
+                activeOpacity={0.8}
+              >
+                <Building size={11} color="#7C3AED" />
+                <Text style={[styles.crossModuleChipText, { color: '#7C3AED' }]} numberOfLines={1}>
+                  {inv.project?.title || inv.project?.name ? `📁 ${inv.project?.title || inv.project?.name}` : '📁 Project'}
+                </Text>
+              </TouchableOpacity>
+            )}
+
+            <TouchableOpacity
+              style={[
+                styles.crossModuleChip,
+                {
+                  backgroundColor: isDark ? '#064E3B' : '#ECFDF5',
+                  borderColor: isDark ? '#065F46' : '#A7F3D0',
+                },
+              ]}
+              onPress={() => {
+                haptics.impactLight();
+                setOneFlowTargetProject(inv.project || (inv.projectId ? { id: inv.projectId, customer: inv.customer } : null));
+                setOneFlowTargetLead(inv.lead || { name: inv.customer?.name, mobile: inv.customer?.phone || inv.customer?.mobile, address: inv.customer?.address });
+                setOneFlowInitialStep(13); // Step 14 is index 13: Finance, Invoice & Token Billing
+                setOneFlowModalVisible(true);
+              }}
+              activeOpacity={0.8}
+            >
+              <Zap size={11} color="#059669" strokeWidth={2.4} />
+              <Text style={[styles.crossModuleChipText, { color: '#059669' }]}>⚡ 1-Flow</Text>
+            </TouchableOpacity>
+
+            {(inv.customer?.name || inv.customer?.phone || inv.leadId) && (
+              <TouchableOpacity
+                style={[
+                  styles.crossModuleChip,
+                  {
+                    backgroundColor: isDark ? '#1E293B' : '#EFF6FF',
+                    borderColor: isDark ? '#1E3A8A' : '#BFDBFE',
+                  },
+                ]}
+                onPress={() => {
+                  haptics.impactLight();
+                  navigation?.navigate('Pipeline', { searchQuery: inv.customer?.name || inv.customer?.phone || '' });
+                }}
+                activeOpacity={0.8}
+              >
+                <User size={11} color="#0066FF" />
+                <Text style={[styles.crossModuleChipText, { color: '#0066FF' }]}>👤 CRM Lead</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
           {/* ACTION BUTTONS ROW */}
           <View style={[styles.cardActionsRow, { borderTopColor: colors.borderSubtle }]}>
             <TouchableOpacity
@@ -659,6 +732,46 @@ export const FinanceScreen: React.FC<{ navigation?: any; route?: any }> = ({ nav
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={
           <View>
+            {/* CROSS-MODULE QUICK BRIDGE */}
+            <View style={styles.moduleBridgeBar}>
+              <TouchableOpacity
+                style={[styles.moduleBridgePill, { backgroundColor: isDark ? '#064E3B' : '#ECFDF5', borderColor: isDark ? '#065F46' : '#A7F3D0' }]}
+                onPress={() => {
+                  haptics.impactLight();
+                  setOneFlowTargetProject(null);
+                  setOneFlowTargetLead(null);
+                  setOneFlowInitialStep(0);
+                  setOneFlowModalVisible(true);
+                }}
+                activeOpacity={0.8}
+              >
+                <Zap size={13} color="#059669" strokeWidth={2.5} />
+                <Text style={[styles.moduleBridgeText, { color: '#059669' }]}>⚡ 1-Flow Deal</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.moduleBridgePill, { backgroundColor: isDark ? '#1E293B' : '#EFF6FF', borderColor: isDark ? '#1E3A8A' : '#BFDBFE' }]}
+                onPress={() => {
+                  haptics.impactLight();
+                  navigation?.navigate('Pipeline');
+                }}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.moduleBridgeText, { color: '#0066FF' }]}>📊 CRM Pipeline</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.moduleBridgePill, { backgroundColor: isDark ? '#1E293B' : '#F5F3FF', borderColor: isDark ? '#4C1D95' : '#DDD6FE' }]}
+                onPress={() => {
+                  haptics.impactLight();
+                  navigation?.navigate('Projects');
+                }}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.moduleBridgeText, { color: '#7C3AED' }]}>🛠️ Solar Projects</Text>
+              </TouchableOpacity>
+            </View>
+
             {/* EXECUTIVE FINANCIAL OVERVIEW */}
             <View
               style={[
@@ -1257,6 +1370,25 @@ export const FinanceScreen: React.FC<{ navigation?: any; route?: any }> = ({ nav
         visible={createInvoiceModalVisible}
         onClose={() => setCreateInvoiceModalVisible(false)}
         onSuccess={() => fetchFinanceData()}
+      />
+
+      {/* 1-FLOW SEAMLESS DEAL CONTINUATION MODAL */}
+      <SeamlessSolarFlowModal
+        visible={oneFlowModalVisible}
+        initialStepIndex={oneFlowInitialStep}
+        initialLead={oneFlowTargetLead}
+        initialProject={oneFlowTargetProject}
+        onClose={() => {
+          setOneFlowModalVisible(false);
+          setOneFlowTargetLead(null);
+          setOneFlowTargetProject(null);
+        }}
+        onComplete={() => {
+          setOneFlowModalVisible(false);
+          setOneFlowTargetLead(null);
+          setOneFlowTargetProject(null);
+          fetchFinanceData();
+        }}
       />
     </View>
   );
@@ -1957,5 +2089,43 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '800',
     color: '#FFFFFF',
+  },
+  moduleBridgeBar: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 14,
+  },
+  moduleBridgePill: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  moduleBridgeText: {
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  cardCrossModuleRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 10,
+  },
+  crossModuleChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  crossModuleChipText: {
+    fontSize: 11,
+    fontWeight: '700',
   },
 });

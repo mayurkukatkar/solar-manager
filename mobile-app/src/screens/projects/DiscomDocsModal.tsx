@@ -157,6 +157,16 @@ export const DiscomDocsModal: React.FC<DiscomDocsModalProps> = ({
       }
 
       if (project?.id) {
+        SafeStorage.getItem(`@solar_project_consumer_${project.id}`).then((stored) => {
+          if (stored && stored.trim()) {
+            setDiscomCustomOverrides((prev: any) => ({
+              ...prev,
+              consumerNumber: stored.trim(),
+              consumerAccountNo: stored.trim(),
+            }));
+          }
+        }).catch(() => {});
+
         SafeStorage.getItem(`@solar_project_serials_${project.id}`).then((stored) => {
           if (stored) {
             try {
@@ -188,11 +198,26 @@ export const DiscomDocsModal: React.FC<DiscomDocsModalProps> = ({
     const installedCap = ((moduleQty * moduleWatt) / 1000).toFixed(3);
     const totalAmount = quote?.total || quote?.grand_total || project?.estimatedValue || project?.totalCost || 0;
 
+    const resolvedConsumerNumber =
+      overrides.consumerNumber ||
+      overrides.consumerAccountNo ||
+      project?.consumerNumber ||
+      project?.discomConsumerNo ||
+      cust?.consumerNumber ||
+      cust?.caNumber ||
+      project?.lead?.electricityConnection ||
+      project?.lead?.consumerNumber ||
+      project?.electricityConnection ||
+      project?.survey?.discomConsumerNo ||
+      project?.subsidies?.[0]?.consumerNumber ||
+      project?.discomApplication?.consumerNumber ||
+      '';
+
     return {
       beneficiaryName: cust?.name || project?.name?.replace(/Project.*/i, '').trim() || '',
       customerName: cust?.name || project?.name?.replace(/Project.*/i, '').trim() || '',
-      consumerNumber: cust?.consumerNumber || cust?.caNumber || project?.consumerNumber || project?.electricityConnection || '',
-      consumerAccountNo: cust?.consumerNumber || cust?.caNumber || project?.consumerNumber || project?.electricityConnection || '',
+      consumerNumber: resolvedConsumerNumber,
+      consumerAccountNo: resolvedConsumerNumber,
       applicationRefNo: project?.subsidies?.[0]?.nationalPortalAppNo || project?.discomApplication?.applicationNo || project?.applicationRefNo || project?.nationalPortalAppNo || '',
       nationalPortalAppNo: project?.subsidies?.[0]?.nationalPortalAppNo || project?.discomApplication?.applicationNo || project?.applicationRefNo || project?.nationalPortalAppNo || '',
       applicationDate: project?.startDate ? new Date(project.startDate).toLocaleDateString('en-IN') : new Date().toLocaleDateString('en-IN'),
@@ -995,11 +1020,22 @@ export const DiscomDocsModal: React.FC<DiscomDocsModalProps> = ({
                     <TextInput
                       style={[styles.textInput, styles.monoFont]}
                       value={discomCustomOverrides.consumerNumber ?? currentFormData.consumerNumber}
-                      onChangeText={(val) =>
-                        setDiscomCustomOverrides({ ...discomCustomOverrides, consumerNumber: val })
-                      }
+                      onChangeText={(val) => {
+                        const clean = val.replace(/[^0-9]/g, '');
+                        setDiscomCustomOverrides((prev: any) => ({
+                          ...prev,
+                          consumerNumber: clean,
+                          consumerAccountNo: clean,
+                        }));
+                        if (project?.id) {
+                          SafeStorage.setItem(`@solar_project_consumer_${project.id}`, clean).catch(() => {});
+                          tenantApi.updateProjectDetails(project.id, { consumerNumber: clean } as any).catch(() => {});
+                        }
+                      }}
                       placeholder="e.g. 12-digit Consumer Account No."
                       placeholderTextColor="#94a3b8"
+                      keyboardType="numeric"
+                      maxLength={16}
                     />
                   </View>
 
