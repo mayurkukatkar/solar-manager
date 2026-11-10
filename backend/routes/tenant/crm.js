@@ -284,6 +284,29 @@ router.patch('/api/tenant/leads/:id', requireTenantAuth, requirePermission('lead
   }
 });
 
+router.patch('/api/tenant/leads/:id/stage', requireTenantAuth, async (req, res) => {
+  try {
+    const { stage } = req.body;
+    const lead = await prisma.lead.update({
+      where: { id: req.params.id, tenantId: req.user.tenantId },
+      data: { status: stage }
+    });
+    if (stage) {
+      await prisma.leadActivity.create({
+        data: {
+          leadId: lead.id,
+          type: 'STATUS_CHANGE',
+          description: `Lead stage changed to ${stage} via 1-Flow`,
+          performedBy: req.user.userId || req.user.id
+        }
+      }).catch(() => {});
+    }
+    res.json({ lead });
+  } catch (error) {
+    res.status(500).json({ error: error.message || 'Failed to update lead stage' });
+  }
+});
+
 router.post('/api/tenant/leads/:id/followups', requireTenantAuth, async (req, res) => {
   try {
     const followup = await prisma.leadFollowUp.create({

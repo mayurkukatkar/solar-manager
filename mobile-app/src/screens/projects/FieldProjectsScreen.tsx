@@ -32,6 +32,7 @@ import {
   MapPin,
   Check,
   X,
+  Sparkles,
 } from 'lucide-react-native';
 import { Header } from '../../components/Header';
 import { tenantApi } from '../../api/endpoints';
@@ -41,6 +42,7 @@ import { BarcodeScannerModal } from '../operations/BarcodeScannerModal';
 import { InstallationQAModal } from '../operations/InstallationQAModal';
 import { ProjectDossierModal } from './ProjectDossierModal';
 import { CelebrationModal } from '../../components/CelebrationModal';
+import { SeamlessSolarFlowModal } from '../../components/SeamlessSolarFlowModal';
 import { SolarJourneyRoadmap } from '../../components/SolarJourneyRoadmap';
 import { solarGamificationService } from '../../services/solarGamificationService';
 import { openWhatsAppDirect } from '../../services/whatsappService';
@@ -90,6 +92,24 @@ export const FieldProjectsScreen: React.FC<{ navigation?: any }> = ({ navigation
   const [qaModalVisible, setQaModalVisible] = useState(false);
   const [docsModalVisible, setDocsModalVisible] = useState(false);
   const [selectedProject, setSelectedProject] = useState<any | null>(null);
+
+  // 1-Flow Studio State
+  const [seamlessFlowVisible, setSeamlessFlowVisible] = useState(false);
+  const [seamlessInitialProject, setSeamlessInitialProject] = useState<any | null>(null);
+  const [seamlessInitialStep, setSeamlessInitialStep] = useState<number>(0);
+
+  const handleOpenSeamlessFlowForProject = (proj: any, stepIdx?: number) => {
+    setSeamlessInitialProject(proj);
+    if (stepIdx !== undefined) {
+      setSeamlessInitialStep(stepIdx);
+    } else {
+      const idx = getProjectStageIndex(proj?.currentStage || proj?.status);
+      if (idx >= 5) setSeamlessInitialStep(13); // DISCOM Mission Control
+      else if (proj?.consumerNumber) setSeamlessInitialStep(13);
+      else setSeamlessInitialStep(9); // CONSUMER_NUMBER
+    }
+    setSeamlessFlowVisible(true);
+  };
 
   // Stage Advancement Modal State
   const [advanceModalVisible, setAdvanceModalVisible] = useState(false);
@@ -703,6 +723,21 @@ export const FieldProjectsScreen: React.FC<{ navigation?: any }> = ({ navigation
                 <Building size={12} color="#D97706" />
                 <Text style={[styles.toolBtnText, { color: colors.textSecondary }]}>DISCOM</Text>
               </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.toolBtn,
+                  {
+                    backgroundColor: isDark ? 'rgba(5, 150, 105, 0.15)' : '#ECFDF5',
+                    borderColor: isDark ? 'rgba(5, 150, 105, 0.35)' : '#A7F3D0',
+                  },
+                ]}
+                onPress={() => handleOpenSeamlessFlowForProject(p)}
+                activeOpacity={0.75}
+              >
+                <Sparkles size={12} color="#059669" />
+                <Text style={[styles.toolBtnText, { color: '#059669', fontWeight: '800' }]}>1-Flow</Text>
+              </TouchableOpacity>
             </View>
 
             {/* Fast Call, WhatsApp & Stage Advance */}
@@ -1187,6 +1222,22 @@ export const FieldProjectsScreen: React.FC<{ navigation?: any }> = ({ navigation
           }}
         />
       ) : null}
+
+      {/* SEAMLESS 1-FLOW SOLAR JOURNEY FOR PROJECTS */}
+      <SeamlessSolarFlowModal
+        visible={seamlessFlowVisible}
+        initialProject={seamlessInitialProject}
+        initialStepIndex={seamlessInitialStep}
+        onClose={() => {
+          setSeamlessFlowVisible(false);
+          setSeamlessInitialProject(null);
+        }}
+        onComplete={() => {
+          setSeamlessFlowVisible(false);
+          setSeamlessInitialProject(null);
+          fetchProjects();
+        }}
+      />
     </View>
   );
 };

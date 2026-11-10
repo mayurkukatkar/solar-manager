@@ -734,7 +734,11 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
           setSeamlessFlowVisible(false);
           setSeamlessInitialLead(null);
         }}
-        onComplete={() => loadDashboard(true)}
+        onComplete={(result) => {
+          setSeamlessFlowVisible(false);
+          setSeamlessInitialLead(null);
+          loadDashboard(true);
+        }}
       />
     </View>
   );

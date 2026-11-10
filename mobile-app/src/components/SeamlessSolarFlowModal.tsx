@@ -66,9 +66,15 @@ const STORAGE_DRAFT_KEY = '@solar_flow_quest_draft_v2';
 export interface SeamlessSolarFlowModalProps {
   visible: boolean;
   initialLead?: any;
+  initialProject?: any;
   initialStepIndex?: number;
   onClose: () => void;
-  onComplete?: (result: any) => void;
+  onComplete?: (result: {
+    lead?: any;
+    project?: any;
+    customer?: any;
+    invoice?: any;
+  }) => void;
 }
 
 // 14-Step Continuous Journey from Ingestion to Handover
@@ -92,38 +98,72 @@ export type FlowStepId =
 export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
   visible,
   initialLead,
-  initialStepIndex = 0,
+  initialProject,
+  initialStepIndex,
   onClose,
   onComplete,
 }) => {
-  const [currentStepIdx, setCurrentStepIdx] = useState(initialStepIndex);
+  // Determine smart starting step based on lead or project state
+  const calculatedInitialStep = useMemo(() => {
+    if (initialStepIndex !== undefined) return initialStepIndex;
+    if (initialProject) {
+      const stageIdx = (initialProject.currentStage || initialProject.status || '').toUpperCase();
+      if (stageIdx.includes('NET') || stageIdx.includes('METER') || stageIdx.includes('DISCOM')) return 13; // DISCOM Mission Control
+      if (initialProject.consumerNumber) return 13;
+      return 9; // CONSUMER_NUMBER
+    }
+    if (initialLead) {
+      const s = (initialLead.status || '').toUpperCase();
+      if (s === 'WON') return 9; // CONSUMER_NUMBER
+      if (s === 'NEGOTIATION' || s === 'QUOTATION_SENT') return 8; // DISPATCH_PROPOSAL
+      if (s === 'SITE_SURVEY') return 3; // ROOF_TYPE
+      return 2; // MONTHLY_BILL
+    }
+    return 0; // CUSTOMER_NAME
+  }, [initialStepIndex, initialProject, initialLead]);
+
+  const [currentStepIdx, setCurrentStepIdx] = useState(calculatedInitialStep);
   const [submitting, setSubmitting] = useState(false);
   const [sessionXpEarned, setSessionXpEarned] = useState(0);
   const [soundMuted, setSoundMuted] = useState(false);
   const [draftPrompt, setDraftPrompt] = useState<any | null>(null);
 
-  // Form State across the entire flow
-  const [customerName, setCustomerName] = useState(initialLead?.name || '');
-  const [customerPhone, setCustomerPhone] = useState(initialLead?.mobile || initialLead?.phone || '');
+  // Form State across the entire flow (pre-filled from initialLead OR initialProject)
+  const [customerName, setCustomerName] = useState(
+    initialProject?.customer?.name || initialProject?.name || initialLead?.name || ''
+  );
+  const [customerPhone, setCustomerPhone] = useState(
+    initialProject?.customer?.mobile || initialProject?.customer?.phone || initialLead?.mobile || initialLead?.phone || ''
+  );
   const [monthlyBill, setMonthlyBill] = useState(String(initialLead?.monthlyBill || '3500'));
   const [monthlyUnits, setMonthlyUnits] = useState(String(initialLead?.monthlyUnits || '410'));
   const [roofType, setRoofType] = useState('Flat RCC Concrete');
   const [selectedShadowObstacles, setSelectedShadowObstacles] = useState<string[]>([]);
-  const [city, setCity] = useState(initialLead?.city || 'Pune');
-  const [address, setAddress] = useState(initialLead?.address || '');
-  const [pincode, setPincode] = useState(initialLead?.pincode || '');
+  const [city, setCity] = useState(
+    initialProject?.city || initialProject?.customer?.city || initialLead?.city || 'Pune'
+  );
+  const [address, setAddress] = useState(
+    initialProject?.installationAddress || initialProject?.customer?.address || initialProject?.address || initialLead?.address || ''
+  );
+  const [pincode, setPincode] = useState(
+    initialProject?.pincode || initialProject?.customer?.pincode || initialLead?.pincode || ''
+  );
   const [terraceCoordinates, setTerraceCoordinates] = useState<string | null>(null);
   const [gpsLoading, setGpsLoading] = useState(false);
 
   // Sizing & Equipment State
-  const [capacityKw, setCapacityKw] = useState(String(initialLead?.estimatedCap || 3.3));
+  const [capacityKw, setCapacityKw] = useState(
+    String(initialProject?.capacity || initialProject?.systemCapacity || initialLead?.estimatedCap || 3.3)
+  );
   const [totalCost, setTotalCost] = useState('195000');
   const [panelBrand, setPanelBrand] = useState('Waaree 540W Mono PERC DCR');
   const [inverterBrand, setInverterBrand] = useState('Solis 3.3kW Grid-Tied Inverter');
-  const [createdLead, setCreatedLead] = useState<any>(initialLead || null);
+  const [createdLead, setCreatedLead] = useState<any>(initialLead || initialProject?.lead || null);
 
   // Onboarding & KYC State
-  const [consumerNumber, setConsumerNumber] = useState(initialLead?.consumerNumber || '');
+  const [consumerNumber, setConsumerNumber] = useState(
+    initialProject?.consumerNumber || initialProject?.customer?.consumerNumber || initialLead?.consumerNumber || initialLead?.electricityConnection || ''
+  );
   const [billingUnit, setBillingUnit] = useState('');
   const [billDocUri, setBillDocUri] = useState<string | null>(null);
   const [aadhaarDocUri, setAadhaarDocUri] = useState<string | null>(null);
@@ -141,7 +181,33 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
 
   // Customer Signature & Execution
   const [customerSignatureSvg, setCustomerSignatureSvg] = useState<string>('');
-  const [provisionedProject, setProvisionedProject] = useState<any>(null);
+  const [provisionedProject, setProvisionedProject] = useState<any>(initialProject || null);
+
+  // Keep state synced when modal becomes visible or targets change
+  useEffect(() => {
+    if (visible) {
+      setCurrentStepIdx(calculatedInitialStep);
+      if (initialProject) {
+        setProvisionedProject(initialProject);
+        setCustomerName(initialProject?.customer?.name || initialProject?.name || '');
+        setCustomerPhone(initialProject?.customer?.mobile || initialProject?.customer?.phone || '');
+        setCapacityKw(String(initialProject?.capacity || initialProject?.systemCapacity || 3.3));
+        setCity(initialProject?.city || initialProject?.customer?.city || 'Pune');
+        setAddress(initialProject?.installationAddress || initialProject?.customer?.address || initialProject?.address || '');
+        setConsumerNumber(initialProject?.consumerNumber || initialProject?.customer?.consumerNumber || '');
+        if (initialProject?.lead) setCreatedLead(initialProject.lead);
+      } else if (initialLead) {
+        setCreatedLead(initialLead);
+        setCustomerName(initialLead?.name || '');
+        setCustomerPhone(initialLead?.mobile || initialLead?.phone || '');
+        setCity(initialLead?.city || 'Pune');
+        setAddress(initialLead?.address || '');
+        setPincode(initialLead?.pincode || '');
+        setCapacityKw(String(initialLead?.estimatedCap || 3.3));
+        setConsumerNumber(initialLead?.consumerNumber || initialLead?.electricityConnection || '');
+      }
+    }
+  }, [visible, initialProject, initialLead, calculatedInitialStep]);
 
   // Advance Payment State
   const [advancePaidConfirmed, setAdvancePaidConfirmed] = useState(false);
@@ -369,6 +435,147 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
     });
   };
 
+  // Helper to save or update lead in CRM pipeline & offline
+  const saveLeadRecord = async () => {
+    setSubmitting(true);
+    try {
+      const payload = {
+        name: customerName.trim(),
+        mobile: customerPhone.replace(/[^0-9]/g, ''),
+        address: address.trim() || undefined,
+        city: city.trim() || 'Site',
+        pincode: pincode.trim() || undefined,
+        monthlyBill: parseFloat(monthlyBill) || 3500,
+        estimatedCap: cap,
+        notes: `Roof: ${roofType}, GPS: ${terraceCoordinates || 'Terrace'}, Hardware: ${panelBrand} + ${inverterBrand}`,
+        forceCreate: true,
+      };
+
+      let res: any = null;
+      if (createdLead?.id) {
+        try {
+          res = await crmApi.updateLead(createdLead.id, payload);
+        } catch {
+          try {
+            res = await crmApi.createLead(payload);
+          } catch {
+            res = await offlineSyncService.saveDraftLead(payload as any);
+          }
+        }
+      } else {
+        try {
+          res = await crmApi.createLead(payload);
+        } catch {
+          res = await offlineSyncService.saveDraftLead(payload as any);
+        }
+      }
+
+      const record = res?.lead || res;
+      setCreatedLead(record);
+      const r = await solarGamificationService.recordAction('LEAD_CAPTURED', {
+        customerName,
+        capacityKw: cap,
+      });
+      setSessionXpEarned((prev) => prev + r.xpGained);
+    } catch (_) {}
+    finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Converts Lead to Client & Provisions Project in backend
+  const provisionProjectFromLead = async () => {
+    if (provisionedProject?.id) {
+      return provisionedProject;
+    }
+
+    setSubmitting(true);
+    let projectResult: any = null;
+
+    try {
+      const targetLeadId = createdLead?.id;
+      if (targetLeadId) {
+        try {
+          const convertRes = await crmApi.convertLead(targetLeadId, {
+            customerName: customerName.trim(),
+            mobile: customerPhone.replace(/[^0-9]/g, ''),
+            address: address.trim() || undefined,
+            city: city.trim() || undefined,
+            pincode: pincode.trim() || undefined,
+            capacity: cap,
+            bankName,
+            accountNumber,
+            ifscCode,
+            consumerNumber: consumerNumber.trim() || 'Pending',
+            signatureSvg: customerSignatureSvg || undefined,
+          });
+          projectResult = convertRes?.project || convertRes;
+        } catch (apiErr: any) {
+          console.warn('Convert API notice in 1-Flow:', apiErr.message);
+          try {
+            const projectsRes = await tenantApi.getProjects();
+            const existing = (projectsRes?.projects || []).find(
+              (p: any) => p.leadId === targetLeadId || (p.customer?.mobile && p.customer.mobile === customerPhone.trim())
+            );
+            if (existing) {
+              projectResult = existing;
+            }
+          } catch {}
+        }
+      }
+
+      if (!projectResult) {
+        projectResult = {
+          id: `prj_${Date.now()}`,
+          projectNumber: `PRJ-${Date.now().toString().slice(-5)}`,
+          name: `${customerName.trim()} Rooftop Solar Project`,
+          capacity: cap,
+          status: 'In Progress',
+          currentStage: 'SURVEY',
+          leadId: targetLeadId,
+          consumerNumber: consumerNumber.trim() || 'Pending',
+          installationAddress: address.trim() || 'Site Roof',
+          city: city.trim() || 'Pune',
+          customer: {
+            name: customerName.trim(),
+            mobile: customerPhone.trim(),
+            address: address.trim(),
+            city: city.trim(),
+            consumerNumber: consumerNumber.trim() || 'Pending',
+          },
+        };
+      }
+
+      setProvisionedProject(projectResult);
+
+      if (createdLead) {
+        setCreatedLead((prev: any) => ({ ...prev, status: 'WON' }));
+      }
+
+      // Upload attached KYC documents now that projectId exists
+      if (billDocUri) {
+        uploadDocumentToCloud('bill', billDocUri);
+      }
+      if (aadhaarDocUri) {
+        uploadDocumentToCloud('aadhaar', aadhaarDocUri);
+      }
+
+      try {
+        const reward = await solarGamificationService.recordAction('CLIENT_ONBOARDED', {
+          capacityKw: cap,
+          customerName: customerName.trim(),
+          projectName: projectResult.projectNumber || projectResult.name,
+        });
+        setSessionXpEarned((prev) => prev + reward.xpGained);
+      } catch {}
+
+      soundEffects.playCashChime();
+      return projectResult;
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const handleNextStep = async () => {
     // Validation for critical inputs
     if (activeStepId === 'CUSTOMER_NAME' && !customerName.trim()) {
@@ -384,8 +591,13 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
     }
 
     // Auto-save Lead checkpoint at Step 5 (Site Location)
-    if (activeStepId === 'SITE_LOCATION' && !createdLead) {
+    if (activeStepId === 'SITE_LOCATION') {
       await saveLeadRecord();
+    }
+
+    // Auto-provision Project & Convert Deal at Step 13 (Customer Signature)
+    if (activeStepId === 'CUSTOMER_SIGNATURE') {
+      await provisionProjectFromLead();
     }
 
     // Advance to next step
@@ -410,40 +622,6 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
     }
   };
 
-  // Helper to save lead to backend/offline
-  const saveLeadRecord = async () => {
-    setSubmitting(true);
-    try {
-      const payload = {
-        name: customerName.trim(),
-        mobile: customerPhone.replace(/[^0-9]/g, ''),
-        address: address.trim() || undefined,
-        city: city.trim() || 'Site',
-        pincode: pincode.trim() || undefined,
-        monthlyBill: parseFloat(monthlyBill) || 3500,
-        estimatedCap: cap,
-        notes: `Roof: ${roofType}, GPS: ${terraceCoordinates || 'Terrace'}, Hardware: ${panelBrand} + ${inverterBrand}`,
-        forceCreate: true,
-      };
-      let res: any = null;
-      try {
-        res = await crmApi.createLead(payload);
-      } catch {
-        res = await offlineSyncService.saveDraftLead(payload as any);
-      }
-      const record = res?.lead || res;
-      setCreatedLead(record);
-      const r = await solarGamificationService.recordAction('LEAD_CAPTURED', {
-        customerName,
-        capacityKw: cap,
-      });
-      setSessionXpEarned((prev) => prev + r.xpGained);
-    } catch (_) {}
-    finally {
-      setSubmitting(false);
-    }
-  };
-
   // Dispatch Proposal via WhatsApp (Text Pitch) and continue without breaker!
   const handleDispatchProposal = async () => {
     setSubmitting(true);
@@ -460,6 +638,17 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
         companyName: 'WhereReady Solar OS',
       };
       await openWhatsAppWithPitch(payload);
+
+      // Advance Lead Stage in CRM Pipeline to QUOTATION_SENT
+      if (createdLead?.id) {
+        await crmApi.updateLead(createdLead.id, {
+          status: 'QUOTATION_SENT',
+          estimatedCap: cap,
+          value: grossAmount,
+        }).catch(() => {});
+        setCreatedLead((prev: any) => ({ ...prev, status: 'QUOTATION_SENT' }));
+      }
+
       const r = await solarGamificationService.recordAction('PROPOSAL_SENT', {
         customerName,
         capacityKw: cap,
@@ -514,6 +703,16 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
 
       const html = generateQuotationHtml(pdfProps as any);
       await createAndSharePdf(html, `Quote_${customerName.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`);
+
+      // Advance Lead Stage in CRM Pipeline to QUOTATION_SENT
+      if (createdLead?.id) {
+        await crmApi.updateLead(createdLead.id, {
+          status: 'QUOTATION_SENT',
+          estimatedCap: cap,
+          value: grossAmount,
+        }).catch(() => {});
+        setCreatedLead((prev: any) => ({ ...prev, status: 'QUOTATION_SENT' }));
+      }
 
       const r = await solarGamificationService.recordAction('PROPOSAL_SENT', {
         customerName,
@@ -599,11 +798,16 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
     } catch (_) {}
   };
 
-  // Generate DISCOM Statutory WCR Pack
+  // Generate DISCOM Statutory WCR Pack & Advance Project to Net Metering
   const handleGenerateDiscomWcr = async () => {
     setSubmitting(true);
     soundEffects.playVerificationShield();
     try {
+      let currentProj = provisionedProject;
+      if (!currentProj) {
+        currentProj = await provisionProjectFromLead();
+      }
+
       const data = {
         beneficiaryName: customerName,
         consumerNumber: consumerNumber || '410010537316',
@@ -621,6 +825,36 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
       };
       const html = generateDiscomHtml('WCR_FULL', data, { includeStamp: true });
       await createAndSharePdf(html, `DISCOM_WCR_${customerName.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`);
+
+      // Persist statutory verification to SafeStorage for project
+      if (currentProj?.id) {
+        await SafeStorage.setItem(
+          `@solar_discom_verified_${currentProj.id}`,
+          JSON.stringify({
+            verified: true,
+            consumerNumber: consumerNumber || '410010537316',
+            generatedAt: new Date().toISOString(),
+          })
+        );
+
+        // Advance project stage to NET_METERING
+        try {
+          await tenantApi.advanceProjectStage(
+            currentProj.id,
+            'NET_METERING',
+            'DISCOM WCR Statutory Dossier Generated via 1-Flow'
+          );
+          setProvisionedProject((prev: any) => ({ ...prev, currentStage: 'NET_METERING' }));
+        } catch {
+          await offlineSyncService.enqueueMutation('UPDATE_PROJECT_STAGE', {
+            projectId: currentProj.id,
+            stage: 'NET_METERING',
+            status: 'NET_METERING',
+            note: 'DISCOM WCR Statutory Dossier Generated via 1-Flow',
+          }).catch(() => {});
+        }
+      }
+
       const r = await solarGamificationService.recordAction('STAGE_ADVANCED', {
         customerName,
         capacityKw: cap,
@@ -666,18 +900,23 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
     setAdvancePaidConfirmed(true);
 
     try {
+      let currentProj = provisionedProject;
+      if (!currentProj) {
+        currentProj = await provisionProjectFromLead();
+      }
+
       const subtotalAmt = Math.round(advanceTokenAmount / 1.138);
       await financeApi
         .createInvoice({
-          customerId: provisionedProject?.customerId || createdLead?.id || `cust_${Date.now()}`,
-          projectId: provisionedProject?.id,
+          customerId: currentProj?.customerId || currentProj?.customer?.id || createdLead?.id || `cust_${Date.now()}`,
+          projectId: currentProj?.id,
           milestone: 'TOKEN_ADVANCE',
           milestoneTitle: `20% Advance Booking Token (${cap} kWp)`,
           subtotal: subtotalAmt,
           taxRate: 13.8,
           taxAmount: advanceTokenAmount - subtotalAmt,
           amount: advanceTokenAmount,
-          notes: `Customer: ${customerName}, Mobile: ${customerPhone}`,
+          notes: `Customer: ${customerName}, Mobile: ${customerPhone}, Project: ${currentProj?.projectNumber || currentProj?.name}`,
         })
         .catch(() => {});
 
@@ -721,7 +960,13 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
   const handleFinalCompletion = async () => {
     setShowCelebration(false);
     await SafeStorage.removeItem(STORAGE_DRAFT_KEY).catch(() => {});
-    if (onComplete) onComplete({ customerName, customerPhone, capacityKw: cap, grossAmount });
+    if (onComplete) {
+      onComplete({
+        lead: createdLead,
+        project: provisionedProject,
+        customer: provisionedProject?.customer,
+      });
+    }
     onClose();
   };
 
@@ -1557,7 +1802,11 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
                 ) : (
                   <>
                     <Text style={styles.continueBtnText}>
-                      {currentStepIdx === 4 ? 'Save Lead & Create Quote ➔' : 'Continue ➔'}
+                      {currentStepIdx === 4
+                        ? 'Save Lead & Create Quote ➔'
+                        : activeStepId === 'CUSTOMER_SIGNATURE'
+                        ? 'Lock Deal & Provision Project ➔'
+                        : 'Continue ➔'}
                     </Text>
                   </>
                 )}

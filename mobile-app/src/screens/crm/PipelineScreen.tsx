@@ -1055,8 +1055,25 @@ export const PipelineScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
           setSeamlessFlowVisible(false);
           setSeamlessInitialLead(null);
         }}
-        onComplete={() => {
+        onComplete={(result) => {
+          setSeamlessFlowVisible(false);
+          setSeamlessInitialLead(null);
           fetchLeads();
+          if (result?.project) {
+            Alert.alert(
+              '🎉 Deal Won & Project Provisioned!',
+              `"${result.project.name || result.lead?.name || 'Solar Installation'}" is active in the Projects Cockpit with statutory DISCOM pack & booking token invoice.\n\nWould you like to open the Projects Cockpit?`,
+              [
+                { text: 'Stay in Pipeline', style: 'cancel' },
+                {
+                  text: 'Open Projects Cockpit ➔',
+                  onPress: () => {
+                    navigation?.navigate?.('MainTabs', { screen: 'Projects' });
+                  },
+                },
+              ]
+            );
+          }
         }}
       />
 

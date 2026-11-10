@@ -112,6 +112,10 @@ export const crmApi = {
     const res = await apiClient.patch(`/api/tenant/leads/${id}/stage`, { stage });
     return res.data;
   },
+  updateLead: async (id: string, data: any) => {
+    const res = await apiClient.patch(`/api/tenant/leads/${id}`, data);
+    return res.data;
+  },
   convertLead: async (id: string, data?: any) => {
     const res = await apiClient.post(`/api/tenant/leads/${id}/convert`, data || {});
     return res.data;
