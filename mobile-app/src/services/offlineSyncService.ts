@@ -27,6 +27,7 @@ export const STAGE_ORDER: Record<string, number> = {
 // ==========================================
 export type OfflineMutationType =
   | 'CREATE_LEAD'
+  | 'CONVERT_LEAD'
   | 'UPDATE_PROJECT_STAGE'
   | 'RECORD_QA_READINGS'
   | 'UPDATE_PROJECT_SERIALS'
@@ -157,6 +158,9 @@ export const offlineSyncService = {
       if (type === 'CREATE_LEAD') {
         defaultEndpoint = '/api/tenant/leads';
         defaultEntityType = 'lead';
+      } else if (type === 'CONVERT_LEAD') {
+        defaultEndpoint = '/api/tenant/leads/convert';
+        defaultEntityType = 'project';
       } else if (type === 'UPDATE_PROJECT_STAGE') {
         defaultEndpoint = '/api/tenant/projects/stage';
         defaultMethod = 'PATCH';
@@ -370,6 +374,11 @@ export const offlineSyncService = {
           }
           // Clean up legacy draft leads
           await this.removeDraftLead(mutation.localTempId).catch(() => {});
+        } else if (mutation.type === 'CONVERT_LEAD' && mutation.localTempId) {
+          const serverProjectId = response.data?.project?.id || response.data?.id;
+          if (serverProjectId) {
+            idMap[mutation.localTempId] = serverProjectId;
+          }
         }
 
         result.results.push({
@@ -388,10 +397,10 @@ export const offlineSyncService = {
 
         // CONFLICT RESOLUTION EVALUATION
         if (status === 409 || (status === 400 && String(errMsg).toLowerCase().includes('already'))) {
-          // Tier 1: Check Monotonic Stage Gating
-          if (mutation.type === 'UPDATE_PROJECT_STAGE') {
+          // Tier 1: Check Monotonic Stage Gating & Idempotent Lead Conversion
+          if (mutation.type === 'UPDATE_PROJECT_STAGE' || mutation.type === 'CONVERT_LEAD') {
             const requestedStage = String(mutation.payload?.stage || '').toUpperCase();
-            // Monotonic Pass: server is already ahead or at requested stage
+            // Monotonic Pass: server is already ahead or deal already converted
             mutation.status = 'COMPLETED';
             result.conflicted++;
             await this.recordConflict({
@@ -399,7 +408,9 @@ export const offlineSyncService = {
               mutationType: mutation.type,
               entityId: mutation.entityId || 'UNKNOWN',
               clientTimestamp: mutation.createdAt,
-              reason: `Stage already at or past ${requestedStage} on server`,
+              reason: mutation.type === 'CONVERT_LEAD'
+                ? 'Lead was already converted to project on server'
+                : `Stage already at or past ${requestedStage} on server`,
               clientPayload: mutation.payload,
               resolution: 'MONOTONIC_PASS',
             });

@@ -188,28 +188,43 @@ export const notifyNetworkStatus = (isOnline: boolean): void => {
 
 // High-speed device internet probe (< 300ms)
 export const checkInternetConnectivity = async (): Promise<boolean> => {
+  // 1. Probe our live backend API endpoint first (most accurate check)
   try {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 4000);
+    const timer = setTimeout(() => controller.abort(), 6000);
+    const res = await fetch(`${currentBaseUrl}/api/auth/me`, {
+      method: 'GET',
+      headers: { Accept: 'application/json' },
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+    if (res.status > 0) return true;
+  } catch {}
+
+  // 2. Probe Google 204 endpoint with GET (standard across all mobile carriers)
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 5000);
     const res = await fetch('https://www.google.com/generate_204', {
-      method: 'HEAD',
+      method: 'GET',
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+    if (res.status >= 200 && res.status < 400) return true;
+  } catch {}
+
+  // 3. Probe Cloudflare CDN trace with GET (direct hostname, avoiding 302 redirects)
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 5000);
+    const res = await fetch('https://one.one.one.one/cdn-cgi/trace', {
+      method: 'GET',
       signal: controller.signal,
     });
     clearTimeout(timer);
     return res.status >= 200 && res.status < 400;
   } catch {
-    try {
-      const controller2 = new AbortController();
-      const timer2 = setTimeout(() => controller2.abort(), 3500);
-      const res2 = await fetch('https://1.1.1.1/cdn-cgi/trace', {
-        method: 'HEAD',
-        signal: controller2.signal,
-      });
-      clearTimeout(timer2);
-      return res2.status >= 200 && res2.status < 400;
-    } catch {
-      return false;
-    }
+    return false;
   }
 };
 
@@ -223,6 +238,24 @@ apiClient.interceptors.response.use(
     // If request was canceled/aborted by the app, it is NOT an offline event
     if (axios.isCancel(error)) {
       return Promise.reject(error);
+    }
+
+    const config = error.config;
+    // Auto-retry transient network drops / severed sockets (e.g. after resuming from WhatsApp or background)
+    if (
+      config &&
+      !config._retry &&
+      (error.code === 'ECONNABORTED' || error.message === 'Network Error' || !error.response)
+    ) {
+      config._retry = true;
+      // Allow 700ms for device radio & WiFi to re-establish
+      await new Promise((r) => setTimeout(r, 700));
+      try {
+        return await apiClient(config);
+      } catch (retryError) {
+        // If retry still fails, fall through to offline handling
+        error = retryError;
+      }
     }
 
     if (error.code === 'ECONNABORTED' || error.message === 'Network Error' || !error.response) {
@@ -281,13 +314,10 @@ export const checkBackendHealth = async (): Promise<BackendConnectionStatus> => 
   const url = await getApiBaseUrl();
   const startTime = Date.now();
 
-  // 1. Probe general internet connectivity
-  const hasInternet = await checkInternetConnectivity();
-
-  // 2. Probe backend server with realistic timeout (10s)
+  // 1. Probe backend server directly (fastest, most realistic probe)
   try {
     const response = await axios.get(`${url}/api/auth/me`, {
-      timeout: 10000,
+      timeout: 8000,
       validateStatus: () => true, // Accept 200, 401, 403 as reachable
     });
 
@@ -301,6 +331,9 @@ export const checkBackendHealth = async (): Promise<BackendConnectionStatus> => 
       lastChecked: new Date().toLocaleTimeString(),
     };
   } catch {
+    // 2. Probe general internet connectivity
+    const hasInternet = await checkInternetConnectivity();
+
     // If custom URL failed but device has internet, try default production URL
     if (url !== DEFAULT_API_URL && hasInternet) {
       try {
@@ -318,12 +351,10 @@ export const checkBackendHealth = async (): Promise<BackendConnectionStatus> => 
             lastChecked: new Date().toLocaleTimeString(),
           };
         }
-      } catch {
-        // Fallback also failed
-      }
+      } catch {}
     }
 
-    // If internet connection is stable, do not lock user as offline
+    // Only notify offline if general internet probe is truly dead
     const finalOnline = hasInternet;
     notifyNetworkStatus(finalOnline);
     return {

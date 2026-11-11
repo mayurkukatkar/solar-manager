@@ -686,9 +686,10 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
     }
   };
 
-  // Converts Lead to Client & Provisions Project in backend
+  // Converts Lead to Client & Provisions Project in backend (Auto-retry & Offline Resilience)
   const provisionProjectFromLead = async () => {
-    if (provisionedProject?.id) {
+    // If project is already provisioned with a REAL backend ID, return it
+    if (provisionedProject?.id && !String(provisionedProject.id).startsWith('prj_')) {
       return provisionedProject;
     }
 
@@ -696,48 +697,98 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
     let projectResult: any = null;
 
     try {
-      const targetLeadId = createdLead?.id;
-      if (targetLeadId) {
+      let targetLeadId = createdLead?.id;
+
+      // 1. If lead is missing or is only a local draft ID, ensure real lead is created / resolved in backend
+      if (!targetLeadId || String(targetLeadId).startsWith('draft_')) {
         try {
-          const convertRes = await crmApi.convertLead(targetLeadId, {
-            customerName: customerName.trim(),
-            mobile: customerPhone.replace(/[^0-9]/g, ''),
+          const cleanMobile = customerPhone.replace(/[^0-9]/g, '');
+          const leadRes = await crmApi.createLead({
+            name: customerName.trim(),
+            mobile: cleanMobile,
             address: fullPremisesAddress || undefined,
             city: city.trim() || undefined,
             district: district.trim() || undefined,
             state: state.trim() || 'Maharashtra',
             pincode: pincode.trim() || undefined,
             capacity: cap,
-            latitude: latitude || undefined,
-            longitude: longitude || undefined,
+            estimatedCap: cap,
+            electricityConnection: consumerNumber.trim() || 'Pending',
             consumerNumber: consumerNumber.trim() || 'Pending',
-            sanctionedLoad: parseFloat(sanctionedLoad) || cap,
-            phase: connectionPhase,
-            roofType,
-            bankName,
-            accountNumber,
-            ifscCode,
-            bankBranch,
-            signatureSvg: customerSignatureSvg || undefined,
           });
-          projectResult = convertRes?.project || convertRes;
-        } catch (apiErr: any) {
-          console.warn('Convert API notice in 1-Flow:', apiErr.message);
-          try {
-            const projectsRes = await tenantApi.getProjects();
-            const existing = (projectsRes?.projects || []).find(
-              (p: any) => p.leadId === targetLeadId || (p.customer?.mobile && p.customer.mobile === customerPhone.trim())
-            );
-            if (existing) {
-              projectResult = existing;
-            }
-          } catch {}
+          const realLead = leadRes?.lead || leadRes;
+          if (realLead?.id) {
+            targetLeadId = realLead.id;
+            setCreatedLead(realLead);
+          }
+        } catch (err: any) {
+          console.warn('Auto-create lead before convert notice:', err.message);
         }
       }
 
-      if (!projectResult) {
+      const convertPayload = {
+        customerName: customerName.trim(),
+        mobile: customerPhone.replace(/[^0-9]/g, ''),
+        address: fullPremisesAddress || undefined,
+        city: city.trim() || undefined,
+        district: district.trim() || undefined,
+        state: state.trim() || 'Maharashtra',
+        pincode: pincode.trim() || undefined,
+        capacity: cap,
+        latitude: latitude || undefined,
+        longitude: longitude || undefined,
+        consumerNumber: consumerNumber.trim() || 'Pending',
+        sanctionedLoad: parseFloat(sanctionedLoad) || cap,
+        phase: connectionPhase,
+        roofType,
+        bankName,
+        accountNumber,
+        ifscCode,
+        bankBranch,
+        signatureSvg: customerSignatureSvg || undefined,
+      };
+
+      // 2. Convert Lead to active Project with automatic retry
+      if (targetLeadId && !String(targetLeadId).startsWith('draft_')) {
+        try {
+          const convertRes = await crmApi.convertLead(targetLeadId, convertPayload);
+          projectResult = convertRes?.project || convertRes;
+        } catch (apiErr: any) {
+          console.warn('Convert API attempt 1 notice in 1-Flow:', apiErr.message);
+          // Quick retry after 800ms
+          try {
+            await new Promise((r) => setTimeout(r, 800));
+            const retryRes = await crmApi.convertLead(targetLeadId, convertPayload);
+            projectResult = retryRes?.project || retryRes;
+          } catch (retryErr: any) {
+            console.warn('Convert API attempt 2 notice in 1-Flow:', retryErr.message);
+            // Verify if project was already generated on backend
+            try {
+              const projectsRes = await tenantApi.getProjects();
+              const existing = (projectsRes?.projects || []).find(
+                (p: any) =>
+                  p.leadId === targetLeadId ||
+                  (p.customer?.mobile &&
+                    p.customer.mobile.replace(/[^0-9]/g, '').slice(-10) ===
+                      customerPhone.replace(/[^0-9]/g, '').slice(-10))
+              );
+              if (existing) {
+                projectResult = existing;
+              }
+            } catch {}
+          }
+        }
+      }
+
+      // 3. Guaranteed fallback & Offline Queue registration
+      if (!projectResult || String(projectResult?.id).startsWith('prj_')) {
+        const localPrjId =
+          projectResult?.id && String(projectResult.id).startsWith('prj_')
+            ? projectResult.id
+            : `prj_${Date.now()}`;
+
         projectResult = {
-          id: `prj_${Date.now()}`,
+          id: localPrjId,
           projectNumber: `PRJ-${Date.now().toString().slice(-5)}`,
           name: `${customerName.trim()} Rooftop Solar Project`,
           capacity: cap,
@@ -760,6 +811,20 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
             consumerNumber: consumerNumber.trim() || 'Pending',
           },
         };
+
+        // Enqueue offline lead conversion so the project is guaranteed to be created on the backend
+        if (targetLeadId && !String(targetLeadId).startsWith('draft_')) {
+          await offlineSyncService
+            .enqueueMutation({
+              type: 'CONVERT_LEAD',
+              endpoint: `/api/tenant/leads/${targetLeadId}/convert`,
+              method: 'POST',
+              payload: convertPayload,
+              entityId: targetLeadId,
+              localTempId: localPrjId,
+            })
+            .catch(() => {});
+        }
       }
 
       setProvisionedProject(projectResult);
@@ -1352,7 +1417,7 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
     soundEffects.playVerificationShield();
     try {
       let currentProj = provisionedProject;
-      if (!currentProj) {
+      if (!currentProj || String(currentProj.id).startsWith('prj_')) {
         currentProj = await provisionProjectFromLead();
       }
 
@@ -1400,21 +1465,25 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
           })
         );
 
-        // Advance project stage to NET_METERING
-        try {
-          await tenantApi.advanceProjectStage(
-            currentProj.id,
-            'NET_METERING',
-            'DISCOM WCR Statutory Dossier Generated via 1-Flow'
-          );
-          setProvisionedProject((prev: any) => ({ ...prev, currentStage: 'NET_METERING' }));
-        } catch {
-          await offlineSyncService.enqueueMutation('UPDATE_PROJECT_STAGE', {
-            projectId: currentProj.id,
-            stage: 'NET_METERING',
-            status: 'NET_METERING',
-            note: 'DISCOM WCR Statutory Dossier Generated via 1-Flow',
-          }).catch(() => {});
+        // Advance project stage to NET_METERING if real backend project ID
+        if (!String(currentProj.id).startsWith('prj_')) {
+          try {
+            await tenantApi.advanceProjectStage(
+              currentProj.id,
+              'NET_METERING',
+              'DISCOM WCR Statutory Dossier Generated via 1-Flow'
+            );
+            setProvisionedProject((prev: any) => ({ ...prev, currentStage: 'NET_METERING' }));
+          } catch {
+            await offlineSyncService
+              .enqueueMutation('UPDATE_PROJECT_STAGE', {
+                projectId: currentProj.id,
+                stage: 'NET_METERING',
+                status: 'NET_METERING',
+                note: 'DISCOM WCR Statutory Dossier Generated via 1-Flow',
+              })
+              .catch(() => {});
+          }
         }
       }
 
@@ -1456,6 +1525,8 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
   const handleFinalCompletion = async () => {
     setShowCelebration(false);
     await SafeStorage.removeItem(STORAGE_DRAFT_KEY).catch(() => {});
+    // Trigger immediate background sync for any queued mutations
+    offlineSyncService.syncQueue().catch(() => {});
     if (onComplete) {
       onComplete({
         lead: createdLead,

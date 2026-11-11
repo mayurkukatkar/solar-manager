@@ -100,6 +100,13 @@ export const crmApi = {
     monthlyBill?: number;
     address?: string;
     city?: string;
+    district?: string;
+    state?: string;
+    pincode?: string;
+    capacity?: number;
+    consumerNumber?: string;
+    electricityConnection?: string;
+    [key: string]: any;
   }) => {
     const res = await apiClient.post('/api/tenant/leads', data);
     return res.data;

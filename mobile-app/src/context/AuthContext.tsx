@@ -108,15 +108,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     });
 
-    // AppState auto-recovery: re-verify connection when user switches back to app
+    // AppState auto-recovery: re-verify connection when user switches back to app (e.g. from WhatsApp)
+    let appStateTimer: any = null;
     const appStateSub = AppState.addEventListener('change', (nextAppState) => {
       if (nextAppState === 'active') {
-        checkBackendHealth().then((st) => {
-          setBackendStatus(st);
-          if (st.isOnline) {
-            offlineSyncService.syncQueue({ tenantId: user?.tenantId || undefined }).catch(() => {});
-          }
-        }).catch(() => {});
+        if (appStateTimer) clearTimeout(appStateTimer);
+        // Wait 1000ms for device cellular/WiFi radio to fully re-establish before probing health
+        appStateTimer = setTimeout(() => {
+          checkBackendHealth().then((st) => {
+            setBackendStatus(st);
+            if (st.isOnline) {
+              offlineSyncService.syncQueue({ tenantId: user?.tenantId || undefined }).catch(() => {});
+            }
+          }).catch(() => {});
+        }, 1000);
       }
     });
 
@@ -135,6 +140,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => {
       removeNetListener();
       appStateSub.remove();
+      if (appStateTimer) clearTimeout(appStateTimer);
       clearInterval(heartbeatTimer);
     };
   }, [handleSessionExpiry, handleAccountSuspended, user?.tenantId, backendStatus.isOnline]);
