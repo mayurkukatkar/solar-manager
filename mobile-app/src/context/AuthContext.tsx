@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { AppState } from 'react-native';
 import { UserProfile, BackendConnectionStatus } from '../types';
 import {
@@ -92,6 +92,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await SafeStorage.removeItem(STORAGE_USER_PROFILE_KEY);
   }, []);
 
+  const userTenantIdRef = useRef<string | undefined>(user?.tenantId || undefined);
+  userTenantIdRef.current = user?.tenantId || undefined;
+
+  // 1. Session initialization on mount
+  useEffect(() => {
+    initSession();
+  }, []);
+
+  // 2. Global network status, AppState resume, and background sync listeners
   useEffect(() => {
     // Register global interceptor handlers
     setUnauthorizedHandler(handleSessionExpiry);
@@ -104,7 +113,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         lastChecked: new Date().toLocaleTimeString(),
       }));
       if (isOnline) {
-        offlineSyncService.syncQueue({ tenantId: user?.tenantId || undefined }).catch(() => { });
+        offlineSyncService.syncQueue({ tenantId: userTenantIdRef.current || undefined }).catch(() => {});
       }
     });
 
@@ -118,24 +127,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           checkBackendHealth().then((st) => {
             setBackendStatus(st);
             if (st.isOnline) {
-              offlineSyncService.syncQueue({ tenantId: user?.tenantId || undefined }).catch(() => {});
+              offlineSyncService.syncQueue({ tenantId: userTenantIdRef.current || undefined }).catch(() => {});
             }
           }).catch(() => {});
         }, 1000);
       }
     });
 
-    // Auto-recovery polling interval (checks every 12s if offline, 45s if online)
+    // Stable background heartbeat: checks every 35s
     const heartbeatTimer = setInterval(() => {
       checkBackendHealth().then((st) => {
         setBackendStatus(st);
         if (st.isOnline) {
-          offlineSyncService.syncQueue({ tenantId: user?.tenantId || undefined }).catch(() => {});
+          offlineSyncService.syncQueue({ tenantId: userTenantIdRef.current || undefined }).catch(() => {});
         }
       }).catch(() => {});
-    }, backendStatus.isOnline ? 45000 : 12000);
-
-    initSession();
+    }, 35000);
 
     return () => {
       removeNetListener();
@@ -143,7 +150,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (appStateTimer) clearTimeout(appStateTimer);
       clearInterval(heartbeatTimer);
     };
-  }, [handleSessionExpiry, handleAccountSuspended, user?.tenantId, backendStatus.isOnline]);
+  }, [handleSessionExpiry, handleAccountSuspended]);
 
   const initSession = async () => {
     try {

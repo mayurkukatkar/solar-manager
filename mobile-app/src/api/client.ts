@@ -188,23 +188,23 @@ export const notifyNetworkStatus = (isOnline: boolean): void => {
 
 // High-speed device internet probe (< 300ms)
 export const checkInternetConnectivity = async (): Promise<boolean> => {
-  // 1. Probe our live backend API endpoint first (most accurate check)
+  // 1. Probe our live backend API health endpoint first (most accurate check, no auth required)
   try {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 6000);
-    const res = await fetch(`${currentBaseUrl}/api/auth/me`, {
+    const timer = setTimeout(() => controller.abort(), 4000);
+    const res = await fetch(`${currentBaseUrl}/api/health`, {
       method: 'GET',
       headers: { Accept: 'application/json' },
       signal: controller.signal,
     });
     clearTimeout(timer);
-    if (res.status > 0) return true;
+    if (res.status >= 200 && res.status < 500) return true;
   } catch {}
 
   // 2. Probe Google 204 endpoint with GET (standard across all mobile carriers)
   try {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 5000);
+    const timer = setTimeout(() => controller.abort(), 4000);
     const res = await fetch('https://www.google.com/generate_204', {
       method: 'GET',
       signal: controller.signal,
@@ -216,7 +216,7 @@ export const checkInternetConnectivity = async (): Promise<boolean> => {
   // 3. Probe Cloudflare CDN trace with GET (direct hostname, avoiding 302 redirects)
   try {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 5000);
+    const timer = setTimeout(() => controller.abort(), 4000);
     const res = await fetch('https://one.one.one.one/cdn-cgi/trace', {
       method: 'GET',
       signal: controller.signal,
@@ -248,8 +248,8 @@ apiClient.interceptors.response.use(
       (error.code === 'ECONNABORTED' || error.message === 'Network Error' || !error.response)
     ) {
       config._retry = true;
-      // Allow 700ms for device radio & WiFi to re-establish
-      await new Promise((r) => setTimeout(r, 700));
+      // Allow 850ms for device radio & WiFi to re-establish
+      await new Promise((r) => setTimeout(r, 850));
       try {
         return await apiClient(config);
       } catch (retryError) {
@@ -314,11 +314,11 @@ export const checkBackendHealth = async (): Promise<BackendConnectionStatus> => 
   const url = await getApiBaseUrl();
   const startTime = Date.now();
 
-  // 1. Probe backend server directly (fastest, most realistic probe)
+  // 1. Probe backend server directly via public /api/health endpoint
   try {
-    const response = await axios.get(`${url}/api/auth/me`, {
-      timeout: 8000,
-      validateStatus: () => true, // Accept 200, 401, 403 as reachable
+    const response = await axios.get(`${url}/api/health`, {
+      timeout: 6000,
+      validateStatus: () => true, // Accept 200, 304, etc. as reachable
     });
 
     const latency = Date.now() - startTime;
@@ -337,8 +337,8 @@ export const checkBackendHealth = async (): Promise<BackendConnectionStatus> => 
     // If custom URL failed but device has internet, try default production URL
     if (url !== DEFAULT_API_URL && hasInternet) {
       try {
-        const fallbackRes = await axios.get(`${DEFAULT_API_URL}/api/auth/me`, {
-          timeout: 8000,
+        const fallbackRes = await axios.get(`${DEFAULT_API_URL}/api/health`, {
+          timeout: 6000,
           validateStatus: () => true,
         });
         if (fallbackRes.status < 500) {

@@ -46,6 +46,7 @@ import { InvoicePdfModal } from '../../components/InvoicePdfModal';
 import { CreateInvoiceModal } from '../../components/CreateInvoiceModal';
 import { EmptyState, SkeletonLoader } from '../../components/common';
 import { useTheme } from '../../theme';
+import { useAuth } from '../../context/AuthContext';
 
 export type LeadStage =
   | 'ALL'
@@ -70,9 +71,11 @@ export const STAGES: { id: LeadStage; label: string }[] = [
 
 export const PipelineScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
   const { colors, isDark } = useTheme();
+  const { backendStatus } = useAuth();
   const [leads, setLeads] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [isOfflineMode, setIsOfflineMode] = useState(false);
   const [activeStage, setActiveStage] = useState<LeadStage>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -107,26 +110,35 @@ export const PipelineScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
     // 1. Instant local cache hydration for zero-flicker startup
     offlineSyncService.getCachedResponse<any[]>('leads').then((cached) => {
       if (cached?.data && Array.isArray(cached.data) && cached.data.length > 0) {
-        setLeads(cached.data);
+        setLeads((prev) => (prev.length === 0 ? cached.data : prev));
         setLoading(false);
       }
     }).catch(() => {});
 
     // 2. Fetch fresh leads from server
-    fetchLeads();
-  }, []);
+    fetchLeads(true);
 
-  const fetchLeads = async () => {
+    // 3. Keep pipeline fresh when screen gains focus
+    if (navigation?.addListener) {
+      const unsubscribe = navigation.addListener('focus', () => {
+        fetchLeads(false);
+      });
+      return unsubscribe;
+    }
+  }, [navigation]);
+
+  const fetchLeads = async (showInitialSpinner: boolean = false) => {
+    if (showInitialSpinner && leads.length === 0) {
+      setLoading(true);
+    }
     try {
       const [res, drafts] = await Promise.all([
         crmApi.getLeads({ all: true }).catch((err) => {
-          console.warn('Leads fetch notice:', err.message);
+          console.warn('Leads fetch network notice:', err.message);
           return null;
         }),
         offlineSyncService.getDraftLeads().catch(() => []),
       ]);
-
-      const serverLeads = (res && Array.isArray(res.leads)) ? res.leads : [];
 
       const draftLeadsFormatted = (drafts || []).map((d: any) => ({
         id: d.localId,
@@ -146,6 +158,45 @@ export const PipelineScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
         createdAt: d.savedAt || new Date().toISOString(),
       }));
 
+      // RESILIENCE ANTI-WIPEOUT GUARD:
+      // If res is null or res.leads is missing, a network drop or timeout occurred.
+      // NEVER wipe out existing leads or replace state with empty []!
+      if (!res || !Array.isArray(res.leads)) {
+        setIsOfflineMode(true);
+        setLeads((currentLeads) => {
+          if (currentLeads.length > 0) {
+            // Keep existing leads intact and merge any new offline drafts
+            return [
+              ...draftLeadsFormatted.filter(
+                (draft: any) => !currentLeads.some((l: any) => l.mobile === draft.mobile)
+              ),
+              ...currentLeads,
+            ];
+          }
+          return currentLeads;
+        });
+
+        // If leads was empty in state, hydrate from storage
+        const cached = await offlineSyncService.getCachedResponse<any[]>('leads');
+        if (cached?.data && Array.isArray(cached.data) && cached.data.length > 0) {
+          setLeads((currentLeads) => {
+            if (currentLeads.length === 0) {
+              return [
+                ...draftLeadsFormatted.filter(
+                  (draft: any) => !cached.data.some((l: any) => l.mobile === draft.mobile)
+                ),
+                ...cached.data,
+              ];
+            }
+            return currentLeads;
+          });
+        }
+        return;
+      }
+
+      // Valid server response received
+      setIsOfflineMode(false);
+      const serverLeads = res.leads;
       const merged = [
         ...draftLeadsFormatted.filter(
           (draft: any) => !serverLeads.some((sl: any) => sl.mobile === draft.mobile)
@@ -158,10 +209,11 @@ export const PipelineScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
         await offlineSyncService.setCachedResponse('leads', merged);
       }
     } catch (err: any) {
-      console.warn('Leads fetch notice:', err.message);
+      console.warn('Leads fetch error:', err.message);
+      setIsOfflineMode(true);
       const cached = await offlineSyncService.getCachedResponse<any[]>('leads');
-      if (cached?.data && Array.isArray(cached.data)) {
-        setLeads(cached.data);
+      if (cached?.data && Array.isArray(cached.data) && cached.data.length > 0) {
+        setLeads((current) => (current.length === 0 ? cached.data : current));
       }
     } finally {
       setLoading(false);
@@ -171,7 +223,7 @@ export const PipelineScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
 
   const onRefresh = () => {
     setRefreshing(true);
-    fetchLeads();
+    fetchLeads(false);
   };
 
   const handlePhoneCall = (phone?: string) => {
@@ -783,6 +835,25 @@ export const PipelineScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
         searchPlaceholder="Search customer, mobile, city, consumer no..."
       />
 
+      {/* OFFLINE / RESILIENCE BANNER */}
+      {(!backendStatus.isOnline || isOfflineMode) && (
+        <View style={styles.offlineBanner}>
+          <View style={styles.offlineDot} />
+          <Text style={styles.offlineBannerText}>
+            {leads.length > 0
+              ? `Offline Mode • Showing cached pipeline (${leads.length} leads)`
+              : 'Offline Mode • Connecting to solar backend...'}
+          </Text>
+          <TouchableOpacity
+            onPress={() => fetchLeads(false)}
+            style={styles.offlineRefreshPill}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.offlineRefreshPillText}>Sync</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       {/* EXECUTIVE RADAR PULSE BAR */}
       <View
         style={[
@@ -951,10 +1022,20 @@ export const PipelineScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
         ) : filteredItems.length === 0 ? (
           <EmptyState
             icon={<Layers size={36} color={colors.textMuted} />}
-            title={activeStage === 'ALL' ? 'No Leads in Pipeline' : `No Leads in ${activeStage}`}
-            description="Capture a new prospect or calculate a solar quote to start closing solar installations."
-            actionTitle="+ Add New Prospect"
-            onActionPress={handleOpenLeadCapture}
+            title={
+              activeStage === 'ALL'
+                ? (!backendStatus.isOnline || isOfflineMode)
+                  ? 'No Offline Leads Cached'
+                  : 'No Leads in Pipeline'
+                : `No Leads in ${activeStage}`
+            }
+            description={
+              (!backendStatus.isOnline || isOfflineMode)
+                ? 'Your device is offline or reconnecting. Tap Retry Connection or pull down to refresh.'
+                : 'Capture a new prospect or calculate a solar quote to start closing solar installations.'
+            }
+            actionTitle={(!backendStatus.isOnline || isOfflineMode) ? '🔄 Retry Connection' : '+ Add New Prospect'}
+            onActionPress={(!backendStatus.isOnline || isOfflineMode) ? () => fetchLeads(true) : handleOpenLeadCapture}
           />
         ) : (
           <FlatList
@@ -1531,6 +1612,45 @@ const styles = StyleSheet.create({
   radarPulseDivider: {
     width: 1,
     height: 24,
+  },
+
+  // OFFLINE BANNER
+  offlineBanner: {
+    marginHorizontal: 16,
+    marginBottom: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    backgroundColor: '#FEF3C7',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  offlineDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: '#D97706',
+    marginRight: 8,
+  },
+  offlineBannerText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#92400E',
+    flex: 1,
+  },
+  offlineRefreshPill: {
+    backgroundColor: '#F59E0B',
+    paddingHorizontal: 9,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  offlineRefreshPillText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#FFFFFF',
   },
 
   // STAGE TABS
