@@ -83,7 +83,7 @@ router.get('/api/tenant/leads', requireTenantAuth, requirePermission('leads.view
           createdAt: true,
           updatedAt: true,
           assignee: {
-            select: { id: true, name: true, email: true, phone: true }
+            select: { id: true, name: true, email: true }
           },
           customer: {
             select: {
@@ -93,7 +93,6 @@ router.get('/api/tenant/leads', requireTenantAuth, requirePermission('leads.view
               email: true,
               address: true,
               city: true,
-              pincode: true,
               invoices: {
                 select: {
                   id: true,
