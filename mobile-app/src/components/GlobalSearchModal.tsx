@@ -27,7 +27,7 @@ import { useTheme, spacing, radii, typography } from '../theme';
 import { Input, Badge, EmptyState, SkeletonLoader } from './common';
 import { crmApi, tenantApi, financeApi } from '../api/endpoints';
 import { SafeStorage } from '../api/client';
-import { navigateToTab } from '../navigation/RootNavigator';
+import { navigateToTab } from '../navigation/navigationService';
 import { hasPermission } from '../utils/rbac';
 
 export type SearchEntityType = 'ALL' | 'LEAD' | 'PROJECT' | 'INVOICE' | 'BARCODE';

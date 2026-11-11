@@ -707,14 +707,11 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
             name: customerName.trim(),
             mobile: cleanMobile,
             address: fullPremisesAddress || undefined,
-            city: city.trim() || undefined,
-            district: district.trim() || undefined,
+            city: city.trim() || district.trim() || undefined,
             state: state.trim() || 'Maharashtra',
             pincode: pincode.trim() || undefined,
-            capacity: cap,
             estimatedCap: cap,
             electricityConnection: consumerNumber.trim() || 'Pending',
-            consumerNumber: consumerNumber.trim() || 'Pending',
           });
           const realLead = leadRes?.lead || leadRes;
           if (realLead?.id) {
@@ -1358,8 +1355,10 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
       // Record invoice aligned with finance module
       try {
         const inv = await financeApi.createInvoice({
-          customerId: currentProj?.customerId || currentProj?.customer?.id || createdLead?.id || `cust_${Date.now()}`,
-          projectId: currentProj?.id,
+          customerId: currentProj?.customerId || currentProj?.customer?.id || createdLead?.id,
+          customerName: customerName.trim(),
+          mobile: customerPhone.replace(/[^0-9]/g, ''),
+          projectId: (currentProj?.id && !String(currentProj.id).startsWith('prj_')) ? currentProj.id : undefined,
           milestone: 'TOKEN_ADVANCE',
           milestoneTitle: `Advance Booking Token (${cap} kWp)`,
           subtotal: compositeBaseTaxable,
@@ -2997,7 +2996,7 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
                   </View>
 
                   {/* Transaction / UTR / Cheque Reference Input */}
-                  <Text style={styles.tokenPresetsLabel}>Transaction / UTR / Cheque Ref No:</Text>
+                  <Text style={[styles.tokenPresetsLabel, { marginTop: 6 }]}>Transaction / UTR / Cheque Ref No:</Text>
                   <TextInput
                     style={styles.textInputRef}
                     value={transactionRef}

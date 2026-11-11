@@ -289,8 +289,10 @@ export const financeApi = {
     return res.data;
   },
   createInvoice: async (data: {
-    customerId: string;
+    customerId?: string;
     projectId?: string;
+    customerName?: string;
+    mobile?: string;
     milestone?: string;
     milestoneTitle?: string;
     subtotal?: number;

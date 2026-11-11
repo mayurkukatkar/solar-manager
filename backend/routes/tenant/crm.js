@@ -219,19 +219,111 @@ router.get('/api/tenant/leads/:id', requireTenantAuth, async (req, res) => {
   }
 });
 
+// Helper to sanitize lead data for Prisma to prevent Unknown argument errors
+function buildPrismaLeadData(body) {
+  const allowedScalarFields = [
+    'leadNumber',
+    'name',
+    'company',
+    'customerType',
+    'email',
+    'mobile',
+    'alternatePhone',
+    'address',
+    'city',
+    'state',
+    'pincode',
+    'status',
+    'estimatedValue',
+    'estimatedCap',
+    'capacityUnit',
+    'systemType',
+    'monthlyBill',
+    'roofType',
+    'roofArea',
+    'electricityConnection',
+    'sanctionedLoad',
+    'source',
+    'campaignId',
+    'notes',
+    'assigneeId',
+    'lastActivityAt',
+    'nextFollowupAt',
+  ];
+
+  const data = {};
+
+  // Map capacity / estimatedCap
+  const rawCap = body.estimatedCap !== undefined ? body.estimatedCap : body.capacity;
+  if (rawCap !== undefined && rawCap !== null && rawCap !== '') {
+    const parsedCap = parseFloat(rawCap);
+    if (!isNaN(parsedCap)) data.estimatedCap = parsedCap;
+  }
+
+  // Map consumerNumber / electricityConnection
+  const rawConn = body.electricityConnection || body.consumerNumber || body.consumerNo;
+  if (rawConn) {
+    data.electricityConnection = String(rawConn).trim();
+  }
+
+  // Map district / city
+  if (body.city) {
+    data.city = String(body.city).trim();
+  } else if (body.district) {
+    data.city = String(body.district).trim();
+  }
+
+  // Address
+  if (body.address) {
+    let addr = String(body.address).trim();
+    if (body.district && !addr.toLowerCase().includes(String(body.district).toLowerCase()) && !data.city?.toLowerCase().includes(String(body.district).toLowerCase())) {
+      addr += `, ${body.district}`;
+    }
+    data.address = addr;
+  }
+
+  // Numeric fields
+  if (body.monthlyBill !== undefined && body.monthlyBill !== null && body.monthlyBill !== '') {
+    const val = parseFloat(body.monthlyBill);
+    if (!isNaN(val)) data.monthlyBill = val;
+  }
+  if (body.sanctionedLoad !== undefined && body.sanctionedLoad !== null && body.sanctionedLoad !== '') {
+    const val = parseFloat(body.sanctionedLoad);
+    if (!isNaN(val)) data.sanctionedLoad = val;
+  }
+  if (body.estimatedValue !== undefined && body.estimatedValue !== null && body.estimatedValue !== '') {
+    const val = parseFloat(body.estimatedValue);
+    if (!isNaN(val)) data.estimatedValue = val;
+  }
+  if (body.roofArea !== undefined && body.roofArea !== null && body.roofArea !== '') {
+    const val = parseFloat(body.roofArea);
+    if (!isNaN(val)) data.roofArea = val;
+  }
+
+  // Other scalar fields
+  for (const field of allowedScalarFields) {
+    if (data[field] === undefined && body[field] !== undefined && body[field] !== null) {
+      data[field] = body[field];
+    }
+  }
+
+  return data;
+}
+
 router.post('/api/tenant/leads', requireTenantAuth, requirePermission('leads.create'), validate(createLeadSchema), async (req, res) => {
   try {
-    const { mobile, email, forceCreate, name, consumerNumber, ...rest } = req.body;
-    const electConn = consumerNumber || rest.electricityConnection || undefined;
-    if (electConn) rest.electricityConnection = electConn;
+    const { mobile, email, forceCreate, name } = req.body;
+    const sanitizedData = buildPrismaLeadData(req.body);
+    const lookupMobile = mobile || sanitizedData.mobile;
+    const lookupEmail = email || sanitizedData.email;
     
     // Duplicate Detection
     const duplicate = await prisma.lead.findFirst({
       where: {
         tenantId: req.user.tenantId,
         OR: [
-          { mobile: mobile },
-          ...(email ? [{ email: email }] : [])
+          ...(lookupMobile ? [{ mobile: lookupMobile }] : []),
+          ...(lookupEmail ? [{ email: lookupEmail }] : [])
         ]
       }
     });
@@ -242,7 +334,7 @@ router.post('/api/tenant/leads', requireTenantAuth, requirePermission('leads.cre
       lead = await prisma.lead.update({
         where: { id: duplicate.id },
         data: {
-          ...rest,
+          ...sanitizedData,
           ...(name ? { name } : {}),
           ...(email ? { email } : {}),
           updatedAt: new Date()
@@ -252,10 +344,10 @@ router.post('/api/tenant/leads', requireTenantAuth, requirePermission('leads.cre
     } else {
       lead = await prisma.lead.create({
         data: {
-          ...rest,
-          name,
-          mobile,
-          email,
+          ...sanitizedData,
+          name: name || sanitizedData.name || 'Solar Prospect',
+          mobile: lookupMobile,
+          email: lookupEmail || undefined,
           tenantId: req.user.tenantId
         }
       });
@@ -284,11 +376,7 @@ router.post('/api/tenant/leads', requireTenantAuth, requirePermission('leads.cre
 
 router.patch('/api/tenant/leads/:id', requireTenantAuth, requirePermission('leads.edit'), async (req, res) => {
   try {
-    const updateData = { ...req.body };
-    if (updateData.consumerNumber) {
-      updateData.electricityConnection = updateData.consumerNumber;
-      delete updateData.consumerNumber;
-    }
+    const updateData = buildPrismaLeadData(req.body);
     const lead = await prisma.lead.update({
       where: { id: req.params.id, tenantId: req.user.tenantId },
       data: updateData

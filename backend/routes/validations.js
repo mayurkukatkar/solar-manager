@@ -23,13 +23,13 @@ const createPlanSchema = z.object({
 
 // CRM / Leads
 const createLeadSchema = z.object({
-  name: z.string().min(2, "Name is required"),
+  name: z.string().min(1, "Name is required"),
   email: z.string().email("Invalid email").nullish().or(z.literal('')),
-  mobile: z.string().min(10, "Valid mobile is required"),
+  mobile: z.string().min(5, "Valid mobile is required"),
   company: z.string().nullish().or(z.literal('')),
   source: z.string().nullish().or(z.literal('')),
   estimatedCap: z.union([z.number(), z.string()]).nullish()
-});
+}).passthrough();
 
 // Inventory
 const createProductSchema = z.object({
