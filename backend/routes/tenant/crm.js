@@ -100,7 +100,6 @@ router.get('/api/tenant/leads', requireTenantAuth, requirePermission('leads.view
                   invoiceNumber: true,
                   amount: true,
                   status: true,
-                  totalPaid: true,
                   dueDate: true,
                   createdAt: true,
                   payments: {
@@ -123,7 +122,6 @@ router.get('/api/tenant/leads', requireTenantAuth, requirePermission('leads.view
                   invoiceNumber: true,
                   amount: true,
                   status: true,
-                  totalPaid: true,
                   dueDate: true,
                   createdAt: true,
                   payments: {
@@ -143,7 +141,30 @@ router.get('/api/tenant/leads', requireTenantAuth, requirePermission('leads.view
       prisma.lead.count({ where })
     ]);
 
-    res.json({ leads, total, page, limit: take });
+    const mappedLeads = leads.map((lead) => {
+      const computeInv = (inv) => ({
+        ...inv,
+        totalPaid: Array.isArray(inv.payments)
+          ? inv.payments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0)
+          : 0,
+      });
+
+      return {
+        ...lead,
+        customer: lead.customer
+          ? {
+              ...lead.customer,
+              invoices: (lead.customer.invoices || []).map(computeInv),
+            }
+          : lead.customer,
+        projects: (lead.projects || []).map((proj) => ({
+          ...proj,
+          invoices: (proj.invoices || []).map(computeInv),
+        })),
+      };
+    });
+
+    res.json({ leads: mappedLeads, total, page, limit: take });
   } catch (error) {
     console.error('Fetch leads error:', error);
     res.status(500).json({ error: 'Failed to fetch leads' });
