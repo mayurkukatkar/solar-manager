@@ -113,7 +113,7 @@ export const PipelineScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
         setLeads((prev) => (prev.length === 0 ? cached.data : prev));
         setLoading(false);
       }
-    }).catch(() => {});
+    }).catch(() => { });
 
     // 2. Fetch fresh leads from server
     fetchLeads(true);

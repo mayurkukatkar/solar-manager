@@ -17,10 +17,10 @@ router.get('/api/tenant/leads/dashboard', requireTenantAuth, async (req, res) =>
     const qualifiedLeads = await prisma.lead.count({ where: { tenantId, status: 'QUALIFIED' } });
     const wonLeads = await prisma.lead.count({ where: { tenantId, status: 'WON' } });
     const lostLeads = await prisma.lead.count({ where: { tenantId, status: 'LOST' } });
-    
+
     // Quick Conversion Rate
     const conversionRate = totalLeads > 0 ? ((wonLeads / totalLeads) * 100).toFixed(1) : 0;
-    
+
     res.json({ dashboard: { totalLeads, newLeads, qualifiedLeads, wonLeads, lostLeads, conversionRate } });
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch dashboard metrics' });
@@ -48,7 +48,7 @@ router.get('/api/tenant/leads', requireTenantAuth, requirePermission('leads.view
     const take = queryLimit ? Math.min(parseInt(queryLimit), 300) : (all === 'true' || all === true ? 250 : 100);
     const page = Math.max(1, parseInt(queryPage) || 1);
     const skip = (page - 1) * take;
-    
+
     const [leads, total] = await Promise.all([
       prisma.lead.findMany({
         where,
@@ -152,9 +152,9 @@ router.get('/api/tenant/leads', requireTenantAuth, requirePermission('leads.view
         ...lead,
         customer: lead.customer
           ? {
-              ...lead.customer,
-              invoices: (lead.customer.invoices || []).map(computeInv),
-            }
+            ...lead.customer,
+            invoices: (lead.customer.invoices || []).map(computeInv),
+          }
           : lead.customer,
         projects: (lead.projects || []).map((proj) => ({
           ...proj,
@@ -307,6 +307,11 @@ function buildPrismaLeadData(body) {
     }
   }
 
+  // Canonicalize status if needed
+  if (data.status === 'QUOTATION_SENT') {
+    data.status = 'PROPOSAL_SENT';
+  }
+
   return data;
 }
 
@@ -316,7 +321,7 @@ router.post('/api/tenant/leads', requireTenantAuth, requirePermission('leads.cre
     const sanitizedData = buildPrismaLeadData(req.body);
     const lookupMobile = mobile || sanitizedData.mobile;
     const lookupEmail = email || sanitizedData.email;
-    
+
     // Duplicate Detection
     const duplicate = await prisma.lead.findFirst({
       where: {
@@ -327,7 +332,7 @@ router.post('/api/tenant/leads', requireTenantAuth, requirePermission('leads.cre
         ]
       }
     });
-    
+
     let lead;
     if (duplicate && !forceCreate) {
       // Update existing lead with latest details so data is never lost
@@ -352,7 +357,7 @@ router.post('/api/tenant/leads', requireTenantAuth, requirePermission('leads.cre
         }
       });
     }
-    
+
     // Log Activity
     try {
       await prisma.leadActivity.create({
@@ -366,7 +371,7 @@ router.post('/api/tenant/leads', requireTenantAuth, requirePermission('leads.cre
     } catch (e) {
       console.warn('Could not log lead activity:', e.message);
     }
-    
+
     res.json({ lead });
   } catch (error) {
     console.error('Lead create error:', error);
@@ -381,18 +386,18 @@ router.patch('/api/tenant/leads/:id', requireTenantAuth, requirePermission('lead
       where: { id: req.params.id, tenantId: req.user.tenantId },
       data: updateData
     });
-    
+
     if (req.body.status) {
-       await prisma.leadActivity.create({
-         data: {
-           leadId: lead.id,
-           type: 'STATUS_CHANGE',
-           description: `Lead status changed to ${req.body.status}`,
-           performedBy: req.user.id
-         }
-       });
+      await prisma.leadActivity.create({
+        data: {
+          leadId: lead.id,
+          type: 'STATUS_CHANGE',
+          description: `Lead status changed to ${req.body.status}`,
+          performedBy: req.user.id
+        }
+      });
     }
-    
+
     res.json({ lead });
   } catch (error) {
     res.status(500).json({ error: 'Failed to update lead' });
@@ -401,7 +406,10 @@ router.patch('/api/tenant/leads/:id', requireTenantAuth, requirePermission('lead
 
 router.patch('/api/tenant/leads/:id/stage', requireTenantAuth, async (req, res) => {
   try {
-    const { stage } = req.body;
+    let { stage } = req.body;
+    if (stage === 'QUOTATION_SENT') {
+      stage = 'PROPOSAL_SENT';
+    }
     const lead = await prisma.lead.update({
       where: { id: req.params.id, tenantId: req.user.tenantId },
       data: { status: stage }
@@ -414,7 +422,7 @@ router.patch('/api/tenant/leads/:id/stage', requireTenantAuth, async (req, res) 
           description: `Lead stage changed to ${stage} via 1-Flow`,
           performedBy: req.user.userId || req.user.id
         }
-      }).catch(() => {});
+      }).catch(() => { });
     }
     res.json({ lead });
   } catch (error) {
@@ -481,18 +489,18 @@ router.post('/api/tenant/leads/:id/convert', requireTenantAuth, async (req, res)
               address: body.address || undefined,
               city: body.city || undefined,
             }
-          }).catch(() => {});
+          }).catch(() => { });
         }
         if (body.consumerNumber) {
           await prisma.lead.update({
             where: { id, tenantId },
             data: { electricityConnection: body.consumerNumber }
-          }).catch(() => {});
+          }).catch(() => { });
           if (existingProject.surveyId) {
             await prisma.siteSurvey.update({
               where: { id: existingProject.surveyId },
               data: { discomConsumerNo: body.consumerNumber }
-            }).catch(() => {});
+            }).catch(() => { });
           }
         }
       }
@@ -645,7 +653,7 @@ router.post('/api/tenant/leads/:id/convert', requireTenantAuth, async (req, res)
         await tx.quotation.update({
           where: { id: latestQuote.id },
           data: { status: 'ACCEPTED', customerId: customer.id, isLocked: true }
-        }).catch(() => {});
+        }).catch(() => { });
       }
 
       // Auto-Initialize Site Survey
@@ -844,7 +852,7 @@ router.post('/api/tenant/leads/:id/convert', requireTenantAuth, async (req, res)
           project: fallbackProject
         });
       }
-    } catch (_) {}
+    } catch (_) { }
 
     res.status(error.statusCode || 500).json({ error: error.message || 'Failed to convert lead', code: error.code });
   }
@@ -869,20 +877,20 @@ router.post('/api/tenant/leads/:id/quotations', requireTenantAuth, async (req, r
   try {
     const { id } = req.params;
     const { items, discount = 0 } = req.body;
-    
+
     if (!items || !items.length) {
       return res.status(400).json({ error: 'Quotation must have at least one item' });
     }
 
     let subtotal = 0;
     let taxTotal = 0;
-    
+
     const processedItems = items.map(item => {
       const lineTotal = item.quantity * item.unitPrice;
       const lineTax = lineTotal * (item.taxRate / 100);
       subtotal += lineTotal;
       taxTotal += lineTax;
-      
+
       return {
         productId: item.productId || null,
         description: item.description,
@@ -892,7 +900,7 @@ router.post('/api/tenant/leads/:id/quotations', requireTenantAuth, async (req, r
         total: lineTotal + lineTax
       };
     });
-    
+
     const grandTotal = subtotal + taxTotal - discount;
 
     const quotation = await prisma.quotation.create({
@@ -944,7 +952,7 @@ router.get('/api/tenant/products', requireTenantAuth, async (req, res) => {
 router.post('/api/tenant/products', requireTenantAuth, validate(createProductSchema), async (req, res) => {
   try {
     const { name, category, sku, brand, unit, purchaseCost, sellingPrice, taxRate, minStock, currentStock } = req.body;
-    
+
     if (!name || !category) {
       return res.status(400).json({ error: 'Name and category are required' });
     }
@@ -998,41 +1006,41 @@ router.get('/api/tenant/inventory/dashboard', requireTenantAuth, async (req, res
   try {
     const productsCount = await prisma.product.count({ where: { tenantId: req.user.tenantId } });
     const warehousesCount = await prisma.warehouse.count({ where: { tenantId: req.user.tenantId } });
-    
+
     const balances = await prisma.stockBalance.findMany({
       where: { warehouse: { tenantId: req.user.tenantId } }
     });
-    
+
     let totalStockValue = 0;
     let lowStockCount = 0;
     let outOfStockCount = 0;
     let reservedStock = 0;
-    
+
     // Low stock involves joining product info, so let's get products
     const products = await prisma.product.findMany({
       where: { tenantId: req.user.tenantId },
       include: { stockBalances: true }
     });
-    
+
     products.forEach(p => {
       const totalPhysical = p.stockBalances.reduce((sum, b) => sum + b.quantity, 0);
       const totalReserved = p.stockBalances.reduce((sum, b) => sum + b.reservedQuantity, 0);
       const avgCost = p.purchaseCost; // simplified valuation for dashboard
-      
+
       totalStockValue += (totalPhysical * avgCost);
       reservedStock += totalReserved;
-      
+
       if (totalPhysical === 0) {
         outOfStockCount++;
       } else if (p.reorderLevel > 0 && totalPhysical <= p.reorderLevel) {
         lowStockCount++;
       }
     });
-    
+
     const pendingReceipts = await prisma.goodsReceipt.count({
       where: { tenantId: req.user.tenantId, status: 'DRAFT' }
     });
-    
+
     res.json({
       totalProducts: productsCount,
       totalStockValue,
@@ -1059,7 +1067,7 @@ router.get('/api/tenant/inventory/products', requireTenantAuth, async (req, res)
       },
       orderBy: { createdAt: 'desc' }
     });
-    
+
     const formatted = products.map(p => {
       const totalPhysical = p.stockBalances.reduce((sum, b) => sum + b.quantity, 0);
       const totalReserved = p.stockBalances.reduce((sum, b) => sum + b.reservedQuantity, 0);
@@ -1072,7 +1080,7 @@ router.get('/api/tenant/inventory/products', requireTenantAuth, async (req, res)
         status: totalPhysical === 0 ? 'Out of Stock' : (p.reorderLevel > 0 && totalPhysical <= p.reorderLevel) ? 'Low Stock' : 'Healthy'
       };
     });
-    
+
     res.json({ products: formatted });
   } catch (error) {
     console.error(error);
@@ -1164,13 +1172,13 @@ router.get('/api/tenant/inventory/serial-numbers', requireTenantAuth, async (req
 router.post('/api/tenant/inventory/dispatch', requireTenantAuth, requirePermission('inventory.dispatch'), async (req, res) => {
   try {
     const { projectId, warehouseId, items, receiverName, notes } = req.body;
-    
+
     // Start transaction for atomic ledger and balance updates
     const result = await prisma.$transaction(async (tx) => {
       // 1. Create Dispatch Document
       const count = await tx.materialDispatch.count({ where: { tenantId: req.user.tenantId } });
       const dispatchNumber = `DIS-${(count + 1).toString().padStart(5, '0')}`;
-      
+
       const dispatch = await tx.materialDispatch.create({
         data: {
           tenantId: req.user.tenantId,
@@ -1189,20 +1197,20 @@ router.post('/api/tenant/inventory/dispatch', requireTenantAuth, requirePermissi
           }
         }
       });
-      
+
       // 2. Process each item
       for (const item of items) {
         const qty = parseFloat(item.quantity);
-        
+
         // 2a. Update StockBalance
         const balance = await tx.stockBalance.findUnique({
           where: { productId_warehouseId: { productId: item.productId, warehouseId } }
         });
-        
+
         if (!balance || balance.availableQuantity < qty) {
           throw new Error(`Insufficient stock for product ${item.productId}`);
         }
-        
+
         const newBalance = await tx.stockBalance.update({
           where: { id: balance.id },
           data: {
@@ -1210,7 +1218,7 @@ router.post('/api/tenant/inventory/dispatch', requireTenantAuth, requirePermissi
             availableQuantity: { decrement: qty }
           }
         });
-        
+
         // 2b. Add StockLedger entry
         await tx.stockLedger.create({
           data: {
@@ -1226,7 +1234,7 @@ router.post('/api/tenant/inventory/dispatch', requireTenantAuth, requirePermissi
             userId: req.user.id
           }
         });
-        
+
         // 2c. Update Serial Numbers if provided
         if (item.serialNumbers && item.serialNumbers.length > 0) {
           await tx.serialNumber.updateMany({
@@ -1243,10 +1251,10 @@ router.post('/api/tenant/inventory/dispatch', requireTenantAuth, requirePermissi
           });
         }
       }
-      
+
       return dispatch;
     });
-    
+
     res.json({ dispatch: result });
   } catch (error) {
     console.error(error);
@@ -1258,12 +1266,12 @@ router.post('/api/tenant/inventory/dispatch', requireTenantAuth, requirePermissi
 router.post('/api/tenant/inventory/receipt', requireTenantAuth, async (req, res) => {
   try {
     const { warehouseId, purchaseOrderId, vendor, items } = req.body;
-    
+
     const result = await prisma.$transaction(async (tx) => {
       // 1. Create GRN
       const count = await tx.goodsReceipt.count({ where: { tenantId: req.user.tenantId } });
       const grnNumber = `GRN-${(count + 1).toString().padStart(5, '0')}`;
-      
+
       const receipt = await tx.goodsReceipt.create({
         data: {
           tenantId: req.user.tenantId,
@@ -1283,27 +1291,27 @@ router.post('/api/tenant/inventory/receipt', requireTenantAuth, async (req, res)
           }
         }
       });
-      
+
       // 2. Process each item
       for (const item of items) {
         const qty = parseFloat(item.quantity);
         const unitCost = parseFloat(item.unitCost || 0);
-        
+
         // 2a. Upsert StockBalance
         const balance = await tx.stockBalance.findUnique({
           where: { productId_warehouseId: { productId: item.productId, warehouseId } }
         });
-        
+
         let newQuantity = qty;
         let avgCost = unitCost;
-        
+
         if (balance) {
           newQuantity = balance.quantity + qty;
           // Weighted Average Cost
           const currentTotalValue = balance.quantity * balance.averageCost;
           const newTotalValue = qty * unitCost;
           avgCost = newQuantity > 0 ? (currentTotalValue + newTotalValue) / newQuantity : 0;
-          
+
           await tx.stockBalance.update({
             where: { id: balance.id },
             data: {
@@ -1323,7 +1331,7 @@ router.post('/api/tenant/inventory/receipt', requireTenantAuth, async (req, res)
             }
           });
         }
-        
+
         // 2b. Add StockLedger entry
         await tx.stockLedger.create({
           data: {
@@ -1339,7 +1347,7 @@ router.post('/api/tenant/inventory/receipt', requireTenantAuth, async (req, res)
             userId: req.user.id
           }
         });
-        
+
         // 2c. Insert Serial Numbers if provided
         if (item.serialNumbers && item.serialNumbers.length > 0) {
           const serialsToInsert = item.serialNumbers.map(sn => ({
@@ -1351,10 +1359,10 @@ router.post('/api/tenant/inventory/receipt', requireTenantAuth, async (req, res)
           await tx.serialNumber.createMany({ data: serialsToInsert, skipDuplicates: true });
         }
       }
-      
+
       return receipt;
     });
-    
+
     res.json({ receipt: result });
   } catch (error) {
     console.error(error);
@@ -1472,13 +1480,13 @@ router.get('/api/tenant/projects', requireTenantAuth, async (req, res) => {
 
 router.post('/api/tenant/projects', requireTenantAuth, async (req, res) => {
   try {
-    let { 
-      name, customerId, leadId, quotationId, surveyId, capacity, 
-      systemType, projectType, projectOwnerId, installationAddress, 
-      city, state, pincode, startDate, expectedCompletionDate, 
-      priority, estimatedValue, estimatedCost 
+    let {
+      name, customerId, leadId, quotationId, surveyId, capacity,
+      systemType, projectType, projectOwnerId, installationAddress,
+      city, state, pincode, startDate, expectedCompletionDate,
+      priority, estimatedValue, estimatedCost
     } = req.body;
-    
+
     // Auto-fill from Quotation if linked
     if (quotationId) {
       const quote = await prisma.quotation.findFirst({
@@ -1496,7 +1504,7 @@ router.post('/api/tenant/projects', requireTenantAuth, async (req, res) => {
           const clientName = quote.customer?.name || quote.lead?.name || 'Solar Customer';
           name = `${clientName} - ${quote.systemCapacity || 5} kWp ${quote.systemType || 'On-Grid'} Solar`;
         }
-        
+
         // Auto-lock and accept quotation
         await prisma.quotation.update({
           where: { id: quote.id },
@@ -1546,11 +1554,11 @@ router.post('/api/tenant/projects', requireTenantAuth, async (req, res) => {
       projectNumber = `PRJ-${Date.now().toString().slice(-5)}`;
     }
 
-    const validStartDate = startDate && !isNaN(new Date(startDate).getTime()) 
-      ? new Date(startDate) 
+    const validStartDate = startDate && !isNaN(new Date(startDate).getTime())
+      ? new Date(startDate)
       : new Date();
-    const validEndDate = expectedCompletionDate && !isNaN(new Date(expectedCompletionDate).getTime()) 
-      ? new Date(expectedCompletionDate) 
+    const validEndDate = expectedCompletionDate && !isNaN(new Date(expectedCompletionDate).getTime())
+      ? new Date(expectedCompletionDate)
       : null;
 
     const project = await prisma.project.create({
@@ -1654,10 +1662,10 @@ router.get('/api/tenant/projects/:id', requireTenantAuth, async (req, res) => {
         tenant: true,
         customer: true,
         lead: true,
-        quotation: { 
-          include: { 
+        quotation: {
+          include: {
             items: { include: { product: true } }
-          } 
+          }
         },
         projectOwner: true,
         tasks: { include: { assignee: true }, orderBy: { createdAt: 'asc' } },
@@ -1696,7 +1704,7 @@ router.get('/api/tenant/projects/:id', requireTenantAuth, async (req, res) => {
 router.patch('/api/tenant/projects/:id', requireTenantAuth, async (req, res) => {
   try {
     const updateData = req.body;
-    
+
     // Prevent changing stage or status via this generic endpoint
     delete updateData.currentStage;
     delete updateData.status;
@@ -1707,19 +1715,19 @@ router.patch('/api/tenant/projects/:id', requireTenantAuth, async (req, res) => 
       const prj = await prisma.project.findUnique({ where: { id: req.params.id, tenantId: req.user.tenantId } });
       if (prj) {
         if (prj.leadId) {
-          await prisma.lead.update({ where: { id: prj.leadId }, data: { electricityConnection: cNum } }).catch(() => {});
+          await prisma.lead.update({ where: { id: prj.leadId }, data: { electricityConnection: cNum } }).catch(() => { });
         }
         if (prj.surveyId) {
-          await prisma.siteSurvey.update({ where: { id: prj.surveyId }, data: { discomConsumerNo: cNum } }).catch(() => {});
+          await prisma.siteSurvey.update({ where: { id: prj.surveyId }, data: { discomConsumerNo: cNum } }).catch(() => { });
         }
-        await prisma.subsidyApplication.updateMany({ where: { projectId: prj.id }, data: { consumerNumber: cNum } }).catch(() => {});
+        await prisma.subsidyApplication.updateMany({ where: { projectId: prj.id }, data: { consumerNumber: cNum } }).catch(() => { });
       }
     }
 
     if (updateData.startDate) updateData.startDate = new Date(updateData.startDate);
     if (updateData.expectedCompletionDate) updateData.expectedCompletionDate = new Date(updateData.expectedCompletionDate);
     if (updateData.actualCompletionDate) updateData.actualCompletionDate = new Date(updateData.actualCompletionDate);
-    
+
     if (updateData.capacity) updateData.capacity = parseFloat(updateData.capacity);
     if (updateData.estimatedValue) updateData.estimatedValue = parseFloat(updateData.estimatedValue);
     if (updateData.estimatedCost) updateData.estimatedCost = parseFloat(updateData.estimatedCost);
@@ -1739,13 +1747,14 @@ router.patch('/api/tenant/projects/:id', requireTenantAuth, async (req, res) => 
 
 router.patch('/api/tenant/projects/:id/stage', requireTenantAuth, async (req, res) => {
   try {
-    const { newStage, comment } = req.body;
-    if (!newStage) return res.status(400).json({ error: 'newStage is required' });
+    const rawStage = req.body.newStage || req.body.stage;
+    const comment = req.body.comment || req.body.note;
+    if (!rawStage) return res.status(400).json({ error: 'newStage is required' });
 
     const project = await prisma.project.findUnique({ where: { id: req.params.id, tenantId: req.user.tenantId } });
     if (!project) return res.status(404).json({ error: 'Project not found' });
 
-    const STAGE_ORDER = [
+    const STAGE_ORDER_COMMERCIAL = [
       'SURVEY_COMPLETED',
       'STRUCTURE_APPROVED',
       'MATERIAL_DISPATCHED',
@@ -1755,34 +1764,139 @@ router.patch('/api/tenant/projects/:id/stage', requireTenantAuth, async (req, re
       'COMMISSIONED'
     ];
 
+    const STAGE_ORDER_FIELD = [
+      'SURVEY',
+      'ENGINEERING',
+      'PROCUREMENT',
+      'INSTALLATION',
+      'NET_METERING',
+      'INSPECTION',
+      'HANDOVER'
+    ];
+
     const LEGACY_STAGE_MAP = {
       'Planning': 'SURVEY_COMPLETED',
+      'SURVEY': 'SURVEY_COMPLETED',
+      'SURVEY_COMPLETED': 'SURVEY_COMPLETED',
+      'Site Survey Pending': 'SURVEY_COMPLETED',
+
       'Design': 'STRUCTURE_APPROVED',
+      'ENGINEERING': 'STRUCTURE_APPROVED',
+      'STRUCTURE_APPROVED': 'STRUCTURE_APPROVED',
+      'CAD DESIGN': 'STRUCTURE_APPROVED',
+      'SLD APPROVAL': 'STRUCTURE_APPROVED',
+
       'Procurement': 'MATERIAL_DISPATCHED',
+      'PROCUREMENT': 'MATERIAL_DISPATCHED',
+      'MATERIAL_DISPATCHED': 'MATERIAL_DISPATCHED',
+      'WAREHOUSE DISPATCH': 'MATERIAL_DISPATCHED',
+
       'Installation': 'INSTALLATION_STARTED',
+      'INSTALLATION': 'INSTALLATION_STARTED',
+      'INSTALLATION_STARTED': 'INSTALLATION_STARTED',
+      'STRUCTURE ERECTION': 'INSTALLATION_STARTED',
+      'DC CABLING INSTALLATION': 'INSTALLATION_STARTED',
+
       'Testing': 'TESTING_COMPLETED',
-      'Handover': 'NET_METER_APPLIED',
-      'Completed': 'COMMISSIONED'
+      'TESTING': 'TESTING_COMPLETED',
+      'TESTING_COMPLETED': 'TESTING_COMPLETED',
+      'INSPECTION': 'TESTING_COMPLETED',
+      'Inspection': 'TESTING_COMPLETED',
+      'QA': 'TESTING_COMPLETED',
+      'CEIG': 'TESTING_COMPLETED',
+      'CEIG INSPECTION': 'TESTING_COMPLETED',
+      'ELECTRICAL TESTING': 'TESTING_COMPLETED',
+      'ELECTRICAL QA SIGN-OFF': 'TESTING_COMPLETED',
+
+      'NET_METERING': 'NET_METER_APPLIED',
+      'NET_METER_APPLIED': 'NET_METER_APPLIED',
+      'DISCOM APPLICATION': 'NET_METER_APPLIED',
+      'BI-DIRECTIONAL METER': 'NET_METER_APPLIED',
+
+      'Handover': 'COMMISSIONED',
+      'HANDOVER': 'COMMISSIONED',
+      'GRID SYNCHRONIZATION': 'COMMISSIONED',
+      'DBT COMMISSIONED': 'COMMISSIONED',
+      'Completed': 'COMMISSIONED',
+      'COMPLETED': 'COMMISSIONED',
+      'COMMISSIONED': 'COMMISSIONED',
+      'PROJECT COMPLETED': 'COMMISSIONED'
     };
 
     const currentCanonical = LEGACY_STAGE_MAP[project.currentStage] || project.currentStage;
-    const newCanonical = LEGACY_STAGE_MAP[newStage] || newStage;
+    const newCanonical = LEGACY_STAGE_MAP[rawStage] || rawStage;
 
-    if (project.currentStage === newStage || currentCanonical === newCanonical) {
-      return res.status(400).json({ error: 'Already in this stage' });
-    }
-
-    const nextIdx = STAGE_ORDER.indexOf(newCanonical);
-    if (nextIdx === -1) {
-      return res.status(400).json({ error: `Invalid stage: ${newStage}` });
-    }
-
-    const currentIdx = STAGE_ORDER.indexOf(currentCanonical);
-    if (currentIdx !== -1 && nextIdx > currentIdx + 1) {
-      return res.status(400).json({
-        error: `Invalid stage transition: cannot jump from ${project.currentStage} to ${newStage}`
+    // Idempotent: If project is already at requested stage, return success (no-op)
+    if (project.currentStage === rawStage || currentCanonical === newCanonical) {
+      return res.json({
+        project,
+        message: `Project is already at stage ${rawStage}`,
+        currentStage: project.currentStage,
+        isNoOp: true
       });
     }
+
+    const nextCommIdx = STAGE_ORDER_COMMERCIAL.indexOf(newCanonical);
+    const nextFieldIdx = STAGE_ORDER_FIELD.indexOf(rawStage);
+    if (nextCommIdx === -1 && nextFieldIdx === -1 && !LEGACY_STAGE_MAP[rawStage]) {
+      return res.status(400).json({ error: `Invalid stage: ${rawStage}` });
+    }
+
+    // Helper to get index in Field sequence
+    function getFieldIdx(stg) {
+      if (!stg) return -1;
+      const s = String(stg).toUpperCase();
+      if (s.includes('SURVEY') || s.includes('PLANNING')) return 0;
+      if (s.includes('ENG') || s.includes('DESIGN') || s.includes('SLD') || s.includes('STRUCTUR')) return 1;
+      if (s.includes('PROCURE') || s.includes('MATERIAL') || s.includes('DISPATCH')) return 2;
+      if (s.includes('INSTALL') || s.includes('ERECT')) return 3;
+      if (s.includes('NET') || s.includes('METER') || s.includes('DISCOM')) return 4;
+      if (s.includes('INSPECT') || s.includes('QA') || s.includes('TEST') || s.includes('CEIG')) return 5;
+      if (s.includes('HANDOVER') || s.includes('COMMISSION') || s.includes('COMPLET') || s.includes('SYNC')) return 6;
+      return -1;
+    }
+
+    const currentCommIdx = STAGE_ORDER_COMMERCIAL.indexOf(currentCanonical);
+    const currentFieldIdx = getFieldIdx(project.currentStage);
+    const targetFieldIdx = getFieldIdx(rawStage);
+
+    // Monotonic Protection: If project has already progressed ahead, treat as idempotent success
+    if (
+      !req.body.allowRollback &&
+      !req.body.force &&
+      currentFieldIdx !== -1 &&
+      targetFieldIdx !== -1 &&
+      currentFieldIdx > targetFieldIdx
+    ) {
+      return res.json({
+        project,
+        message: `Project has already progressed past stage ${rawStage} (currently at ${project.currentStage})`,
+        currentStage: project.currentStage,
+        isNoOp: true
+      });
+    }
+
+    if (!req.body.force) {
+      const isCommValid = currentCommIdx === -1 || nextCommIdx <= currentCommIdx + 1;
+      const isFieldValid = currentFieldIdx === -1 || targetFieldIdx <= currentFieldIdx + 1;
+
+      // Allow transitioning between interchangeable stage 4 & 5 (Net Metering and Inspection/Testing)
+      const isPreCommissionInterchange = (
+        (currentCommIdx === 3 && (nextCommIdx === 4 || targetFieldIdx === 4)) ||
+        (currentFieldIdx === 3 && (targetFieldIdx === 4 || nextCommIdx === 4)) ||
+        (currentFieldIdx === 4 && targetFieldIdx === 5) ||
+        (currentCommIdx === 4 && nextCommIdx === 5) ||
+        ((currentCommIdx === 4 || currentCommIdx === 5 || currentFieldIdx === 4 || currentFieldIdx === 5) && (nextCommIdx === 6 || targetFieldIdx === 6))
+      );
+
+      if (!isCommValid && !isFieldValid && !isPreCommissionInterchange) {
+        return res.status(400).json({
+          error: `Invalid stage transition: cannot jump from ${project.currentStage} to ${rawStage}`
+        });
+      }
+    }
+
+    const newStage = rawStage;
 
     const STAGE_PROGRESS = {
       'SURVEY_COMPLETED': 15,
@@ -1797,14 +1911,22 @@ router.patch('/api/tenant/projects/:id/stage', requireTenantAuth, async (req, re
       'Procurement': 50,
       'Installation': 75,
       'Testing': 90,
-      'Handover': 95,
-      'Completed': 100
+      'Handover': 100,
+      'Completed': 100,
+      'SURVEY': 15,
+      'ENGINEERING': 30,
+      'PROCUREMENT': 50,
+      'INSTALLATION': 75,
+      'NET_METERING': 85,
+      'INSPECTION': 90,
+      'TESTING': 90,
+      'HANDOVER': 100
     };
-    const progressPercent = STAGE_PROGRESS[newStage] !== undefined 
-      ? STAGE_PROGRESS[newStage] 
+    const progressPercent = STAGE_PROGRESS[newStage] !== undefined
+      ? STAGE_PROGRESS[newStage]
       : (STAGE_PROGRESS[newCanonical] !== undefined ? STAGE_PROGRESS[newCanonical] : (project.progressPercent || 0));
 
-    const isCommissioned = newCanonical === 'COMMISSIONED' || newStage === 'Completed';
+    const isCommissioned = newCanonical === 'COMMISSIONED' || newStage === 'Completed' || newStage === 'HANDOVER';
     const isMaterialDispatched = newCanonical === 'MATERIAL_DISPATCHED' || newStage === 'Procurement';
 
     const updateData = {
@@ -1928,7 +2050,7 @@ router.patch('/api/tenant/projects/:id/stage', requireTenantAuth, async (req, re
       if (!existingCert && project.customerId) {
         const customer = await prisma.customer.findUnique({ where: { id: project.customerId } });
         const installation = await prisma.installationJob.findFirst({ where: { projectId: project.id } });
-        
+
         await prisma.completionCertificate.create({
           data: {
             tenantId: req.user.tenantId,
@@ -1953,12 +2075,12 @@ router.patch('/api/tenant/projects/:id/stage', requireTenantAuth, async (req, re
 router.patch('/api/tenant/projects/:id/status', requireTenantAuth, async (req, res) => {
   try {
     const { status, progress, updateText, nextAction } = req.body;
-    
+
     const project = await prisma.project.update({
       where: { id: req.params.id, tenantId: req.user.tenantId },
-      data: { 
-        status, 
-        ...(progress !== undefined && { progressPercent: parseFloat(progress) }) 
+      data: {
+        status,
+        ...(progress !== undefined && { progressPercent: parseFloat(progress) })
       }
     });
 
@@ -2025,7 +2147,7 @@ router.post('/api/tenant/projects/:id/tasks', requireTenantAuth, async (req, res
     if (!project) return res.status(404).json({ error: 'Project not found' });
 
     const { name, description, priority, dueDate, assigneeId } = req.body;
-    
+
     const task = await prisma.projectTask.create({
       data: {
         projectId: req.params.id,
@@ -2037,7 +2159,7 @@ router.post('/api/tenant/projects/:id/tasks', requireTenantAuth, async (req, res
       },
       include: { assignee: true }
     });
-    
+
     res.status(201).json({ task });
   } catch (error) {
     res.status(500).json({ error: 'Failed to create task' });
@@ -2054,8 +2176,8 @@ router.patch('/api/tenant/tasks/:id', requireTenantAuth, async (req, res) => {
     const { status, progress } = req.body;
     const task = await prisma.projectTask.update({
       where: { id: req.params.id },
-      data: { 
-        status, 
+      data: {
+        status,
         ...(progress !== undefined && { progress: parseFloat(progress) })
       },
       include: { assignee: true }
@@ -2075,7 +2197,7 @@ router.post('/api/tenant/projects/:id/milestones', requireTenantAuth, async (req
     if (!project) return res.status(404).json({ error: 'Project not found' });
 
     const { name, description, targetDate, responsibleId } = req.body;
-    
+
     const milestone = await prisma.projectMilestone.create({
       data: {
         projectId: req.params.id,
@@ -2085,7 +2207,7 @@ router.post('/api/tenant/projects/:id/milestones', requireTenantAuth, async (req
         responsibleId
       }
     });
-    
+
     res.status(201).json({ milestone });
   } catch (error) {
     res.status(500).json({ error: 'Failed to create milestone' });
@@ -2102,7 +2224,7 @@ router.patch('/api/tenant/milestones/:id', requireTenantAuth, async (req, res) =
     const { status, actualDate } = req.body;
     const milestone = await prisma.projectMilestone.update({
       where: { id: req.params.id },
-      data: { 
+      data: {
         status,
         actualDate: actualDate ? new Date(actualDate) : null
       }
@@ -2122,7 +2244,7 @@ router.post('/api/tenant/projects/:id/materials', requireTenantAuth, async (req,
     if (!project) return res.status(404).json({ error: 'Project not found' });
 
     const { productId, description, quantity } = req.body;
-    
+
     const material = await prisma.projectMaterialRequirement.create({
       data: {
         projectId: req.params.id,
@@ -2132,7 +2254,7 @@ router.post('/api/tenant/projects/:id/materials', requireTenantAuth, async (req,
       },
       include: { product: true }
     });
-    
+
     res.status(201).json({ material });
   } catch (error) {
     res.status(500).json({ error: 'Failed to add material requirement' });
@@ -2149,7 +2271,7 @@ router.patch('/api/tenant/materials/:id', requireTenantAuth, async (req, res) =>
     const { status, quantity } = req.body;
     const material = await prisma.projectMaterialRequirement.update({
       where: { id: req.params.id },
-      data: { 
+      data: {
         ...(status && { status }),
         ...(quantity && { quantity: parseFloat(quantity) })
       },
@@ -2187,7 +2309,7 @@ router.get('/api/tenant/customers/:id', requireTenantAuth, async (req, res) => {
   try {
     const customer = await prisma.customer.findUnique({
       where: { id: req.params.id, tenantId: req.user.tenantId },
-      include: { 
+      include: {
         lead: {
           include: {
             activities: { orderBy: { createdAt: 'desc' } },

@@ -1,37 +1,48 @@
-# Task Assignment: Milestone M1 Reviewer 1
+# Task Assignment: Reviewer M1-1 — Code & Documentation Review
 
-## Mission
-Review the deliverables for Milestone M1 (Documentation Baseline & Architecture Specifications):
-- `docs/product-audit.md`
-- `docs/module-inventory.md`
-- `docs/architecture-and-dependencies.md`
-- `docs/implementation-roadmap.md`
-- `docs/quality-and-regression-report.md`
-- `PROJECT.md` at repository root
+## Identity & Role
+- Working Directory: f:\Company Products\solar-manager\.agents\teamwork\reviewer_m1_1\
+- Role: Quality Reviewer (teamwork_reviewer)
+- Parent: Orchestrator (94d7f2ae-468d-438a-8f95-fa253185584b)
 
-## Mandatory Inputs to Read First
-- `f:\Company Products\solar-manager\.agents\teamwork\ORIGINAL_REQUEST.md` (read completely before starting)
-- `f:\Company Products\solar-manager\.agents\teamwork\worker_m1_docs\handoff.md`
-- `f:\Company Products\solar-manager\.agents\teamwork\orchestrator\PROJECT.md`
+## Mandatory Reading
+- Read `f:\Company Products\solar-manager\.agents\teamwork\ORIGINAL_REQUEST.md`.
+- Read `f:\Company Products\solar-manager\.agents\teamwork\orchestrator\PROJECT.md`.
+- Read Worker M1's handoff: `f:\Company Products\solar-manager\.agents\teamwork\worker_m1\handoff.md`.
 
-## Review Scope & Verification
-1. Examine completeness: Verify every model (68 models), route file (26 files), frontend page (58 pages), and mobile feature is inventoried.
-2. Examine correctness: Verify risk descriptions, security findings (P0 child-entity isolation, JWT discrepancy, OCR endpoints, RBAC), and financial math flaws against the actual codebase.
-3. Run test verification commands documented in Worker M1 handoff:
-   - `node --test "backend/test/*.test.js"`
+## Scope of Review
+1. Inspect the 4 documentation files in `/docs/`:
+   - `docs/mobile-product-audit.md`
+   - `docs/mobile-screen-inventory.md`
+   - `docs/mobile-ux-problems.md`
+   - `docs/mobile-design-system.md`
+   Verify completeness against Acceptance Criteria R1.
+2. Inspect the theme architecture in `mobile-app/src/theme/`:
+   - `colors.ts`, `tokens.ts`, `ThemeProvider.tsx`, `useTheme.ts`, `index.ts`.
+   - Verify light & dark mode tokens, tabular numerals helper, and backward compatibility.
+3. Run verification commands:
+   - `cmd /c "cd mobile-app && npx tsc --noEmit"`
    - `node mobile-app/test-perspectives.js`
-   - TypeScript checks on `web-client` and `mobile-app`
-4. Formulate an explicit verdict: `APPROVE` or `REQUEST_CHANGES`.
+   - `node mobile-app/test-e2e.js`
+4. Formulate explicit verdict: `APPROVE` or `REQUEST_CHANGES`.
 
-## Working Directory
-`f:\Company Products\solar-manager\.agents\teamwork\reviewer_m1_1\`
-Write your `handoff.md` with your verdict, findings, and verification results. Notify orchestrator via `send_message`.
+## Output Deliverable
+Write your review report to:
+`f:\Company Products\solar-manager\.agents\teamwork\reviewer_m1_1\review_report.md`
+and write `handoff.md` with explicit Verdict. Maintain `progress.md`.
+When finished, send a message to orchestrator (`94d7f2ae-468d-438a-8f95-fa253185584b`).
 
-## 2026-10-29T11:40:20Z
-[Message] timestamp=2026-10-29T11:40:20Z sender=ad2f5e64-da78-454d-ba4a-3ebeb2c3f34b priority=MESSAGE_PRIORITY_HIGH
-You are Reviewer 1 for Milestone M1 (Documentation Baseline & Architecture Specs).
-Your working directory is f:\Company Products\solar-manager\.agents\teamwork\reviewer_m1_1\
-Read f:\Company Products\solar-manager\.agents\teamwork\ORIGINAL_REQUEST.md and your dispatch file at f:\Company Products\solar-manager\.agents\teamwork\reviewer_m1_1\DISPATCH.md before starting.
-Review the 6 artifacts produced by Worker M1: docs/product-audit.md, docs/module-inventory.md, docs/architecture-and-dependencies.md, docs/implementation-roadmap.md, docs/quality-and-regression-report.md, and PROJECT.md. Run test verification commands.
-Update progress.md with your liveness heartbeat.
-Write your final review report with an explicit verdict (APPROVE or REQUEST_CHANGES) to f:\Company Products\solar-manager\.agents\teamwork\reviewer_m1_1\handoff.md and notify me via send_message when complete.
+
+## 2026-10-30T08:23:18Z
+You are Reviewer M1-1 (Quality Reviewer).
+Working directory: f:\Company Products\solar-manager\.agents\teamwork\reviewer_m1_1\
+Read instructions: f:\Company Products\solar-manager\.agents\teamwork\reviewer_m1_1\DISPATCH.md
+Read original request: f:\Company Products\solar-manager\.agents\teamwork\ORIGINAL_REQUEST.md
+Read project plan: f:\Company Products\solar-manager\.agents\teamwork\orchestrator\PROJECT.md
+Read Worker M1 handoff: f:\Company Products\solar-manager\.agents\teamwork\worker_m1\handoff.md
+
+Review the 4 documentation files in /docs/ and theme architecture in mobile-app/src/theme/.
+Run verification commands: tsc --noEmit, test-perspectives.js, and test-e2e.js.
+Formulate explicit verdict: APPROVE or REQUEST_CHANGES.
+Write review_report.md and handoff.md in your working directory. Maintain progress.md.
+When finished, send a message to orchestrator (94d7f2ae-468d-438a-8f95-fa253185584b).

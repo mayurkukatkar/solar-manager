@@ -8,6 +8,7 @@ import {
   RefreshControl,
   Platform,
   Linking,
+  Alert,
 } from 'react-native';
 import {
   Zap,
@@ -35,6 +36,7 @@ import { GamificationPill } from '../../components/GamificationPill';
 import { SolarJourneyRoadmap } from '../../components/SolarJourneyRoadmap';
 import { SeamlessSolarFlowModal } from '../../components/SeamlessSolarFlowModal';
 import { tourService } from '../../services/tourService';
+import { offlineSyncService } from '../../services/offlineSyncService';
 import { tenantApi, crmApi } from '../../api/endpoints';
 import { openWhatsAppWithPitch } from '../../services/whatsappService';
 import { useAuth } from '../../context/AuthContext';
@@ -738,6 +740,24 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
           setSeamlessFlowVisible(false);
           setSeamlessInitialLead(null);
           loadDashboard(true);
+          offlineSyncService.syncQueue({ force: true }).catch(() => { });
+          if (result?.project) {
+            Alert.alert(
+              '🎉 1-Flow Complete: Lead, Project & Finance Synchronized!',
+              `"${result.project.name || result.lead?.name || 'Solar Installation'}" is now live in:\n\n• CRM Pipeline (Won / Contract Signed)\n• Field Projects (DISCOM Mission Control)\n• Finance (Turnkey Contract & Token Recorded)\n\nWhere would you like to go?`,
+              [
+                { text: 'Stay on Dashboard', style: 'cancel' },
+                {
+                  text: 'View in Projects ➔',
+                  onPress: () => navigation.navigate('Projects'),
+                },
+                {
+                  text: 'View in Finance ➔',
+                  onPress: () => navigation.navigate('Finance'),
+                },
+              ]
+            );
+          }
         }}
       />
     </View>

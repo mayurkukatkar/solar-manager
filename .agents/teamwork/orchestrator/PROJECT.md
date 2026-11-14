@@ -1,99 +1,188 @@
-# Project: WhereReady Solar OS Enterprise SaaS
+# Project: WhereReady Solar OS — Mobile Product Transformation
 
 ## Architecture
-- **Repository Structure**:
-  - `backend/`: Node.js Express 5.2.1 application with Prisma ORM 5.22.0 connecting to PostgreSQL. Houses 26 route files (100+ endpoints) and 68 Prisma models.
-  - `web-client/`: Next.js 16.3.5 App Router, React 19.2.8, Tailwind CSS v4, Lucide React, Recharts. Houses 58 routes across 13 tenant business modules, 12 super-admin platform screens, and 10 public marketing routes.
-  - `mobile-app/`: React Native 0.88.0, Expo SDK 58 application providing field engineering tools (camera barcode scanning, earth resistance QA, 7-template statutory DISCOM document generation, offline draft storage).
-  - `docs/`: Product audit, architecture, and module specification documentation.
-- **Data Flow & Multi-Tenancy**:
-  - Multi-tenant architecture with `tenantId` partitioning across all core entities (`User`, `Lead`, `Customer`, `SiteSurvey`, `Quotation`, `Project`, `Invoice`, `DiscomApplication`, `SubsidyApplication`, `InstallationJob`, etc.).
-  - JWT Bearer token authentication containing `tenantId`, `role`, and `permissions`.
-  - Static file storage via Multer / Cloudinary.
-  - Real-time statutory and financial calculations via `services/solarCalculator.js` (backend) and `services/solarCalculator.ts` (web-client).
+WhereReady Solar OS is a multi-tier SaaS platform tailored for Indian solar EPC businesses, installers, and DISCOM liaisons. The mobile client (`mobile-app/`) operates on React Native 0.88 with Expo SDK 58, React Navigation 7, Hermes JS engine, Android New Architecture (Fabric + TurboModules), and Edge-to-Edge rendering.
+
+```
+mobile-app/
+├── src/
+│   ├── api/             # Axios client, interceptors, SafeStorage, 16 domain endpoint modules
+│   ├── components/      # Common UI primitives (Button, Card, Badge, Input, EmptyState, SkeletonLoader)
+│   ├── context/         # AuthContext (session, JWT token, tenant suspension, health)
+│   ├── navigation/      # RootNavigator (React Navigation 7: Stack + BottomTabs)
+│   ├── screens/         # Domain screens (auth, dashboard, crm, projects, operations, finance, modules, profile)
+│   ├── services/        # OfflineSyncService, PDF generators, document templates
+│   ├── theme/           # Design tokens (colors, typography, spacing, radii, shadows, theme context)
+│   └── types/           # TypeScript interfaces, DTOs, navigation param lists
+├── assets/              # Branding icons, splash screens, solar proposal imagery
+├── android/             # Autolinked native Android project (edge-to-edge, new arch)
+└── test-perspectives.js # Automated perspective verification suite
+```
 
 ## Feature Inventory
-Every feature discovered during the survey phase across backend, web-client, and mobile-app:
+Every feature identified during the survey phase is enumerated here and assigned to a milestone.
 
 | # | Feature | Description | Milestone | Source |
 |---|---------|-------------|-----------|--------|
-| 1 | Baseline Documentation & Module Inventory | Author `docs/product-audit.md`, `docs/module-inventory.md`, `docs/architecture-and-dependencies.md`, `docs/implementation-roadmap.md`, `docs/quality-and-regression-report.md` | M1 | Survey Reports |
-| 2 | Design Tokens & WhereReady Branding | Unified semantic color tokens (`primary`, `accent`, `status`, `surface`), clean font loading, elevation, borders | M2 | Frontend Survey |
-| 3 | Shared UI Primitives Library | Centralized `Button`, `Input`, `Select`, `Modal`/`Dialog`, `Table`, `Badge`, `Card`, `Toast`, `EmptyState`, `Skeleton` in `web-client/src/components/ui` | M2 | Frontend Survey |
-| 4 | Responsive Viewport Fixes (320px–1920px) | `grid-cols-1 sm:grid-cols-2` across modal forms, 44px touch targets, mobile status selectors on Kanban cards | M2 | Frontend Survey |
-| 5 | Native Alert Replacement with Toasts | Replace browser `alert()` invocations across finance, surveys, tasks, projects with non-blocking toasts | M2 | Frontend Survey |
-| 6 | Navigation & Dead Link Elimination | Resolve 404 links: `/tenant/installation/schedule`, `/calendar`, `/checklists`, `/tenant/inventory/products/new`, `/tenant/quotations/new`, `/super-admin/security` | M2 | Frontend Survey |
-| 7 | Multi-Tenant Child Entity Isolation | Enforce `project: { tenantId }` checks on `ProjectTask`, `ProjectMilestone`, `ProjectMaterialRequirement`, and `ServiceVisit` mutations | M3 | Backend Survey |
-| 8 | JWT User Identity Normalization | Normalize `req.user = { id: payload.userId, ...payload }` to fix audit logs, createdBy tracking, and self-protection checks | M3 | Backend Survey |
-| 9 | Public OCR Endpoint Authentication | Attach `requireTenantAuth` to `/api/tenant/ocr/scan-bill` and `/fetch-consumer` with rate limiting | M3 | Backend Survey |
-| 10 | Granular RBAC Route Enforcement | Apply `requirePermission` across tenant route controllers for fine-grained employee access control | M3 | Backend Survey |
-| 11 | Financial GST Trade Discount Math | Recompute GST taxable base proportionally when `overallDiscount` is applied in `solarCalculator.js` and `solarCalculator.ts` | M3 | Backend & Frontend Survey |
-| 12 | Milestone Payment Decimal Rounding | Ensure sum of milestone percentages and amounts precisely equals gross total without 1-rupee drift | M3 | Backend & Frontend Survey |
-| 13 | Elimination of Hardcoded Mock Leaks | Remove hardcoded vendor and customer identities from `tenant/projects/[id]/page.tsx` and fake data from dashboard | M4 | Frontend Survey |
-| 14 | 60-Second Quotation & Sizing Engine | Solar capacity sizing, 25-year financial cash flow, 13.8% composite solar GST, multi-stage revision history | M4 | Survey Reports |
-| 15 | Site Survey to Quote 1-Click Conversion | Seamless technical feasibility audit handoff into commercial quotation without data loss | M4 | Survey Reports |
-| 16 | DISCOM 5-Stage Gating State Machine | Enforce prerequisite statutory document validations for Feasibility, CEIG, Meter Testing, Net Metering, and Grid Sync | M4 | Spec Miner Survey |
-| 17 | PM Surya Ghar Central Subsidy Funnel | 7-stage national portal funnel (₹30k/₹60k/₹78k slabs), DBT bank verification, smart regex parser | M4 | Spec Miner Survey |
-| 18 | Purchase Order Auto-Stock Ledger | Automatic increment of warehouse inventory stock upon PO receipt, serial number tracking | M5 | Backend Survey |
-| 19 | Mobile Field 2D Barcode Scanning | Physical QR/barcode capture of PV modules and inverters for DCR traceability, duplicate prevention | M5 | Spec Miner Survey |
-| 20 | Mobile Electrical QA Sign-Off | Earth pit resistance (<5.0Ω) and anti-islanding trip (<2.0s) validation before commissioning | M5 | Spec Miner Survey |
-| 21 | Mobile Statutory PDF Template Parity | Fix `'PM Surya Ghar Muft Bijli Yojana'` text in `mobile-app/src/services/pdfService.ts` to pass parity test suite | M5 | Backend Survey |
-| 22 | Touch-Friendly Mobile Task Operations | Replace pure HTML5 drag-and-drop in Kanban with touch-friendly quick status selectors | M5 | Frontend Survey |
-| 23 | Cross-Module Lead-to-Service Journey | Verify full end-to-end lifecycle (Lead -> Customer -> Survey -> Quotation -> Project -> Procurement -> Installation -> Invoicing -> Service) | M6 | Survey Reports |
-| 24 | Full Automated Regression Verification | Run backend tests, mobile perspectives suite, TypeScript compilation, and E2E test suite cleanly | M6 | Survey Reports |
+| 1 | Product & Screen Audit Docs | Create `/docs/mobile-product-audit.md`, `/docs/mobile-screen-inventory.md`, `/docs/mobile-ux-problems.md` | M1 | Survey / R1 |
+| 2 | Mobile Design System Spec | Create `/docs/mobile-design-system.md` with tokens for colors, typography, spacing, elevation, states | M1 | Survey / R1 |
+| 3 | Core Design Tokens Upgrade | Implement color tokens (light + dark), semantic statuses, 4pt spacing scale, elevation in `src/theme/` | M1 | Survey / R1 |
+| 4 | Tabular Numerals & Typography | Implement typography scale with tabular numeral support for currency and technical metrics | M1 | Survey / R1 |
+| 5 | Theme Provider & Hook | Light and dark theme context/provider with system theme detection and manual toggle | M1 | Survey / R1 |
+| 6 | Standardized Button Primitive | Multi-variant (primary, secondary, outline, ghost, danger), states (default, pressed, loading, disabled) | M1 | Survey / R1 |
+| 7 | Standardized Input Primitive | Input with labels, helper text, inline error validation, prefix/suffix icons, focus states | M1 | Survey / R1 |
+| 8 | Standardized Card & Surface | Elevated, outlined, and flat cards with elevation tokens and theme awareness | M1 | Survey / R1 |
+| 9 | Standardized Badge Primitive | Status badges (success, warning, danger, neutral, info, primary) with consistent padding | M1 | Survey / R1 |
+| 10 | Standardized Skeleton Loader | Loading placeholder primitives replacing raw ActivityIndicators | M1 | Survey / R1 |
+| 11 | Standardized Empty State | Informative empty states with icon circle, title, description, and primary CTA button | M1 | Survey / R1 |
+| 12 | Navigation Stack Reorganization | Reorganize `RootNavigator.tsx` with clean stack & tab hierarchy, route typing | M2 | Survey / R2 |
+| 13 | Safe Area Inset Hardening | Fix `Header.tsx` and screen layouts using `useSafeAreaInsets()` for Android cutouts/notches | M2 | Survey / R2 |
+| 14 | Android Hardware Back Handling | Predictable back navigation across tabs and modal dismissal with dirty form alerts | M2 | Survey / R2 |
+| 15 | Dead Code Elimination | Remove unreferenced `ProjectsScreen.tsx` and deprecate redundant `LeadsScreen.tsx` | M2 | Survey / R2 |
+| 16 | Role-Personalized Command Center | Transform `DashboardScreen.tsx` into an executive command radar displaying real metrics | M2 | Survey / R2 |
+| 17 | Remove Fake Dashboard Fallbacks | Strip hardcoded dummy leads (`Ramesh Patil`), dummy funnels, and fake horizon maps | M2 | Survey / R2 |
+| 18 | Dashboard Loading & Empty States | Integrate SkeletonLoader during API fetch and EmptyState when no data exists | M2 | Survey / R2 |
+| 19 | Authorized Global Search | Modal/screen allowing search across leads, projects, invoices, and serials with RBAC filtering | M2 | Survey / R2 |
+| 20 | Quick Action Dispatcher | FAB / quick action menu for Create Lead, New Quote, Scan Barcode, Record Payment | M2 | Survey / R2 |
+| 21 | ModulesScreen Decomposition | Extract 9 monolithic modal modules from `ModulesScreen.tsx` into modular screens/flows | M3 | Survey / R3 |
+| 22 | Lead Capture Ergonomics | Add `KeyboardAvoidingView`, inline validation, 12-digit consumer number check to `LeadCaptureModal` | M3 | Survey / R3 |
+| 23 | Unsaved Changes Protection | Warn users before discarding dirty input in `LeadCaptureModal`, `CustomerOnboardingModal` | M3 | Survey / R3 |
+| 24 | Pipeline Kanban & Stage Actions | Redesign `PipelineScreen.tsx` with virtualized stages, lead cards, quick action triggers | M3 | Survey / R3 |
+| 25 | Sizing & Quick Quote Calculator | Redesign `QuickQuoteScreen.tsx` with dynamic tenant branding, ALMM modules, PM Surya Ghar DBT | M3 | Survey / R3 |
+| 26 | Multi-Language Proposal Generator | Generate customer proposal PDF with EN/HI/MR pitch text, 12 curated visual templates | M3 | Survey / R3 |
+| 27 | Customer Onboarding KYC Modal | Robust form layout with `KeyboardAvoidingView`, bank IFSC, consumer ID, photo uploads | M3 | Survey / R3 |
+| 28 | Field Projects List & Filtering | Redesign `FieldProjectsScreen.tsx` with stage filters, progress bars, search, virtualized list | M3 | Survey / R3 |
+| 29 | Canonical Project Stage Gating | Enforce stage order (Survey -> Structure -> Material -> Install -> Testing -> NetMeter -> Commission) | M3 | Survey / R3 |
+| 30 | Project Dossier Management | Document repository in `ProjectDossierModal.tsx` with categorized uploads, progress, confirmations | M3 | Survey / R3 |
+| 31 | Statutory DISCOM Document Studio | 7-template generator in `DiscomDocsModal.tsx` with 115mm stamp margin toggle and live PDF preview | M3 | Survey / R3 |
+| 32 | Field Operations & Checklist | Redesign `OperationsScreen.tsx` with interactive installation checklist and geo-photo capture | M3 | Survey / R3 |
+| 33 | 2D Barcode Scanner & ALMM Verification | Camera 2D QR/DataMatrix scanning with DCR domestic content validation, duplicate blocking | M3 | Survey / R3 |
+| 34 | Electrical QA Sign-Off | `InstallationQAModal.tsx` enforcing CEA safety thresholds (<5.0Ω earth pit, <2.0s trip, >1MΩ) | M3 | Survey / R3 |
+| 35 | Milestone Invoicing Ledger | Redesign `FinanceScreen.tsx` with milestone breakdown, overdue aging, payment recording | M3 | Survey / R3 |
+| 36 | Statutory Solar Composite GST | 13.8% composite solar GST calculation (70% @ 12% + 30% @ 18%) with trade discount scaling | M3 | Survey / R3 |
+| 37 | In-App Invoice PDF Viewer & Share | Preview, print, and WhatsApp share sheet dispatch for milestone invoices | M3 | Survey / R3 |
+| 38 | Field Profile & Tenant Identity | Display authorized user/tenant profile, active permissions, statutory links (MSEDCL, PM Surya Ghar) | M3 | Survey / R3 |
+| 39 | Real Offline Sync Queue | Replace simulated `setTimeout` in `FieldProfileScreen.tsx` with real AsyncStorage offline sync queue | M3 | Survey / R3 |
+| 40 | Session Expiry & Suspension Modals | Non-dismissible handling of HTTP 401 (session expired) and HTTP 403 (`TENANT_SUSPENDED`) | M3 | Survey / R3 |
+| 41 | Native Haptics Integration | Integrate `expo-haptics` for tactile feedback on scan success, stage change, QA validation | M4 | Survey / R4 |
+| 42 | Network Connectivity Listener | Integrate `expo-network` / NetInfo for real-time online/offline banner and queue replay | M4 | Survey / R4 |
+| 43 | List Virtualization Optimization | Optimize FlatList / FlashList with `windowSize`, `getItemLayout`, `maxToRenderPerBatch` | M4 | Survey / R4 |
+| 44 | API Debounce & Caching | Debounce search inputs (300ms) and memoize heavy statutory calculations | M4 | Survey / R4 |
+| 45 | Android Permission UX | Clear, graceful permission request dialogs and fallbacks for Camera, Gallery, Storage | M4 | Survey / R4 |
+| 46 | E2E Regression Verification | 100% pass on 23-perspective automated test suite and expanded tier 1-4 tests | M5 | Survey / R5 |
+| 47 | TypeScript & Lint Verification | Strict TypeScript compilation (`tsc --noEmit`) with 0 errors, clean linting | M5 | Survey / R5 |
+| 48 | Adversarial Testing & Hardening | Tier 5 adversarial testing of edge cases, offline transitions, and boundary values | M5 | Survey / R5 |
+| 49 | Transformation Documentation | Produce `/docs/mobile-transformation-plan.md`, `progress.md`, and `testing.md` | M5 | Survey / R5 |
+| 50 | Final Completion Deliverables Report | Comprehensive report with before-and-after audit, screen modifications, and readiness | M5 | Survey / R5 |
 
 ## Milestones
 
 | # | Name | Scope | Dependencies | Status |
 |---|------|-------|-------------|--------|
-| M1 | Documentation Baseline & Architecture Specs | Author complete `docs/product-audit.md`, `docs/module-inventory.md`, `docs/architecture-and-dependencies.md`, `docs/implementation-roadmap.md`, `docs/quality-and-regression-report.md`, and project root `PROJECT.md` | none | DONE (6 artifacts, 134KB, audit CLEAN) |
-| M2 | Design System & Shared UI Components Foundation | Centralized UI primitives in `web-client/src/components/ui/`, token standardization, responsive layouts (320px–1920px), toast context replacing `alert()`, 404 dead link fixes | M1 | DONE (10 UI primitives, 7 Next.js routes, alert replacement, tsc clean, audit CLEAN) |
-| M3 | Security, Multi-Tenancy & Financial Precision Hardening | Backend child entity tenant isolation, JWT `req.user.id` normalization, OCR route auth, RBAC middleware, GST trade discount arithmetic in backend & web-client calculators | M1 | DONE (Child tenancy, JWT id, OCR auth, GST math, 15 tests pass, audit CLEAN) |
-| M4 | Commercial & Operations Module Workflows | Remove hardcoded mock leaks in project DISCOM generator and dashboard, Quotation-to-Project conversion, DISCOM 5-stage gating, PM Surya Ghar subsidy funnel | M2, M3 | DONE (Atomic conditional locking, polling, 0 duplicate projects/BOM, 0 statutory leaks, 14/14 adversarial, 17/17 M4, audit CLEAN) |
-| M5 | Field Operations, Inventory & Mobile Parity | PO receiving stock automation, mobile barcode scanner & electrical QA sign-off, mobile PDF template parity fix, mobile touch Kanban | M3, M4 | DONE (PO auto-receipt, atomic compare-and-swap locking, status regression guard, mobile PDF parity, CEA electrical QA, 15/15 adversarial, 17/17 M5, 1/1 parity, 23/23 mobile, audit CLEAN) |
-| M6 | Cross-Module E2E Validation & Regression Fixes | Complete Lead-to-Service lifecycle validation, verify 100% test passes across backend, mobile, and web-client, final evidence report | M4, M5 | DONE (10-phase lifecycle pass, 1-rupee rounding fix, 127 backend, 69 E2E, 23 mobile, 8 UI, 66 routes, audit CLEAN) |
+| M1 | Audit, Screen Inventory & Design System Foundation | Document audit, screen inventory, UX problems; design system specification & tokens (light/dark, typography, tabular numerals, spacing, states); shared UI primitives | none | DONE |
+| M2 | Mobile IA, Navigation & Business Command Dashboard | Navigation restructuring, safe area insets, Android hardware back, dead code removal, Dashboard transformation with authorized data & loading skeletons, global search | M1 | DONE |
+| M3 | End-to-End Module, Screen & Workflow Transformation | Decompose ModulesScreen; CRM/Pipeline, QuickQuote, Customer Onboarding, Field Projects, DISCOM Studio, Field Operations, Electrical QA, Barcode Scanner, Finance & Invoicing, Profile | M1, M2 | DONE |
+| M4 | Native Android Interactions, Performance & Layout Validation | Expo Haptics, real offline sync queue, network status listener, list virtualization, memoization, permission handling, layout responsiveness | M1, M2, M3 | DONE |
+| M5 | E2E Testing, Adversarial Hardening & Final Reporting | Dual-track verification: Tiers 1-4 automated test pass, Tier 5 adversarial hardening, TypeScript checks, transformation docs and final completion report | M1, M2, M3, M4 | IN_PROGRESS |
 
 ## Interface Contracts
 
-### Auth & Tenancy Middleware ↔ Route Controllers
-- `req.user`: `{ id: string, userId: string, role: string, tenantId: string, permissions: string[] }`
-- `requireTenantAuth`: Extracts bearer token or cookie, verifies JWT against `JWT_SECRET`, checks tenant status != `SUSPENDED`, sets `req.user`, rejects 401/403.
-- `requirePermission(...permissions)`: Verifies `req.user.permissions.includes(permission)` or `role === 'TENANT_ADMIN'`.
+### Theme ↔ Screen Components
+```typescript
+interface ThemeColors {
+  primary: string;
+  primaryLight: string;
+  primaryDark: string;
+  accent: string;
+  accentLight: string;
+  background: string;
+  surface: string;
+  surfaceElevated: string;
+  border: string;
+  borderSubtle: string;
+  text: string;
+  textSecondary: string;
+  textMuted: string;
+  success: string;
+  successLight: string;
+  warning: string;
+  warningLight: string;
+  danger: string;
+  dangerLight: string;
+  info: string;
+  infoLight: string;
+}
 
-### Sub-Entity Query Contract
-- All mutations on sub-entities (`tasks`, `milestones`, `materials`, `service visits`) MUST enforce parent tenant ownership:
-  `prisma.projectTask.update({ where: { id, project: { tenantId: req.user.tenantId } }, data: ... })`
+interface DesignTokens {
+  colors: ThemeColors;
+  isDark: boolean;
+  spacing: (step: number) => number; // 4pt grid: 1=4px, 2=8px, 4=16px, etc.
+  radii: { sm: number; md: number; lg: number; xl: number; full: number };
+  typography: {
+    fontFamilies: { regular: string; medium: string; bold: string; mono: string };
+    sizes: { tiny: number; caption: number; body: number; sub: number; base: number; title: number; h3: number; h2: number; h1: number };
+    tabularNums: { fontVariant: ['tabular-nums'] };
+  };
+}
+```
 
-### Financial Engine Contract (`solarCalculator`)
-- Input: `{ items: Array<{ unitPrice: number, quantity: number, taxRate: number, discount?: number }>, overallDiscount?: number, useCompositeSolarGST?: boolean }`
-- Output: `{ subtotal: number, overallDiscount: number, taxableAmount: number, totalTax: number, grandTotal: number, cgst: number, sgst: number, milestones: Array<{ stage: string, percentage: number, amount: number }> }`
-- Invariant 1: If `overallDiscount > 0`, item taxable amounts and taxes are adjusted proportionally before summing `totalTax`.
-- Invariant 2: `sum(milestones.map(m => m.amount)) === grandTotal` strictly (no 1-rupee rounding drift).
+### Auth & Tenant Context ↔ Screens
+```typescript
+interface UserProfile {
+  id: string;
+  name: string;
+  email: string;
+  role: 'SUPER_ADMIN' | 'TENANT_ADMIN' | 'TENANT_SUB_ADMIN';
+  tenantName: string;
+  tenantId: string;
+  avatarUrl?: string;
+  permissions?: string[];
+}
 
-### UI Primitives Contract (`web-client/src/components/ui`)
-- `Button`: `({ variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger', size?: 'sm' | 'md' | 'lg', isLoading?: boolean, children, ...props })`
-- `Input`: `({ label?: string, error?: string, helperText?: string, ...props })`
-- `Modal`: `({ isOpen: boolean, onClose: () => void, title?: string, children })`
-- `Toast`: `useToast().showToast({ type: 'success' | 'error' | 'info' | 'warning', message: string })`
+interface AuthContextValue {
+  user: UserProfile | null;
+  token: string | null;
+  isLoading: boolean;
+  sessionExpired: boolean;
+  accountSuspended: boolean;
+  accountSuspendedMessage: string;
+  backendStatus: { isOnline: boolean; serverUrl: string; latencyMs?: number };
+  logout: () => Promise<void>;
+  resetPasswordRequired: boolean;
+}
+```
+
+### Statutory Solar Calculation Contract
+```typescript
+interface PricingCalculation {
+  systemKw: number;
+  basePricePerWatt: number;
+  subtotal: number;
+  tradeDiscount: number;
+  taxableAmount: number;
+  gstRate: number; // 0.138 (13.8% composite solar GST)
+  gstAmount: number;
+  grossTotal: number;
+  cfaSubsidy: number; // ₹30k (1kW), ₹60k (2kW), ₹78k (>=3kW residential cap)
+  netPayableByCustomer: number;
+  milestones: [
+    { name: 'Advance', percentage: 20, amount: number },
+    { name: 'Delivery', percentage: 60, amount: number },
+    { name: 'Installation', percentage: 15, amount: number },
+    { name: 'Commissioning', percentage: 5, amount: number }
+  ];
+}
+```
 
 ## Code Layout
-- `backend/`:
-  - `middleware/auth.js`: Auth verification & RBAC
-  - `routes/tenant/*.js`: Tenant API controllers
-  - `services/solarCalculator.js`: Financial calculation engine
-  - `test/*.test.js`: Automated backend test suites
-- `web-client/`:
-  - `src/components/ui/`: Standardized UI primitive components
-  - `src/app/globals.css`: Design tokens & Tailwind theme
-  - `src/app/tenant/*`: Tenant business module pages
-  - `src/services/solarCalculator.ts`: Frontend calculation engine
-- `mobile-app/`:
-  - `src/screens/*`: Mobile operational screens
-  - `src/services/*`: PDF generation, offline sync, WhatsApp integration
-  - `test-perspectives.js`: Mobile automated test suite
-- `docs/`:
-  - `product-audit.md`: Full architectural and security audit
-  - `module-inventory.md`: Complete module and page inventory
-  - `architecture-and-dependencies.md`: System dependencies and data models
-  - `implementation-roadmap.md`: Batch implementation roadmap
-  - `quality-and-regression-report.md`: Test execution and regression report
+- `docs/mobile-product-audit.md`: Detailed codebase architecture, packages, and technical evaluation.
+- `docs/mobile-screen-inventory.md`: Complete 23-screen inventory with routes, states, and deficiencies.
+- `docs/mobile-ux-problems.md`: Catalog of UX anti-patterns, form ergonomics flaws, and layout issues.
+- `docs/mobile-design-system.md`: Full design system specification with tokens, scales, and component guidelines.
+- `docs/mobile-transformation-plan.md`: Milestone roadmap, architectural decisions, and tracking.
+- `docs/mobile-transformation-progress.md`: Phase-by-phase execution log and milestones status.
+- `docs/mobile-transformation-testing.md`: Comprehensive test matrix, commands, results, and edge cases.
+- `mobile-app/src/theme/`: Standardized theme tokens (`colors.ts`, `tokens.ts`, `ThemeProvider.tsx`, `useTheme.ts`).
+- `mobile-app/src/components/common/`: Reusable UI primitives (`Button`, `Card`, `Badge`, `Input`, `EmptyState`, `SkeletonLoader`, etc.).
+- `mobile-app/src/navigation/`: Navigation root, stacks, tab navigators, and route types.
+- `mobile-app/src/screens/`: Domain screen modules (auth, dashboard, crm, projects, operations, finance, modules, profile).

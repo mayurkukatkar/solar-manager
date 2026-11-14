@@ -344,22 +344,20 @@ export const InvoicePdfModal: React.FC<InvoicePdfModalProps> = ({
                   <Text style={styles.totalVal}>₹{(invoicePdfData.taxAmount - Math.round(invoicePdfData.taxAmount / 2)).toLocaleString('en-IN')}</Text>
                 </View>
                 <View style={styles.grandTotalRow}>
-                  <Text style={styles.grandTotalLabel}>Total Invoice Value</Text>
+                  <Text style={styles.grandTotalLabel}>Total Amount</Text>
                   <Text style={styles.grandTotalVal}>₹{invoicePdfData.grossTotal.toLocaleString('en-IN')}</Text>
                 </View>
-                {totalPaid > 0 && (
-                  <View style={styles.totalRow}>
-                    <Text style={[styles.totalLabel, { color: '#059669', fontWeight: '700' }]}>
-                      Amount Paid to Date
-                    </Text>
-                    <Text style={[styles.totalVal, { color: '#059669', fontWeight: '800' }]}>
-                      ₹{totalPaid.toLocaleString('en-IN')}
-                    </Text>
-                  </View>
-                )}
+                <View style={styles.totalRow}>
+                  <Text style={[styles.totalLabel, { color: '#059669', fontWeight: '700' }]}>
+                    First Advance Paid
+                  </Text>
+                  <Text style={[styles.totalVal, { color: '#059669', fontWeight: '800' }]}>
+                    ₹{totalPaid.toLocaleString('en-IN')}
+                  </Text>
+                </View>
                 <View style={styles.totalRow}>
                   <Text style={[styles.totalLabel, { color: balance > 0 ? '#b45309' : '#059669', fontWeight: '900' }]}>
-                    Balance Outstanding
+                    Remaining Balance
                   </Text>
                   <Text style={[styles.totalVal, { color: balance > 0 ? '#b45309' : '#059669', fontWeight: '900' }]}>
                     ₹{balance.toLocaleString('en-IN')}

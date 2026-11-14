@@ -173,139 +173,139 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
       const canViewLeads = hasPermission(user, 'leads.view');
       const leadsPromise = canViewLeads
         ? crmApi
-            .getLeads({ search: debouncedQuery, all: true })
-            .then((data) => {
-              if (isCancelled) return;
-              const leadsList = Array.isArray(data?.leads)
-                ? data.leads
-                : Array.isArray(data)
+          .getLeads({ search: debouncedQuery, all: true })
+          .then((data) => {
+            if (isCancelled) return;
+            const leadsList = Array.isArray(data?.leads)
+              ? data.leads
+              : Array.isArray(data)
                 ? data
                 : [];
-              leadsList.forEach((lead: any) => {
-                collected.push({
-                  id: lead.id,
-                  entityType: 'LEAD',
-                  title: lead.name || 'Unnamed Prospect',
-                  subtitle: `${lead.city || 'Location N/A'} • ${lead.mobile || lead.phone || 'No Mobile'} • Stage: ${lead.stage || 'NEW'}`,
-                  badgeLabel: 'Lead',
-                  badgeVariant: 'primary',
-                  metaRight: lead.estimatedCap ? `${lead.estimatedCap} kW` : undefined,
-                  originalData: lead,
-                });
+            leadsList.forEach((lead: any) => {
+              collected.push({
+                id: lead.id,
+                entityType: 'LEAD',
+                title: lead.name || 'Unnamed Prospect',
+                subtitle: `${lead.city || 'Location N/A'} • ${lead.mobile || lead.phone || 'No Mobile'} • Stage: ${lead.stage || 'NEW'}`,
+                badgeLabel: 'Lead',
+                badgeVariant: 'primary',
+                metaRight: lead.estimatedCap ? `${lead.estimatedCap} kW` : undefined,
+                originalData: lead,
               });
-            })
-            .catch(() => {})
+            });
+          })
+          .catch(() => { })
         : Promise.resolve();
 
       // 2. Projects Query (RBAC: projects.view)
       const canViewProjects = hasPermission(user, 'projects.view');
       const projectsPromise = canViewProjects
         ? tenantApi
-            .getProjects()
-            .then((data) => {
-              if (isCancelled) return;
-              const projList = Array.isArray(data?.projects)
-                ? data.projects
-                : Array.isArray(data)
+          .getProjects()
+          .then((data) => {
+            if (isCancelled) return;
+            const projList = Array.isArray(data?.projects)
+              ? data.projects
+              : Array.isArray(data)
                 ? data
                 : [];
-              projList.forEach((proj: any) => {
-                const name = (proj.name || '').toLowerCase();
-                const custName = (proj.customer?.name || '').toLowerCase();
-                const consumerNo = (proj.consumerNumber || proj.discomConsumerNo || '').toLowerCase();
-                const city = (proj.city || proj.address || '').toLowerCase();
+            projList.forEach((proj: any) => {
+              const name = (proj.name || '').toLowerCase();
+              const custName = (proj.customer?.name || '').toLowerCase();
+              const consumerNo = (proj.consumerNumber || proj.discomConsumerNo || '').toLowerCase();
+              const city = (proj.city || proj.address || '').toLowerCase();
 
-                // Match against fields
-                if (
-                  name.includes(q) ||
-                  custName.includes(q) ||
-                  consumerNo.includes(q) ||
-                  city.includes(q)
-                ) {
-                  collected.push({
-                    id: proj.id,
-                    entityType: 'PROJECT',
-                    title: proj.name || `Project #${proj.id.slice(0, 8)}`,
-                    subtitle: `${proj.customer?.name || 'Customer'} • ${proj.city || 'Site'} • ${proj.currentStage || proj.status || 'Active'}`,
-                    badgeLabel: 'Project',
-                    badgeVariant: 'success',
-                    metaRight: proj.capacity ? `${proj.capacity} kWp` : undefined,
-                    originalData: proj,
-                  });
-                }
+              // Match against fields
+              if (
+                name.includes(q) ||
+                custName.includes(q) ||
+                consumerNo.includes(q) ||
+                city.includes(q)
+              ) {
+                collected.push({
+                  id: proj.id,
+                  entityType: 'PROJECT',
+                  title: proj.name || `Project #${proj.id.slice(0, 8)}`,
+                  subtitle: `${proj.customer?.name || 'Customer'} • ${proj.city || 'Site'} • ${proj.currentStage || proj.status || 'Active'}`,
+                  badgeLabel: 'Project',
+                  badgeVariant: 'success',
+                  metaRight: proj.capacity ? `${proj.capacity} kWp` : undefined,
+                  originalData: proj,
+                });
+              }
 
-                // 4. Barcodes & Hardware Serials Scanning (RBAC: operations.view / hardware.scan)
-                const canViewHardware =
-                  hasPermission(user, 'operations.view') ||
-                  hasPermission(user, 'hardware.scan') ||
-                  hasPermission(user, 'operations.scan');
+              // 4. Barcodes & Hardware Serials Scanning (RBAC: operations.view / hardware.scan)
+              const canViewHardware =
+                hasPermission(user, 'operations.view') ||
+                hasPermission(user, 'hardware.scan') ||
+                hasPermission(user, 'operations.scan');
 
-                if (canViewHardware) {
-                  const moduleSerials: string[] = Array.isArray(proj.moduleSerials)
-                    ? proj.moduleSerials
-                    : typeof proj.dcrModuleSerials === 'string'
+              if (canViewHardware) {
+                const moduleSerials: string[] = Array.isArray(proj.moduleSerials)
+                  ? proj.moduleSerials
+                  : typeof proj.dcrModuleSerials === 'string'
                     ? proj.dcrModuleSerials.split(/[\n,]/).map((s: string) => s.trim())
                     : [];
 
-                  moduleSerials.forEach((sn) => {
-                    if (sn && sn.toLowerCase().includes(q)) {
-                      collected.push({
-                        id: `sn_${proj.id}_${sn}`,
-                        entityType: 'BARCODE',
-                        title: `Serial: ${sn}`,
-                        subtitle: `Project: ${proj.name} (${proj.customer?.name || 'Site'})`,
-                        badgeLabel: 'PV Hardware',
-                        badgeVariant: 'warning',
-                        metaRight: 'Module Serial',
-                        originalData: { ...proj, matchedSerial: sn },
-                      });
-                    }
-                  });
-
-                  if (proj.inverterSerial && proj.inverterSerial.toLowerCase().includes(q)) {
+                moduleSerials.forEach((sn) => {
+                  if (sn && sn.toLowerCase().includes(q)) {
                     collected.push({
-                      id: `inv_${proj.id}_${proj.inverterSerial}`,
+                      id: `sn_${proj.id}_${sn}`,
                       entityType: 'BARCODE',
-                      title: `Inverter: ${proj.inverterSerial}`,
+                      title: `Serial: ${sn}`,
                       subtitle: `Project: ${proj.name} (${proj.customer?.name || 'Site'})`,
-                      badgeLabel: 'Inverter Serial',
+                      badgeLabel: 'PV Hardware',
                       badgeVariant: 'warning',
-                      metaRight: 'Grid-Tie',
-                      originalData: { ...proj, matchedSerial: proj.inverterSerial },
+                      metaRight: 'Module Serial',
+                      originalData: { ...proj, matchedSerial: sn },
                     });
                   }
+                });
+
+                if (proj.inverterSerial && proj.inverterSerial.toLowerCase().includes(q)) {
+                  collected.push({
+                    id: `inv_${proj.id}_${proj.inverterSerial}`,
+                    entityType: 'BARCODE',
+                    title: `Inverter: ${proj.inverterSerial}`,
+                    subtitle: `Project: ${proj.name} (${proj.customer?.name || 'Site'})`,
+                    badgeLabel: 'Inverter Serial',
+                    badgeVariant: 'warning',
+                    metaRight: 'Grid-Tie',
+                    originalData: { ...proj, matchedSerial: proj.inverterSerial },
+                  });
                 }
-              });
-            })
-            .catch(() => {})
+              }
+            });
+          })
+          .catch(() => { })
         : Promise.resolve();
 
       // 3. Finance & Invoices Query (RBAC: finance.view)
       const canViewFinance = hasPermission(user, 'finance.view');
       const financePromise = canViewFinance
         ? financeApi
-            .getInvoices({ search: debouncedQuery })
-            .then((data) => {
-              if (isCancelled) return;
-              const invList = Array.isArray(data?.invoices)
-                ? data.invoices
-                : Array.isArray(data)
+          .getInvoices({ search: debouncedQuery })
+          .then((data) => {
+            if (isCancelled) return;
+            const invList = Array.isArray(data?.invoices)
+              ? data.invoices
+              : Array.isArray(data)
                 ? data
                 : [];
-              invList.forEach((inv: any) => {
-                collected.push({
-                  id: inv.id,
-                  entityType: 'INVOICE',
-                  title: `Invoice #${inv.invoiceNumber || inv.id.slice(0, 8)}`,
-                  subtitle: `${inv.customer?.name || 'Customer'} • Status: ${inv.status || 'UNPAID'}`,
-                  badgeLabel: 'Invoice',
-                  badgeVariant: 'accent',
-                  metaRight: inv.amount ? `₹${Number(inv.amount).toLocaleString('en-IN')}` : undefined,
-                  originalData: inv,
-                });
+            invList.forEach((inv: any) => {
+              collected.push({
+                id: inv.id,
+                entityType: 'INVOICE',
+                title: `Invoice #${inv.invoiceNumber || inv.id.slice(0, 8)}`,
+                subtitle: `${inv.customer?.name || 'Customer'} • Status: ${inv.status || 'UNPAID'}`,
+                badgeLabel: 'Invoice',
+                badgeVariant: 'accent',
+                metaRight: inv.amount ? `₹${Number(inv.amount).toLocaleString('en-IN')}` : undefined,
+                originalData: inv,
               });
-            })
-            .catch(() => {})
+            });
+          })
+          .catch(() => { })
         : Promise.resolve();
 
       // Execute all authorized endpoints in parallel

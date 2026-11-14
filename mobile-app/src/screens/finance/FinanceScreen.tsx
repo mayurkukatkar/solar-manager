@@ -500,21 +500,21 @@ export const FinanceScreen: React.FC<{ navigation?: any; route?: any }> = ({ nav
             ]}
           >
             <View style={styles.metricItem}>
-              <Text style={[styles.metricLabel, { color: colors.textMuted }]}>INVOICE TOTAL</Text>
+              <Text style={[styles.metricLabel, { color: colors.textMuted }]}>TOTAL AMOUNT</Text>
               <Text style={[styles.metricVal, { color: colors.text }]}>
                 ₹{(inv.amount || 0).toLocaleString('en-IN')}
               </Text>
             </View>
 
             <View style={styles.metricItem}>
-              <Text style={[styles.metricLabel, { color: colors.textMuted }]}>COLLECTED</Text>
+              <Text style={[styles.metricLabel, { color: colors.textMuted }]}>FIRST ADVANCE</Text>
               <Text style={[styles.metricVal, { color: '#10B981' }]}>
                 ₹{totalPaid.toLocaleString('en-IN')}
               </Text>
             </View>
 
             <View style={styles.metricItem}>
-              <Text style={[styles.metricLabel, { color: colors.textMuted }]}>BALANCE DUE</Text>
+              <Text style={[styles.metricLabel, { color: colors.textMuted }]}>REMAINING BALANCE</Text>
               <Text
                 style={[
                   styles.metricVal,

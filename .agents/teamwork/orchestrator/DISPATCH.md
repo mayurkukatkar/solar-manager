@@ -1,55 +1,39 @@
-## 2026-10-29T11:13:04Z
+## 2026-10-30T07:39:49Z
 
-Operate as a coordinated senior product engineering team (combining Principal Software Architect, Senior Full-Stack Engineers, Product Manager, Solar Industry Domain Expert, Enterprise UI/UX Designer, Design Systems Engineer, QA and Automation Engineer, Application Security Engineer, SaaS Multi-Tenant Architect, Database and Performance Engineer, Accessibility Specialist, DevOps and Reliability Engineer, and Indian Business Workflow Specialist) to audit, redesign, improve, implement, test, and validate every existing module, page, workflow, component, integration, and user-facing interaction in the current WhereReady Solar OS codebase. The final result must be a cohesive, professional solar business management and operations SaaS for solar vendors, EPC companies, installers, and solar businesses.
+Operate as a multidisciplinary product transformation team (Chief Product Designer, Principal UI/UX Designer, Senior Mobile Application Architect, Design Systems Architect, Mobile Interaction Designer, User Experience Researcher, React Native and Expo Specialist, Mobile Performance Engineer, Accessibility Specialist, Mobile Security Engineer, Product Quality Assurance Engineer, Product Strategy Consultant) to transform the existing WhereReady Solar OS Expo / React Native mobile application into a world-class premium mobile SaaS product for solar businesses, vendors, and EPC companies.
 
 Integrity mode: development
 
 ## Verification Resources
-- Existing repository build, lint, type-check, and test scripts located in package manifests and configuration files across backend, frontend, web-client, and mobile-app packages.
+- Existing repository build, lint, type-check, and test scripts located in package manifests and configuration files across the codebase, along with local environment setup for running and verifying the mobile application.
 
 ## Requirements
 
-### R1. Full Codebase Discovery, Baseline & Module Inventory (Phases 1 & 2)
-Audit and map the entire existing codebase across backend, frontend, web-client, and mobile-app, inspecting repository structure, package manifests, API endpoints, routing, database schema, auth, sessions, tenant resolution, and all existing modules and submodules. Identify critical security, data integrity, financial calculation, and application stability risks. Create or update documentation artifacts in the repository: `docs/product-audit.md`, `docs/module-inventory.md`, `docs/architecture-and-dependencies.md`, `docs/implementation-roadmap.md`, and `docs/quality-and-regression-report.md`. Maintain a progress tracker covering every discovered module, assigned owner, status, changes, test results, and blockers.
+### R1. Codebase Discovery, Screen Inventory & Design System Foundation
+Conduct a complete investigation of the existing Expo mobile application without modifying backend architecture or breaking API contracts, producing structured inventory and audit documentation in `/docs/mobile-product-audit.md`, `/docs/mobile-screen-inventory.md`, and `/docs/mobile-ux-problems.md`. Establish a distinctive, professional design system in `/docs/mobile-design-system.md` with reusable tokens for colors (preserving WhereReady branding with semantic statuses), typography scale with tabular numerals, consistent spacing scale, shape/elevation hierarchy, unified iconography, light and dark theme support, and complete component states (default, active, focused, pressed, disabled, loading, success, error) before screen styling.
 
-### R2. Design System & Shared UI Components Foundation (Phase 3)
-Establish a coherent visual identity and reusable design tokens (colors, typography, spacing, status styles, borders, elevation) respecting existing WhereReady branding. Improve application-wide navigation and standardize shared UI primitives and interactive controls (buttons, tables, forms, modals, drawers, toasts) across desktop and mobile viewports (320px to 1920px) before redesigning individual modules. Ensure purposeful loading, empty, error, and success states without superficial mockups or breaking business logic.
+### R2. Mobile Information Architecture, Navigation & Business Command Dashboard
+Redesign the mobile information architecture and navigation for mobile ergonomics, supporting predictable tab/stack navigation, Android hardware back behaviour, safe areas, role-based access, and authorized global search and quick actions. Transform the main dashboard into a business command centre providing role-personalized operational visibility (KPIs, active projects, sales overview, financial summaries, pending/overdue milestones, team activity, and quick actions) using progressive disclosure and real authorized data without fake statistics.
 
-### R3. Dependency-Aware Batch Implementation & Coordination (Phases 4 & 5)
-Implement module improvements in controlled, dependency-aware batches across all existing modules (CRM/Leads, Customers, Surveys, Quotations, Projects, Inventory/Procurement, Installation, Workforce, Finance/Invoicing/Payments, Service/Warranty, Reports, Settings, SaaS Admin). Assign parallel specialists only to independent workstreams. A lead integrator must coordinate shared files, database migrations, API contracts, and integration changes to prevent conflicting edits to shared files. Never replace real functionality with mockups, dummy data, or placeholder actions. Continue implementing improvements after the audit without stopping at recommendations, proceeding through implementation phases without waiting for approval for routine, reversible changes.
+### R3. End-to-End Module, Screen & Workflow Transformation
+Inspect and redesign every existing module, screen, and sub-screen (including Leads/CRM, Project Management, Inventory Management, Installation Management, Staff Management, and Financial/Payment modules) tailored to role-specific tasks while maintaining design system consistency. Implement deliberate application state designs for every screen (loading skeletons, informative empty states with primary actions, human-readable error recovery, offline resilience, partial data handling, and graceful session expiration) and optimize mobile data entry forms with native pickers, logical keyboard handling, field validation, and unsaved change protection.
 
-### R4. Cross-Module Workflows, Multi-Tenant Security & Controlled Safeguards (Phases 6 & 7)
-Validate complete solar business journeys (Lead to Customer to Survey to Quotation to Project to Procurement to Installation to Invoicing/Payment to Service) with consistent state across linked entities. Enforce server-side role-based authorization and strict multi-tenant isolation on all tenant-scoped resources. Strictly adhere to execution safeguards: no destructive database migrations, no production data modification, no secret exposure, no breaking deployment changes without explicit authorization, and no connecting to live external services or production databases (local development and mock environments only).
+### R4. Native Android Interactions, Performance & Layout Validation
+Deliver a fluid native Android experience with purposeful gestures, native haptics, responsive layouts across diverse screen sizes (handling notches, dynamic font scaling, long strings, keyboard open), and proper permission handling for camera and document uploads. Audit and optimize application performance, list virtualization, memoization, API caching/debounce, startup time, and memory usage without adding unnecessary packages.
 
-### R5. Layered Testing, Regression Fixes & Final Evidence Reporting
-Execute automated tests after each batch before proceeding; preserve existing functionality and resolve regressions immediately. Verify responsive layouts (320px to 1920px), financial decimal precision arithmetic, and security controls. Never claim tests or compliance checks passed unless actually executed and verified; mark blocked or unverified items honestly. Produce an evidence-based completion report detailing discovered/audited/verified module counts, module-level changes, design and technical improvements, test execution outcomes, remaining risks, and next steps.
+### R5. Comprehensive Quality Assurance, Validation & Transformation Reporting
+Validate all major user journeys and role-based permissions against functional regressions, simulating edge cases (offline/slow network, API failures, expired sessions, duplicate submissions) and running TypeScript checks, linting, and build verification. Capture actual before-and-after screenshots from the running application on devices/emulators to evaluate visual quality across established quality dimensions (target score 9/10), maintaining `/docs/mobile-transformation-plan.md`, `/docs/mobile-transformation-progress.md`, and `/docs/mobile-transformation-testing.md`, and delivering a comprehensive final completion report covering product audit, design transformation, screen modifications, engineering changes, test results, visual comparisons, and readiness assessment.
 
-## Acceptance Criteria
+## 2026-10-30T12:14:19Z
 
-### Audit, Baseline & Progress Tracking
-- [ ] Complete module inventory, dependency map, and risk baseline are documented in `docs/` (`product-audit.md`, `module-inventory.md`, `architecture-and-dependencies.md`, `implementation-roadmap.md`, `quality-and-regression-report.md`).
-- [ ] A progress tracker is maintained recording every discovered module, assigned owner, implementation status, changes made, test results, and documented blockers.
+Liveness nudge: Resource quota has reset. Please resume Milestone M3 execution.
 
-### Design System & Component Foundation
-- [ ] Shared design tokens for colors, typography, spacing, and semantic statuses are implemented and applied to shared components before individual module overhauls.
-- [ ] Shared interactive components (tables, forms, dialogs, dropdowns, navigation) handle loading, empty, error, and success states without broken focus, clipping, or double submissions.
-- [ ] Responsive layouts function cleanly across viewports from 320px mobile to 1920px desktop without horizontal overflow or clipped actions.
+## 2026-10-30T15:23:03Z
 
-### Functional Implementation & Lead Coordination
-- [ ] All discovered modules are audited and improved in dependency-aware batches without replacing real functionality with mockups or dummy data.
-- [ ] No conflicting changes occur on shared files, coordinated through a designated lead integrator for shared schemas, migrations, and API contracts.
-- [ ] Quotations, invoices, and payment calculations use decimal arithmetic with consistent tax, discount, and rounding rules.
-- [ ] Cross-module solar workflows maintain consistent state across linked records without orphaned data or duplicate records on retries.
+System restored after server restart. The user requested: "Please continue execution of the project transformation."
 
-### Security, Multi-Tenancy & Safeguards
-- [ ] Server-side authorization and multi-tenant isolation are verified on all tenant-scoped queries, mutations, background jobs, exports, and file downloads.
-- [ ] No destructive database migrations, production data alterations, secret exposures, or live external database connections take place.
-
-### Verification & Delivery Reporting
-- [ ] Batch-level tests run cleanly before proceeding to subsequent batches, with regressions investigated and fixed immediately.
-- [ ] Existing build, lint, type-check, and automated test commands pass with verified results; unverified or blocked items are explicitly marked.
-- [ ] A final evidence-based completion report is delivered covering overall audit metrics, module-by-module changes, design/technical improvements, test outcomes, remaining risks, and next steps.
-
-## 2026-10-29T16:15:47Z
-
-The quota window has reset and the server has restarted. Please resume execution from where you left off (Milestone M4 remediation — concurrency hardening and static string purges) and proceed through Milestones M5 and M6. Check the status of your subagents, revive or re-spawn as necessary, and continue the execution pipeline.
+Current status:
+- Milestones M1, M2, and M3 are 100% completed and gate-certified.
+- Milestone M4 Pass 1 gate review completed: Reviewers M4-1 & M4-2 approved, Challenger M4-2 approved (29/29 tests), Forensic Auditor M4 confirmed CLEAN (0 violations). Challenger M4-1 requested changes for 2 failing tests in Suite 7 of `tier5-m4-offline-haptics-stress.js` (multi-tenant queue filtering and idempotency key retention).
+- Explorer M4 Remediation has already completed its analysis and delivered its blueprint in `.agents/teamwork/explorer_m4_remediation/handoff.md` and `analysis.md`.
+- Next actions: Dispatch Worker M4 Remediation to implement the surgical fixes in `offlineSyncService.ts` and `AuthContext.tsx`, re-run Challenger M4-1 (expecting 32/32 tests pass), determine M4 Gate PASS, and proceed to Milestone M5 (Comprehensive QA, final hardening, deliverables reporting, and Victory Audit).

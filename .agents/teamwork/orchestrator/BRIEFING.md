@@ -1,129 +1,128 @@
-# BRIEFING — 2026-10-29T12:25:30Z
+# BRIEFING — 2026-10-30T08:50:00Z
 
 ## Mission
-Audit, redesign, improve, implement, test, and validate every existing module, page, workflow, component, integration, and user-facing interaction in WhereReady Solar OS into a cohesive, production-grade solar business management and operations SaaS.
+Transform WhereReady Solar OS Expo / React Native mobile app into a world-class premium mobile SaaS product for solar businesses, vendors, and EPC companies.
 
 ## 🔒 My Identity
-- Archetype: teamwork_orchestrator
+- Archetype: orchestrator
 - Roles: orchestrator, user_liaison, human_reporter, successor
-- Working directory: f:\Company Products\solar-manager\.agents\teamwork\orchestrator\
+- Working directory: f:\Company Products\solar-manager\.agents\teamwork\orchestrator
 - Original parent: parent
-- Original parent conversation ID: 8832e93e-05ab-4864-b040-d03a27d45713
+- Original parent conversation ID: c304cd4f-fbd0-47a2-a899-06e2c25620ea
 
 ## 🔒 My Workflow
-- **Pattern**: Project Pattern (Dual Track: Implementation Track + E2E Testing Track)
+- **Pattern**: Project Pattern
 - **Scope document**: f:\Company Products\solar-manager\.agents\teamwork\orchestrator\PROJECT.md
-1. **Decompose**: Survey codebase with 3 parallel Explorers/Spec Miners to discover inventory, modules, packages, routing, APIs, schema, and baseline risks. Record features in PROJECT.md and docs/*. Decompose into milestone batches (M1: Documentation Baseline [DONE], M2: Design System & UI Primitives [IN_VERIFICATION], M3: Security/Auth/Financials [IN_VERIFICATION], M4: Commercial & Operations, M5: Field Ops & Inventory, M6: Cross-Module E2E Verification).
+1. **Decompose**: Survey full scope with 3 Explorers, synthesize Feature Inventory in PROJECT.md, decompose into discrete milestones (R1-R5), and dispatch sub-orchestrators/workers.
 2. **Dispatch & Execute**:
-   - Run the Explorer -> Worker -> Reviewer -> Challenger -> Auditor gate cycle per milestone.
-   - Dual track: Spawn E2E Testing Track in parallel [DONE - TEST_READY.md published, 69/69 passing].
-3. **On failure** (in this order):
-   - Retry: nudge stuck agent or re-send task
-   - Replace: spawn fresh agent with partial progress
-   - Skip: proceed without (only if non-critical)
-   - Redistribute: split stuck agent's remaining work
-   - Redesign: re-partition decomposition
-   - Escalate: report to parent (sub-orchestrators only, last resort)
-4. **Succession**: At 16 spawns, write handoff.md, kill crons, spawn successor teamwork_orchestrator, notify parent.
+   - Direct iteration loop / sub-orchestration: Explorer -> Worker -> Reviewer -> Challenger -> Auditor -> Gate.
+   - Dual track: Implementation track & E2E Testing track.
+3. **On failure**: Retry -> Replace -> Skip -> Redistribute -> Redesign -> Escalate.
+4. **Succession**: Manage subagent spawns within overall conversation limit 128.
 - **Work items**:
-  1. Survey & Codebase Discovery [done]
-  2. Documentation Artifacts & Module Inventory (M1) [done]
-  3. Design System & Shared UI Primitives (M2) [done]
-  4. Security, Tenancy & Financial Precision (M3) [done]
-  5. Commercial & Operations Module Workflows (M4) [done]
-  6. Field Operations, Inventory & Mobile Parity (M5) [done]
-  7. Cross-Module Workflows, End-to-End Validation & Verification (M6) [done]
-  8. Dual Track: E2E Test Suite Tiers 1-4 [done - 69/69 passing]
-- **Current phase**: Project Completion & Final Evidence Reporting
-- **Current focus**: Authoring and delivering final evidence completion report to parent and user
-
-## 🔒 Key Constraints
-- NEVER write, modify, or create source code files directly.
-- NEVER run build/test commands yourself — require workers to do so.
-- NEVER investigate or explore the problem at the code level — dispatch Explorers for technical investigation.
-- You MAY use file-editing tools ONLY for metadata/state files (.md) in your .agents/teamwork/ folder.
-- Hard Veto on Auditor Integrity Violation: binary veto, failure on violation.
-- Decimal precision arithmetic for quotations, invoices, payments, tax, discounts.
-- Strict multi-tenant isolation and server-side authorization on all tenant-scoped queries, mutations, jobs, exports, downloads.
-- Controlled safeguards: no destructive migrations, no production data alteration, no secret exposures, no live external service connections.
-- Never replace real functionality with mockups, dummy data, or placeholder actions.
-- Never reuse a subagent after it has delivered its handoff — always spawn fresh.
-
-## Current Parent
-- Conversation ID: 8832e93e-05ab-4864-b040-d03a27d45713
-- Updated: 2026-10-29T16:15:47Z
-
-## Key Decisions Made
-- Milestone M1 Gate PASSED (all 6 documentation deliverables verified, audit CLEAN).
-- Dual Track E2E Test Suite completed: 69/69 tests passing across Tiers 1-4; `TEST_INFRA.md` and `TEST_READY.md` published at root.
-- Milestone M2 Gate PASSED (10 centralized UI primitives, 7 Next.js routes, alert replacement, tsc clean, audit CLEAN).
-- Milestone M3 Gate PASSED (child tenancy, JWT normalization, OCR auth, GST math, 15 tests pass, audit CLEAN).
-- Milestone M4 Iteration 1 Gate: Reviewer APPROVE, Auditor CLEAN, Challenger REQUEST_CHANGES (concurrency defects & statutory leaks).
-- Server restarted / quota reset at 16:15:47Z; revived `worker_m4_remediation` (`c7d1811b-dd7a-4ee0-abd7-c5328c24d62f`), running state confirmed.
-
-## Team Roster
-| Agent | Type | Work Item | Status | Conv ID |
-|-------|------|-----------|--------|---------|
-| explorer_backend | teamwork_explorer | Backend, DB, Auth & Financials Survey | completed | 9e39ee15-de32-45ba-8b15-78fa7c1329ec |
-| explorer_frontend | teamwork_explorer | Frontend, Design System & UI Survey | completed | 7eb9398a-bca9-4fb0-9946-2f8f05ccef56 |
-| spec_miner_mobile | teamwork_spec_miner | Mobile, End-to-End Workflows & Spec Mining | completed | 33015706-6b16-4348-9af3-fdabde610868 |
-| worker_m1_docs | teamwork_worker | Milestone M1 Documentation Baseline | completed | 75e58f04-d44c-4001-ae5e-4df462ee14ff |
-| reviewer_m1_1 | teamwork_reviewer | Milestone M1 Reviewer 1 | completed | c10167a7-d3d1-440f-9af6-d283bf309293 |
-| reviewer_m1_2 | teamwork_reviewer | Milestone M1 Reviewer 2 | completed | 5d5f9bb9-1d4a-4454-9caa-2514b165cfa9 |
-| challenger_m1_1 | teamwork_challenger | Milestone M1 Challenger 1 | completed | b17dfd09-3956-443a-b9c9-f2ddfd0b44b9 |
-| challenger_m1_2 | teamwork_challenger | Milestone M1 Challenger 2 | completed | 69472e46-9df2-40a8-9b3f-192f34a5f7ed |
-| auditor_m1 | teamwork_auditor | Milestone M1 Forensic Auditor | completed | 941b2529-a9b9-4c21-b653-2d148e7a672e |
-| test_writer_e2e | teamwork_test_writer | Dual Track E2E Test Suite (Tiers 1-4) | completed | 8d626190-4f4d-4480-b251-94c3c9d1d1f8 |
-| worker_m2_ui | teamwork_worker | Milestone M2 Design System & UI | completed | 7f9ee98c-5bb6-4a7c-87d0-0c8fbfe9434f |
-| worker_m3_security | teamwork_worker | Milestone M3 Security & Financials | completed | e27041e7-cb3e-4e1e-8e0c-94658b81428a |
-| reviewer_m2 | teamwork_reviewer | Milestone M2 Reviewer | completed | d8be946d-59a8-4c80-bcac-fb1d79a72c21 |
-| reviewer_m3 | teamwork_reviewer | Milestone M3 Reviewer | completed | 3f72e3fd-8504-4020-a6c5-06da1d9a3345 |
-| challenger_m2_m3 | teamwork_challenger | Milestones M2 & M3 Challenger | completed | a90f1e93-9b75-4716-af19-0c0e0ade4f79 |
-| auditor_m2_m3 | teamwork_auditor | Milestones M2 & M3 Forensic Auditor | completed | 29b7ed94-9335-4a9b-a5ec-18e9b8697012 |
-| worker_m4 | teamwork_worker | Milestone M4 Commercial & Operations | completed | e44689d6-2891-4805-b9bc-7c82f7ab6603 |
-| reviewer_m4 | teamwork_reviewer | Milestone M4 Reviewer | completed | c7ed5aec-c536-4d48-a2b3-001996095968 |
-| auditor_m4 | teamwork_auditor | Milestone M4 Forensic Auditor | completed | 5f61154c-8eab-43d3-a9de-a62dc7be874e |
-| challenger_m4 | teamwork_challenger | Milestone M4 Challenger | completed | 256dde01-ae12-4bdc-9454-0b7d375ed466 |
-| worker_m4_remediation | teamwork_worker | Milestone M4 Remediation | completed | c7d1811b-dd7a-4ee0-abd7-c5328c24d62f |
-| challenger_m4_v2 | teamwork_challenger | Milestone M4 Remediation Challenger | completed | 9dea9cfd-79e5-409a-bf39-1df86ba5d15f |
-| reviewer_m4_v2 | teamwork_reviewer | Milestone M4 Remediation Reviewer | completed | 4c3fe324-ce1d-433c-879c-59f59f5cf9f7 |
-| auditor_m4_v2 | teamwork_auditor | Milestone M4 Remediation Auditor | completed | e7542db8-02cb-4345-98de-a926afea0c58 |
-| worker_m5 | teamwork_worker | Milestone M5 Field Ops & Mobile Worker | completed | 9fbe8bdd-c8b7-4e7e-b15e-a32f22da33e6 |
-| reviewer_m5 | teamwork_reviewer | Milestone M5 Reviewer | completed | 6ce2fe7c-c385-43c5-a35a-ee876452a3d1 |
-| challenger_m5 | teamwork_challenger | Milestone M5 Challenger | completed | ed7bfe04-4be5-48c5-948b-6c8ecf0add7a |
-| auditor_m5 | teamwork_auditor | Milestone M5 Forensic Auditor | completed | 349c454e-f69f-4ef3-9aca-e570ce3cf9c2 |
-| worker_m5_remediation | teamwork_worker | Milestone M5 Remediation Worker | completed | 96452bc3-1594-4759-8ef0-57c903c4fac3 |
-| reviewer_m5_v2 | teamwork_reviewer | Milestone M5 Remediation Reviewer | completed | 907952b8-6a4a-4d38-a631-f589882a5d7b |
-| challenger_m5_v2 | teamwork_challenger | Milestone M5 Remediation Challenger | completed | 9cff50b7-ceee-4b83-8232-fb42bc3c804f |
-| auditor_m5_v2 | teamwork_auditor | Milestone M5 Remediation Auditor | completed | 3303d615-2f89-4c73-8186-079ecd59607d |
-| worker_m6 | teamwork_worker | Milestone M6 Lead Integrator | completed | f311025d-e675-48f5-bbbc-dffc2631320e |
-| reviewer_m6 | teamwork_reviewer | Milestone M6 Reviewer | completed | b7a12a78-1df7-4220-aa27-c11525365330 |
-| challenger_m6 | teamwork_challenger | Milestone M6 Challenger | completed | dfc6efdf-3d51-4918-bc85-71c2f244e23f |
-| auditor_m6 | teamwork_auditor | Milestone M6 Forensic Auditor | completed | 707029ad-2113-431a-b760-ecf30bc91f9a |
+  1. Survey & Feature Inventory [completed]
+  2. E2E Testing Track [completed: TEST_INFRA.md, 121 tests, TEST_READY.md]
+  3. M1: Codebase Discovery, Screen Inventory & Design System Foundation [completed: Gate PASS]
+   4. M2: Mobile IA, Navigation & Business Command Dashboard [completed: Gate PASS]
+   5. M3: End-to-End Module, Screen & Workflow Transformation [completed: Gate PASS]
+   6. M4: Native Android Interactions, Performance & Layout Validation [completed: Gate PASS]
+   7. M5: Final E2E Test Suite Pass, Adversarial Hardening & Final Documentation [in-progress]
+- **Current phase**: Milestone M5 E2E Testing, Adversarial Hardening & Final Reporting
+- **Current focus**: Comprehensive QA, 100% E2E test verification, adversarial coverage, transformation docs & final deliverables report
+ 
+ ## 🔒 Key Constraints
+ - NEVER write, modify, or create source code files directly.
+ - NEVER run build/test commands yourself — require workers to do so.
+ - NEVER investigate or explore the problem at the code level — dispatch Explorers for technical investigation.
+ - You MAY use file-editing tools ONLY for metadata/state files (.md) in your .agents/teamwork/ folder.
+ - Binary veto on Forensic Auditor integrity violations.
+ - Never reuse a subagent after it has delivered its handoff — always spawn fresh.
+ 
+ ## Current Parent
+ - Conversation ID: c304cd4f-fbd0-47a2-a899-06e2c25620ea
+ - Updated: 2026-10-30T09:22:00Z
+ 
+ ## Key Decisions Made
+ - Milestone M1 passed gate (CLEAN audit, APPROVE from 2 reviewers & 2 challengers).
+ - Milestone M2 passed gate (CLEAN audit, APPROVE from 2 reviewers & 2 challengers, 62 Tier 5 stress tests added, 0 TS errors, 184/184 E2E tests).
+ - Milestone M3 passed gate after remediation (F-01 to F-04 resolved, CLEAN audit, APPROVE from 2 reviewers & 2 challengers).
+ - Milestone M4 passed gate after remediation (multi-tenant queue filtering & idempotency key retention resolved, CLEAN audit, APPROVE from 2 reviewers & 2 challengers, 32/32 stress tests pass).
+ 
+ ## Team Roster
+ | Agent | Type | Work Item | Status | Conv ID |
+ |-------|------|-----------|--------|---------|
+ | explorer_survey_1 | teamwork_explorer | Codebase, RN/Expo, tooling, navigation | completed | db76ceca-d830-4e7b-9d9c-945463bbed35 |
+ | explorer_survey_2 | teamwork_explorer | Screen inventory, UI/UX audit, design tokens | completed | dc563f49-4aee-4e20-8d0e-16fcc01b453e |
+ | spec_miner_survey_3 | teamwork_spec_miner | API contracts, RBAC, domain entities | completed | e2d3816f-0347-4642-969b-882a9a87be03 |
+ | explorer_m1_1 | teamwork_explorer | M1: Documentation architecture & audit specs | completed | bb34aa1d-a682-4ccc-82b2-90bb912332d5 |
+ | explorer_m1_2 | teamwork_explorer | M1: Theme tokens & dark theme blueprint | completed | 831bc40a-922e-42a1-92ad-bcb7fbfc6115 |
+ | explorer_m1_3 | teamwork_explorer | M1: Common UI primitives & states blueprint | completed | 880088d8-200c-4850-88af-4c8d68ea2ea9 |
+ | test_writer_e2e | teamwork_test_writer | E2E Testing Track: TEST_INFRA.md & Tiers 1-4 | completed | 81e22961-70d5-47cf-9251-87064788b322 |
+ | worker_m1 | teamwork_worker | M1 Implementation: docs, theme, primitives | completed | e6ff3e42-4435-422a-a630-c821f79162c9 |
+ | reviewer_m1_1 | teamwork_reviewer | M1: Code & Docs Review | completed | b91399d7-9b3c-42ff-87bb-3b9c20710076 |
+ | reviewer_m1_2 | teamwork_reviewer | M1: Primitives & Ergonomics Review | completed | 2a9f6ffb-54c0-4d74-b5c3-46d924fc7bc6 |
+ | challenger_m1_1 | teamwork_challenger | M1: Theme & Token Stress Testing | completed | 66e8067b-fcda-4849-bb24-b5f645553ebc |
+ | challenger_m1_2 | teamwork_challenger | M1: Primitives & Layout Stress Testing | completed | 26bfacc1-e88a-4737-915a-fee204fbeeab |
+ | auditor_m1_1 | teamwork_auditor | M1: Forensic Integrity Audit | completed | c37117ac-44a3-4499-b73a-cf27d90c4c20 |
+ | explorer_m2_1 | teamwork_explorer | M2: Navigation, Safe Area & BackHandler | completed | 2ccea259-f7e1-4a35-891d-d520a6efb946 |
+ | explorer_m2_2 | teamwork_explorer | M2: Dashboard & Real Data Strategy | completed | d92c60a4-5b0d-400b-8362-6286211dcf8c |
+ | explorer_m2_3 | teamwork_explorer | M2: Global Search & Quick Actions Modal | completed | 2affc98e-20f1-4d58-a477-90dff803f5e2 |
+ | worker_m2 | teamwork_worker | M2 Implementation: nav, header, dashboard, search | completed | 54175790-3124-4763-a39b-5eef77b5d5aa |
+ | reviewer_m2_1 | teamwork_reviewer | M2: Code & Navigation Review | completed | 254ea341-5b57-4ac1-a6d0-eb3351b151b4 |
+ | reviewer_m2_2 | teamwork_reviewer | M2: Dashboard & Search Review | completed | 9e4751a7-0d9d-4c36-ab23-fc32f4eef565 |
+ | challenger_m2_1 | teamwork_challenger | M2: IA & Interaction Stress Testing | completed | 3cd21112-10c7-4368-9519-9a21b5ae569e |
+ | challenger_m2_2 | teamwork_challenger | M2: Dashboard & Edge Cases Stress Testing | completed | 3f0148b4-dd31-4fbc-9a10-970d53f840f6 |
+ | auditor_m2_1 | teamwork_auditor | M2: Forensic Integrity Audit | completed | ebc98abf-c0c1-4e0b-91ad-240639b9dd1a |
+| explorer_m3_1 | teamwork_explorer | M3: Modules & Profile Architecture | completed | cf00b7f9-c78f-4581-b44f-98e3d66c66bd |
+| explorer_m3_2 | teamwork_explorer | M3: CRM, Pipeline & Quotation Blueprint | completed | 5cdb3fae-588a-4012-bb23-deec59658da6 |
+| explorer_m3_3 | teamwork_explorer | M3: Projects, Operations & Finance Blueprint | completed | 40db2094-f14b-49f6-ab4c-f9380f1b2101 |
+| worker_m3 | teamwork_worker | M3 Implementation: modules, CRM, projects, ops, finance | failed | 9306eb70-c4b3-400f-9137-973b88f73d26 |
+| worker_m3_2 | teamwork_worker | M3 Replacement: Pipeline, Projects, Ops, Finance | completed | de3b765d-0484-48f7-936a-7632bdc2a7c3 |
+| reviewer_m3_1 | teamwork_reviewer | M3: Code, CRM & Modules Review | in-progress | decaae26-6dbe-487a-b21f-88ab9f051d7b |
+| reviewer_m3_2 | teamwork_reviewer | M3: Projects, Operations & Finance Review | in-progress | 5f1ab426-acba-4258-8f2b-3bb6a8573eae |
+| challenger_m3_1 | teamwork_challenger | M3: CRM & Sizing Stress Testing | in-progress | ccab7db1-eb3a-4781-913d-3742e43ceecd |
+| challenger_m3_2 | teamwork_challenger | M3: Ops & Finance Stress Testing | in-progress | ffeba87a-8eae-4a1f-8728-900691e8c971 |
+| auditor_m3_1 | teamwork_auditor | M3: Forensic Integrity Audit | completed | 477c388c-ef91-4967-89c7-3ff8a8003847 |
+| explorer_m3_remediation | teamwork_explorer | M3 Remediation Strategy (F-01 to F-04) | completed | 3efeeabf-90a7-4dba-ad03-cf746a5b02e2 |
+| worker_m3_3 | teamwork_worker | M3 Remediation: F-01 to F-04 fixes | completed | c76fd2d7-e80a-43ec-baa0-b524a26ac067 |
+| reviewer_m3_2_r2 | teamwork_reviewer | M3 Re-Review: Projects & Ops Verification | in-progress | 3646a453-c9a5-4505-b728-86141a3cec26 |
+| auditor_m3_r2 | teamwork_auditor | M3 Re-Audit: Forensic Integrity Verification | completed | 2b24dcb7-2965-4aa4-a736-be430797805b |
+| explorer_m4_1 | teamwork_explorer | M4: Haptics & Gestures Architecture | completed | fe08df3a-3bf4-4d51-a19f-cdeaaf579a76 |
+| explorer_m4_2 | teamwork_explorer | M4: Offline Sync & Network Architecture | completed | 5c06fedf-04e6-4838-9c5b-49db6523a3fd |
+| explorer_m4_3 | teamwork_explorer | M4: Virtualization & Permissions Architecture | completed | 2467a2ad-e09d-4fdb-8bac-15f5434732e5 |
+| worker_m4_v2 | teamwork_worker | M4 Implementation: haptics, offline sync, virtualization, permissions UX | completed | 6e27dc15-a32c-44d2-8c32-7efa3756423d |
+| reviewer_m4_1 | teamwork_reviewer | M4: Haptics & Offline Sync Review | completed | 40ee6ba0-9c08-4139-a39b-755560d7ead8 |
+| reviewer_m4_2 | teamwork_reviewer | M4: Virtualization & Permissions Review | completed | be01a486-9e8c-4b1c-9263-86f22d5e8243 |
+| challenger_m4_1 | teamwork_challenger | M4: Haptics & Offline Queue Stress Testing | completed | efd18828-36b7-4025-961e-aa98316343ec |
+| challenger_m4_2 | teamwork_challenger | M4: Virtualization & Layout Stress Testing | completed | 7ba81379-2757-40d5-b0d7-1a55774fa2fd |
+| auditor_m4_1 | teamwork_auditor | M4: Forensic Integrity Audit | completed | 8ab7566c-a488-43f1-a896-66f25b644821 |
+| explorer_m4_remediation | teamwork_explorer | M4 Remediation: Multi-Tenant & Idempotency Strategy | completed | 0ed88de9-1fee-4b85-ae70-5936d6af5270 |
+| worker_m4_remediation_v2 | teamwork_worker | M4 Remediation: Fix offlineSyncService & AuthContext | completed | fa69d8ac-9b42-4d2b-824a-38299fb99c25 |
+| challenger_m4_re_test | teamwork_challenger | M4 Re-Test: Haptics & Offline Queue Stress Suite | completed | 0a066acc-dacf-4190-97a6-e12f0a75c6ab |
+| auditor_m4_re_audit | teamwork_auditor | M4 Re-Audit: Multi-Tenant & Idempotency Integrity | completed | 782e6e5a-0284-4820-9df2-eb585e834245 |
+| worker_m5_deliverables | teamwork_worker | M5: Documentation, QA & Final Deliverables | in-progress | 69337ff6-2bb8-4b01-97fd-1b22dd0ea038 |
 
 ## Succession Status
-- Succession required: no (all milestones completed, under 128 spawn ceiling)
-- Spawn count: 36 / 128
-- Pending subagents: none
+- Succession required: no
+- Spawn count: 50 / 128
+- Pending subagents: 69337ff6-2bb8-4b01-97fd-1b22dd0ea038
 - Predecessor: none
 - Successor: none
 
 ## Active Timers
-- Heartbeat cron: none (all subagents completed, cron cancelled)
-- Safety timer: none (all subagents completed, timer cancelled)
+- Heartbeat cron: 94d7f2ae-468d-438a-8f95-fa253185584b/task-1582
+- Safety timer: 94d7f2ae-468d-438a-8f95-fa253185584b/task-1584
 
 ## Artifact Index
-- f:\Company Products\solar-manager\.agents\teamwork\ORIGINAL_REQUEST.md — Authoritative User Request
-- f:\Company Products\solar-manager\.agents\teamwork\orchestrator\DISPATCH.md — Parent Dispatch Record
-- f:\Company Products\solar-manager\.agents\teamwork\orchestrator\BRIEFING.md — Working State & Identity
-- f:\Company Products\solar-manager\.agents\teamwork\orchestrator\progress.md — Progress Heartbeat & Checklist
-- f:\Company Products\solar-manager\.agents\teamwork\orchestrator\PROJECT.md — Global System & Milestone Blueprint
-- f:\Company Products\solar-manager\.agents\teamwork\orchestrator\GATE_STATUS.md — Gate Verdicts Log
-- f:\Company Products\solar-manager\PROJECT.md — Master Project Specification at Root
-- f:\Company Products\solar-manager\TEST_INFRA.md — E2E Test Infrastructure Specification
-- f:\Company Products\solar-manager\TEST_READY.md — E2E Test Readiness & 69/69 Pass Report
-- f:\Company Products\solar-manager\docs\product-audit.md — Full Product Audit
-- f:\Company Products\solar-manager\docs\module-inventory.md — Module Inventory
-- f:\Company Products\solar-manager\docs\architecture-and-dependencies.md — Architecture & Topology
-- f:\Company Products\solar-manager\docs\implementation-roadmap.md — Roadmap & Module Progress Tracker
-- f:\Company Products\solar-manager\docs\quality-and-regression-report.md — Quality & Regression Report
+- .agents/teamwork/ORIGINAL_REQUEST.md — Original verbatim user request
+- .agents/teamwork/orchestrator/PROJECT.md — Global project plan & milestones
+- .agents/teamwork/orchestrator/GATE_STATUS.md — Gate status tracking
+- TEST_INFRA.md — Dual-track E2E test infrastructure
+- TEST_READY.md — E2E test readiness declaration
+- docs/mobile-product-audit.md — Mobile product audit
+- docs/mobile-screen-inventory.md — Screen inventory table
+- docs/mobile-ux-problems.md — UX problems catalog
+- docs/mobile-design-system.md — Design system specification
+- .agents/teamwork/explorer_m2_1/analysis.md — M2 Navigation blueprint
+- .agents/teamwork/explorer_m2_2/analysis.md — M2 Dashboard blueprint
+- .agents/teamwork/explorer_m2_3/analysis.md — M2 Global Search blueprint

@@ -305,7 +305,14 @@ apiClient.interceptors.response.use(
           ? 'Network connection issue. Please verify internet connectivity.'
           : error.message || 'Network request failed.');
 
-    return Promise.reject(new Error(message));
+    const errObj = new Error(message) as any;
+    errObj.response = error.response;
+    errObj.status = error.response?.status;
+    errObj.data = error.response?.data;
+    errObj.code = error.code;
+    errObj.isAxiosError = true;
+
+    return Promise.reject(errObj);
   }
 );
 

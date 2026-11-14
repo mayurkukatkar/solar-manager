@@ -68,7 +68,8 @@ import {
   sharePdfFile,
   printDirectly,
 } from '../services/pdfService';
-import { crmApi, tenantApi, documentsApi, financeApi } from '../api/endpoints';
+import { crmApi, tenantApi, documentsApi, financeApi, dpdpApi, maskAadhaarNumber } from '../api/endpoints';
+import { DpdpConsentModal } from './DpdpConsentModal';
 import { offlineSyncService } from '../services/offlineSyncService';
 import { SafeStorage } from '../api/client';
 import { haptics } from '../utils/haptics';
@@ -132,7 +133,7 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
     if (initialLead) {
       const s = (initialLead.status || '').toUpperCase();
       if (s === 'WON') return 9; // CONSUMER_NUMBER
-      if (s === 'NEGOTIATION' || s === 'QUOTATION_SENT') return 8; // DISPATCH_PROPOSAL
+      if (s === 'NEGOTIATION' || s === 'PROPOSAL_SENT' || s === 'QUOTATION_SENT') return 8; // DISPATCH_PROPOSAL
       if (s === 'SITE_SURVEY') return 3; // ROOF_TYPE
       return 2; // MONTHLY_BILL
     }
@@ -156,7 +157,7 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
   const [monthlyUnits, setMonthlyUnits] = useState(String(initialLead?.monthlyUnits || '410'));
   const [roofType, setRoofType] = useState('Flat RCC Concrete');
   const [selectedShadowObstacles, setSelectedShadowObstacles] = useState<string[]>([]);
-  
+
   // Detailed Statutory Address & Site Coordinates
   const [premisesAddress, setPremisesAddress] = useState(
     initialProject?.installationAddress || initialProject?.customer?.address || initialProject?.address || initialLead?.address || ''
@@ -197,7 +198,7 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
   const [hardwareMode, setHardwareMode] = useState<'presets' | 'manual'>('presets');
   const [panelBrand, setPanelBrand] = useState('Waaree 540W Mono PERC DCR');
   const [inverterBrand, setInverterBrand] = useState('Solis 3.3kW Grid-Tied Inverter');
-  
+
   // Custom / Manual Equipment Entries (for document statutory compliance)
   const [customModuleMake, setCustomModuleMake] = useState('Waaree Energies');
   const [customModuleWattage, setCustomModuleWattage] = useState('540');
@@ -205,7 +206,7 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
   const [customInverterMake, setCustomInverterMake] = useState('Solis');
   const [customInverterCapacity, setCustomInverterCapacity] = useState('3.3');
   const [customInverterPhase, setCustomInverterPhase] = useState<'Single Phase' | 'Three Phase'>('Single Phase');
-  
+
   const [createdLead, setCreatedLead] = useState<any>(initialLead || initialProject?.lead || null);
 
   // Onboarding & KYC State
@@ -215,7 +216,7 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
   const [billingUnit, setBillingUnit] = useState(
     initialProject?.discomApplication?.bu || initialProject?.billingUnit || ''
   );
-  
+
   // All 6 Statutory KYC Documents
   const [billDocUri, setBillDocUri] = useState<string | null>(null);
   const [aadhaarDocUri, setAadhaarDocUri] = useState<string | null>(null);
@@ -252,16 +253,35 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
   const [customerSignatureSvg, setCustomerSignatureSvg] = useState<string>('');
   const [provisionedProject, setProvisionedProject] = useState<any>(initialProject || null);
   const [recordedInvoiceNumber, setRecordedInvoiceNumber] = useState<string>('');
+  const [dpdpModalVisible, setDpdpModalVisible] = useState(false);
 
   // Keep state synced when modal becomes visible or targets change
   useEffect(() => {
     if (visible) {
       setCurrentStepIdx(calculatedInitialStep);
+      setCustomerSignatureSvg('');
+      setBillDocUri(null);
+      setAadhaarDocUri(null);
+      setPanDocUri(null);
+      setTaxReceiptDocUri(null);
+      setChequeDocUri(null);
+      setTerracePhotoUri(null);
+      setBillUploadStatus('idle');
+      setAadhaarUploadStatus('idle');
+      setPanUploadStatus('idle');
+      setTaxReceiptUploadStatus('idle');
+      setChequeUploadStatus('idle');
+      setTerracePhotoUploadStatus('idle');
+      setAdvancePaidConfirmed(false);
+      setRecordedInvoiceNumber('');
+
       if (initialProject) {
         setProvisionedProject(initialProject);
         setCustomerName(initialProject?.customer?.name || initialProject?.name || '');
         setCustomerPhone(initialProject?.customer?.mobile || initialProject?.customer?.phone || '');
-        setCapacityKw(String(initialProject?.capacity || initialProject?.systemCapacity || 3.3));
+        const prjCap = initialProject?.capacity || initialProject?.systemCapacity || 3.3;
+        setCapacityKw(String(prjCap));
+        setTotalCost(String(initialProject?.totalCost || initialProject?.quotation?.total || Math.round(prjCap * 58000)));
         setCity(initialProject?.city || initialProject?.customer?.city || 'Pune');
         setDistrict(initialProject?.district || initialProject?.survey?.district || 'Pune');
         setState(initialProject?.state || initialProject?.survey?.state || 'Maharashtra');
@@ -272,15 +292,23 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
           setLatitude(initialProject.survey.latitude);
           setLongitude(initialProject.survey.longitude);
           setTerraceCoordinates(`${initialProject.survey.latitude.toFixed(6)}° N, ${initialProject.survey.longitude.toFixed(6)}° E`);
+        } else {
+          setLatitude(null);
+          setLongitude(null);
+          setTerraceCoordinates(null);
         }
         if (initialProject?.survey?.sanctionedLoad) {
           setSanctionedLoad(String(initialProject.survey.sanctionedLoad));
+        } else {
+          setSanctionedLoad(String(prjCap));
         }
         if (initialProject?.survey?.electricalPhase) {
           setConnectionPhase(initialProject.survey.electricalPhase as any);
         }
         if (initialProject?.lead) setCreatedLead(initialProject.lead);
+        else setCreatedLead(null);
       } else if (initialLead) {
+        setProvisionedProject(null);
         setCreatedLead(initialLead);
         setCustomerName(initialLead?.name || '');
         setCustomerPhone(initialLead?.mobile || initialLead?.phone || '');
@@ -289,14 +317,50 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
         setState(initialLead?.state || 'Maharashtra');
         setPremisesAddress(initialLead?.address || '');
         setPincode(initialLead?.pincode || '');
-        setCapacityKw(String(initialLead?.estimatedCap || 3.3));
+        const leadCap = initialLead?.estimatedCap || 3.3;
+        setCapacityKw(String(leadCap));
+        setTotalCost(String(initialLead?.value || Math.round(leadCap * 58000)));
         setConsumerNumber(initialLead?.consumerNumber || initialLead?.electricityConnection || '');
         if (initialLead?.sanctionedLoad) {
           setSanctionedLoad(String(initialLead.sanctionedLoad));
+        } else {
+          setSanctionedLoad(String(leadCap));
         }
         if (initialLead?.phase) {
           setConnectionPhase(initialLead.phase as any);
         }
+      } else {
+        // Starting fresh without an existing lead or project
+        setProvisionedProject(null);
+        setCreatedLead(null);
+        setCustomerName('');
+        setCustomerPhone('');
+        setMonthlyBill('3500');
+        setMonthlyUnits('410');
+        setRoofType('Flat RCC Concrete');
+        setSelectedShadowObstacles([]);
+        setPremisesAddress('');
+        setStreetLandmark('');
+        setCity('Pune');
+        setDistrict('Pune');
+        setState('Maharashtra');
+        setPincode('');
+        setLatitude(null);
+        setLongitude(null);
+        setTerraceCoordinates(null);
+        setSanctionedLoad('3.3');
+        setConnectionPhase('Single Phase');
+        setCapacityKw('3.3');
+        setTotalCost('195000');
+        setConsumerNumber('');
+        setBillingUnit('');
+        setAccountNumber('');
+        setIfscCode('SBIN0000455');
+        setBankName('State Bank of India');
+        setBankBranch('');
+        setTokenAmountReceived('25000');
+        setPaymentMode('UPI');
+        setTransactionRef('');
       }
     }
   }, [visible, initialProject, initialLead, calculatedInitialStep]);
@@ -343,7 +407,7 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
   // Cross-Field Calculations
   const cap = parseFloat(capacityKw) || 3.3;
   const grossAmount = parseFloat(totalCost) || 195000;
-  const subsidyAmount = cap >= 3 ? 78000 : cap >= 2 ? 60000 : 30000;
+  const subsidyAmount = cap >= 3 ? 78000 : cap >= 2 ? 60000 : cap >= 1 ? 30000 : 0;
   const netCustomerCost = Math.max(0, grossAmount - subsidyAmount);
   const monthlySavings = Math.round(cap * 120 * 8.5);
   const annualGenUnits = Math.round(cap * 1460);
@@ -363,7 +427,9 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
     ? (parseFloat(customModuleWattage) || 540)
     : (panelBrand.includes('545') ? 545 : 540);
   const effectivePanelQty = Math.ceil((cap * 1000) / effectiveModuleWattage);
-  const effectiveInverterMake = hardwareMode === 'manual' ? (customInverterMake.trim() || 'Grid Inverter') : inverterBrand;
+  const effectiveInverterMake = hardwareMode === 'manual'
+    ? (customInverterMake.trim() || 'Grid Inverter')
+    : inverterBrand.replace(/3\.3kW/g, `${cap}kW`);
   const effectiveInverterCap = hardwareMode === 'manual' ? (parseFloat(customInverterCapacity) || cap) : cap;
 
   // Full Statutory Addresses
@@ -387,7 +453,7 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
             if (draft?.customerName && draft?.currentStepIdx > 0) {
               setDraftPrompt(draft);
             }
-          } catch {}
+          } catch { }
         }
       });
     }
@@ -442,9 +508,13 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
         paymentMode,
         transactionRef,
         sessionXpEarned,
+        customerSignatureSvg: customerSignatureSvg || '',
+        createdLead: createdLead || null,
+        recordedInvoiceNumber: recordedInvoiceNumber || '',
+        advancePaidConfirmed: advancePaidConfirmed || false,
       };
       await SafeStorage.setItem(STORAGE_DRAFT_KEY, JSON.stringify(draftData));
-    } catch {}
+    } catch { }
   };
 
   const handleApplyDraft = () => {
@@ -452,6 +522,7 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
     setCustomerName(draftPrompt.customerName || '');
     setCustomerPhone(draftPrompt.customerPhone || '');
     setMonthlyBill(draftPrompt.monthlyBill || '3500');
+    setMonthlyUnits(draftPrompt.monthlyUnits || '410');
     setRoofType(draftPrompt.roofType || 'Flat RCC Concrete');
     setSelectedShadowObstacles(draftPrompt.selectedShadowObstacles || []);
     setPremisesAddress(draftPrompt.premisesAddress || draftPrompt.address || '');
@@ -479,6 +550,7 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
     setConsumerNumber(draftPrompt.consumerNumber || '');
     setBillingUnit(draftPrompt.billingUnit || '');
     setBankName(draftPrompt.bankName || 'State Bank of India');
+    setBankBranch(draftPrompt.bankBranch || '');
     setAccountNumber(draftPrompt.accountNumber || '');
     setIfscCode(draftPrompt.ifscCode || 'SBIN0000455');
     setBillDocUri(draftPrompt.billDocUri || null);
@@ -490,6 +562,10 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
     if (draftPrompt.tokenAmountReceived) setTokenAmountReceived(String(draftPrompt.tokenAmountReceived));
     if (draftPrompt.paymentMode) setPaymentMode(draftPrompt.paymentMode);
     if (draftPrompt.transactionRef) setTransactionRef(draftPrompt.transactionRef);
+    if (draftPrompt.customerSignatureSvg) setCustomerSignatureSvg(draftPrompt.customerSignatureSvg);
+    if (draftPrompt.createdLead) setCreatedLead(draftPrompt.createdLead);
+    if (draftPrompt.recordedInvoiceNumber) setRecordedInvoiceNumber(draftPrompt.recordedInvoiceNumber);
+    if (draftPrompt.advancePaidConfirmed !== undefined) setAdvancePaidConfirmed(draftPrompt.advancePaidConfirmed);
     setSessionXpEarned(draftPrompt.sessionXpEarned || 0);
     setCurrentStepIdx(Math.min(draftPrompt.currentStepIdx || 0, totalSteps - 1));
     setDraftPrompt(null);
@@ -498,7 +574,7 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
 
   const handleDiscardDraft = async () => {
     setDraftPrompt(null);
-    await SafeStorage.removeItem(STORAGE_DRAFT_KEY).catch(() => {});
+    await SafeStorage.removeItem(STORAGE_DRAFT_KEY).catch(() => { });
   };
 
   // 1-Tap Genuine Terrace GPS Detection using expo-location
@@ -680,7 +756,10 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
         capacityKw: cap,
       });
       setSessionXpEarned((prev) => prev + r.xpGained);
-    } catch (_) {}
+      return record;
+    } catch (_) {
+      return null;
+    }
     finally {
       setSubmitting(false);
     }
@@ -703,20 +782,33 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
       if (!targetLeadId || String(targetLeadId).startsWith('draft_')) {
         try {
           const cleanMobile = customerPhone.replace(/[^0-9]/g, '');
-          const leadRes = await crmApi.createLead({
-            name: customerName.trim(),
-            mobile: cleanMobile,
-            address: fullPremisesAddress || undefined,
-            city: city.trim() || district.trim() || undefined,
-            state: state.trim() || 'Maharashtra',
-            pincode: pincode.trim() || undefined,
-            estimatedCap: cap,
-            electricityConnection: consumerNumber.trim() || 'Pending',
-          });
-          const realLead = leadRes?.lead || leadRes;
-          if (realLead?.id) {
-            targetLeadId = realLead.id;
-            setCreatedLead(realLead);
+          const savedLead = await saveLeadRecord();
+          if (savedLead?.id && !String(savedLead.id).startsWith('draft_')) {
+            targetLeadId = savedLead.id;
+            setCreatedLead(savedLead);
+          } else {
+            const leadRes = await crmApi.createLead({
+              name: customerName.trim(),
+              mobile: cleanMobile,
+              address: fullPremisesAddress || undefined,
+              city: city.trim() || district.trim() || undefined,
+              district: district.trim() || undefined,
+              state: state.trim() || 'Maharashtra',
+              pincode: pincode.trim() || undefined,
+              latitude: latitude || undefined,
+              longitude: longitude || undefined,
+              estimatedCap: cap,
+              sanctionedLoad: parseFloat(sanctionedLoad) || cap,
+              phase: connectionPhase,
+              roofType,
+              electricityConnection: consumerNumber.trim() || 'Pending',
+              forceCreate: true,
+            });
+            const realLead = leadRes?.lead || leadRes;
+            if (realLead?.id) {
+              targetLeadId = realLead.id;
+              setCreatedLead(realLead);
+            }
           }
         } catch (err: any) {
           console.warn('Auto-create lead before convert notice:', err.message);
@@ -732,6 +824,7 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
         state: state.trim() || 'Maharashtra',
         pincode: pincode.trim() || undefined,
         capacity: cap,
+        estimatedValue: grossAmount,
         latitude: latitude || undefined,
         longitude: longitude || undefined,
         consumerNumber: consumerNumber.trim() || 'Pending',
@@ -767,12 +860,12 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
                   p.leadId === targetLeadId ||
                   (p.customer?.mobile &&
                     p.customer.mobile.replace(/[^0-9]/g, '').slice(-10) ===
-                      customerPhone.replace(/[^0-9]/g, '').slice(-10))
+                    customerPhone.replace(/[^0-9]/g, '').slice(-10))
               );
               if (existing) {
                 projectResult = existing;
               }
-            } catch {}
+            } catch { }
           }
         }
       }
@@ -820,7 +913,7 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
               entityId: targetLeadId,
               localTempId: localPrjId,
             })
-            .catch(() => {});
+            .catch(() => { });
         }
       }
 
@@ -831,12 +924,43 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
       }
 
       // Upload attached KYC documents to project vault
-      if (billDocUri) uploadDocumentToCloud('bill', billDocUri, billDocName);
-      if (aadhaarDocUri) uploadDocumentToCloud('aadhaar', aadhaarDocUri, aadhaarDocName);
-      if (panDocUri) uploadDocumentToCloud('pan', panDocUri, panDocName);
-      if (taxReceiptDocUri) uploadDocumentToCloud('taxReceipt', taxReceiptDocUri, taxReceiptDocName);
-      if (chequeDocUri) uploadDocumentToCloud('cheque', chequeDocUri, chequeDocName);
-      if (terracePhotoUri) uploadDocumentToCloud('terracePhoto', terracePhotoUri, terracePhotoName);
+      const targetProjId = projectResult?.id && !String(projectResult.id).startsWith('prj_') ? projectResult.id : undefined;
+      const targetCustId = projectResult?.customerId || projectResult?.customer?.id;
+      if (billDocUri) uploadDocumentToCloud('bill', billDocUri, billDocName, undefined, targetProjId, targetCustId);
+      if (aadhaarDocUri) uploadDocumentToCloud('aadhaar', aadhaarDocUri, aadhaarDocName, undefined, targetProjId, targetCustId);
+      if (panDocUri) uploadDocumentToCloud('pan', panDocUri, panDocName, undefined, targetProjId, targetCustId);
+      if (taxReceiptDocUri) uploadDocumentToCloud('taxReceipt', taxReceiptDocUri, taxReceiptDocName, undefined, targetProjId, targetCustId);
+      if (chequeDocUri) uploadDocumentToCloud('cheque', chequeDocUri, chequeDocName, undefined, targetProjId, targetCustId);
+      if (terracePhotoUri) uploadDocumentToCloud('terracePhoto', terracePhotoUri, terracePhotoName, undefined, targetProjId, targetCustId);
+
+      // Statutory DPDP Act 2023 Affirmative Consent Recording
+      try {
+        const dpdpPrincipalId = projectResult?.customerId || projectResult?.id || targetLeadId;
+        const dpdpPrincipalType = projectResult?.customerId ? 'CUSTOMER' : 'LEAD';
+        const dpdpPayload = {
+          dataPrincipalId: dpdpPrincipalId,
+          dataPrincipalType: dpdpPrincipalType as any,
+          dataPrincipalName: customerName.trim(),
+          dataPrincipalPhone: customerPhone.trim(),
+          dataPrincipalEmail: undefined,
+          purposes: [
+            'FEASIBILITY_SIZING',
+            'DISCOM_NET_METERING',
+            'PM_SURYA_GHAR_DBT',
+            'CONTRACT_INVOICING',
+            'COMMUNICATION_UPDATES',
+          ],
+          signatureSvg: customerSignatureSvg || undefined,
+          capturedVia: '1FLOW_MOBILE',
+          noticeVersion: '2026.1',
+          noticeLanguage: 'en',
+        };
+        await dpdpApi.recordConsent(dpdpPayload).catch(async () => {
+          await offlineSyncService.enqueueMutation('RECORD_DPDP_CONSENT', dpdpPayload).catch(() => {});
+        });
+      } catch (dpdpErr: any) {
+        console.warn('DPDP consent recording notice:', dpdpErr.message);
+      }
 
       try {
         const reward = await solarGamificationService.recordAction('CLIENT_ONBOARDED', {
@@ -845,7 +969,7 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
           projectName: projectResult.projectNumber || projectResult.name,
         });
         setSessionXpEarned((prev) => prev + reward.xpGained);
-      } catch {}
+      } catch { }
 
       soundEffects.playCashChime();
       return projectResult;
@@ -903,6 +1027,11 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
   // Dispatch Proposal via WhatsApp (Text Pitch) and continue without breaker!
   const handleDispatchProposal = async () => {
     setSubmitting(true);
+    const effectiveCompanyName = user?.tenantName || (user as any)?.company || 'WhereReady Solar OS';
+    const effectiveCompanyPhone = (user as any)?.tenantPhone || (user as any)?.phone || (user as any)?.mobile || '';
+    const effectiveCompanyEmail = user?.email || 'support@solaros.in';
+    const effectiveCompanyAddress = (user as any)?.tenantAddress || (user as any)?.address || `${city}, ${state}`;
+
     try {
       const payload = {
         customerName,
@@ -913,18 +1042,22 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
         netPayable: netCustomerCost,
         monthlySavings,
         lifetimeSavings: monthlySavings * 12 * 25,
-        companyName: 'WhereReady Solar OS',
+        companyName: effectiveCompanyName,
+        repName: user?.name,
+        repPhone: effectiveCompanyPhone,
       };
       await openWhatsAppWithPitch(payload);
 
-      // Advance Lead Stage in CRM Pipeline to QUOTATION_SENT
-      if (createdLead?.id) {
+      // Advance Lead Stage in CRM Pipeline to PROPOSAL_SENT
+      if (createdLead?.id && !String(createdLead.id).startsWith('draft_')) {
         await crmApi.updateLead(createdLead.id, {
-          status: 'QUOTATION_SENT',
+          status: 'PROPOSAL_SENT',
           estimatedCap: cap,
           value: grossAmount,
-        }).catch(() => {});
-        setCreatedLead((prev: any) => ({ ...prev, status: 'QUOTATION_SENT' }));
+        }).catch(() => { });
+        setCreatedLead((prev: any) => ({ ...prev, status: 'PROPOSAL_SENT' }));
+      } else {
+        await saveLeadRecord().catch(() => {});
       }
 
       const r = await solarGamificationService.recordAction('PROPOSAL_SENT', {
@@ -949,15 +1082,20 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
   // Dispatch Branded PDF Quotation via WhatsApp
   const handleSharePdfProposal = async () => {
     setSubmitting(true);
+    const effectiveCompanyName = user?.tenantName || (user as any)?.company || 'WhereReady Solar OS';
+    const effectiveCompanyPhone = (user as any)?.tenantPhone || (user as any)?.phone || (user as any)?.mobile || '';
+    const effectiveCompanyEmail = user?.email || 'support@solaros.in';
+    const effectiveCompanyAddress = (user as any)?.tenantAddress || (user as any)?.address || `${city}, ${state}`;
+
     try {
       const pdfProps = {
         quotationNumber: `QUOT-${Date.now().toString().slice(-6)}`,
         quotationDate: new Date().toLocaleDateString('en-IN'),
         validUntil: new Date(Date.now() + 15 * 86400000).toLocaleDateString('en-IN'),
-        companyName: 'WhereReady Solar OS',
-        companyAddress: 'Renewable Power Division',
-        companyPhone: '+91 98765 43210',
-        companyEmail: 'support@solaros.in',
+        companyName: effectiveCompanyName,
+        companyAddress: effectiveCompanyAddress,
+        companyPhone: effectiveCompanyPhone,
+        companyEmail: effectiveCompanyEmail,
         customerName,
         customerMobile: customerPhone,
         customerAddress: fullStatutoryAddress || `${city}, Maharashtra`,
@@ -986,14 +1124,16 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
       const html = generateQuotationHtml(pdfProps as any);
       await createAndSharePdf(html, `Quote_${customerName.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`);
 
-      // Advance Lead Stage in CRM Pipeline to QUOTATION_SENT
-      if (createdLead?.id) {
+      // Advance Lead Stage in CRM Pipeline to PROPOSAL_SENT
+      if (createdLead?.id && !String(createdLead.id).startsWith('draft_')) {
         await crmApi.updateLead(createdLead.id, {
-          status: 'QUOTATION_SENT',
+          status: 'PROPOSAL_SENT',
           estimatedCap: cap,
           value: grossAmount,
-        }).catch(() => {});
-        setCreatedLead((prev: any) => ({ ...prev, status: 'QUOTATION_SENT' }));
+        }).catch(() => { });
+        setCreatedLead((prev: any) => ({ ...prev, status: 'PROPOSAL_SENT' }));
+      } else {
+        await saveLeadRecord().catch(() => {});
       }
 
       const r = await solarGamificationService.recordAction('PROPOSAL_SENT', {
@@ -1064,7 +1204,9 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
     docType: DocSlotType,
     fileUri: string,
     customFilename?: string,
-    mimeType?: string
+    mimeType?: string,
+    overrideProjectId?: string,
+    overrideCustomerId?: string
   ) => {
     setUploadStatusBySlot(docType, 'uploading');
 
@@ -1119,8 +1261,20 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
       } as any);
       formData.append('title', docMeta.title);
       formData.append('category', docMeta.category);
-      if (createdLead?.id) formData.append('customerId', createdLead.id);
-      if (provisionedProject?.id) formData.append('projectId', provisionedProject.id);
+
+      const resolvedCustId =
+        overrideCustomerId ||
+        provisionedProject?.customerId ||
+        provisionedProject?.customer?.id;
+      if (resolvedCustId && !String(resolvedCustId).startsWith('cust_') && !String(resolvedCustId).startsWith('draft_')) {
+        formData.append('customerId', resolvedCustId);
+      }
+      const resolvedProjId =
+        overrideProjectId ||
+        (provisionedProject?.id && !String(provisionedProject.id).startsWith('prj_') ? provisionedProject.id : undefined);
+      if (resolvedProjId) {
+        formData.append('projectId', resolvedProjId);
+      }
 
       await documentsApi.uploadDocument(formData);
       setUploadStatusBySlot(docType, 'synced');
@@ -1146,7 +1300,7 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
         setDocUriBySlot(docType, uri, name);
         uploadDocumentToCloud(docType, uri, name, 'image/jpeg');
       }
-    } catch (_) {}
+    } catch (_) { }
   };
 
   // Attach Statutory PDF / Digital Document via DocumentPicker
@@ -1187,7 +1341,7 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
         setDocUriBySlot(docType, uri, name);
         uploadDocumentToCloud(docType, uri, name, 'image/jpeg');
       }
-    } catch (_) {}
+    } catch (_) { }
   };
 
   // Launch 1-Tap UPI Intent
@@ -1249,17 +1403,7 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
         `Thank you for choosing clean solar energy! ☀️`;
 
       const cleanPhone = (customerPhone || '').replace(/[^0-9]/g, '');
-      const encodedMsg = encodeURIComponent(message);
-      const url = cleanPhone.length >= 10
-        ? `whatsapp://send?phone=91${cleanPhone.slice(-10)}&text=${encodedMsg}`
-        : `whatsapp://send?text=${encodedMsg}`;
-
-      const canOpen = await Linking.canOpenURL(url).catch(() => false);
-      if (canOpen) {
-        await Linking.openURL(url);
-      } else {
-        await Linking.openURL(`https://wa.me/${cleanPhone.length >= 10 ? `91${cleanPhone.slice(-10)}` : ''}?text=${encodedMsg}`);
-      }
+      await openWhatsAppDirect(cleanPhone, message);
     } catch {
       Alert.alert('WhatsApp', 'Could not open WhatsApp for receipt sharing.');
     }
@@ -1267,12 +1411,18 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
 
   const buildReceiptPdfHtml = () => {
     const today = new Date().toLocaleDateString('en-IN');
-    const invoiceNum = recordedInvoiceNumber || `ADV-${Date.now().toString().slice(-6)}`;
+    const invoiceNum = recordedInvoiceNumber || `INV-${Date.now().toString().slice(-6)}`;
+    const totalTurnkeyAmount = grossAmount;
+    const totalBaseTaxable = Math.round(totalTurnkeyAmount / 1.138);
+    const totalGstAmount = totalTurnkeyAmount - totalBaseTaxable;
+    const remainingBalance = Math.max(0, totalTurnkeyAmount - parsedTokenAmount);
+    const isFullyPaid = remainingBalance <= 0;
+
     return generateInvoiceHtml({
       invoiceNumber: invoiceNum,
       invoiceDate: today,
       dueDate: today,
-      invoiceType: 'ADVANCE_RECEIPT',
+      invoiceType: 'TAX_INVOICE',
       companyName: user?.tenantName || (user as any)?.company || 'WhereReady Solar OS',
       companyAddress: (user as any)?.tenantAddress || (user as any)?.address || '',
       companyPhone: (user as any)?.tenantPhone || (user as any)?.phone || '',
@@ -1285,23 +1435,23 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
       consumerNumber: consumerNumber.trim(),
       projectName: `${customerName.trim()} - ${cap} kWp Rooftop Solar System`,
       projectCapacityKw: cap,
-      milestoneTitle: 'Advance Booking Token for Rooftop Solar EPC Procurement',
-      milestoneKey: 'BOOKING_ADVANCE',
-      subtotal: compositeBaseTaxable,
+      milestoneTitle: `Turnkey Solar EPC Project Contract (${cap} kWp On-Grid)`,
+      milestoneKey: 'TOTAL_CONTRACT',
+      subtotal: totalBaseTaxable,
       taxRate: 13.8,
-      taxAmount: compositeGstAmount,
-      grossTotal: parsedTokenAmount,
+      taxAmount: totalGstAmount,
+      grossTotal: totalTurnkeyAmount,
       totalPaid: parsedTokenAmount,
-      balanceDue: 0,
-      status: 'PAID',
+      balanceDue: remainingBalance,
+      status: isFullyPaid ? 'PAID' : 'PARTIAL',
       items: [
         {
-          description: `Advance Token Booking for ${cap} kWp Turnkey Solar System (${effectiveModuleMake} Modules + ${effectiveInverterMake} Inverter)`,
+          description: `Turnkey Solar EPC Project Supply & Installation (${cap} kWp On-Grid) — ${effectiveModuleMake} Modules (${effectiveModuleWattage}Wp × ${effectivePanelQty}) + ${effectiveInverterMake} Inverter (${effectiveInverterCap}kW)`,
           hsn: '9954',
           qty: 1,
           unit: 'Lot',
-          rate: compositeBaseTaxable,
-          amount: parsedTokenAmount,
+          rate: totalBaseTaxable,
+          amount: totalTurnkeyAmount,
           gstRate: 13.8,
         },
       ],
@@ -1310,7 +1460,7 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
           amount: parsedTokenAmount,
           mode: paymentMode,
           date: new Date().toISOString(),
-          reference: transactionRef.trim() || 'VERIFIED_OFFLINE',
+          reference: transactionRef.trim() || 'FIRST_ADVANCE_TOKEN',
         },
       ],
     });
@@ -1343,6 +1493,17 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
       Alert.alert('Specify Token', 'Please enter a valid token amount received (e.g. ₹25,000) to record payment.');
       return;
     }
+
+    if (advancePaidConfirmed && recordedInvoiceNumber) {
+      // Already recorded, advance to next step without duplicating invoice or payment
+      const nextIdx = currentStepIdx + 1;
+      saveDraftLocally(nextIdx);
+      animateCardTransition('next', () => {
+        setCurrentStepIdx(nextIdx);
+      });
+      return;
+    }
+
     setSubmitting(true);
     soundEffects.playCashChime();
 
@@ -1354,38 +1515,57 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
 
       // Record invoice aligned with finance module
       try {
+        const totalTurnkeyAmount = grossAmount;
+        const totalBaseTaxable = Math.round(totalTurnkeyAmount / 1.138);
+        const totalGstAmount = totalTurnkeyAmount - totalBaseTaxable;
+        const remainingBalance = Math.max(0, totalTurnkeyAmount - parsedTokenAmount);
+
         const inv = await financeApi.createInvoice({
-          customerId: currentProj?.customerId || currentProj?.customer?.id || createdLead?.id,
+          customerId: currentProj?.customerId || currentProj?.customer?.id || (createdLead?.id && !String(createdLead.id).startsWith('draft_') ? createdLead.id : undefined),
           customerName: customerName.trim(),
           mobile: customerPhone.replace(/[^0-9]/g, ''),
           projectId: (currentProj?.id && !String(currentProj.id).startsWith('prj_')) ? currentProj.id : undefined,
-          milestone: 'TOKEN_ADVANCE',
-          milestoneTitle: `Advance Booking Token (${cap} kWp)`,
-          subtotal: compositeBaseTaxable,
+          milestone: 'TOTAL_CONTRACT',
+          milestoneTitle: `Solar EPC Turnkey Contract (${cap} kWp On-Grid)`,
+          subtotal: totalBaseTaxable,
           taxRate: 13.8,
-          taxAmount: compositeGstAmount,
-          amount: parsedTokenAmount,
-          notes: `Customer: ${customerName}, Mobile: ${customerPhone}, Mode: ${paymentMode}, Ref: ${transactionRef || 'OFFLINE'}`,
+          taxAmount: totalGstAmount,
+          amount: totalTurnkeyAmount,
+          notes: `Turnkey Contract Value: ₹${totalTurnkeyAmount.toLocaleString('en-IN')}, First Advance Paid: ₹${parsedTokenAmount.toLocaleString('en-IN')}, Remaining Balance: ₹${remainingBalance.toLocaleString('en-IN')}. Mode: ${paymentMode}, Ref: ${transactionRef || 'OFFLINE'}`,
+          items: [
+            {
+              description: `Turnkey Solar EPC Project Supply & Installation (${cap} kWp On-Grid)`,
+              hsn: '9954',
+              quantity: 1,
+              unitPrice: totalBaseTaxable,
+              total: totalTurnkeyAmount,
+            }
+          ]
         });
 
-        if (inv?.invoiceNumber) {
-          setRecordedInvoiceNumber(inv.invoiceNumber);
+        const createdInv = (inv as any)?.invoice || inv;
+
+        if (createdInv?.invoiceNumber) {
+          setRecordedInvoiceNumber(createdInv.invoiceNumber);
         } else {
-          setRecordedInvoiceNumber(`ADV-${Date.now().toString().slice(-6)}`);
+          setRecordedInvoiceNumber(`INV-${Date.now().toString().slice(-6)}`);
         }
 
-        // Record payment in customer ledger
-        if (inv?.id) {
-          await financeApi.recordPayment(inv.id, {
+        // Record first advance payment in customer ledger
+        if (createdInv?.id) {
+          await financeApi.recordPayment(createdInv.id, {
             amount: parsedTokenAmount,
             mode: paymentMode,
-            reference: transactionRef || 'TOKEN_ADVANCE',
-            notes: `Token received during 1-Flow onboarding`,
+            reference: transactionRef || 'FIRST_ADVANCE_TOKEN',
+            notes: `First advance booking token received via 1-Flow onboarding. Remaining Balance: ₹${remainingBalance.toLocaleString('en-IN')}`,
             date: new Date().toISOString(),
-          }).catch(() => {});
+          }).catch(() => { });
         }
       } catch (finErr) {
         console.warn('Finance sync deferred to offline queue:', finErr);
+        if (!recordedInvoiceNumber) {
+          setRecordedInvoiceNumber(`INV-${Date.now().toString().slice(-6)}`);
+        }
       }
 
       setAdvancePaidConfirmed(true);
@@ -1451,7 +1631,7 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
       try {
         const html = generateDiscomHtml('WCR_FULL', data, { includeStamp: true });
         await createAndSharePdf(html, `DISCOM_WCR_${customerName.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`);
-      } catch {}
+      } catch { }
 
       // Persist statutory verification to SafeStorage for project
       if (currentProj?.id) {
@@ -1470,18 +1650,37 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
             await tenantApi.advanceProjectStage(
               currentProj.id,
               'NET_METERING',
-              'DISCOM WCR Statutory Dossier Generated via 1-Flow'
+              'DISCOM WCR Statutory Dossier Generated via 1-Flow',
+              true
             );
             setProvisionedProject((prev: any) => ({ ...prev, currentStage: 'NET_METERING' }));
-          } catch {
-            await offlineSyncService
-              .enqueueMutation('UPDATE_PROJECT_STAGE', {
-                projectId: currentProj.id,
-                stage: 'NET_METERING',
-                status: 'NET_METERING',
-                note: 'DISCOM WCR Statutory Dossier Generated via 1-Flow',
-              })
-              .catch(() => {});
+          } catch (stgErr: any) {
+            const msg = stgErr?.response?.data?.error || stgErr?.message || '';
+            const lowerMsg = String(msg).toLowerCase();
+            const isOfflineErr =
+              stgErr.code === 'ECONNABORTED' ||
+              stgErr.message === 'Network Error' ||
+              !stgErr.response;
+
+            if (isOfflineErr) {
+              await offlineSyncService
+                .enqueueMutation({
+                  type: 'UPDATE_PROJECT_STAGE',
+                  endpoint: `/api/tenant/projects/${currentProj.id}/stage`,
+                  method: 'PATCH',
+                  payload: {
+                    stage: 'NET_METERING',
+                    status: 'NET_METERING',
+                    note: 'DISCOM WCR Statutory Dossier Generated via 1-Flow',
+                    force: true,
+                  },
+                  entityId: currentProj.id,
+                  entityType: 'project',
+                })
+                .catch(() => { });
+            } else if (lowerMsg.includes('already') || lowerMsg.includes('progressed') || lowerMsg.includes('completed')) {
+              setProvisionedProject((prev: any) => ({ ...prev, currentStage: 'NET_METERING' }));
+            }
           }
         }
       }
@@ -1493,7 +1692,7 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
       });
       setSessionXpEarned((prev) => prev + r.xpGained);
 
-      await SafeStorage.removeItem(STORAGE_DRAFT_KEY).catch(() => {});
+      await SafeStorage.removeItem(STORAGE_DRAFT_KEY).catch(() => { });
       soundEffects.playCelebrationFanfare();
 
       // Trigger Grand Finale Celebration!
@@ -1523,14 +1722,22 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
 
   const handleFinalCompletion = async () => {
     setShowCelebration(false);
-    await SafeStorage.removeItem(STORAGE_DRAFT_KEY).catch(() => {});
-    // Trigger immediate background sync for any queued mutations
-    offlineSyncService.syncQueue().catch(() => {});
+    await SafeStorage.removeItem(STORAGE_DRAFT_KEY).catch(() => { });
+    // Trigger immediate background sync for any queued mutations with force flag
+    await offlineSyncService.syncQueue({ force: true }).catch(() => { });
     if (onComplete) {
       onComplete({
         lead: createdLead,
         project: provisionedProject,
         customer: provisionedProject?.customer,
+        invoice: recordedInvoiceNumber
+          ? {
+              invoiceNumber: recordedInvoiceNumber,
+              amount: grossAmount,
+              advancePaid: parsedTokenAmount,
+              balance: remainingProjectBalance,
+            }
+          : undefined,
       });
     }
     onClose();
@@ -2172,25 +2379,26 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
                     <Text style={[styles.presetHeading, { marginTop: 14 }]}>2. GRID-TIED INVERTER MAKE:</Text>
                     <View style={styles.brandOptionsList}>
                       {[
-                        { name: 'Solis 3.3kW Grid-Tied Inverter', tag: 'Dual MPPT' },
-                        { name: 'Growatt 3.3kW High Yield Inverter', tag: 'High Yield' },
-                        { name: 'GoodWe Smart Grid Inverter', tag: 'Smart Cloud' },
-                        { name: 'Deye 3.3kW Grid Inverter', tag: 'Hybrid Ready' },
-                        { name: 'Sungrow 3.3kW Industrial Inverter', tag: 'Premium' },
+                        { make: 'Solis', desc: `${cap}kW Dual MPPT Grid-Tied`, tag: 'Dual MPPT' },
+                        { make: 'Growatt', desc: `${cap}kW High Yield Inverter`, tag: 'High Yield' },
+                        { make: 'GoodWe', desc: `${cap}kW Smart Grid Inverter`, tag: 'Smart Cloud' },
+                        { make: 'Deye', desc: `${cap}kW Grid Inverter`, tag: 'Hybrid Ready' },
+                        { make: 'Sungrow', desc: `${cap}kW Industrial Inverter`, tag: 'Premium' },
                       ].map((inv) => {
-                        const isSel = inverterBrand === inv.name;
+                        const fullName = `${inv.make} ${inv.desc}`;
+                        const isSel = inverterBrand.includes(inv.make);
                         return (
                           <TouchableOpacity
-                            key={inv.name}
+                            key={inv.make}
                             style={[styles.brandOptionCard, isSel && styles.brandOptionCardSelected]}
                             onPress={() => {
                               soundEffects.playSelect();
-                              setInverterBrand(inv.name);
+                              setInverterBrand(fullName);
                             }}
                           >
                             <View style={{ flex: 1 }}>
                               <Text style={[styles.brandOptionTitle, isSel && styles.brandOptionTitleSelected]}>
-                                {inv.name}
+                                {fullName}
                               </Text>
                               <Text style={styles.brandOptionTag}>{inv.tag}</Text>
                             </View>
@@ -2836,6 +3044,20 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
                       <Text style={styles.verifiedConsumerText}>✓ PM Surya Ghar DBT Eligible & Verified</Text>
                     </View>
                   </View>
+                ) : !ifscVerified && ifscCode.length === 11 && !ifscLoading ? (
+                  <View style={[styles.inputWrapper, { marginTop: 10 }]}>
+                    <Building size={18} color="#64748B" style={styles.inputIcon} />
+                    <TextInput
+                      style={styles.bigTextInput}
+                      placeholder="Bank Name (e.g. HDFC Bank / State Bank)"
+                      placeholderTextColor="#94A3B8"
+                      value={bankName}
+                      onChangeText={(val) => {
+                        setBankName(val);
+                        setIfscVerified(true);
+                      }}
+                    />
+                  </View>
                 ) : null}
 
                 <View style={[styles.inputWrapper, { marginTop: 12 }]}>
@@ -2862,8 +3084,31 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
 
                 <View style={styles.verifiedConsumerBadge}>
                   <ShieldCheck size={14} color="#15803D" />
-                  <Text style={styles.verifiedConsumerText}>Legally binding under Information Technology Act, 2000</Text>
+                  <Text style={styles.verifiedConsumerText}>Legally binding under IT Act 2000 & DPDP Act 2023</Text>
                 </View>
+
+                {/* DPDP STATUTORY CONSENT & NOTICE TRIGGER */}
+                <TouchableOpacity
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginTop: 10,
+                    paddingVertical: 10,
+                    paddingHorizontal: 12,
+                    backgroundColor: '#ECFDF5',
+                    borderRadius: 10,
+                    borderWidth: 1,
+                    borderColor: '#A7F3D0',
+                  }}
+                  onPress={() => setDpdpModalVisible(true)}
+                  activeOpacity={0.7}
+                >
+                  <ShieldCheck size={16} color="#059669" style={{ marginRight: 6 }} />
+                  <Text style={{ color: '#047857', fontSize: 12, fontWeight: '700' }}>
+                    View DPDP Statutory Notice & Itemized Consent
+                  </Text>
+                </TouchableOpacity>
               </View>
             )}
 
@@ -3233,8 +3478,8 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
                       {currentStepIdx === 4
                         ? 'Save Lead & Create Quote ➔'
                         : activeStepId === 'CUSTOMER_SIGNATURE'
-                        ? 'Lock Deal & Provision Project ➔'
-                        : 'Continue ➔'}
+                          ? 'Lock Deal & Provision Project ➔'
+                          : 'Continue ➔'}
                     </Text>
                   </>
                 )}
@@ -3332,6 +3577,21 @@ export const SeamlessSolarFlowModal: React.FC<SeamlessSolarFlowModalProps> = ({
             onClose={() => setDiscomStudioVisible(false)}
           />
         )}
+
+        {/* DPDP ACT 2023 STATUTORY CONSENT & NOTICE MODAL */}
+        <DpdpConsentModal
+          visible={dpdpModalVisible}
+          onClose={() => setDpdpModalVisible(false)}
+          customerName={customerName.trim()}
+          customerPhone={customerPhone.trim()}
+          customerEmail={undefined}
+          dataPrincipalId={provisionedProject?.customerId || provisionedProject?.id || createdLead?.id || 'DRAFT_PRINCIPAL'}
+          dataPrincipalType="LEAD"
+          signatureSvg={customerSignatureSvg}
+          onConsentGranted={() => {
+            soundEffects.playVerificationShield();
+          }}
+        />
       </View>
     </Modal>
   );

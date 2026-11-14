@@ -2841,16 +2841,33 @@ export function generateInvoiceHtml(data: InvoicePdfProps): string {
           <span class="total-line-val">₹ ${formatInr(sgst)}</span>
         </div>
         <div class="grand-total-line">
-          <span>Total Invoice Value</span>
+          <span>Total Project Amount</span>
           <span class="grand-total-val">₹ ${formatInr(data.grossTotal)}</span>
         </div>
         <div class="paid-line">
-          <span>Amount Paid to Date</span>
+          <span>First Advance Received</span>
           <span>₹ ${formatInr(data.totalPaid)}</span>
         </div>
         <div class="bal-line">
-          <span>Balance Outstanding</span>
+          <span>Remaining Balance Due</span>
           <span>₹ ${formatInr(data.balanceDue)}</span>
+        </div>
+
+        <!-- Detailed Financial Summary Block -->
+        <div style="margin-top: 10px; padding: 10px 12px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0; font-size: 10.5px;">
+          <div style="font-weight: 800; color: #0f172a; margin-bottom: 5px; text-transform: uppercase; font-size: 9.5px; letter-spacing: 0.5px;">Financial Ledger Summary:</div>
+          <div style="display: flex; justify-content: space-between; margin-bottom: 3px;">
+            <span style="color: #475569;">Total Turnkey EPC Value:</span>
+            <strong style="color: #0f172a;">₹ ${formatInr(data.grossTotal)}</strong>
+          </div>
+          <div style="display: flex; justify-content: space-between; margin-bottom: 3px; color: #059669;">
+            <span>First Advance Token Paid:</span>
+            <strong style="color: #059669;">- ₹ ${formatInr(data.totalPaid)}</strong>
+          </div>
+          <div style="display: flex; justify-content: space-between; color: #b45309; font-weight: 800; border-top: 1px dashed #cbd5e1; padding-top: 4px; margin-top: 3px;">
+            <span>Remaining Balance Due:</span>
+            <strong style="color: #b45309;">₹ ${formatInr(data.balanceDue)}</strong>
+          </div>
         </div>
       </div>
     </div>

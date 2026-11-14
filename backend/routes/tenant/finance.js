@@ -367,7 +367,7 @@ router.get('/api/tenant/finance/stats', requireTenantAuth, async (req, res) => {
     invoices.forEach(inv => {
       const paidForInv = inv.payments.reduce((s, p) => s + (p.amount || 0), 0);
       const isPaid = paidForInv >= inv.amount || inv.status === 'PAID';
-      
+
       if (isPaid) {
         paidCount++;
       } else if (paidForInv > 0) {
@@ -434,10 +434,10 @@ router.get('/api/tenant/finance', requireTenantAuth, async (req, res) => {
       ];
     }
 
-    const invoices = await prisma.invoice.findMany({ 
+    const invoices = await prisma.invoice.findMany({
       where,
-      include: { 
-        customer: true, 
+      include: {
+        customer: true,
         project: {
           select: {
             id: true,
@@ -448,8 +448,8 @@ router.get('/api/tenant/finance', requireTenantAuth, async (req, res) => {
             systemType: true,
             currentStage: true
           }
-        }, 
-        payments: { orderBy: { date: 'desc' } } 
+        },
+        payments: { orderBy: { date: 'desc' } }
       },
       orderBy: { createdAt: 'desc' }
     });
@@ -459,7 +459,7 @@ router.get('/api/tenant/finance', requireTenantAuth, async (req, res) => {
       const totalPaid = (inv.payments || []).reduce((sum, p) => sum + (p.amount || 0), 0);
       const balance = Math.max(0, (inv.amount || 0) - totalPaid);
       const isOverdue = !['PAID'].includes(inv.status) && inv.dueDate && new Date(inv.dueDate) < now;
-      
+
       let computedStatus = inv.status;
       if (totalPaid >= inv.amount && inv.amount > 0) {
         computedStatus = 'PAID';
@@ -503,15 +503,15 @@ router.get('/api/tenant/finance/:id', requireTenantAuth, async (req, res) => {
     const [invoice, tenant] = await Promise.all([
       prisma.invoice.findUnique({
         where: { id: req.params.id, tenantId: req.user.tenantId },
-        include: { 
-          customer: true, 
+        include: {
+          customer: true,
           project: {
             include: {
               subsidies: true,
               discomApplication: true
             }
-          }, 
-          payments: { orderBy: { date: 'desc' } } 
+          },
+          payments: { orderBy: { date: 'desc' } }
         }
       }),
       prisma.tenant.findUnique({
@@ -538,7 +538,7 @@ router.get('/api/tenant/finance/:id', requireTenantAuth, async (req, res) => {
     const totalPaid = (invoice.payments || []).reduce((sum, p) => sum + (p.amount || 0), 0);
     const balance = Math.max(0, (invoice.amount || 0) - totalPaid);
 
-    res.json({ 
+    res.json({
       invoice: {
         ...invoice,
         totalPaid,
@@ -660,17 +660,15 @@ router.get('/api/tenant/invoices/:id/pdf', requireTenantAuth, async (req, res) =
     y -= 18;
 
     page.drawRectangle({ x: 330, y: y - 5, width: 220, height: 22, color: rgb(0.06, 0.72, 0.5) });
-    drawText('Gross Invoice Total:', 340, y + 2, 10, true, rgb(1, 1, 1));
+    drawText('Total Amount:', 340, y + 2, 10, true, rgb(1, 1, 1));
     drawText(`Rs. ${Number(invoice.amount || 0).toLocaleString('en-IN')}`, 470, y + 2, 10, true, rgb(1, 1, 1));
     y -= 24;
 
-    if (totalPaid > 0) {
-      drawText('Less: Paid to Date:', 340, y, 9, true, rgb(0.06, 0.6, 0.3));
-      drawText(`-Rs. ${totalPaid.toLocaleString('en-IN')}`, 470, y, 9, true, rgb(0.06, 0.6, 0.3));
-      y -= 16;
-    }
+    drawText('First Advance Paid:', 340, y, 9, true, rgb(0.06, 0.6, 0.3));
+    drawText(`Rs. ${totalPaid.toLocaleString('en-IN')}`, 470, y, 9, true, rgb(0.06, 0.6, 0.3));
+    y -= 16;
 
-    drawText('Balance Payable:', 340, y, 10, true, rgb(0.8, 0.3, 0.0));
+    drawText('Remaining Balance:', 340, y, 10, true, rgb(0.8, 0.3, 0.0));
     drawText(`Rs. ${balance.toLocaleString('en-IN')}`, 470, y, 10, true, rgb(0.8, 0.3, 0.0));
     y -= 35;
 
@@ -699,23 +697,23 @@ router.get('/api/tenant/invoices/:id/pdf', requireTenantAuth, async (req, res) =
 // 4. Create Milestone / GST Tax Invoice
 router.post('/api/tenant/finance', requireTenantAuth, requirePermission('finance.create_invoice'), async (req, res) => {
   try {
-    const { 
-      customerId: rawCustomerId, 
-      projectId: rawProjectId, 
+    let {
+      customerId: rawCustomerId,
+      projectId: rawProjectId,
       customerName,
       mobile: rawMobile,
-      milestone, 
-      milestoneTitle, 
-      subtotal, 
-      taxRate = 13.8, 
-      taxAmount, 
-      subsidyDeduction = 0, 
-      amount, 
-      dueDate, 
-      items, 
-      notes, 
+      milestone,
+      milestoneTitle,
+      subtotal,
+      taxRate = 13.8,
+      taxAmount,
+      subsidyDeduction = 0,
+      amount,
+      dueDate,
+      items,
+      notes,
       terms,
-      status = 'UNPAID' 
+      status = 'UNPAID'
     } = req.body;
 
     // 1. Resolve and validate Project ID (PostgreSQL Foreign Key protection)
@@ -944,7 +942,7 @@ router.post('/api/tenant/finance/convert-quotation', requireTenantAuth, async (r
     for (let i = 0; i < targetMilestones.length; i++) {
       const ms = targetMilestones[i];
       const invNumber = `INV-${currentYear}-${(count + 1 + i).toString().padStart(4, '0')}`;
-      
+
       let milestoneAmount;
       if (i === targetMilestones.length - 1 && targetMilestones.length === milestones.length) {
         milestoneAmount = totalSystemPrice - runningSum;
@@ -1047,7 +1045,7 @@ router.post('/api/tenant/finance/milestone-invoices', requireTenantAuth, async (
         await prisma.lead.update({
           where: { id: lead.id },
           data: { customerId }
-        }).catch(() => {});
+        }).catch(() => { });
       }
     }
 
@@ -1233,7 +1231,7 @@ router.post('/api/tenant/invoices/:id/payments', requireTenantAuth, requirePermi
 
     // Recompute total payments
     const totalPaid = invoice.payments.reduce((sum, p) => sum + p.amount, 0) + parsedAmount;
-    
+
     // Auto-update invoice status
     let newStatus = 'PARTIAL';
     if (totalPaid >= invoice.amount) {
@@ -1265,11 +1263,11 @@ router.post('/api/tenant/invoices/:id/payments', requireTenantAuth, requirePermi
       }
     }
 
-    res.status(201).json({ 
-      payment, 
-      invoice: updatedInvoice, 
+    res.status(201).json({
+      payment,
+      invoice: updatedInvoice,
       receiptNumber,
-      invoiceStatus: newStatus 
+      invoiceStatus: newStatus
     });
   } catch (error) {
     console.error('Error recording payment:', error);
@@ -1485,7 +1483,7 @@ router.delete('/api/tenant/procurement/:id', requireTenantAuth, async (req, res)
 // ----------------------------------------------------
 router.get('/api/tenant/service', requireTenantAuth, async (req, res) => {
   try {
-    const service = await prisma.supportTicket.findMany({ 
+    const service = await prisma.supportTicket.findMany({
       where: { tenantId: req.user.tenantId },
       include: { customer: true, project: true, assignee: true, visits: true },
       orderBy: { createdAt: 'desc' }

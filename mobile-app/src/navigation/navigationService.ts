@@ -54,3 +54,4 @@ export function navigateToTab(screenName: string, params?: any) {
     navigationRef.navigate('MainTabs', { screen: screenName as any, params });
   }
 }
+

@@ -87,6 +87,9 @@ model Tenant {
   automationRules        AutomationRule[]
   staffMembers           Staff[]
   departments            Department[]
+  dpdpConsents           DPDPConsent[]
+  dpdpRequests           DPDPRequest[]
+  dpdpConfig             Json?
 }
 
 // ----------------------------------------------------
@@ -1725,3 +1728,74 @@ model ProjectStaffAssignment {
 
 
 
+
+
+// ----------------------------------------------------
+// DIGITAL PERSONAL DATA PROTECTION (DPDP ACT 2023)
+// ----------------------------------------------------
+model DPDPConsent {
+  id                 String    @id @default(uuid())
+  tenantId           String
+  tenant             Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  dataPrincipalType  String    @default("LEAD") // LEAD, CUSTOMER, STAFF, USER
+  dataPrincipalId    String    // Lead ID, Customer ID, or Staff ID
+  dataPrincipalName  String?
+  dataPrincipalPhone String?
+  dataPrincipalEmail String?
+
+  purposes           Json      // ["FEASIBILITY_SIZING", "DISCOM_NET_METERING", "PM_SURYA_GHAR_DBT", "CONTRACT_INVOICING", "COMMUNICATION_UPDATES", "FINANCING_LOAN"]
+  status             String    @default("ACTIVE") // ACTIVE, REVOKED, EXPIRED
+
+  noticeVersion      String    @default("1.0")
+  noticeLanguage     String    @default("en") // en, hi, mr, etc.
+
+  capturedVia        String    @default("1FLOW_MOBILE") // 1FLOW_MOBILE, WEB_PORTAL, FIELD_COCKPIT, SIGNATURE_PAD
+  ipAddress          String?
+  userAgent          String?
+  signatureSvg       String?   @db.Text
+
+  grantedAt          DateTime  @default(now())
+  validUntil         DateTime?
+  revokedAt          DateTime?
+  revocationReason   String?
+  revokedPurposes    Json?
+
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@index([tenantId, dataPrincipalId])
+  @@index([tenantId, status])
+  @@index([tenantId, dataPrincipalPhone])
+}
+
+model DPDPRequest {
+  id                 String    @id @default(uuid())
+  tenantId           String
+  tenant             Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  requestNumber      String    // e.g. "DPDP-REQ-2026-0001"
+  dataPrincipalType  String    @default("CUSTOMER") // LEAD, CUSTOMER
+  dataPrincipalId    String
+  dataPrincipalName  String?
+  dataPrincipalPhone String?
+  dataPrincipalEmail String?
+
+  requestType        String    // ACCESS_SUMMARY (Sec 11), CORRECTION (Sec 12), ERASURE (Sec 12), GRIEVANCE (Sec 13), NOMINATION (Sec 14)
+  status             String    @default("PENDING") // PENDING, IN_PROGRESS, COMPLETED, REJECTED
+  priority           String    @default("NORMAL")
+
+  requestDetails     Json?     // payload / details submitted by Data Principal
+  slaDueDate         DateTime  // DPDP statutory resolution deadline (30 days)
+
+  resolutionNotes    String?   @db.Text
+  resolvedBy         String?   // User ID of DPO / Grievance Officer
+  resolvedAt         DateTime?
+  rejectionReason    String?   @db.Text
+
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@index([tenantId, status])
+  @@index([tenantId, requestType])
+}

@@ -507,6 +507,7 @@ export const ModulesScreen: React.FC<{ route?: any; navigation?: any }> = ({
       <SeamlessSolarFlowModal
         visible={seamlessFlowVisible}
         onClose={() => setSeamlessFlowVisible(false)}
+        onComplete={() => setSeamlessFlowVisible(false)}
       />
     </View>
   );

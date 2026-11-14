@@ -1,24 +1,21 @@
-# Challenger 2 Progress & Liveness Heartbeat
+# Challenger M1-2 Progress & Liveness Heartbeat
 
-- **Last visited**: 2026-10-29T11:48:00Z
-- **Current Status**: Empirically stress-testing claims and compiling Challenge Report.
+- **Last visited**: 2026-10-30T08:46:00Z
+- **Current Status**: Task complete. Adversarial stress verification executed, challenge report authored, and hard handoff completed with explicit verdict APPROVE.
 - **Completed Steps**:
-  - [x] Initialized DISPATCH.md, BRIEFING.md, and progress.md.
-  - [x] Read ORIGINAL_REQUEST.md, DISPATCH.md, and worker_m1_docs/handoff.md.
-  - [x] Ran TypeScript typecheck on `web-client` (`node web-client/node_modules/typescript/bin/tsc --noEmit -p web-client/tsconfig.json` -> 0 errors, exit code 0).
-  - [x] Ran TypeScript typecheck on `mobile-app` (`node mobile-app/node_modules/typescript/bin/tsc --noEmit -p mobile-app/tsconfig.json` -> 0 errors, exit code 0).
-  - [x] Empirically confirmed all 7 reported 404 dead links:
-    - `/tenant/installation/schedule` (referenced in `tenant/installation/page.tsx:38` and `tenant/installation/jobs/page.tsx:52`)
-    - `/tenant/installation/calendar` (referenced in `tenant/installation/page.tsx:95`)
-    - `/tenant/installation/checklists` (referenced in `tenant/installation/page.tsx:103`)
-    - `/tenant/inventory/products/new` (referenced in `tenant/inventory/page.tsx:44` and `tenant/inventory/products/page.tsx:43`)
-    - `/tenant/quotations/new` (referenced in `tenant/projects/[id]/page.tsx:992`)
-  - [x] Empirically confirmed hardcoded vendor and customer fallback data in `tenant/projects/[id]/page.tsx:87-144` ("EKVARTA ENERGY SOLUTIONS", "SHRI. SURENDRA RAMBHAU THAKRE", GSTIN "27DTXPM6427E1Z3", CA "410022120526", etc.).
-  - [x] Empirically proved trade discount GST bug in `solarCalculator.js` / `solarCalculator.ts` (charges GST on pre-discount subtotal while taxable base is discounted, leading to tax overcharge, e.g. 22.5% effective GST instead of 18%).
-  - [x] Empirically proved milestone rounding drift in `solarCalculator.js` / `solarCalculator.ts` (35% of amounts in 100,000–101,000 range deviate by ±₹1 from total).
-  - [x] Empirically ran backend test suite: 14 passed, 1 failed (`unifiedTemplateParity.test.js:49` missing "PM Surya Ghar Muft Bijli Yojana" in mobile `pdfService.ts`).
-  - [x] Empirically ran mobile perspectives test suite: 23 passed, 0 failed.
-- **In Progress**:
-  - [ ] Compiling comprehensive Challenger 2 Handoff Report (`handoff.md`).
-  - [ ] Updating BRIEFING.md.
-  - [ ] Sending notification message to orchestrator.
+  - [x] Initialized DISPATCH.md, BRIEFING.md, and progress.md for M1-2 assignment.
+  - [x] Read ORIGINAL_REQUEST.md, PROJECT.md, and worker_m1/handoff.md.
+  - [x] Inspected source code of all 8 shared UI primitives and theme modules in `mobile-app/`.
+  - [x] Designed and authored comprehensive empirical adversarial stress test suite (`mobile-app/tests/tier5-ui-primitives-stress.test.js`) with 63 automated assertions across 10 test suites.
+  - [x] Executed TypeScript typecheck via `tsc --noEmit` -> 0 errors (exit code 0).
+  - [x] Executed perspective automated test suite -> 23 / 23 passed (exit code 0).
+  - [x] Executed full E2E & Tier 5 stress test runner (`node mobile-app/test-e2e.js`) -> 184 / 184 passed across 37 suites (exit code 0).
+  - [x] Empirically tested loading button click spamming (200-500 iterations) -> 0 unauthorized calls fired.
+  - [x] Empirically tested dirty form navigation guard in `ModalHeader` and `useDirtyFormWarning` -> clean dismisses without alert, dirty intercepts and prompts native Alert with Discard/Cancel.
+  - [x] Empirically tested 5,000-character string inputs and Unicode characters across all 8 primitives -> 0 crashes, 0 memory exhaustion, proper 1-line ellipsize protection.
+  - [x] Discovered minor advisory finding in `tokens.ts` regarding `formatInr(NaN)` yielding `'₹NaN'`.
+  - [x] Cleaned up temporary test smoke files.
+  - [x] Authored comprehensive Challenge Report: `f:\Company Products\solar-manager\.agents\teamwork\challenger_m1_2\challenge_report.md`.
+  - [x] Authored 5-component Hard Handoff Report with explicit verdict APPROVE: `f:\Company Products\solar-manager\.agents\teamwork\challenger_m1_2\handoff.md`.
+  - [x] Updated BRIEFING.md.
+  - [x] Sent final completion message to orchestrator (`94d7f2ae-468d-438a-8f95-fa253185584b`).

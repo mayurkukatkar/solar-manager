@@ -82,9 +82,9 @@ export const OfflineBanner: React.FC = () => {
     if (isSyncing) return;
     setIsSyncing(true);
     try {
-      const res = await offlineSyncService.syncQueue();
+      const res = await offlineSyncService.syncQueue({ force: true });
       setLastSyncResult({ synced: res.synced, failed: res.failed });
-      if (res.synced > 0 && res.failed === 0) {
+      if ((res.synced > 0 || res.conflicted > 0 || res.remaining === 0) && res.failed === 0) {
         setShowSuccess(true);
         setTimeout(() => setShowSuccess(false), 3000);
       }

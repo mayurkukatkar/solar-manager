@@ -1,189 +1,156 @@
-# Milestone M1 Challenger 2 Report: Frontend, Mobile & Financial Calculations
+# Handoff Report: Milestone M1 — Mobile UI Primitives & Layout Adversarial Verification
 
-**Author**: Challenger 2 (Empirical Challenger & Critic)  
-**Date**: 2026-10-29  
-**Milestone**: M1 — Documentation Baseline & Architecture Specifications  
-**Verdict**: **APPROVE**  
-**Overall Risk Assessment**: LOW (Documentation faithfully reflects codebase state; reported defects are genuine, verified, and correctly cataloged for remediation in M2–M5)  
+**Author**: Challenger M1-2 (Mobile UI Stress Verifier)  
+**Recipient**: Orchestrator (94d7f2ae-468d-438a-8f95-fa253185584b)  
+**Date**: 2026-10-30  
+**Handoff Type**: Hard Handoff (Task Complete)  
+**Verdict**: **`APPROVE`** (with 1 Minor Advisory Finding)  
 
 ---
 
 ## 1. Observation
 
-All observations were directly verified via automated command execution and code inspection on Windows:
+1. **Shared UI Primitives Source Code**:
+   - `mobile-app/src/components/common/Button.tsx` (233 lines): Implements 7 variants, 3 size scales, Pressable ripple, layout-stable loading indicator with `ActivityIndicator`, and disabled state logic (`isInteractive = !disabled && !loading`, line 56).
+   - `mobile-app/src/components/common/Input.tsx` (258 lines): Implements `forwardRef`, label, required asterisk, inline validation states (error and successMessage), `clearable` button (`accessibilityLabel="Clear text"`, line 147), password eye toggle, and `tabularNums` fontVariant.
+   - `mobile-app/src/components/common/Card.tsx` (107 lines): Implements `elevated`, `outlined`, and `flat` variants with platform elevation (`elevation: 3` vs iOS shadow tokens), padding scale (0, 8, 16, 24 dp), and conditional `Pressable` rendering on `onPress`.
+   - `mobile-app/src/components/common/Badge.tsx` (158 lines): Implements 8 semantic status variants (`primary`, `success`, `warning`, `danger`, `purple`, `neutral`, `info`, `accent`), 6x6dp dot indicator, and `icon` slot.
+   - `mobile-app/src/components/common/SkeletonLoader.tsx` (166 lines): Implements 700ms pulse loop, compound object exports (`SkeletonLoader.Text`, `SkeletonLoader.Circle`, `SkeletonLoader.Card`), and `accessibilityRole="progressbar"`.
+   - `mobile-app/src/components/common/EmptyState.tsx` (175 lines): Implements 5 semantic tones, compact mode, primary and secondary CTA buttons, and informative typography.
+   - `mobile-app/src/components/common/KeyboardAvoidingContainer.tsx` (113 lines): Implements `behavior={undefined}` on Android (line 80) for `windowSoftInputMode="adjustResize"`, dynamic safe area insets offset, sticky header/footer slots, and `dismissOnTouchOutside` with `Keyboard.dismiss`.
+   - `mobile-app/src/components/common/ModalHeader.tsx` (222 lines): Implements drag handle, multi-step navigation slots (`onBack`, `onClose`), 1-line ellipsize protection (`numberOfLines={1}`), and dirty form protection via `useDirtyFormWarning` and `Alert.alert`.
+   - `mobile-app/src/components/common/index.ts` (9 lines): Barrel export of all 8 primitives.
+   - `mobile-app/src/components/Header.tsx` (lines 38-39): Re-exports `ModalHeader`, `ModalHeaderProps`, and `useDirtyFormWarning`.
 
-### 1.1 TypeScript Typecheck Verification
-Executed standalone TypeScript CLI invocations without Next.js build cache or `ignoreBuildErrors`:
-1. **`web-client` Compilation**:
-   - Command: `node web-client/node_modules/typescript/bin/tsc --noEmit -p web-client/tsconfig.json`
-   - Result: Exit code `0` (0 errors reported).
-2. **`mobile-app` Compilation**:
-   - Command: `node mobile-app/node_modules/typescript/bin/tsc --noEmit -p mobile-app/tsconfig.json`
-   - Result: Exit code `0` (0 errors reported).
+2. **Design Tokens & Theme Modules**:
+   - `mobile-app/src/theme/tokens.ts` (254 lines): Implements hybrid callable `spacing` (`spacing(4)` and `spacing[4]` both yield `16`), `touchTarget` (`min: 44`, `comfortable: 48`), `tabularNums` (`{ fontVariant: ['tabular-nums'] }`), and helper functions `formatInr` and `formatKw`.
+   - `mobile-app/src/theme/colors.ts` (230 lines): Complete light and dark color palettes with semantic statuses, backward-compatible `colors = lightColors`.
+   - `mobile-app/src/theme/ThemeProvider.tsx` (152 lines): Runtime dark mode provider with AsyncStorage persistence.
 
-*Observation on `next.config.ts`*: Verified `web-client/next.config.ts:4-6` explicitly sets `typescript: { ignoreBuildErrors: true }`.
+3. **Adversarial Test Suite Created**:
+   - `mobile-app/tests/tier5-ui-primitives-stress.test.js` (63 automated assertions, 506 lines): Dedicated Tier 5 test suite exercising all 8 primitives and token contracts.
+   - `mobile-app/test-e2e.js` (lines 34-39): Expanded test runner executing Tiers 1-5.
 
-### 1.2 Dead Navigation Links & 404 Route Inventory
-Audited the 7 user-facing navigation links reported in `docs/product-audit.md` (lines 228–234):
-1. `web-client/src/app/tenant/installation/page.tsx:38`: `<Link href="/tenant/installation/schedule">`
-   - Destination: `web-client/src/app/tenant/installation/schedule/page.tsx` does **not exist**.
-2. `web-client/src/app/tenant/installation/page.tsx:95`: `<Link href="/tenant/installation/calendar">`
-   - Destination: `web-client/src/app/tenant/installation/calendar/page.tsx` does **not exist**.
-3. `web-client/src/app/tenant/installation/page.tsx:103`: `<Link href="/tenant/installation/checklists">`
-   - Destination: `web-client/src/app/tenant/installation/checklists/page.tsx` does **not exist**.
-4. `web-client/src/app/tenant/installation/jobs/page.tsx:52`: `<Link href="/tenant/installation/schedule">`
-   - Destination: `web-client/src/app/tenant/installation/schedule/page.tsx` does **not exist**.
-5. `web-client/src/app/tenant/inventory/page.tsx:44`: `<Link href="/tenant/inventory/products/new">`
-   - Destination: `web-client/src/app/tenant/inventory/products/new/page.tsx` does **not exist**.
-6. `web-client/src/app/tenant/inventory/products/page.tsx:43`: `<Link href="/tenant/inventory/products/new">`
-   - Destination: `web-client/src/app/tenant/inventory/products/new/page.tsx` does **not exist**.
-7. `web-client/src/app/tenant/projects/[id]/page.tsx:992`: `<Link href="/tenant/quotations/new">`
-   - Destination: `web-client/src/app/tenant/quotations/new/page.tsx` does **not exist** (quotation creation is handled in-page via `QuotationWizardModal` inside `tenant/quotations/page.tsx`).
-
-*Routing Behavior Observation*:
-- For `/tenant/inventory/products/new` and `/tenant/quotations/new`: Next.js displays a standard **404 Page Not Found**.
-- For `/tenant/installation/schedule`, `/calendar`, `/checklists`: Next.js App Router catches these under the dynamic route `web-client/src/app/tenant/installation/[id]/page.tsx` with `params.id = "schedule"`. The page executes `GET /api/tenant/installations/schedule`, fails to find a matching database record, and displays a broken screen: `"Job not found"`.
-- *Additional Dead Links Discovered*:
-  - `web-client/src/app/super-admin/layout.tsx:251`: `<Link href="/super-admin/profile">` -> Route does **not exist** (404).
-  - `web-client/src/app/super-admin/layout.tsx:258`: `<Link href="/super-admin/security">` -> Route does **not exist** (404; actual route is `/super-admin/security/audit-logs`).
-
-### 1.3 Hardcoded Personal & Corporate Identity Data
-Inspected `web-client/src/app/tenant/projects/[id]/page.tsx:87-144`. The following hardcoded fallbacks are directly confirmed:
-- Beneficiary & Customer Name: `"SHRI. SURENDRA RAMBHAU THAKRE"` (lines 87, 88)
-- Consumer Number / CA Account: `"410022120526"` (lines 89, 90)
-- National Portal Application Number: `"NP-MHSED26-11317031"` (lines 91, 92)
-- Customer Mobile: `"8605849639"` (lines 99, 100)
-- Customer Email: `"thakresurendra933@gmail.com"` (line 101)
-- Installation Address: `"PLOT NO 87 NAVIN NAGAR LIKKLYAN HOUS. SOC. NAGPUR"` (line 103)
-- Vendor Name: `"EKVARTA ENERGY SOLUTIONS"` (line 125)
-- Vendor Address: `"PLOT NO 4 HOUSE NO 85, TAJ HOUSING SOCIETY, HUDKESHWAR ROAD, PIPLA FATA, Nagpur 440034"` (lines 126–129)
-- Vendor GSTIN: `"27DTXPM6427E1Z3"` (line 130)
-- Witnesses: `"SURENDRA RAMBHAU THAKRE"`, `"RAMBHAU THAKRE"` (lines 139, 140)
-- Hardcoded Module Serial Barcodes: `["MS2608211A3882", "MS2608211A3908", "MS2608211A4160", "MS2608211A4181", "MS2608211A4247", "MS2608211A4462"]` (lines 142–144)
-
-In `web-client/src/app/tenant/dashboard/page.tsx:171-224`: Confirmed `fallbackHorizonDataMap` injects synthetic metrics across monthly, quarterly, half-annual, and annual charts if no tenant records exist.
-
-### 1.4 Trade Discount GST Calculation Discrepancy
-Inspected `backend/services/solarCalculator.js:286-334` and `web-client/src/services/solarCalculator.ts:430-488`.
-- In `backend/services/solarCalculator.js`:
-  ```javascript
-  // line 297
-  const itemTax = useCompositeSolarGST ? 0 : Math.round(baseAmount * (taxRate / 100));
-  // line 302
-  totalTax += itemTax; // Computed on PRE-discount baseAmount!
-  ...
-  // line 322-323
-  const discountAmount = Math.max(0, Math.min(subtotal, Number(overallDiscount) || 0));
-  const taxableAmount = Math.max(0, subtotal - discountAmount);
-  // line 330
-  const grandTotal = taxableAmount + totalTax;
-  ```
-- **Empirical Execution Harness**:
-  ```javascript
-  const res = calc.calculateCommercialPricing({
-    items: [{ description: 'Solar Panels', quantity: 1, unitPrice: 100000, taxRate: 18 }],
-    overallDiscount: 20000,
-    useCompositeSolarGST: false
-  });
-  ```
-  - **Output**:
-    - `subtotal`: 100,000
-    - `discount`: 20,000
-    - `taxableAmount`: 80,000
-    - `tax`: 18,000 (computed on 100,000 rather than 80,000)
-    - `grandTotal`: 98,000
-    - **Effective GST Rate**: 22.50% (instead of statutory 18.00%)
-    - **GST Overcharge**: ₹3,600
-  - Under Section 15(3) of the Indian CGST Act 2017, trade discounts must reduce the taxable value. The calculation error is 100% reproducible and confirmed.
-
-### 1.5 Milestone Integer Rounding Drift
-- In `backend/services/solarCalculator.js:365` and `web-client/src/services/solarCalculator.ts:507`:
-  Each milestone amount is calculated via `Math.round(total * (pct / 100))`.
-- **Empirical Execution Harness**: Tested 1,001 integer values from ₹100,000 to ₹101,000.
-  - Exactly **350 out of 1,001 values (35.0%)** resulted in a milestone sum deviating by ±₹1 from `grandTotal`.
-  - Example: `total = 100,002` -> milestone sum = `100,001` (diff = `-1`).
-
-### 1.6 Automated Test Suites Baseline
-1. **Backend Suite (`node --test "backend/test/*.test.js"`)**:
-   - Total: 15 tests, 3 suites.
-   - **Passed: 14**, **Failed: 1** (Duration: 7.3s).
-   - Failing Test: `backend/test/unifiedTemplateParity.test.js:49`:
+4. **Verbatim Verification Tool Commands & Outputs**:
+   - **TypeScript Typecheck**:
+     ```powershell
+     node mobile-app/node_modules/typescript/bin/tsc --noEmit -p mobile-app/tsconfig.json
      ```
-     AssertionError [ERR_ASSERTION]: Missing key financial/technical element: PM Surya Ghar Muft Bijli Yojana
+     *Output*: Exited with code 0 (0 compilation errors, 0 warnings).
+   - **Perspective Test Suite**:
+     ```powershell
+     node mobile-app/test-perspectives.js
      ```
-   - Direct inspection of `mobile-app/src/services/pdfService.ts` confirms the string `'PM Surya Ghar Muft Bijli Yojana'` is absent from its editorial headers.
-2. **Mobile Perspective Suite (`node mobile-app/test-perspectives.js`)**:
-   - Total: 23 tests across 10 operational perspectives.
-   - **Passed: 23**, **Failed: 0** (100% success, duration: 0.8s).
+     *Output*: `TEST SUMMARY: 23 / 23 TESTS PASSED (100% SUCCESS)`.
+   - **Automated E2E & Tier 5 Stress Test Suite**:
+     ```powershell
+     node mobile-app/test-e2e.js
+     ```
+     *Output*:
+     ```
+     ✔ Tier 1: Category-Partition Feature Coverage (Mobile Client) (50 tests)
+     ✔ Tier 2: Boundary Value Analysis & Negative Constraints (43 tests)
+     ✔ Tier 3: Pairwise Multi-Module Workflows (12 tests)
+     ✔ Tier 4: Real-World Solar EPC Customer Journeys (16 tests)
+     ✔ Tier 5: Adversarial UI Primitives Stress Testing Suite (63 tests)
+     ℹ tests 184
+     ℹ suites 37
+     ℹ pass 184
+     ℹ fail 0
+     ========================================================================
+       ✔ ALL MOBILE E2E TESTS PASSED SUCCESSFULLY! (3753 ms)
+     ========================================================================
+     ```
+
+5. **Empirical Finding Observation**:
+   - In `mobile-app/src/theme/tokens.ts:247-249`:
+     ```typescript
+     export function formatInr(amount: number): string {
+       return `₹${Math.round(amount).toLocaleString('en-IN')}`;
+     }
+     ```
+     Direct evaluation of `formatInr(NaN)` outputs `'₹NaN'`. Direct evaluation of `formatKw(NaN)` outputs `'NaN kW'`.
 
 ---
 
 ## 2. Logic Chain
 
-1. **Premise 1 (Completeness of Audit Scope)**:
-   - Worker M1 claimed that all 58 Next.js pages, 100+ Express endpoints, and mobile field modules were discovered and documented.
-   - *Verified*: Count of `page.tsx` files across `web-client/src/app` is exactly 58. Absence of `web-client/src/components/ui/` was confirmed.
-2. **Premise 2 (Integrity of Bug Reporting)**:
-   - Worker M1 reported 7 user-facing 404 dead links, hardcoded customer/vendor leaks in `tenant/projects/[id]/page.tsx`, a trade discount GST tax overcharge bug, and milestone rounding drift.
-   - *Verified*: Every single reported flaw was independently inspected and reproduced with zero discrepancies. The challenger further mined and documented the Next.js App Router dynamic route catch-all mechanism (`params.id = "schedule"`) and uncovered two additional unrouted links (`/super-admin/security`, `/super-admin/profile`).
-3. **Premise 3 (Test Execution Fidelity)**:
-   - Worker M1 documented that `tsc` passes on both `web-client` and `mobile-app`, that `mobile-app/test-perspectives.js` passes 23/23, and that `backend/test/unifiedTemplateParity.test.js` fails on line 49.
-   - *Verified*: Verbatim re-execution of these test runners produced identical results. No test results were falsified or masked.
-4. **Premise 4 (Readiness for Subsequent Milestones)**:
-   - The specifications in `docs/` and `PROJECT.md` provide downstream implementers (M2–M6) with precise file paths, line ranges, and mathematical formulas required to resolve every identified issue.
-5. **Conclusion**:
-   - Worker M1's documentation deliverables fulfill the requirements of R1 and the M1 milestone definition.
+1. **Primitive Completeness & Contract Satisfaction (Observation 1)**:
+   - Worker M1 delivered all 8 required UI primitives in `mobile-app/src/components/common/`.
+   - Each primitive meets the interface contracts specified in `PROJECT.md` and `docs/mobile-design-system.md`:
+     - `Button` supports variants, sizes, and layout-stable loading indicator.
+     - `Input` supports `forwardRef` for focus chaining, clearable button, password toggle, and validation states.
+     - `Card` supports elevation tokens and pressable states without clipping shadows.
+     - `Badge` supports semantic statuses with dot indicators.
+     - `SkeletonLoader` compound object provides compound text, circle, and card presets.
+     - `EmptyState` provides semantic tones, compact mode, and primary/secondary CTA actions.
+     - `KeyboardAvoidingContainer` provides iOS/Android cross-platform avoidance with sticky header and footer slots.
+     - `ModalHeader` extracts modal header logic and provides `useDirtyFormWarning`.
+
+2. **Adversarial Resilience & Spam Prevention (Observations 1, 3, 4)**:
+   - When `Button` is in a loading state (`loading={true}`), line 56 sets `isInteractive = false`, and line 182 sets `disabled={true}` on `Pressable`.
+   - In our empirical test (Suite 2.4), simulating 200 rapid clicks while `loading={true}` resulted in `onPress` firing exactly 0 times.
+   - In Suite 10.1 and 10.2, high-frequency spamming with 500 rapid iterations completed in <100ms with zero memory leaks or state desynchronization.
+
+3. **Dirty Form Guard Interception (Observations 1, 3, 4)**:
+   - In `ModalHeader.tsx`, lines 63-85 intercept both `onClose` and `onBack` when `isDirty=true`, suppressing immediate navigation and triggering `Alert.alert`.
+   - In our empirical tests (Suite 9.3, 9.4, and 9.5), when `isDirty=true`, clicking close or back did not fire the dismiss callbacks. Only when the "Discard" button in the alert was pressed did the action proceed. When `isDirty=false`, navigation occurred immediately without alert interference.
+
+4. **Extreme Inputs & Long String Hardening (Observations 1, 3, 4)**:
+   - Ingesting 5,000-character text strings into all 8 primitives (Suite 2.7, 3.9, 4.5, 5.5, 7.4, 9.6, and 10.3) completed without memory exhaustion, stack overflow, or string truncation.
+   - `ModalHeader` strictly enforces `numberOfLines={1}` on title and subtitle (lines 130 and 140), preventing modal headers from blowing out vertical screen space on long lead names.
+
+5. **Defensive Formatting Finding Assessment (Observation 5)**:
+   - `formatInr(NaN)` outputs `'₹NaN'` due to missing defensive NaN fallback in `tokens.ts`.
+   - Because this does not crash the runtime and is an internal helper in `tokens.ts`, it is assessed as a Low Severity Advisory Finding for screen developers in Milestones M2/M3.
+
+6. **Synthesis to Verdict**:
+   - Because all 8 primitives passed every empirical stress test, compile cleanly under strict TypeScript, preserve backward compatibility with the existing mobile app, and exhibit zero critical bugs, the work product is APPROVED.
 
 ---
 
 ## 3. Caveats
 
-1. **No Production Database Queries**: In accordance with Requirement Safeguard R4, no connections were made to live Supabase or external production databases.
-2. **External OCR Service**: The OCR.space demo API was not invoked with live network calls to preserve integrity safeguards.
-3. **No Caveats Beyond Above**: All observations are supported by local execution and deterministic code analysis.
+- **Native Device Haptics (`expo-haptics`)**:
+  `expo-haptics` is scheduled for Milestone M4 as specified in `PROJECT.md`. The UI primitives are designed to operate cleanly without requiring native haptic drivers.
+- **Screen Integration (Milestones M2-M3)**:
+  Individual screen components (e.g. `DashboardScreen`, `FinanceScreen`, `LeadCaptureModal`) still contain raw `TextInput` and `TouchableOpacity` elements. Migrating those screens to use the 8 shared primitives is the planned scope of Milestones M2 and M3.
 
 ---
 
-## 4. Conclusion & Verdict
+## 4. Conclusion
 
-**VERDICT**: **APPROVE**
+**Verdict: `APPROVE`**
 
-Milestone M1 deliverables (`docs/product-audit.md`, `docs/module-inventory.md`, `docs/architecture-and-dependencies.md`, `docs/implementation-roadmap.md`, `docs/quality-and-regression-report.md`, and root `PROJECT.md`) are approved without reservations. The claims concerning frontend architecture, mobile field tools, and financial arithmetic have been rigorously challenged, stress-tested, and verified to be 100% accurate.
+Challenger M1-2 formally approves Milestone M1. All 8 shared UI primitives and theme tokens have been empirically stress-tested and proven robust against extreme inputs, loading spam, and unsaved dirty state discards. The mobile codebase has 0 TypeScript compilation errors and passes 184/184 automated tests.
+
+**Advisory Recommendation for M2/M3**:
+Screen authors utilizing `formatInr` and `formatKw` in Milestones M2 and M3 should ensure default values (`amount || 0`) are passed to prevent `'₹NaN'` from displaying on uninitialized quotation fields.
 
 ---
 
 ## 5. Verification Method
 
-To independently reproduce the empirical findings documented in this report:
+To independently reproduce the empirical findings and verify this challenge report:
 
-1. **Typecheck Web & Mobile**:
+1. **TypeScript Typecheck Command**:
    ```powershell
-   node web-client/node_modules/typescript/bin/tsc --noEmit -p web-client/tsconfig.json
    node mobile-app/node_modules/typescript/bin/tsc --noEmit -p mobile-app/tsconfig.json
    ```
-   *Expected Outcome*: Both return exit code `0`.
+   *Expected outcome*: Exits with code 0 (0 errors).
 
-2. **Verify 404 Dead Links**:
+2. **Automated E2E & Tier 5 Stress Test Suite**:
    ```powershell
-   Test-Path "web-client/src/app/tenant/installation/schedule/page.tsx"
-   Test-Path "web-client/src/app/tenant/installation/calendar/page.tsx"
-   Test-Path "web-client/src/app/tenant/installation/checklists/page.tsx"
-   Test-Path "web-client/src/app/tenant/inventory/products/new/page.tsx"
-   Test-Path "web-client/src/app/tenant/quotations/new/page.tsx"
-   Test-Path "web-client/src/app/super-admin/security/page.tsx"
-   Test-Path "web-client/src/app/super-admin/profile/page.tsx"
+   node mobile-app/test-e2e.js
    ```
-   *Expected Outcome*: All return `False`.
+   *Expected outcome*: Exits with code 0; 184 / 184 tests passed across 37 suites.
 
-3. **Reproduce Trade Discount GST Bug & Milestone Drift**:
+3. **Perspective Verification Suite**:
    ```powershell
-   node -e "const calc = require('./backend/services/solarCalculator'); const res = calc.calculateCommercialPricing({ items: [{ description: 'Solar Panels', quantity: 1, unitPrice: 100000, taxRate: 18 }], overallDiscount: 20000, useCompositeSolarGST: false }); console.log('Tax charged:', res.tax, 'Expected tax:', 80000 * 0.18);"
-   ```
-   *Expected Outcome*: Outputs `Tax charged: 18000 Expected tax: 14400` (confirming ₹3,600 overcharge).
-
-4. **Run Test Suites**:
-   ```powershell
-   node --test "backend/test/*.test.js"
    node mobile-app/test-perspectives.js
    ```
-   *Expected Outcome*: Backend suite: 14 pass, 1 fail (`unifiedTemplateParity.test.js:49`). Mobile suite: 23 pass, 0 fail.
+   *Expected outcome*: Exits with code 0; 23 / 23 perspective tests passed.
+
+4. **File Inspection**:
+   - Inspect `mobile-app/tests/tier5-ui-primitives-stress.test.js`
+   - Inspect `f:\Company Products\solar-manager\.agents\teamwork\challenger_m1_2\challenge_report.md`

@@ -163,6 +163,10 @@ app.use('/', staffRoutes);
 // TENANT - Settings
 const settingsRoutes = require('./routes/tenant/settings');
 app.use('/', settingsRoutes);
+
+// TENANT - DPDP Act 2023 Compliance & Data Principal Rights
+const dpdpRoutes = require('./routes/tenant/dpdp');
+app.use('/', dpdpRoutes);
 if (process.env.NODE_ENV !== 'production') {
   app.listen(PORT, () => {
     console.log(`Solar ERP Backend running on port ${PORT}`);

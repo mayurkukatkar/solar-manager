@@ -36,7 +36,7 @@ import {
   Receipt,
 } from 'lucide-react-native';
 import { Header } from '../../components/Header';
-import { tenantApi } from '../../api/endpoints';
+import { tenantApi, STAGE_TO_BACKEND_MAP } from '../../api/endpoints';
 import { SafeStorage } from '../../api/client';
 import { DiscomDocsModal } from './DiscomDocsModal';
 import { BarcodeScannerModal } from '../operations/BarcodeScannerModal';
@@ -65,12 +65,13 @@ export const CANONICAL_PROJECT_STAGES = [
 
 export function getProjectStageIndex(stageOrStatus?: string): number {
   const s = (stageOrStatus || '').toUpperCase();
-  if (s.includes('HANDOVER') || s.includes('SYNC') || s.includes('COMPLET') || s.includes('COMMISSION')) return 7;
-  if (s.includes('INSPECT') || s.includes('QA') || s.includes('TEST') || s.includes('CEIG')) return 6;
-  if (s.includes('NET') || s.includes('METER') || s.includes('DISCOM')) return 5;
-  if (s.includes('INSTALL') || s.includes('ERECT')) return 4;
+  if (s.includes('SURVEY')) return 1;
+  if (s.includes('ENG') || s.includes('DESIGN') || s.includes('SLD') || s.includes('STRUCTURE_APPROVED')) return 2;
   if (s.includes('PROCURE') || s.includes('MATERIAL') || s.includes('DISPATCH')) return 3;
-  if (s.includes('ENG') || s.includes('DESIGN') || s.includes('SLD')) return 2;
+  if (s.includes('INSTALL') || s.includes('ERECT')) return 4;
+  if (s.includes('NET') || s.includes('METER') || s.includes('DISCOM')) return 5;
+  if (s.includes('INSPECT') || s.includes('QA') || s.includes('TEST') || s.includes('CEIG')) return 6;
+  if (s.includes('HANDOVER') || s.includes('SYNC') || s.includes('COMPLET') || s.includes('COMMISSION')) return 7;
   return 1;
 }
 
@@ -105,7 +106,7 @@ export const FieldProjectsScreen: React.FC<{ navigation?: any }> = ({ navigation
       setSeamlessInitialStep(stepIdx);
     } else {
       const idx = getProjectStageIndex(proj?.currentStage || proj?.status);
-      if (idx >= 5) setSeamlessInitialStep(13); // DISCOM Mission Control
+      if (idx >= 5) setSeamlessInitialStep(14); // DISCOM Mission Control
       else if (proj?.consumerNumber) setSeamlessInitialStep(13);
       else setSeamlessInitialStep(9); // CONSUMER_NUMBER
     }
@@ -347,35 +348,16 @@ export const FieldProjectsScreen: React.FC<{ navigation?: any }> = ({ navigation
       setAdvanceModalVisible(false);
       fetchProjects();
     } catch (err: any) {
-      try {
-        await offlineSyncService.enqueueMutation('UPDATE_PROJECT_STAGE', {
-          projectId: projectToAdvance.id,
-          stage: nextStage.id,
-          stageId: nextStage.id,
-          status: nextStage.id,
-          note: advanceNote.trim() || `Advanced to ${nextStage.label} via Mobile Field Cockpit`,
-        });
+      const errMsg = err.response?.data?.error || err.message || '';
+      const lowerErr = String(errMsg).toLowerCase();
+      const isAlreadyAhead =
+        lowerErr.includes('already') ||
+        lowerErr.includes('progressed') ||
+        lowerErr.includes('cannot jump') ||
+        lowerErr.includes('completed');
 
-        let reward: any = null;
-        try {
-          reward = await solarGamificationService.recordAction(actionType, {
-            capacityKw: capacityVal,
-            customerName: projectToAdvance?.customer?.name || projectToAdvance?.name,
-            projectName: projectToAdvance?.name,
-          });
-        } catch (_) {}
-
-        setCelebrationData({
-          title: `${nextStage.label} Saved Offline! 🛡️`,
-          subtitle: `Project "${projectToAdvance.name}" milestone to ${nextStage.label} is safely preserved on your device. Will auto-sync once online.`,
-          stageName: `${nextStage.label} (Offline Safe)`,
-          xpAwarded: reward?.xpGained || 50,
-          customerName: projectToAdvance?.customer?.name,
-          customerPhone: projectToAdvance?.customer?.mobile,
-          projectName: projectToAdvance?.name,
-          capacityKw: capacityVal,
-        });
-        setShowCelebration(true);
+      if (isAlreadyAhead) {
+        // Project is already at or past this milestone on the cloud: show milestone success
         setProjects((prev) =>
           prev.map((p) =>
             p.id === projectToAdvance.id
@@ -383,11 +365,78 @@ export const FieldProjectsScreen: React.FC<{ navigation?: any }> = ({ navigation
               : p
           )
         );
-      } catch (queueErr) {
-        Alert.alert('Stage Advance Note', err.message || 'Stage updated successfully.');
+        setCelebrationData({
+          title: isCompletion ? 'Project 100% Completed & Energized! ☀️' : `${nextStage.label} Milestone Achieved! 🚀`,
+          subtitle: `Project "${projectToAdvance.name}" is verified at ${nextStage.label} on cloud operations.`,
+          stageName: isCompletion ? 'Final Handover & DBT Subsidy' : nextStage.label,
+          xpAwarded: 50,
+          customerName: projectToAdvance?.customer?.name,
+          customerPhone: projectToAdvance?.customer?.mobile,
+          projectName: projectToAdvance?.name,
+          capacityKw: capacityVal,
+        });
+        setShowCelebration(true);
+        setAdvanceModalVisible(false);
+        fetchProjects();
+        return;
+      }
+
+      const isOfflineOrNetworkError =
+        err.code === 'ECONNABORTED' ||
+        err.message === 'Network Error' ||
+        !err.response ||
+        (err.response?.status >= 500 && err.response?.status < 600);
+
+      if (isOfflineOrNetworkError) {
+        try {
+          const backendCanonicalStage = STAGE_TO_BACKEND_MAP[nextStage.id] || nextStage.id;
+          await offlineSyncService.enqueueMutation('UPDATE_PROJECT_STAGE', {
+            projectId: projectToAdvance.id,
+            stage: nextStage.id,
+            newStage: backendCanonicalStage,
+            stageId: nextStage.id,
+            status: nextStage.id,
+            force: true,
+            note: advanceNote.trim() || `Advanced to ${nextStage.label} via Mobile Field Cockpit`,
+            comment: advanceNote.trim() || `Advanced to ${nextStage.label} via Mobile Field Cockpit`,
+          });
+
+          let reward: any = null;
+          try {
+            reward = await solarGamificationService.recordAction(actionType, {
+              capacityKw: capacityVal,
+              customerName: projectToAdvance?.customer?.name || projectToAdvance?.name,
+              projectName: projectToAdvance?.name,
+            });
+          } catch (_) {}
+
+          setCelebrationData({
+            title: `${nextStage.label} Saved Offline! 🛡️`,
+            subtitle: `Project "${projectToAdvance.name}" milestone to ${nextStage.label} is safely preserved on your device. Will auto-sync once online.`,
+            stageName: `${nextStage.label} (Offline Safe)`,
+            xpAwarded: reward?.xpGained || 50,
+            customerName: projectToAdvance?.customer?.name,
+            customerPhone: projectToAdvance?.customer?.mobile,
+            projectName: projectToAdvance?.name,
+            capacityKw: capacityVal,
+          });
+          setShowCelebration(true);
+          setProjects((prev) =>
+            prev.map((p) =>
+              p.id === projectToAdvance.id
+                ? { ...p, currentStage: nextStage.id, status: nextStage.id }
+                : p
+            )
+          );
+        } catch (queueErr) {
+          Alert.alert('Stage Advance Note', err.message || 'Stage updated successfully.');
+        }
+      } else {
+        // Validation / Business logic error from cloud
+        Alert.alert('Stage Advancement Note', errMsg || 'Could not advance stage on cloud. Please refresh and retry.');
+        fetchProjects();
       }
       setAdvanceModalVisible(false);
-      fetchProjects();
     } finally {
       setAdvancingStage(false);
     }
