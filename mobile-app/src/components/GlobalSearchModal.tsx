@@ -25,16 +25,16 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
 import { useTheme, spacing, radii, typography } from '../theme';
 import { Input, Badge, EmptyState, SkeletonLoader } from './common';
-import { crmApi, tenantApi, financeApi } from '../api/endpoints';
+import { crmApi, tenantApi, financeApi, customerApi } from '../api/endpoints';
 import { SafeStorage } from '../api/client';
 import { navigateToTab } from '../navigation/navigationService';
 import { hasPermission } from '../utils/rbac';
 
-export type SearchEntityType = 'ALL' | 'LEAD' | 'PROJECT' | 'INVOICE' | 'BARCODE';
+export type SearchEntityType = 'ALL' | 'CUSTOMER' | 'LEAD' | 'PROJECT' | 'INVOICE' | 'BARCODE';
 
 export interface SearchResultItem {
   id: string;
-  entityType: 'LEAD' | 'PROJECT' | 'INVOICE' | 'BARCODE';
+  entityType: 'CUSTOMER' | 'LEAD' | 'PROJECT' | 'INVOICE' | 'BARCODE';
   title: string;
   subtitle: string;
   badgeLabel: string;
@@ -308,8 +308,35 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
           .catch(() => { })
         : Promise.resolve();
 
+      // 4. Customers Query (RBAC: leads.view or projects.view)
+      const customersPromise = (canViewLeads || canViewProjects)
+        ? customerApi
+          .getCustomers({ search: debouncedQuery })
+          .then((data) => {
+            if (isCancelled) return;
+            const custList = Array.isArray(data?.customers)
+              ? data.customers
+              : Array.isArray(data)
+                ? data
+                : [];
+            custList.forEach((cust: any) => {
+              collected.push({
+                id: cust.id,
+                entityType: 'CUSTOMER',
+                title: cust.name || 'Customer',
+                subtitle: `${cust.city || 'Site'} • ${cust.mobile || 'No Mobile'} • CA: ${cust.consumerNumber || 'Pending'}`,
+                badgeLabel: 'Customer',
+                badgeVariant: 'accent',
+                metaRight: cust.customerType || 'Turnkey',
+                originalData: cust,
+              });
+            });
+          })
+          .catch(() => { })
+        : Promise.resolve();
+
       // Execute all authorized endpoints in parallel
-      await Promise.allSettled([leadsPromise, projectsPromise, financePromise]);
+      await Promise.allSettled([leadsPromise, projectsPromise, financePromise, customersPromise]);
 
       if (!isCancelled) {
         setResults(collected);
@@ -330,6 +357,9 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
     onClose();
 
     switch (item.entityType) {
+      case 'CUSTOMER':
+        navigateToTab('CustomerProfile', { customerId: item.id, customer: item.originalData });
+        break;
       case 'LEAD':
         navigateToTab('Pipeline', { leadId: item.id, highlightId: item.id });
         break;
@@ -360,6 +390,7 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
     return item.entityType === activeCategory;
   });
 
+  const customersCount = results.filter((r) => r.entityType === 'CUSTOMER').length;
   const leadsCount = results.filter((r) => r.entityType === 'LEAD').length;
   const projectsCount = results.filter((r) => r.entityType === 'PROJECT').length;
   const invoicesCount = results.filter((r) => r.entityType === 'INVOICE').length;
@@ -430,6 +461,26 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
                 All ({results.length})
               </Text>
             </TouchableOpacity>
+
+            {customersCount > 0 && (
+              <TouchableOpacity
+                style={[
+                  styles.chip,
+                  activeCategory === 'CUSTOMER' && [styles.chipActive, { backgroundColor: colors.primary }],
+                  activeCategory !== 'CUSTOMER' && { backgroundColor: colors.surfaceRecessed },
+                ]}
+                onPress={() => setActiveCategory('CUSTOMER')}
+              >
+                <Text
+                  style={[
+                    styles.chipText,
+                    activeCategory === 'CUSTOMER' ? styles.chipTextActive : { color: colors.textSecondary },
+                  ]}
+                >
+                  Customers ({customersCount})
+                </Text>
+              </TouchableOpacity>
+            )}
 
             {hasPermission(user, 'leads.view') && leadsCount > 0 && (
               <TouchableOpacity
@@ -559,6 +610,7 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
                   accessibilityLabel={`${item.badgeLabel}: ${item.title}`}
                 >
                   <View style={styles.resultLeftIcon}>
+                    {item.entityType === 'CUSTOMER' && <Users size={18} color="#0066FF" />}
                     {item.entityType === 'LEAD' && <Users size={18} color={colors.primary} />}
                     {item.entityType === 'PROJECT' && <Briefcase size={18} color={colors.success} />}
                     {item.entityType === 'INVOICE' && <Receipt size={18} color="#8b5cf6" />}

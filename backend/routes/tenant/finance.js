@@ -342,7 +342,12 @@ router.get('/api/tenant/finance/stats', requireTenantAuth, async (req, res) => {
     const [invoices, payments, projectsWithSubsidy] = await Promise.all([
       prisma.invoice.findMany({
         where: { tenantId },
-        include: { payments: true }
+        include: {
+          payments: true,
+          project: {
+            select: { id: true, currentStage: true, status: true, estimatedValue: true, capacity: true }
+          }
+        }
       }),
       prisma.payment.findMany({
         where: { invoice: { tenantId } }
@@ -353,34 +358,69 @@ router.get('/api/tenant/finance/stats', requireTenantAuth, async (req, res) => {
       })
     ]);
 
-    const totalInvoiced = invoices.reduce((sum, inv) => sum + (inv.amount || 0), 0);
     const totalCollected = payments.reduce((sum, p) => sum + (p.amount || 0), 0);
-    const outstanding = Math.max(0, totalInvoiced - totalCollected);
-
     const now = new Date();
+
+    let totalContractValue = 0;
+    let billedReceivables = 0;
+    let unbilledWip = 0;
     let overdueAmount = 0;
     let overdueCount = 0;
     let paidCount = 0;
     let partialCount = 0;
     let unpaidCount = 0;
 
+    const isStageReached = (currentStage, minStage) => {
+      const STAGE_ORDER = [
+        'LEAD', 'SURVEY', 'DESIGN', 'ENGINEERING', 'PLANNING', 'PROCUREMENT', 'MATERIAL_DELIVERY',
+        'INSTALLATION', 'TESTING', 'NET_METERING', 'INSPECTION', 'COMMISSIONED', 'COMPLETED'
+      ];
+      const curIdx = STAGE_ORDER.indexOf((currentStage || '').toUpperCase());
+      const minIdx = STAGE_ORDER.indexOf(minStage.toUpperCase());
+      return curIdx >= 0 && minIdx >= 0 ? curIdx >= minIdx : false;
+    };
+
     invoices.forEach(inv => {
       const paidForInv = inv.payments.reduce((s, p) => s + (p.amount || 0), 0);
       const isPaid = paidForInv >= inv.amount || inv.status === 'PAID';
+      const projStage = inv.project?.currentStage || '';
 
-      if (isPaid) {
-        paidCount++;
-      } else if (paidForInv > 0) {
-        partialCount++;
-      } else {
-        unpaidCount++;
+      totalContractValue += (inv.amount || 0);
+
+      // Determine if milestone is mature/billed
+      let isMature = true;
+      if (inv.milestone) {
+        if (inv.milestone === 'ADVANCE') {
+          isMature = true;
+        } else if (inv.milestone === 'MATERIAL_DELIVERY') {
+          isMature = isStageReached(projStage, 'PROCUREMENT') || paidForInv > 0;
+        } else if (inv.milestone === 'INSTALLATION') {
+          isMature = isStageReached(projStage, 'INSTALLATION') || paidForInv > 0;
+        } else if (inv.milestone === 'COMMISSIONING') {
+          isMature = isStageReached(projStage, 'NET_METERING') || paidForInv > 0;
+        }
       }
 
-      if (!isPaid && inv.dueDate && new Date(inv.dueDate) < now) {
-        overdueCount++;
-        overdueAmount += Math.max(0, inv.amount - paidForInv);
+      if (isMature) {
+        billedReceivables += (inv.amount || 0);
+        if (isPaid) {
+          paidCount++;
+        } else if (paidForInv > 0) {
+          partialCount++;
+        } else {
+          unpaidCount++;
+        }
+
+        if (!isPaid && inv.dueDate && new Date(inv.dueDate) < now) {
+          overdueCount++;
+          overdueAmount += Math.max(0, inv.amount - paidForInv);
+        }
+      } else {
+        unbilledWip += (inv.amount || 0);
       }
     });
+
+    const outstanding = Math.max(0, billedReceivables - totalCollected);
 
     // PM Surya Ghar DBT Subsidies expected across active pipelines
     const expectedSubsidies = projectsWithSubsidy.reduce((sum, s) => {
@@ -391,12 +431,16 @@ router.get('/api/tenant/finance/stats', requireTenantAuth, async (req, res) => {
     // GST Collected Estimate (13.8% composite solar GST on realized collections)
     const effectiveGstCollected = Math.round(totalCollected - (totalCollected / 1.138));
 
-    // Collection rate percentage
-    const collectionRate = totalInvoiced > 0 ? Math.round((totalCollected / totalInvoiced) * 100) : 0;
+    // Collection & Realization rate percentages
+    const collectionRate = billedReceivables > 0 ? Math.round((totalCollected / billedReceivables) * 100) : 0;
+    const realizationRate = totalContractValue > 0 ? Math.round((totalCollected / totalContractValue) * 100) : 0;
 
     res.json({
       stats: {
-        totalInvoiced,
+        totalInvoiced: totalContractValue,
+        totalContractValue,
+        billedReceivables,
+        unbilledWip,
         totalCollected,
         outstanding,
         overdueAmount,
@@ -407,7 +451,8 @@ router.get('/api/tenant/finance/stats', requireTenantAuth, async (req, res) => {
         totalInvoices: invoices.length,
         expectedSubsidies,
         effectiveGstCollected,
-        collectionRate
+        collectionRate,
+        realizationRate
       }
     });
   } catch (error) {
@@ -953,6 +998,12 @@ router.post('/api/tenant/finance/convert-quotation', requireTenantAuth, async (r
       const taxableSubtotal = Math.round(milestoneAmount / 1.138);
       const taxAmount = milestoneAmount - taxableSubtotal;
 
+      // Indian Solar Works Contract 70:30 Statutory Split (Notification 24/2018 & 8/2021)
+      const goodsBase = Math.round(taxableSubtotal * 0.70);
+      const serviceBase = taxableSubtotal - goodsBase;
+      const goodsTax = Math.round(goodsBase * 0.12);
+      const serviceTax = taxAmount - goodsTax;
+
       const inv = await prisma.invoice.create({
         data: {
           tenantId: req.user.tenantId,
@@ -964,19 +1015,36 @@ router.post('/api/tenant/finance/convert-quotation', requireTenantAuth, async (r
           subtotal: taxableSubtotal,
           taxRate: 13.8,
           taxAmount,
-          subsidyDeduction: ms.key === 'COMMISSIONING' ? centralSubsidy : 0,
+          subsidyDeduction: 0,
           amount: milestoneAmount,
           dueDate: new Date(Date.now() + ms.dueDays * 86400000),
           status: 'UNPAID',
           items: [
             {
-              description: `${ms.title} - ${ms.desc} (${quote.systemCapacity || 3.3} kWp System)`,
-              hsn: ms.hsn,
+              description: `${ms.title} - Solar PV Modules & Inverter Equipment Supply (70% Goods Component)`,
+              hsn: '8541',
               qty: 1,
               unit: 'Stage',
-              rate: taxableSubtotal,
-              amount: taxableSubtotal,
-              gstRate: 13.8
+              rate: goodsBase,
+              amount: goodsBase,
+              gstRate: 12.0,
+              cgstRate: 6.0,
+              sgstRate: 6.0,
+              taxAmount: goodsTax,
+              total: goodsBase + goodsTax
+            },
+            {
+              description: `${ms.title} - Installation, Structural Erection & Net-Metering Services (30% Services Component)`,
+              hsn: '9954',
+              qty: 1,
+              unit: 'Stage',
+              rate: serviceBase,
+              amount: serviceBase,
+              gstRate: 18.0,
+              cgstRate: 9.0,
+              sgstRate: 9.0,
+              taxAmount: serviceTax,
+              total: serviceBase + serviceTax
             }
           ],
           notes: `Quotation ref: ${quote.qNumber}. PM Surya Ghar central subsidy of ₹${centralSubsidy.toLocaleString('en-IN')} to be credited via DBT directly to customer Aadhaar-linked bank account upon commissioning.`,
@@ -1121,6 +1189,12 @@ router.post('/api/tenant/finance/milestone-invoices', requireTenantAuth, async (
       const taxableSubtotal = Math.round(milestoneAmount / 1.138);
       const taxAmount = milestoneAmount - taxableSubtotal;
 
+      // Indian Solar Works Contract 70:30 Statutory Split (Notification 24/2018 & 8/2021)
+      const goodsBase = Math.round(taxableSubtotal * 0.70);
+      const serviceBase = taxableSubtotal - goodsBase;
+      const goodsTax = Math.round(goodsBase * 0.12);
+      const serviceTax = taxAmount - goodsTax;
+
       const inv = await prisma.invoice.create({
         data: {
           tenantId,
@@ -1132,19 +1206,36 @@ router.post('/api/tenant/finance/milestone-invoices', requireTenantAuth, async (
           subtotal: taxableSubtotal,
           taxRate: 13.8,
           taxAmount,
-          subsidyDeduction: ms.key === 'COMMISSIONING' ? centralSubsidy : 0,
+          subsidyDeduction: 0,
           amount: milestoneAmount,
           dueDate: new Date(Date.now() + ms.dueDays * 86400000),
           status: 'UNPAID',
           items: [
             {
-              description: `${ms.title} - ${ms.desc} (${cap} kWp System)`,
-              hsn: ms.hsn,
+              description: `${ms.title} - Solar PV Modules & Inverter Equipment Supply (70% Goods Component)`,
+              hsn: '8541',
               qty: 1,
               unit: 'Stage',
-              rate: taxableSubtotal,
-              amount: taxableSubtotal,
-              gstRate: 13.8
+              rate: goodsBase,
+              amount: goodsBase,
+              gstRate: 12.0,
+              cgstRate: 6.0,
+              sgstRate: 6.0,
+              taxAmount: goodsTax,
+              total: goodsBase + goodsTax
+            },
+            {
+              description: `${ms.title} - Installation, Structural Erection & Net-Metering Services (30% Services Component)`,
+              hsn: '9954',
+              qty: 1,
+              unit: 'Stage',
+              rate: serviceBase,
+              amount: serviceBase,
+              gstRate: 18.0,
+              cgstRate: 9.0,
+              sgstRate: 9.0,
+              taxAmount: serviceTax,
+              total: serviceBase + serviceTax
             }
           ],
           notes: `Turnkey Solar EPC Project for ${customer?.name || 'Customer'}. PM Surya Ghar central CFA of ₹${centralSubsidy.toLocaleString('en-IN')} disbursed directly to consumer bank account.`,
@@ -1272,6 +1363,339 @@ router.post('/api/tenant/invoices/:id/payments', requireTenantAuth, requirePermi
   } catch (error) {
     console.error('Error recording payment:', error);
     res.status(500).json({ error: 'Failed to record payment' });
+  }
+});
+
+// 8b. Multi-Milestone Project/Customer Payment Allocation
+router.post('/api/tenant/finance/payments', requireTenantAuth, requirePermission('finance.record_payment'), async (req, res) => {
+  try {
+    const { projectId, customerId, invoiceId, amount, mode = 'UPI', reference, date, notes } = req.body;
+    const parsedAmount = parseFloat(amount);
+    if (!parsedAmount || parsedAmount <= 0) {
+      return res.status(400).json({ error: 'A valid payment amount greater than zero is required' });
+    }
+
+    const tenantId = req.user.tenantId;
+    const currentYear = new Date().getFullYear();
+    const count = await prisma.payment.count({ where: { invoice: { tenantId } } });
+
+    // Determine target invoices
+    let targetInvoices = [];
+    if (invoiceId) {
+      const inv = await prisma.invoice.findFirst({
+        where: { id: invoiceId, tenantId },
+        include: { payments: true }
+      });
+      if (!inv) return res.status(404).json({ error: 'Invoice not found' });
+      targetInvoices.push(inv);
+
+      if (inv.projectId) {
+        const others = await prisma.invoice.findMany({
+          where: {
+            tenantId,
+            projectId: inv.projectId,
+            id: { not: inv.id },
+            status: { in: ['UNPAID', 'PARTIAL'] }
+          },
+          include: { payments: true },
+          orderBy: { createdAt: 'asc' }
+        });
+        targetInvoices.push(...others);
+      }
+    } else if (projectId) {
+      targetInvoices = await prisma.invoice.findMany({
+        where: {
+          tenantId,
+          projectId,
+          status: { in: ['UNPAID', 'PARTIAL'] }
+        },
+        include: { payments: true },
+        orderBy: { createdAt: 'asc' }
+      });
+    } else if (customerId) {
+      targetInvoices = await prisma.invoice.findMany({
+        where: {
+          tenantId,
+          customerId,
+          status: { in: ['UNPAID', 'PARTIAL'] }
+        },
+        include: { payments: true },
+        orderBy: { createdAt: 'asc' }
+      });
+    }
+
+    if (targetInvoices.length === 0) {
+      return res.status(400).json({ error: 'No open invoices found for this project or customer' });
+    }
+
+    let remainingToAllocate = parsedAmount;
+    const allocations = [];
+    const receiptNumber = `REC-${currentYear}-${(count + 1).toString().padStart(4, '0')}`;
+
+    for (let i = 0; i < targetInvoices.length; i++) {
+      const inv = targetInvoices[i];
+      if (remainingToAllocate <= 0) break;
+
+      const alreadyPaid = (inv.payments || []).reduce((s, p) => s + (p.amount || 0), 0);
+      const invoiceBalance = Math.max(0, inv.amount - alreadyPaid);
+
+      const isLast = (i === targetInvoices.length - 1);
+      const allocAmount = isLast ? remainingToAllocate : Math.min(invoiceBalance, remainingToAllocate);
+
+      if (allocAmount <= 0) continue;
+
+      const payment = await prisma.payment.create({
+        data: {
+          invoiceId: inv.id,
+          amount: allocAmount,
+          mode: mode || 'UPI',
+          reference: reference ? reference.trim() : null,
+          notes: notes || null,
+          receiptNumber,
+          date: date ? new Date(date) : new Date()
+        }
+      });
+
+      const newTotalPaid = alreadyPaid + allocAmount;
+      const newStatus = newTotalPaid >= inv.amount ? 'PAID' : (newTotalPaid > 0 ? 'PARTIAL' : 'UNPAID');
+
+      await prisma.invoice.update({
+        where: { id: inv.id },
+        data: { status: newStatus }
+      });
+
+      allocations.push({
+        paymentId: payment.id,
+        invoiceId: inv.id,
+        invoiceNumber: inv.invoiceNumber,
+        milestone: inv.milestone,
+        allocatedAmount: allocAmount,
+        status: newStatus
+      });
+
+      remainingToAllocate -= allocAmount;
+    }
+
+    const linkedProjId = projectId || targetInvoices[0]?.projectId;
+    if (linkedProjId) {
+      try {
+        await prisma.projectTimelineEvent.create({
+          data: {
+            projectId: linkedProjId,
+            title: `Payment Received: ₹${parsedAmount.toLocaleString('en-IN')}`,
+            description: `Payment of ₹${parsedAmount.toLocaleString('en-IN')} via ${mode} (${reference || 'No ref'}) allocated across ${allocations.length} milestone(s). Receipt: ${receiptNumber}.`,
+            eventType: 'PAYMENT',
+            createdBy: req.user.userId
+          }
+        });
+      } catch { }
+    }
+
+    res.status(201).json({
+      success: true,
+      receiptNumber,
+      totalAmount: parsedAmount,
+      allocations
+    });
+  } catch (error) {
+    console.error('Error in payment allocation:', error);
+    res.status(500).json({ error: 'Failed to allocate payment' });
+  }
+});
+
+// 8c. Dynamic NPCI UPI QR Generator
+router.get('/api/tenant/invoices/:id/upi-qr', requireTenantAuth, async (req, res) => {
+  try {
+    const [invoice, tenant] = await Promise.all([
+      prisma.invoice.findUnique({
+        where: { id: req.params.id, tenantId: req.user.tenantId },
+        include: { customer: true, project: true, payments: true }
+      }),
+      prisma.tenant.findUnique({
+        where: { id: req.user.tenantId }
+      })
+    ]);
+
+    if (!invoice) return res.status(404).json({ error: 'Invoice not found' });
+
+    const totalPaid = (invoice.payments || []).reduce((sum, p) => sum + (p.amount || 0), 0);
+    const balance = Math.max(0, invoice.amount - totalPaid);
+
+    const bankDetails = tenant?.bankDetails || tenant?.settings?.bankDetails || {};
+    const upiId = bankDetails.upiId || 'solar@bank';
+    const payeeName = bankDetails.accountName || tenant?.name || 'Solar Energy EPC';
+    const note = `${invoice.invoiceNumber}_${(invoice.milestone || 'Milestone').replace(/\s+/g, '_')}`;
+
+    // NPCI UPI URI Specification
+    const upiString = `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(payeeName)}&am=${balance.toFixed(2)}&tr=${encodeURIComponent(invoice.invoiceNumber)}&tn=${encodeURIComponent(note)}&cu=INR`;
+    const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(upiString)}&margin=6`;
+
+    res.json({
+      invoiceId: invoice.id,
+      invoiceNumber: invoice.invoiceNumber,
+      balance,
+      upiId,
+      payeeName,
+      upiString,
+      qrImageUrl
+    });
+  } catch (error) {
+    console.error('Error generating UPI QR:', error);
+    res.status(500).json({ error: 'Failed to generate UPI QR code' });
+  }
+});
+
+// 8d. Project Job Costing & Financial P&L
+router.get('/api/tenant/finance/projects/:id/pnl', requireTenantAuth, async (req, res) => {
+  try {
+    const projectId = req.params.id;
+    const tenantId = req.user.tenantId;
+
+    const project = await prisma.project.findFirst({
+      where: { id: projectId, tenantId },
+      include: {
+        customer: true,
+        invoices: { include: { payments: true }, orderBy: { createdAt: 'asc' } },
+        costs: { orderBy: { createdAt: 'desc' } },
+        purchaseOrders: { include: { items: true } },
+        subsidies: true
+      }
+    });
+
+    if (!project) return res.status(404).json({ error: 'Project not found' });
+
+    const allInvoices = project.invoices || [];
+    const totalContractValue = allInvoices.reduce((sum, inv) => sum + (inv.amount || 0), 0) || project.estimatedValue || 0;
+
+    let billedRevenue = 0;
+    let realizedCash = 0;
+
+    allInvoices.forEach(inv => {
+      const paid = (inv.payments || []).reduce((s, p) => s + (p.amount || 0), 0);
+      realizedCash += paid;
+      billedRevenue += (inv.amount || 0);
+    });
+
+    const unbilledWip = Math.max(0, totalContractValue - billedRevenue);
+    const outstandingReceivables = Math.max(0, billedRevenue - realizedCash);
+
+    let materialCost = 0;
+    (project.purchaseOrders || []).forEach(po => {
+      materialCost += (po.total || 0);
+    });
+
+    let siteExpenses = 0;
+    (project.costs || []).forEach(c => {
+      siteExpenses += (c.actual || c.budget || 0);
+    });
+
+    const totalDirectCost = materialCost + siteExpenses;
+    const grossProfit = billedRevenue - totalDirectCost;
+    const grossMarginPercent = billedRevenue > 0 ? Number(((grossProfit / billedRevenue) * 100).toFixed(1)) : 0;
+
+    const centralSubsidy = (project.subsidies?.[0]?.centralSubsidyAmount) || (project.capacity >= 3 ? 78000 : project.capacity >= 2 ? 60000 : 30000);
+    const subsidyStatus = project.subsidies?.[0]?.portalStage || 'NOT_SUBMITTED';
+
+    res.json({
+      project: {
+        id: project.id,
+        name: project.name,
+        capacity: project.capacity,
+        currentStage: project.currentStage,
+        customer: project.customer
+      },
+      pnl: {
+        totalContractValue,
+        billedRevenue,
+        realizedCash,
+        outstandingReceivables,
+        unbilledWip,
+        materialCost,
+        siteExpenses,
+        totalDirectCost,
+        grossProfit,
+        grossMarginPercent,
+        realizationRatePercent: totalContractValue > 0 ? Math.round((realizedCash / totalContractValue) * 100) : 0
+      },
+      subsidy: {
+        centralSubsidyAmount: centralSubsidy,
+        status: subsidyStatus
+      },
+      milestones: allInvoices.map(inv => {
+        const paid = (inv.payments || []).reduce((s, p) => s + (p.amount || 0), 0);
+        return {
+          id: inv.id,
+          invoiceNumber: inv.invoiceNumber,
+          milestone: inv.milestone,
+          milestoneTitle: inv.milestoneTitle,
+          amount: inv.amount,
+          paid,
+          balance: Math.max(0, inv.amount - paid),
+          status: inv.status,
+          dueDate: inv.dueDate
+        };
+      }),
+      expenses: project.costs || []
+    });
+  } catch (error) {
+    console.error('Error fetching project P&L:', error);
+    res.status(500).json({ error: 'Failed to fetch project financial analysis' });
+  }
+});
+
+// 8e. Record On-Site Field Expense against Project
+router.post('/api/tenant/finance/projects/:id/expenses', requireTenantAuth, async (req, res) => {
+  try {
+    const projectId = req.params.id;
+    const tenantId = req.user.tenantId;
+    const { category = 'MISC', amount, description, budget = 0 } = req.body;
+
+    const parsedAmount = parseFloat(amount);
+    if (!parsedAmount || parsedAmount <= 0) {
+      return res.status(400).json({ error: 'Valid expense amount greater than zero is required' });
+    }
+
+    const project = await prisma.project.findFirst({
+      where: { id: projectId, tenantId }
+    });
+    if (!project) return res.status(404).json({ error: 'Project not found' });
+
+    const costRecord = await prisma.projectCost.create({
+      data: {
+        projectId,
+        category: category.toUpperCase(),
+        actual: parsedAmount,
+        budget: parseFloat(budget) || parsedAmount
+      }
+    });
+
+    await prisma.project.update({
+      where: { id: projectId },
+      data: {
+        actualCost: { increment: parsedAmount }
+      }
+    });
+
+    try {
+      await prisma.projectTimelineEvent.create({
+        data: {
+          projectId,
+          title: `Site Expense: ₹${parsedAmount.toLocaleString('en-IN')} [${category.toUpperCase()}]`,
+          description: description || `Field expense recorded under category ${category}.`,
+          eventType: 'MATERIAL',
+          createdBy: req.user.userId
+        }
+      });
+    } catch { }
+
+    res.status(201).json({
+      success: true,
+      expense: costRecord,
+      message: 'Project expense recorded successfully'
+    });
+  } catch (error) {
+    console.error('Error recording project expense:', error);
+    res.status(500).json({ error: 'Failed to record project expense' });
   }
 });
 

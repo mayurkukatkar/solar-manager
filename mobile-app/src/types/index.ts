@@ -62,13 +62,37 @@ export interface DashboardData {
 export interface Customer {
   id?: string;
   name: string;
+  company?: string;
   mobile?: string;
   phone?: string;
   email?: string;
   address?: string;
   city?: string;
   state?: string;
+  pincode?: string;
+  customerType?: 'RESIDENTIAL' | 'COMMERCIAL' | 'INDUSTRIAL';
   consumerNumber?: string;
+  discomName?: string;
+  sanctionedLoadKw?: number;
+  tariffCategory?: string;
+  leadId?: string;
+  tenantId?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CustomerDetailedProfile extends Customer {
+  lead?: any;
+  projects?: any[];
+  surveys?: any[];
+  quotations?: any[];
+  invoices?: any[];
+  tickets?: any[];
+  amcs?: any[];
+  subsidies?: any[];
+  loans?: any[];
+  Document?: any[];
+  InstallationJob?: any[];
 }
 
 export interface Lead {

@@ -21,6 +21,8 @@ import {
   ChevronRight,
   Sparkles,
   ArrowRight,
+  Users,
+  Wrench,
 } from 'lucide-react-native';
 import { Header } from '../../components/Header';
 import { ModalHeader } from '../../components/common/ModalHeader';
@@ -33,11 +35,13 @@ import { hasPermission } from '../../utils/rbac';
 import {
   QuotationsModule,
   SurveysModule,
+  CustomersModule,
   SubsidiesModule,
   FinancingModule,
   DiscomModule,
   InvoicingModule,
   ProcurementModule,
+  InstallationsModule,
   AmcModule,
   SuperAdminModule,
 } from './submodules';
@@ -81,6 +85,16 @@ export const MODULE_CATEGORIES: ModuleCategory[] = [
         iconColor: '#6366F1',
         bgColor: '#EEF2FF',
         permission: ['surveys.view', 'surveys.create', 'surveys', 'survey'],
+      },
+      {
+        id: 'CUSTOMERS',
+        name: 'Customer 360° Profiles',
+        desc: 'Complete customer dossiers, technical site specs, invoices & PM Surya Ghar',
+        icon: Users,
+        iconColor: '#059669',
+        bgColor: '#ECFDF5',
+        tag: 'Dossier 360°',
+        permission: ['leads.view', 'projects.view', 'crm.view', 'leads', 'projects', 'crm'],
       },
     ],
   },
@@ -136,6 +150,16 @@ export const MODULE_CATEGORIES: ModuleCategory[] = [
     title: 'OPERATIONS & AMC',
     modules: [
       {
+        id: 'INSTALLATION',
+        name: 'Field Operations & QA',
+        desc: 'Site execution, CEA safety checklists, 2D serials & 5-geo proofs',
+        icon: Wrench,
+        iconColor: '#F59E0B',
+        bgColor: '#FFFBEB',
+        tag: 'Live Execution',
+        permission: ['installations.view', 'operations.view', 'installation', 'installations', 'projects.view', 'projects'],
+      },
+      {
         id: 'PROCUREMENT',
         name: 'Procurement & Stock',
         desc: 'DCR modules, grid-tie inverters, ACDB/DCDB & material dispatch',
@@ -180,6 +204,8 @@ const normalizeModuleId = (id: string | null | undefined): string | null => {
   if (upper === 'DOCS' || upper === 'DISCOM_DOCS') return 'DISCOM';
   if (upper === 'SERVICE' || upper === 'TICKETS') return 'AMC';
   if (upper === 'PM_SURYA_GHAR' || upper === 'SUBSIDIES') return 'SUBSIDY';
+  if (upper === 'CUSTOMERS' || upper === 'CUSTOMER' || upper === 'CLIENTS') return 'CUSTOMERS';
+  if (upper === 'INSTALLATION' || upper === 'INSTALLATIONS' || upper === 'OPERATIONS' || upper === 'FIELD' || upper === 'JOBS') return 'INSTALLATION';
   return upper;
 };
 
@@ -277,6 +303,13 @@ export const ModulesScreen: React.FC<{ route?: any; navigation?: any }> = ({
             initialParams={route?.params}
           />
         );
+      case 'CUSTOMERS':
+        return (
+          <CustomersModule
+            onClose={() => setActiveSubModule(null)}
+            initialParams={route?.params}
+          />
+        );
       case 'SUBSIDY':
         return (
           <SubsidiesModule
@@ -308,6 +341,13 @@ export const ModulesScreen: React.FC<{ route?: any; navigation?: any }> = ({
       case 'PROCUREMENT':
         return (
           <ProcurementModule
+            onClose={() => setActiveSubModule(null)}
+            initialParams={route?.params}
+          />
+        );
+      case 'INSTALLATION':
+        return (
+          <InstallationsModule
             onClose={() => setActiveSubModule(null)}
             initialParams={route?.params}
           />

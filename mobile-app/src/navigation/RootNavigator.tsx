@@ -33,6 +33,7 @@ import { QuickQuoteScreen } from '../screens/crm/QuickQuoteScreen';
 import { FinanceScreen } from '../screens/finance/FinanceScreen';
 import { ModulesScreen } from '../screens/modules/ModulesScreen';
 import { FieldProfileScreen } from '../screens/profile/FieldProfileScreen';
+import { CustomerProfileScreen } from '../screens/crm/CustomerProfileScreen';
 import { LeadCaptureModal } from '../screens/crm/LeadCaptureModal';
 import { CreateInvoiceModal } from '../components/CreateInvoiceModal';
 import { BarcodeScannerModal } from '../screens/operations/BarcodeScannerModal';
@@ -249,6 +250,7 @@ const MainTabNavigator: React.FC = () => {
           setBarcodeModalVisible(true);
         }}
         onOpenRecordPayment={() => setCreateInvoiceModalVisible(true)}
+        onOpenFieldOps={() => navigationRef.navigate('Operations')}
       />
 
       {/* LEAD CAPTURE MODAL */}
@@ -396,6 +398,7 @@ export const RootNavigator: React.FC = () => {
               <Stack.Screen name="Operations" component={OperationsScreen} />
               {/* Consolidated CRM route: legacy 'Leads' directs to PipelineScreen */}
               <Stack.Screen name="Leads" component={PipelineScreen} />
+              <Stack.Screen name="CustomerProfile" component={CustomerProfileScreen} />
             </>
           )}
         </Stack.Navigator>

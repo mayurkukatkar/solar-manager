@@ -23,6 +23,7 @@ export type RootStackParamList = {
   Profile: undefined;
   Operations: undefined;
   Leads: { stage?: string; leadId?: string } | undefined;
+  CustomerProfile: { customerId?: string; leadId?: string; customer?: any } | undefined;
 };
 
 export const navigationRef = createNavigationContainerRef<RootStackParamList>();
@@ -46,7 +47,8 @@ export function navigateToTab(screenName: string, params?: any) {
       screenName === 'Modules' ||
       screenName === 'Profile' ||
       screenName === 'Operations' ||
-      screenName === 'FinanceDetail'
+      screenName === 'FinanceDetail' ||
+      screenName === 'CustomerProfile'
     ) {
       navigationRef.navigate(screenName as any, params);
       return;

@@ -24,7 +24,7 @@ import {
 import { ModalHeader, useDirtyFormWarning } from '../../components/common/ModalHeader';
 import { CelebrationModal } from '../../components/CelebrationModal';
 import { solarGamificationService } from '../../services/solarGamificationService';
-import { tenantApi } from '../../api/endpoints';
+import { tenantApi, installationsApi } from '../../api/endpoints';
 import { SafeStorage } from '../../api/client';
 import { haptics } from '../../utils/haptics';
 import { offlineSyncService } from '../../services/offlineSyncService';
@@ -173,6 +173,7 @@ export const InstallationQAModal: React.FC<InstallationQAModalProps> = ({
         await SafeStorage.setItem(`@solar_qa_${project.id}`, JSON.stringify(qaPayload));
         project.qaReadings = qaPayload;
         project.qaPassed = true;
+        await installationsApi.saveQAReadings(project.id, qaPayload).catch(() => null);
         await tenantApi.advanceProjectStage(project.id, 'Testing', 'Electrical Testing & QA Completed via Mobile Field OS');
       }
 

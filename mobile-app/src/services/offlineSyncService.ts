@@ -33,6 +33,11 @@ export type OfflineMutationType =
   | 'RECORD_QA_READINGS'
   | 'UPDATE_PROJECT_SERIALS'
   | 'UPDATE_JOB_STATUS'
+  | 'UPDATE_JOB_CHECKLIST'
+  | 'UPLOAD_JOB_PHOTO'
+  | 'ASSIGN_TECHNICIAN'
+  | 'RECORD_JOB_SIGNOFF'
+  | 'UPDATE_JOB_MATERIALS'
   | 'CAPTURE_PHOTO_METADATA'
   | 'RECORD_PAYMENT'
   | 'RECORD_DPDP_CONSENT';
@@ -178,6 +183,31 @@ export const offlineSyncService = {
       } else if (type === 'UPDATE_JOB_STATUS') {
         defaultEndpoint = '/api/installations/status';
         defaultMethod = 'PATCH';
+        defaultEntityType = 'installation';
+      } else if (type === 'UPDATE_JOB_CHECKLIST') {
+        const jobId = (legacyPayload as any)?.jobId;
+        defaultEndpoint = jobId ? `/api/tenant/installations/${jobId}/checklist` : '/api/tenant/installations/checklist';
+        defaultMethod = 'PUT';
+        defaultEntityType = 'installation';
+      } else if (type === 'UPLOAD_JOB_PHOTO') {
+        const jobId = (legacyPayload as any)?.jobId;
+        defaultEndpoint = jobId ? `/api/tenant/installations/${jobId}/photos` : '/api/tenant/installations/photos';
+        defaultMethod = 'POST';
+        defaultEntityType = 'installation';
+      } else if (type === 'ASSIGN_TECHNICIAN') {
+        const jobId = (legacyPayload as any)?.jobId;
+        defaultEndpoint = jobId ? `/api/tenant/installations/${jobId}/assignments` : '/api/tenant/installations/assignments';
+        defaultMethod = 'POST';
+        defaultEntityType = 'installation';
+      } else if (type === 'RECORD_JOB_SIGNOFF') {
+        const jobId = (legacyPayload as any)?.jobId;
+        defaultEndpoint = jobId ? `/api/tenant/installations/${jobId}/signoff` : '/api/tenant/installations/signoff';
+        defaultMethod = 'POST';
+        defaultEntityType = 'installation';
+      } else if (type === 'UPDATE_JOB_MATERIALS') {
+        const jobId = (legacyPayload as any)?.jobId;
+        defaultEndpoint = jobId ? `/api/tenant/installations/${jobId}/materials` : '/api/tenant/installations/materials';
+        defaultMethod = 'PUT';
         defaultEntityType = 'installation';
       } else if (type === 'RECORD_DPDP_CONSENT') {
         defaultEndpoint = '/api/tenant/dpdp/consent';

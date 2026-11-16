@@ -276,6 +276,46 @@ export const installationsApi = {
     const res = await apiClient.post('/api/tenant/installations/schedule', data);
     return res.data;
   },
+  updateChecklist: async (id: string, items: any[]) => {
+    const res = await apiClient.put(`/api/tenant/installations/${id}/checklist`, { items });
+    return res.data;
+  },
+  uploadPhoto: async (id: string, photo: { category: string; url: string; caption?: string }) => {
+    const res = await apiClient.post(`/api/tenant/installations/${id}/photos`, photo);
+    return res.data;
+  },
+  deletePhoto: async (id: string, photoId: string) => {
+    const res = await apiClient.delete(`/api/tenant/installations/${id}/photos/${photoId}`);
+    return res.data;
+  },
+  saveMaterials: async (id: string, data: { materials?: any[]; serialNumbers?: string[]; productId?: string }) => {
+    const res = await apiClient.put(`/api/tenant/installations/${id}/materials`, data);
+    return res.data;
+  },
+  saveQAReadings: async (id: string, readings: { pit1Inverter: string; pit2Structure: string; pit3Lightning: string; antiIslandingTripSec: string; insulationMegaOhms: string; notes?: string }) => {
+    const res = await apiClient.put(`/api/tenant/installations/${id}/qa`, readings);
+    return res.data;
+  },
+  reportIssue: async (id: string, issue: { category: string; severity: string; description: string }) => {
+    const res = await apiClient.post(`/api/tenant/installations/${id}/issues`, issue);
+    return res.data;
+  },
+  updateIssue: async (id: string, issueId: string, status: string) => {
+    const res = await apiClient.put(`/api/tenant/installations/${id}/issues/${issueId}`, { status });
+    return res.data;
+  },
+  assignTechnician: async (id: string, userId: string, role?: string) => {
+    const res = await apiClient.post(`/api/tenant/installations/${id}/assignments`, { userId, role });
+    return res.data;
+  },
+  removeAssignment: async (id: string, assignmentId: string) => {
+    const res = await apiClient.delete(`/api/tenant/installations/${id}/assignments/${assignmentId}`);
+    return res.data;
+  },
+  recordSignoff: async (id: string, data: { customerName: string; signatureData?: string; handoverConfirmed?: boolean; notes?: string }) => {
+    const res = await apiClient.post(`/api/tenant/installations/${id}/signoff`, data);
+    return res.data;
+  },
 };
 
 // ==========================================
@@ -380,6 +420,40 @@ export const financeApi = {
     data: { amount: number; mode: string; reference?: string; notes?: string; date?: string }
   ) => {
     const res = await apiClient.post(`/api/tenant/invoices/${invoiceId}/payments`, data);
+    return res.data;
+  },
+  allocatePayment: async (data: {
+    customerId?: string;
+    projectId?: string;
+    amount: number;
+    mode: string;
+    reference?: string;
+    date?: string;
+    notes?: string;
+  }) => {
+    const res = await apiClient.post('/api/tenant/finance/payments', data);
+    return res.data;
+  },
+  getProjectPnl: async (projectId: string) => {
+    const res = await apiClient.get(`/api/tenant/finance/projects/${projectId}/pnl`);
+    return res.data;
+  },
+  recordProjectExpense: async (
+    projectId: string,
+    data: {
+      category: string;
+      description: string;
+      amount: number;
+      invoiceRef?: string;
+      date?: string;
+      notes?: string;
+    }
+  ) => {
+    const res = await apiClient.post(`/api/tenant/finance/projects/${projectId}/expenses`, data);
+    return res.data;
+  },
+  getInvoiceUpiQr: async (invoiceId: string) => {
+    const res = await apiClient.get(`/api/tenant/invoices/${invoiceId}/upi-qr`);
     return res.data;
   },
   getReceipt: async (invoiceId: string, paymentId: string) => {
@@ -638,6 +712,33 @@ export const dpdpApi = {
   },
   getDpoInfo: async () => {
     const res = await apiClient.get('/api/tenant/dpdp/dpo');
+    return res.data;
+  },
+};
+
+// ==========================================
+// 18. CUSTOMERS & CRM 360 SERVICE
+// ==========================================
+export const customerApi = {
+  getCustomers: async (params?: { search?: string }) => {
+    const url = params?.search ? `/api/tenant/customers?search=${encodeURIComponent(params.search)}` : '/api/tenant/customers';
+    const res = await apiClient.get(url);
+    return res.data;
+  },
+  getCustomer: async (id: string) => {
+    const res = await apiClient.get(`/api/tenant/customers/${id}`);
+    return res.data;
+  },
+  updateCustomer: async (id: string, data: any) => {
+    const res = await apiClient.patch(`/api/tenant/customers/${id}`, data);
+    return res.data;
+  },
+  addNote: async (id: string, note: string) => {
+    const res = await apiClient.post(`/api/tenant/customers/${id}/notes`, { note });
+    return res.data;
+  },
+  getDataSummary: async (customerId: string) => {
+    const res = await apiClient.get(`/api/tenant/dpdp/data-summary/${customerId}`);
     return res.data;
   },
 };

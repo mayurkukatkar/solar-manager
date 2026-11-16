@@ -55,7 +55,7 @@ export const FIELD_TECHNICIANS = [
   { id: 'tech-4', name: 'Amit Deshmukh', role: 'Rooftop Erection Tech', phone: '+91 98220 99001' },
 ];
 
-export const OperationsScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
+export const OperationsScreen: React.FC<{ navigation?: any; onClose?: () => void }> = ({ navigation, onClose }) => {
   const { colors, isDark } = useTheme();
   const [jobs, setJobs] = useState<InstallationJob[]>([]);
   const [loading, setLoading] = useState(true);
@@ -226,11 +226,20 @@ export const OperationsScreen: React.FC<{ navigation?: any }> = ({ navigation })
     fetchOperations();
   };
 
-  const toggleChecklist = (id: string) => {
+  const toggleChecklist = async (id: string) => {
     soundEffects.playSelect();
     haptics.selection();
+    let updatedCompleted = false;
+    let targetItemTitle = '';
     setChecklist((prev) => {
-      const next = prev.map((item) => (item.id === id ? { ...item, completed: !item.completed } : item));
+      const next = prev.map((item) => {
+        if (item.id === id) {
+          updatedCompleted = !item.completed;
+          targetItemTitle = item.title;
+          return { ...item, completed: updatedCompleted };
+        }
+        return item;
+      });
       const allDone = next.every((item) => item.completed);
       if (allDone) {
         soundEffects.playVerificationShield();
@@ -238,6 +247,23 @@ export const OperationsScreen: React.FC<{ navigation?: any }> = ({ navigation })
       }
       return next;
     });
+
+    if (activeJob) {
+      try {
+        await installationsApi.updateChecklist(activeJob.id, [{
+          itemId: id,
+          item: targetItemTitle || 'Technical Safety Item',
+          isChecked: updatedCompleted,
+          status: updatedCompleted ? 'PASS' : null,
+        }]);
+      } catch (_) {
+        offlineSyncService.enqueueMutation('UPDATE_JOB_CHECKLIST', {
+          jobId: activeJob.id,
+          itemId: id,
+          isChecked: updatedCompleted,
+        }).catch(() => null);
+      }
+    }
   };
 
   const handleOpenBarcodeScanner = () => {
@@ -288,9 +314,12 @@ export const OperationsScreen: React.FC<{ navigation?: any }> = ({ navigation })
     }
   };
 
-  const applyCapturedPhoto = (slot: number, uri: string) => {
+  const applyCapturedPhoto = async (slot: number, uri: string) => {
     haptics.notificationSuccess();
     const timestamp = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+    const targetPhoto = geoPhotos.find((p) => p.slot === slot);
+    const category = targetPhoto?.category || 'ROOF';
+
     setGeoPhotos((prev) =>
       prev.map((p) =>
         p.slot === slot
@@ -304,6 +333,22 @@ export const OperationsScreen: React.FC<{ navigation?: any }> = ({ navigation })
       )
     );
     Alert.alert('Inspection Photo Recorded', `Slot ${slot} photo recorded at ${timestamp}.`);
+
+    if (activeJob) {
+      try {
+        await installationsApi.uploadPhoto(activeJob.id, {
+          category,
+          url: uri,
+          caption: `PM Surya Ghar Slot ${slot} (${category}) recorded at ${timestamp}`,
+        });
+      } catch (_) {
+        offlineSyncService.enqueueMutation('UPLOAD_JOB_PHOTO', {
+          jobId: activeJob.id,
+          category,
+          url: uri,
+        }).catch(() => null);
+      }
+    }
   };
 
   const handleSiteCheckIn = async (job: InstallationJob) => {
@@ -363,7 +408,7 @@ export const OperationsScreen: React.FC<{ navigation?: any }> = ({ navigation })
     setAssignModalVisible(true);
   };
 
-  const handleAssignTechnician = (tech: (typeof FIELD_TECHNICIANS)[0]) => {
+  const handleAssignTechnician = async (tech: (typeof FIELD_TECHNICIANS)[0]) => {
     if (!jobToAssign) return;
     setJobs((prev) =>
       prev.map((j) =>
@@ -377,6 +422,15 @@ export const OperationsScreen: React.FC<{ navigation?: any }> = ({ navigation })
           : j
       )
     );
+    try {
+      await installationsApi.assignTechnician(jobToAssign.id, tech.id, 'TECHNICIAN');
+    } catch (_) {
+      offlineSyncService.enqueueMutation('ASSIGN_TECHNICIAN', {
+        jobId: jobToAssign.id,
+        userId: tech.id,
+        role: 'TECHNICIAN',
+      }).catch(() => null);
+    }
     Alert.alert('Technician Dispatched', `${tech.name} (${tech.role}) assigned to ${jobToAssign.customerName}.`);
     setAssignModalVisible(false);
     setJobToAssign(null);
@@ -602,10 +656,10 @@ export const OperationsScreen: React.FC<{ navigation?: any }> = ({ navigation })
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* GLOBAL HEADER */}
       <Header
-        variant={navigation?.canGoBack?.() ? 'detail' : 'main'}
+        variant={navigation?.canGoBack?.() || onClose ? 'detail' : 'main'}
         title="Field Operations"
         subtitle="Live site execution, 2D serials, 5-geo proofs & CEA sign-off"
-        onBack={navigation?.canGoBack?.() ? () => navigation.goBack() : undefined}
+        onBack={onClose || (navigation?.canGoBack?.() ? () => navigation.goBack() : undefined)}
       />
 
       {/* OPERATIONAL RADAR PULSE CARDS */}
@@ -1084,12 +1138,24 @@ export const OperationsScreen: React.FC<{ navigation?: any }> = ({ navigation })
 
                   <TouchableOpacity
                     style={styles.completeJobBtn}
-                    onPress={() => {
+                    onPress={async () => {
                       soundEffects.playCelebrationFanfare();
                       solarGamificationService.recordAction('QA_CERTIFIED', {
                         customerName: activeJob.customerName,
                         capacityKw: activeJob.capacityKw,
                       });
+                      try {
+                        await installationsApi.recordSignoff(activeJob.id, {
+                          customerName: activeJob.customerName,
+                          signatureData: 'Customer Digital Signature Confirmed on Glass',
+                          handoverConfirmed: true,
+                        });
+                      } catch (_) {
+                        offlineSyncService.enqueueMutation('RECORD_JOB_SIGNOFF', {
+                          jobId: activeJob.id,
+                          customerName: activeJob.customerName,
+                        }).catch(() => null);
+                      }
                       handleUpdateStatus(activeJob.id, 'COMPLETED');
                       setCelebrationData({
                         title: 'Zero-Defect Handover Dossier Certified! 🎉',
@@ -1124,7 +1190,7 @@ export const OperationsScreen: React.FC<{ navigation?: any }> = ({ navigation })
           }}
           initialModuleSerials={scannedSerials}
           onClose={() => setBarcodeModalVisible(false)}
-          onSaveSerials={({ modules, inverter }) => {
+          onSaveSerials={async ({ modules, inverter }) => {
             setScannedSerials(modules);
             setJobs((prev) =>
               prev.map((j) =>
@@ -1136,6 +1202,16 @@ export const OperationsScreen: React.FC<{ navigation?: any }> = ({ navigation })
             setActiveJob((prev) =>
               prev ? { ...prev, moduleSerialNumbers: modules, inverterSerial: inverter } : null
             );
+            try {
+              await installationsApi.saveMaterials(activeJob.id, {
+                serialNumbers: modules,
+              });
+            } catch (_) {
+              offlineSyncService.enqueueMutation('UPDATE_JOB_MATERIALS', {
+                jobId: activeJob.id,
+                serialNumbers: modules,
+              }).catch(() => null);
+            }
             setBarcodeModalVisible(false);
           }}
         />

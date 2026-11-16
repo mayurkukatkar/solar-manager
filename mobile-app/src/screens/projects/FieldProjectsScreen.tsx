@@ -42,6 +42,7 @@ import { DiscomDocsModal } from './DiscomDocsModal';
 import { BarcodeScannerModal } from '../operations/BarcodeScannerModal';
 import { InstallationQAModal } from '../operations/InstallationQAModal';
 import { ProjectDossierModal } from './ProjectDossierModal';
+import { CustomerProfileModal } from '../crm/CustomerProfileModal';
 import { CelebrationModal } from '../../components/CelebrationModal';
 import { SeamlessSolarFlowModal } from '../../components/SeamlessSolarFlowModal';
 import { SolarJourneyRoadmap } from '../../components/SolarJourneyRoadmap';
@@ -94,6 +95,38 @@ export const FieldProjectsScreen: React.FC<{ navigation?: any }> = ({ navigation
   const [qaModalVisible, setQaModalVisible] = useState(false);
   const [docsModalVisible, setDocsModalVisible] = useState(false);
   const [selectedProject, setSelectedProject] = useState<any | null>(null);
+  const [customerProfileVisible, setCustomerProfileVisible] = useState(false);
+  const [selectedCustomerForProfile, setSelectedCustomerForProfile] = useState<any | null>(null);
+
+  const handleOpenCustomerProfile = (proj: any) => {
+    haptics.impactLight();
+    const customerId = proj?.customerId || proj?.customer?.id;
+    const leadId = proj?.leadId || proj?.lead?.id;
+    const custData = {
+      ...(proj?.customer || {}),
+      id: customerId || proj?.customer?.id || leadId,
+      customerId: customerId || proj?.customer?.id,
+      leadId: leadId,
+      name: proj?.customer?.name || proj?.lead?.name || proj?.name?.replace(/Rooftop|Solar|Plant|kWp|\d+(\.\d+)?/gi, '').trim() || 'Valued Customer',
+      company: proj?.customer?.company || proj?.lead?.company,
+      mobile: proj?.customer?.mobile || proj?.customer?.phone || proj?.lead?.mobile || proj?.lead?.phone,
+      phone: proj?.customer?.mobile || proj?.customer?.phone || proj?.lead?.mobile || proj?.lead?.phone,
+      email: proj?.customer?.email || proj?.lead?.email,
+      address: proj?.installationAddress || proj?.address || proj?.customer?.address,
+      city: proj?.city || proj?.customer?.city,
+      customerType: proj?.customer?.customerType || proj?.customerType || 'RESIDENTIAL',
+      consumerNumber: proj?.discomConsumerNo || proj?.consumerNumber || proj?.customer?.consumerNumber,
+      projects: [proj],
+      quotations: proj?.quotation ? [proj.quotation] : [],
+      surveys: proj?.survey ? [proj.survey] : [],
+      invoices: Array.isArray(proj?.invoices) ? proj.invoices : [],
+      Document: Array.isArray(proj?.Document) ? proj.Document : [],
+      documents: Array.isArray(proj?.Document) ? proj.Document : [],
+      lead: proj?.lead || null,
+    };
+    setSelectedCustomerForProfile(custData);
+    setCustomerProfileVisible(true);
+  };
 
   // 1-Flow Studio State
   const [seamlessFlowVisible, setSeamlessFlowVisible] = useState(false);
@@ -691,12 +724,16 @@ export const FieldProjectsScreen: React.FC<{ navigation?: any }> = ({ navigation
             </Text>
 
             <View style={styles.metadataRow}>
-              <View style={styles.metadataItem}>
-                <User size={11} color={colors.textMuted} />
-                <Text style={[styles.metadataText, { color: colors.textSecondary }]} numberOfLines={1}>
-                  {custName}
+              <TouchableOpacity
+                style={styles.metadataItem}
+                onPress={() => handleOpenCustomerProfile(p)}
+                activeOpacity={0.7}
+              >
+                <User size={11} color="#0066FF" />
+                <Text style={[styles.metadataText, { color: '#0066FF', fontWeight: '700' }]} numberOfLines={1}>
+                  {custName} (Profile)
                 </Text>
-              </View>
+              </TouchableOpacity>
 
               <Text style={[styles.metadataDivider, { color: colors.textMuted }]}>•</Text>
 
@@ -763,6 +800,21 @@ export const FieldProjectsScreen: React.FC<{ navigation?: any }> = ({ navigation
           <View style={[styles.actionRow, { borderTopColor: colors.borderSubtle }]}>
             {/* Quick Tools */}
             <View style={styles.actionTools}>
+              <TouchableOpacity
+                style={[
+                  styles.toolBtn,
+                  {
+                    backgroundColor: isDark ? 'rgba(0, 102, 255, 0.12)' : '#EFF6FF',
+                    borderColor: isDark ? '#1E3A8A' : '#BFDBFE',
+                  },
+                ]}
+                onPress={() => handleOpenCustomerProfile(p)}
+                activeOpacity={0.75}
+              >
+                <User size={12} color="#0066FF" />
+                <Text style={[styles.toolBtnText, { color: '#0066FF', fontWeight: '700' }]}>Customer</Text>
+              </TouchableOpacity>
+
               <TouchableOpacity
                 style={[
                   styles.toolBtn,
@@ -1143,6 +1195,21 @@ export const FieldProjectsScreen: React.FC<{ navigation?: any }> = ({ navigation
           project={selectedProject}
           onClose={() => setDocsModalVisible(false)}
           onRefreshProject={fetchProjects}
+        />
+      )}
+
+      {/* DETAILED CUSTOMER 360 PROFILE MODAL */}
+      {selectedCustomerForProfile && (
+        <CustomerProfileModal
+          visible={customerProfileVisible}
+          customerId={selectedCustomerForProfile?.id || selectedCustomerForProfile?.customerId}
+          leadId={selectedCustomerForProfile?.leadId}
+          customerData={selectedCustomerForProfile}
+          onClose={() => {
+            setCustomerProfileVisible(false);
+            setSelectedCustomerForProfile(null);
+          }}
+          onUpdate={() => fetchProjects()}
         />
       )}
 

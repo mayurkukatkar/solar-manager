@@ -32,14 +32,17 @@ import {
   Clock,
   TrendingUp,
   FileSpreadsheet,
+  User,
 } from 'lucide-react-native';
 import { Header } from '../../components/Header';
 import { openWhatsAppWithPitch } from '../../services/whatsappService';
 import { crmApi } from '../../api/endpoints';
 import { offlineSyncService } from '../../services/offlineSyncService';
+import { haptics } from '../../utils/haptics';
 import { LeadCaptureModal } from './LeadCaptureModal';
 import { QuotationBuilderModal } from './QuotationBuilderModal';
 import { CustomerOnboardingModal } from './CustomerOnboardingModal';
+import { CustomerProfileModal } from './CustomerProfileModal';
 import { DiscomDocsModal } from '../projects/DiscomDocsModal';
 import { SeamlessSolarFlowModal } from '../../components/SeamlessSolarFlowModal';
 import { InvoicePdfModal } from '../../components/InvoicePdfModal';
@@ -100,6 +103,36 @@ export const PipelineScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
   const [selectedProject, setSelectedProject] = useState<any | null>(null);
   const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [leadForDetail, setLeadForDetail] = useState<any | null>(null);
+  const [customerProfileVisible, setCustomerProfileVisible] = useState(false);
+  const [selectedCustomerForProfile, setSelectedCustomerForProfile] = useState<any | null>(null);
+
+  const handleOpenCustomerProfileForLead = (lead: any) => {
+    haptics.impactLight();
+    const customerId = lead?.customer?.id || lead?.customerId;
+    const leadId = lead?.id;
+    const custData = {
+      ...(lead?.customer || {}),
+      id: customerId || lead?.id,
+      customerId: customerId,
+      leadId: leadId,
+      name: lead?.name || lead?.customer?.name || 'Valued Customer',
+      company: lead?.company || lead?.customer?.company,
+      mobile: lead?.mobile || lead?.phone || lead?.customer?.mobile,
+      phone: lead?.mobile || lead?.phone || lead?.customer?.mobile,
+      email: lead?.email || lead?.customer?.email,
+      address: lead?.address || lead?.customer?.address,
+      city: lead?.city || lead?.customer?.city,
+      customerType: lead?.customerType || lead?.customer?.customerType || 'RESIDENTIAL',
+      consumerNumber: lead?.consumerNumber || lead?.electricityConnection || lead?.customer?.consumerNumber,
+      lead: lead,
+      projects: Array.isArray(lead?.projects) ? lead.projects : [],
+      quotations: Array.isArray(lead?.quotations) ? lead.quotations : [],
+      surveys: Array.isArray(lead?.surveys) ? lead.surveys : [],
+      invoices: Array.isArray(lead?.customer?.invoices) ? lead.customer.invoices : [],
+    };
+    setSelectedCustomerForProfile(custData);
+    setCustomerProfileVisible(true);
+  };
 
   const handleOpenLeadDetail = (lead: any) => {
     setLeadForDetail(lead);
@@ -1096,6 +1129,21 @@ export const PipelineScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
         />
       )}
 
+      {/* DETAILED CUSTOMER 360 PROFILE MODAL */}
+      {selectedCustomerForProfile && (
+        <CustomerProfileModal
+          visible={customerProfileVisible}
+          customerId={selectedCustomerForProfile?.id || selectedCustomerForProfile?.customerId}
+          leadId={selectedCustomerForProfile?.leadId}
+          customerData={selectedCustomerForProfile}
+          onClose={() => {
+            setCustomerProfileVisible(false);
+            setSelectedCustomerForProfile(null);
+          }}
+          onUpdate={() => fetchLeads(false)}
+        />
+      )}
+
       {/* CREATE INVOICE MODAL */}
       <CreateInvoiceModal
         visible={createInvoiceModalVisible}
@@ -1273,7 +1321,7 @@ export const PipelineScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
                         activeOpacity={0.8}
                       >
                         <Phone size={13} color="#0066FF" strokeWidth={2.4} />
-                        <Text style={styles.modalCommBtnText}>Call Customer</Text>
+                        <Text style={styles.modalCommBtnText}>Call</Text>
                       </TouchableOpacity>
 
                       <TouchableOpacity
@@ -1282,7 +1330,19 @@ export const PipelineScreen: React.FC<{ navigation?: any }> = ({ navigation }) =
                         activeOpacity={0.8}
                       >
                         <MessageCircle size={13} color="#10B981" strokeWidth={2.4} />
-                        <Text style={[styles.modalCommBtnText, { color: '#10B981' }]}>WhatsApp Pitch</Text>
+                        <Text style={[styles.modalCommBtnText, { color: '#10B981' }]}>WhatsApp</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={[styles.modalCommBtn, { backgroundColor: isDark ? '#1E293B' : '#EFF6FF', borderColor: '#0066FF' }]}
+                        onPress={() => {
+                          setDetailModalVisible(false);
+                          handleOpenCustomerProfileForLead(leadForDetail);
+                        }}
+                        activeOpacity={0.8}
+                      >
+                        <User size={13} color="#0066FF" strokeWidth={2.4} />
+                        <Text style={[styles.modalCommBtnText, { color: '#0066FF' }]}>360° Profile</Text>
                       </TouchableOpacity>
                     </View>
                   </View>

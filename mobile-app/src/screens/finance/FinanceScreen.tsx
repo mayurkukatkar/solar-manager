@@ -13,6 +13,7 @@ import {
   Alert,
   Platform,
   FlatList,
+  Image,
 } from 'react-native';
 import {
   Receipt,
@@ -36,6 +37,10 @@ import {
   MapPin,
   User,
   Zap,
+  QrCode,
+  PieChart,
+  Check,
+  DollarSign,
 } from 'lucide-react-native';
 import { Header } from '../../components/Header';
 import { InvoicePdfModal } from '../../components/InvoicePdfModal';
@@ -71,12 +76,41 @@ export const FinanceScreen: React.FC<{ navigation?: any; route?: any }> = ({ nav
   const [stats, setStats] = useState({
     totalRevenue: 0,
     outstanding: 0,
+    billedReceivables: 0,
+    unbilledWip: 0,
+    totalContractValue: 0,
     overdueAmount: 0,
     overdueCount: 0,
     expectedSubsidies: 0,
     paidCount: 0,
     unpaidCount: 0,
   });
+
+  // Dynamic UPI QR Code & Auto-allocation State
+  const [upiQrData, setUpiQrData] = useState<{
+    upiUri?: string;
+    qrCodeUrl?: string;
+    vpa?: string;
+    payeeName?: string;
+    amount?: number;
+  } | null>(null);
+  const [loadingQr, setLoadingQr] = useState(false);
+  const [autoAllocateMilestones, setAutoAllocateMilestones] = useState(false);
+
+  // Project Job Costing P&L Modal State
+  const [pnlModalVisible, setPnlModalVisible] = useState(false);
+  const [projectPnlData, setProjectPnlData] = useState<any | null>(null);
+  const [loadingPnl, setLoadingPnl] = useState(false);
+
+  // Field Site Expense Logger Modal State
+  const [expenseModalVisible, setExpenseModalVisible] = useState(false);
+  const [expenseProjectId, setExpenseProjectId] = useState<string>('');
+  const [expenseCategory, setExpenseCategory] = useState<string>('INSTALLATION');
+  const [expenseDescription, setExpenseDescription] = useState<string>('');
+  const [expenseAmount, setExpenseAmount] = useState<string>('');
+  const [expenseInvoiceRef, setExpenseInvoiceRef] = useState<string>('');
+  const [expenseNotes, setExpenseNotes] = useState<string>('');
+  const [submittingExpense, setSubmittingExpense] = useState(false);
 
   // Invoices List
   const [invoices, setInvoices] = useState<any[]>([]);
@@ -129,7 +163,10 @@ export const FinanceScreen: React.FC<{ navigation?: any; route?: any }> = ({ nav
       if (statsRes && statsRes.stats) {
         newStats = {
           totalRevenue: statsRes.stats.totalCollected || 0,
-          outstanding: statsRes.stats.outstanding || 0,
+          outstanding: statsRes.stats.billedReceivables ?? statsRes.stats.outstanding ?? 0,
+          billedReceivables: statsRes.stats.billedReceivables ?? statsRes.stats.outstanding ?? 0,
+          unbilledWip: statsRes.stats.unbilledWip || 0,
+          totalContractValue: statsRes.stats.totalContractValue || 0,
           overdueAmount: statsRes.stats.overdueAmount || 0,
           overdueCount: statsRes.stats.overdueCount || 0,
           expectedSubsidies: statsRes.stats.expectedSubsidies || 0,
@@ -243,6 +280,22 @@ export const FinanceScreen: React.FC<{ navigation?: any; route?: any }> = ({ nav
     setPdfModalVisible(true);
   };
 
+  // Fetch Dynamic UPI QR
+  const loadUpiQr = async (invoiceId: string) => {
+    try {
+      setLoadingQr(true);
+      setUpiQrData(null);
+      const res = await financeApi.getInvoiceUpiQr(invoiceId);
+      if (res?.upiUri) {
+        setUpiQrData(res);
+      }
+    } catch (err: any) {
+      console.warn('UPI QR fetch notice:', err.message);
+    } finally {
+      setLoadingQr(false);
+    }
+  };
+
   // Open Payment Modal
   const handleOpenPaymentModal = (invoice: any) => {
     const totalPaid = invoice.totalPaid ?? (invoice.payments || []).reduce((s: number, p: any) => s + (p.amount || 0), 0);
@@ -252,10 +305,12 @@ export const FinanceScreen: React.FC<{ navigation?: any; route?: any }> = ({ nav
     setPayMode('UPI');
     setPayRef('');
     setPayNotes('');
+    setAutoAllocateMilestones(false);
     setPaymentModalVisible(true);
+    loadUpiQr(invoice.id);
   };
 
-  // Submit Payment
+  // Submit Payment (Supports single invoice or FIFO project milestone allocation)
   const handleSubmitPayment = async () => {
     if (!selectedInvoice) return;
     const amt = parseFloat(payAmount);
@@ -266,19 +321,36 @@ export const FinanceScreen: React.FC<{ navigation?: any; route?: any }> = ({ nav
 
     setSubmittingPayment(true);
     try {
-      const res = await financeApi.recordPayment(selectedInvoice.id, {
-        amount: amt,
-        mode: payMode,
-        reference: payRef.trim() || undefined,
-        notes: payNotes.trim() || undefined,
-      });
+      if (autoAllocateMilestones) {
+        const res = await financeApi.allocatePayment({
+          customerId: selectedInvoice.customerId || selectedInvoice.customer?.id,
+          projectId: selectedInvoice.projectId || selectedInvoice.project?.id,
+          amount: amt,
+          mode: payMode,
+          reference: payRef.trim() || undefined,
+          notes: payNotes.trim() || undefined,
+        });
 
-      Alert.alert(
-        'Payment Recorded',
-        `Receipt No: ${res.receiptNumber || 'REC-' + Date.now().toString().slice(-6)}\nAmount: ₹${amt.toLocaleString(
-          'en-IN'
-        )}\nInvoice Status: ${res.invoiceStatus || 'Updated'}`
-      );
+        Alert.alert(
+          'Payment Auto-Allocated',
+          `Successfully allocated ₹${amt.toLocaleString('en-IN')} across open project milestones.\nSettled ${res.allocations?.length || 1} milestone demand(s).`
+        );
+      } else {
+        const res = await financeApi.recordPayment(selectedInvoice.id, {
+          amount: amt,
+          mode: payMode,
+          reference: payRef.trim() || undefined,
+          notes: payNotes.trim() || undefined,
+        });
+
+        Alert.alert(
+          'Payment Recorded',
+          `Receipt No: ${res.receiptNumber || 'REC-' + Date.now().toString().slice(-6)}\nAmount: ₹${amt.toLocaleString(
+            'en-IN'
+          )}\nInvoice Status: ${res.invoiceStatus || 'Updated'}`
+        );
+      }
+
       setPaymentModalVisible(false);
       setSelectedInvoice(null);
       fetchFinanceData();
@@ -289,6 +361,66 @@ export const FinanceScreen: React.FC<{ navigation?: any; route?: any }> = ({ nav
       );
     } finally {
       setSubmittingPayment(false);
+    }
+  };
+
+  // Open Project Job Costing P&L Modal
+  const handleOpenProjectPnl = async (projectId: string) => {
+    try {
+      haptics.impactLight();
+      setLoadingPnl(true);
+      setPnlModalVisible(true);
+      const res = await financeApi.getProjectPnl(projectId);
+      setProjectPnlData(res?.pnl || res);
+    } catch (err: any) {
+      Alert.alert('P&L Fetch Failed', err.response?.data?.error || err.message || 'Could not load project P&L.');
+      setPnlModalVisible(false);
+    } finally {
+      setLoadingPnl(false);
+    }
+  };
+
+  // Submit Field Site Expense
+  const handleSubmitExpense = async () => {
+    const amt = parseFloat(expenseAmount);
+    if (!amt || amt <= 0) {
+      Alert.alert('Invalid Amount', 'Please enter a valid expense amount.');
+      return;
+    }
+    if (!expenseDescription.trim()) {
+      Alert.alert('Missing Description', 'Please provide an expense description (e.g. Crane hire, Transport).');
+      return;
+    }
+    const targetProjId = expenseProjectId || invoices.find((i) => i.projectId)?.projectId;
+    if (!targetProjId) {
+      Alert.alert('Missing Project', 'Please select or associate a project for this site expense.');
+      return;
+    }
+
+    setSubmittingExpense(true);
+    try {
+      await financeApi.recordProjectExpense(targetProjId, {
+        category: expenseCategory,
+        description: expenseDescription.trim(),
+        amount: amt,
+        invoiceRef: expenseInvoiceRef.trim() || undefined,
+        notes: expenseNotes.trim() || undefined,
+      });
+
+      Alert.alert(
+        'Site Expense Logged',
+        `₹${amt.toLocaleString('en-IN')} logged under ${expenseCategory}.\nProject actual cost and job costing P&L have been updated.`
+      );
+      setExpenseModalVisible(false);
+      setExpenseDescription('');
+      setExpenseAmount('');
+      setExpenseInvoiceRef('');
+      setExpenseNotes('');
+      fetchFinanceData();
+    } catch (err: any) {
+      Alert.alert('Expense Logging Failed', err.response?.data?.error || err.message || 'Could not log site expense.');
+    } finally {
+      setSubmittingExpense(false);
     }
   };
 
@@ -668,6 +800,23 @@ export const FinanceScreen: React.FC<{ navigation?: any; route?: any }> = ({ nav
               <Text style={styles.pdfBtnText}>PDF Invoice</Text>
             </TouchableOpacity>
 
+            {Boolean(inv.projectId || inv.project?.id) && (
+              <TouchableOpacity
+                style={[
+                  styles.pnlBtn,
+                  {
+                    backgroundColor: isDark ? '#1E293B' : '#FEF3C7',
+                    borderColor: isDark ? '#78350F' : '#FDE68A',
+                  },
+                ]}
+                onPress={() => handleOpenProjectPnl(inv.projectId || inv.project?.id)}
+                activeOpacity={0.85}
+              >
+                <PieChart size={13} color="#D97706" />
+                <Text style={styles.pnlBtnText}>P&L</Text>
+              </TouchableOpacity>
+            )}
+
             {!isPaid && (
               <TouchableOpacity
                 style={styles.recordPayBtn}
@@ -746,7 +895,19 @@ export const FinanceScreen: React.FC<{ navigation?: any; route?: any }> = ({ nav
                 activeOpacity={0.8}
               >
                 <Zap size={13} color="#059669" strokeWidth={2.5} />
-                <Text style={[styles.moduleBridgeText, { color: '#059669' }]}>⚡ 1-Flow Deal</Text>
+                <Text style={[styles.moduleBridgeText, { color: '#059669' }]}>⚡ 1-Flow</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.moduleBridgePill, { backgroundColor: isDark ? '#1E293B' : '#FEF3C7', borderColor: isDark ? '#78350F' : '#FDE68A' }]}
+                onPress={() => {
+                  haptics.impactLight();
+                  setExpenseModalVisible(true);
+                }}
+                activeOpacity={0.8}
+              >
+                <DollarSign size={13} color="#D97706" />
+                <Text style={[styles.moduleBridgeText, { color: '#D97706' }]}>💸 Site Expense</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -757,7 +918,7 @@ export const FinanceScreen: React.FC<{ navigation?: any; route?: any }> = ({ nav
                 }}
                 activeOpacity={0.8}
               >
-                <Text style={[styles.moduleBridgeText, { color: '#0066FF' }]}>📊 CRM Pipeline</Text>
+                <Text style={[styles.moduleBridgeText, { color: '#0066FF' }]}>📊 Pipeline</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -768,88 +929,102 @@ export const FinanceScreen: React.FC<{ navigation?: any; route?: any }> = ({ nav
                 }}
                 activeOpacity={0.8}
               >
-                <Text style={[styles.moduleBridgeText, { color: '#7C3AED' }]}>🛠️ Solar Projects</Text>
+                <Text style={[styles.moduleBridgeText, { color: '#7C3AED' }]}>🛠️ Projects</Text>
               </TouchableOpacity>
             </View>
 
             {/* EXECUTIVE FINANCIAL OVERVIEW */}
-            <View
-              style={[
-                styles.executiveCard,
-                {
-                  backgroundColor: colors.surface,
-                  borderColor: colors.borderSubtle,
-                },
-              ]}
-            >
-              <View style={styles.kpiRow}>
-                <View style={styles.kpiCol}>
-                  <View style={styles.kpiTopRow}>
-                    <Text style={[styles.kpiLabel, { color: colors.textMuted }]}>
-                      COLLECTIONS REALIZED
-                    </Text>
-                    <TrendingUp size={13} color="#10B981" />
+            {(() => {
+              const contractBook = stats.totalContractValue || (stats.totalRevenue + stats.outstanding + stats.unbilledWip) || 1;
+              const collectedPct = Math.min(100, Math.round((stats.totalRevenue / contractBook) * 100));
+
+              return (
+                <View
+                  style={[
+                    styles.executiveCard,
+                    {
+                      backgroundColor: colors.surface,
+                      borderColor: colors.borderSubtle,
+                    },
+                  ]}
+                >
+                  <View style={styles.kpiRow}>
+                    <View style={styles.kpiCol}>
+                      <View style={styles.kpiTopRow}>
+                        <Text style={[styles.kpiLabel, { color: colors.textMuted }]}>
+                          REALIZED CASH
+                        </Text>
+                        <TrendingUp size={13} color="#10B981" />
+                      </View>
+                      <Text style={[styles.kpiVal, { color: '#10B981' }]}>
+                        ₹{(stats.totalRevenue / 100000).toFixed(2)}L
+                      </Text>
+                      <Text style={[styles.kpiSub, { color: colors.textSecondary }]}>
+                        ₹{stats.totalRevenue.toLocaleString('en-IN')} received
+                      </Text>
+                    </View>
+
+                    <View style={[styles.kpiDivider, { backgroundColor: colors.borderSubtle }]} />
+
+                    <View style={styles.kpiCol}>
+                      <View style={styles.kpiTopRow}>
+                        <Text style={[styles.kpiLabel, { color: colors.textMuted }]}>
+                          BILLED DUE
+                        </Text>
+                        <Clock size={13} color="#F59E0B" />
+                      </View>
+                      <Text style={[styles.kpiVal, { color: '#F59E0B' }]}>
+                        ₹{((stats.billedReceivables || stats.outstanding) / 100000).toFixed(2)}L
+                      </Text>
+                      <Text style={[styles.kpiSub, { color: colors.textSecondary }]}>
+                        Mature milestone debt
+                      </Text>
+                    </View>
+
+                    <View style={[styles.kpiDivider, { backgroundColor: colors.borderSubtle }]} />
+
+                    <View style={styles.kpiCol}>
+                      <View style={styles.kpiTopRow}>
+                        <Text style={[styles.kpiLabel, { color: colors.textMuted }]}>
+                          UNBILLED WIP
+                        </Text>
+                        <Building size={13} color="#0066FF" />
+                      </View>
+                      <Text style={[styles.kpiVal, { color: '#0066FF' }]}>
+                        ₹{(stats.unbilledWip / 100000).toFixed(2)}L
+                      </Text>
+                      <Text style={[styles.kpiSub, { color: colors.textSecondary }]}>
+                        Future pipeline stages
+                      </Text>
+                    </View>
                   </View>
-                  <Text style={[styles.kpiVal, { color: colors.text }]}>
-                    ₹{(stats.totalRevenue / 100000).toFixed(2)}L
-                  </Text>
-                  <Text style={[styles.kpiSub, { color: colors.textSecondary }]}>
-                    ₹{stats.totalRevenue.toLocaleString('en-IN')} received
-                  </Text>
-                </View>
 
-                <View style={[styles.kpiDivider, { backgroundColor: colors.borderSubtle }]} />
+                  {/* Realization Progress Bar */}
+                  <View style={styles.capitalTrackContainer}>
+                    <View style={styles.capitalTrackLabels}>
+                      <Text style={styles.capitalTrackLeftText}>
+                        {collectedPct}% Contract Book Realized
+                      </Text>
+                      <Text style={[styles.capitalTrackRightText, { color: colors.textMuted }]}>
+                        Total Contract: ₹{(contractBook / 100000).toFixed(2)}L
+                      </Text>
+                    </View>
 
-                <View style={styles.kpiCol}>
-                  <View style={styles.kpiTopRow}>
-                    <Text style={[styles.kpiLabel, { color: colors.textMuted }]}>
-                      RECEIVABLES
-                    </Text>
-                    <Clock size={13} color="#F59E0B" />
+                    <View style={[styles.capitalProgressBar, { backgroundColor: isDark ? '#334155' : '#F1F5F9' }]}>
+                      <View
+                        style={[
+                          styles.capitalProgressFill,
+                          {
+                            width: `${collectedPct}%`,
+                            backgroundColor: collectedPct >= 100 ? '#10B981' : '#0066FF',
+                          },
+                        ]}
+                      />
+                    </View>
                   </View>
-                  <Text style={[styles.kpiVal, { color: '#0066FF' }]}>
-                    ₹{(stats.outstanding / 100000).toFixed(2)}L
-                  </Text>
-                  <Text style={[styles.kpiSub, { color: colors.textSecondary }]}>
-                    Active milestone balance
-                  </Text>
                 </View>
-              </View>
-
-              {/* Realization Progress Bar */}
-              <View style={styles.capitalTrackContainer}>
-                <View style={styles.capitalTrackLabels}>
-                  <Text style={styles.capitalTrackLeftText}>
-                    {stats.totalRevenue + stats.outstanding > 0
-                      ? Math.round((stats.totalRevenue / (stats.totalRevenue + stats.outstanding)) * 100)
-                      : 65}
-                    % Collected
-                  </Text>
-                  <Text style={[styles.capitalTrackRightText, { color: colors.textMuted }]}>
-                    Total Book: ₹{((stats.totalRevenue + stats.outstanding) / 100000).toFixed(1)}L
-                  </Text>
-                </View>
-
-                <View style={[styles.capitalProgressBar, { backgroundColor: isDark ? '#334155' : '#F1F5F9' }]}>
-                  <View
-                    style={[
-                      styles.capitalProgressFill,
-                      {
-                        width: `${stats.totalRevenue + stats.outstanding > 0
-                            ? Math.min(
-                              100,
-                              Math.round(
-                                (stats.totalRevenue / (stats.totalRevenue + stats.outstanding)) * 100
-                              )
-                            )
-                            : 65
-                          }%`,
-                      },
-                    ]}
-                  />
-                </View>
-              </View>
-            </View>
+              );
+            })()}
 
             {/* OVERDUE NOTICE WITH 3-TIER AGING */}
             {stats.overdueCount > 0 && (
@@ -1297,6 +1472,95 @@ export const FinanceScreen: React.FC<{ navigation?: any; route?: any }> = ({ nav
                 ))}
               </View>
 
+              {/* DYNAMIC NPCI UPI QR SECTION */}
+              {payMode === 'UPI' && (
+                <View
+                  style={[
+                    styles.upiQrBox,
+                    {
+                      backgroundColor: isDark ? '#1E293B' : '#F0FDF4',
+                      borderColor: isDark ? '#065F46' : '#BBF7D0',
+                    },
+                  ]}
+                >
+                  <View style={styles.upiQrHeader}>
+                    <QrCode size={16} color="#10B981" />
+                    <Text style={[styles.upiQrTitle, { color: colors.text }]}>
+                      NPCI Dynamic UPI QR Code
+                    </Text>
+                  </View>
+                  <Text style={[styles.upiQrSub, { color: colors.textSecondary }]}>
+                    Scan using PhonePe, Google Pay, Paytm, or BHIM
+                  </Text>
+
+                  {loadingQr ? (
+                    <View style={{ paddingVertical: 20, alignItems: 'center' }}>
+                      <ActivityIndicator size="small" color="#10B981" />
+                      <Text style={{ fontSize: 11, color: colors.textMuted, marginTop: 6 }}>
+                        Generating merchant UPI QR...
+                      </Text>
+                    </View>
+                  ) : upiQrData?.qrCodeUrl ? (
+                    <View style={styles.qrImageWrap}>
+                      <Image
+                        source={{ uri: upiQrData.qrCodeUrl }}
+                        style={styles.qrImage}
+                        resizeMode="contain"
+                      />
+                      <Text style={[styles.qrPayeeText, { color: colors.textSecondary }]}>
+                        Payee: <Text style={{ fontWeight: '700', color: colors.text }}>{upiQrData.payeeName}</Text>
+                      </Text>
+                      <Text style={[styles.qrVpaText, { color: colors.textMuted }]}>
+                        VPA: {upiQrData.vpa}
+                      </Text>
+
+                      {upiQrData.upiUri && (
+                        <TouchableOpacity
+                          style={styles.launchUpiBtn}
+                          onPress={() => Linking.openURL(upiQrData.upiUri!)}
+                          activeOpacity={0.8}
+                        >
+                          <Zap size={13} color="#FFFFFF" />
+                          <Text style={styles.launchUpiBtnText}>1-Tap Launch UPI App</Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  ) : null}
+                </View>
+              )}
+
+              {/* MULTI-MILESTONE AUTO-ALLOCATION TOGGLE */}
+              {Boolean(selectedInvoice?.projectId || selectedInvoice?.customerId) && (
+                <TouchableOpacity
+                  style={[
+                    styles.autoAllocateWrap,
+                    {
+                      backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
+                      borderColor: autoAllocateMilestones ? '#0066FF' : colors.borderSubtle,
+                    },
+                  ]}
+                  onPress={() => setAutoAllocateMilestones(!autoAllocateMilestones)}
+                  activeOpacity={0.7}
+                >
+                  <View
+                    style={[
+                      styles.autoAllocateCheckbox,
+                      autoAllocateMilestones && { backgroundColor: '#0066FF', borderColor: '#0066FF' },
+                    ]}
+                  >
+                    {autoAllocateMilestones && <Check size={11} color="#FFFFFF" strokeWidth={3} />}
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.autoAllocateTitle, { color: colors.text }]}>
+                      Multi-Milestone FIFO Allocation
+                    </Text>
+                    <Text style={[styles.autoAllocateSub, { color: colors.textSecondary }]}>
+                      Auto-apply payment across open project milestones in sequential order
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              )}
+
               {/* TRANSACTION REFERENCE / UTR */}
               <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>
                 TRANSACTION REFERENCE / UTR NO.
@@ -1390,6 +1654,325 @@ export const FinanceScreen: React.FC<{ navigation?: any; route?: any }> = ({ nav
           fetchFinanceData();
         }}
       />
+
+      {/* PROJECT FINANCIAL P&L & JOB COSTING MODAL */}
+      <Modal
+        visible={pnlModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setPnlModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View
+            style={[
+              styles.modalSheet,
+              {
+                backgroundColor: colors.surface,
+                borderColor: colors.borderSubtle,
+                maxHeight: '85%',
+              },
+            ]}
+          >
+            <View style={styles.modalDragHandle} />
+            <View style={[styles.modalHeader, { borderBottomColor: colors.borderSubtle }]}>
+              <View>
+                <Text style={[styles.modalTitle, { color: colors.text }]}>
+                  Project Financial P&L & Costing
+                </Text>
+                <Text style={[styles.modalSub, { color: colors.textMuted }]}>
+                  {projectPnlData?.project?.name || 'Turnkey Solar EPC Project'}
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={[styles.modalCloseBtn, { backgroundColor: isDark ? '#1E293B' : '#F1F5F9' }]}
+                onPress={() => setPnlModalVisible(false)}
+                activeOpacity={0.7}
+              >
+                <X size={16} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            {loadingPnl ? (
+              <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+                <ActivityIndicator size="large" color="#0066FF" />
+                <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 10 }}>
+                  Computing real-time job costing & P&L...
+                </Text>
+              </View>
+            ) : projectPnlData ? (
+              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
+                {/* STATUS BADGE */}
+                <View
+                  style={[
+                    styles.pnlStatusBanner,
+                    {
+                      backgroundColor:
+                        projectPnlData.profitability?.status === 'HEALTHY' || projectPnlData.profitability?.status === 'PROFITABLE'
+                          ? (isDark ? 'rgba(16, 185, 129, 0.15)' : '#ECFDF5')
+                          : (isDark ? 'rgba(239, 68, 68, 0.15)' : '#FEF2F2'),
+                      borderColor:
+                        projectPnlData.profitability?.status === 'HEALTHY' || projectPnlData.profitability?.status === 'PROFITABLE'
+                          ? '#10B981'
+                          : '#EF4444',
+                    },
+                  ]}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text
+                      style={[
+                        styles.pnlStatusTitle,
+                        {
+                          color:
+                            projectPnlData.profitability?.status === 'HEALTHY' || projectPnlData.profitability?.status === 'PROFITABLE'
+                              ? '#10B981'
+                              : '#EF4444',
+                        },
+                      ]}
+                    >
+                      GROSS PROFIT: ₹{projectPnlData.profitability?.grossProfit?.toLocaleString('en-IN')} ({projectPnlData.profitability?.marginPercent}% MARGIN)
+                    </Text>
+                    <Text style={[styles.pnlStatusSub, { color: colors.textSecondary }]}>
+                      Job Costing Status: {projectPnlData.profitability?.status}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* REVENUE BREAKDOWN */}
+                <Text style={[styles.pnlSectionHeading, { color: colors.text }]}>REVENUE & INFLOWS</Text>
+                <View
+                  style={[
+                    styles.pnlCard,
+                    {
+                      backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
+                      borderColor: colors.borderSubtle,
+                    },
+                  ]}
+                >
+                  <View style={styles.pnlRow}>
+                    <Text style={[styles.pnlRowLabel, { color: colors.textSecondary }]}>Total Contract Value</Text>
+                    <Text style={[styles.pnlRowVal, { color: colors.text }]}>
+                      ₹{projectPnlData.revenue?.contractValue?.toLocaleString('en-IN')}
+                    </Text>
+                  </View>
+                  <View style={styles.pnlRow}>
+                    <Text style={[styles.pnlRowLabel, { color: colors.textSecondary }]}>Billed Invoices</Text>
+                    <Text style={[styles.pnlRowVal, { color: colors.text }]}>
+                      ₹{projectPnlData.revenue?.billedAmount?.toLocaleString('en-IN')}
+                    </Text>
+                  </View>
+                  <View style={styles.pnlRow}>
+                    <Text style={[styles.pnlRowLabel, { color: colors.textSecondary }]}>Cash Collected</Text>
+                    <Text style={[styles.pnlRowVal, { color: '#10B981' }]}>
+                      ₹{projectPnlData.revenue?.realizedCash?.toLocaleString('en-IN')}
+                    </Text>
+                  </View>
+                  <View style={styles.pnlRow}>
+                    <Text style={[styles.pnlRowLabel, { color: colors.textSecondary }]}>Mature Receivables Due</Text>
+                    <Text style={[styles.pnlRowVal, { color: '#F59E0B' }]}>
+                      ₹{projectPnlData.revenue?.outstanding?.toLocaleString('en-IN')}
+                    </Text>
+                  </View>
+                  <View style={styles.pnlRow}>
+                    <Text style={[styles.pnlRowLabel, { color: colors.textSecondary }]}>Unbilled Work-in-Progress</Text>
+                    <Text style={[styles.pnlRowVal, { color: '#0066FF' }]}>
+                      ₹{projectPnlData.revenue?.unbilledWip?.toLocaleString('en-IN')}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* COST BREAKDOWN */}
+                <Text style={[styles.pnlSectionHeading, { color: colors.text }]}>JOB COSTS & OUTFLOWS</Text>
+                <View
+                  style={[
+                    styles.pnlCard,
+                    {
+                      backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
+                      borderColor: colors.borderSubtle,
+                    },
+                  ]}
+                >
+                  <View style={styles.pnlRow}>
+                    <Text style={[styles.pnlRowLabel, { color: colors.textSecondary }]}>Material Supply (POs)</Text>
+                    <Text style={[styles.pnlRowVal, { color: colors.text }]}>
+                      ₹{projectPnlData.costs?.materialCost?.toLocaleString('en-IN')}
+                    </Text>
+                  </View>
+                  <View style={styles.pnlRow}>
+                    <Text style={[styles.pnlRowLabel, { color: colors.textSecondary }]}>Field & Site Expenses</Text>
+                    <Text style={[styles.pnlRowVal, { color: colors.text }]}>
+                      ₹{projectPnlData.costs?.siteExpenses?.toLocaleString('en-IN')}
+                    </Text>
+                  </View>
+                  <View style={[styles.pnlRow, { borderTopWidth: 1, borderTopColor: colors.borderSubtle, paddingTop: 8, marginTop: 4 }]}>
+                    <Text style={[styles.pnlRowLabel, { color: colors.text, fontWeight: '700' }]}>Total Project Cost</Text>
+                    <Text style={[styles.pnlRowVal, { color: '#EF4444', fontWeight: '800' }]}>
+                      ₹{projectPnlData.costs?.totalCost?.toLocaleString('en-IN')}
+                    </Text>
+                  </View>
+                </View>
+              </ScrollView>
+            ) : null}
+          </View>
+        </View>
+      </Modal>
+
+      {/* FIELD ON-SITE EXPENSE LOGGER MODAL */}
+      <Modal
+        visible={expenseModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setExpenseModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View
+            style={[
+              styles.modalSheet,
+              {
+                backgroundColor: colors.surface,
+                borderColor: colors.borderSubtle,
+              },
+            ]}
+          >
+            <View style={styles.modalDragHandle} />
+            <View style={[styles.modalHeader, { borderBottomColor: colors.borderSubtle }]}>
+              <View>
+                <Text style={[styles.modalTitle, { color: colors.text }]}>Log On-Site Field Expense</Text>
+                <Text style={[styles.modalSub, { color: colors.textMuted }]}>
+                  Crane, freight, civil, liaison or site consumables
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={[styles.modalCloseBtn, { backgroundColor: isDark ? '#1E293B' : '#F1F5F9' }]}
+                onPress={() => setExpenseModalVisible(false)}
+                activeOpacity={0.7}
+              >
+                <X size={16} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={{ maxHeight: 420 }} showsVerticalScrollIndicator={false}>
+              {/* CATEGORY PICKER */}
+              <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>EXPENSE CATEGORY *</Text>
+              <View style={styles.modePickerRow}>
+                {(['INSTALLATION', 'TRANSPORT', 'PERMITS', 'HARDWARE', 'OTHER'] as const).map((cat) => (
+                  <TouchableOpacity
+                    key={cat}
+                    style={[
+                      styles.modeChip,
+                      {
+                        backgroundColor: expenseCategory === cat ? '#D97706' : isDark ? '#1E293B' : '#F8FAFC',
+                        borderColor: expenseCategory === cat ? '#D97706' : colors.borderSubtle,
+                      },
+                    ]}
+                    onPress={() => setExpenseCategory(cat)}
+                    activeOpacity={0.7}
+                  >
+                    <Text
+                      style={[
+                        styles.modeChipText,
+                        {
+                          color: expenseCategory === cat ? '#FFFFFF' : colors.textSecondary,
+                          fontWeight: expenseCategory === cat ? '800' : '600',
+                          fontSize: 10,
+                        },
+                      ]}
+                    >
+                      {cat}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* AMOUNT */}
+              <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>EXPENSE AMOUNT (₹) *</Text>
+              <TextInput
+                style={[
+                  styles.modalInput,
+                  {
+                    backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
+                    borderColor: colors.borderSubtle,
+                    color: colors.text,
+                  },
+                ]}
+                keyboardType="numeric"
+                value={expenseAmount}
+                onChangeText={setExpenseAmount}
+                placeholder="e.g. 8500"
+                placeholderTextColor={colors.textMuted}
+              />
+
+              {/* DESCRIPTION */}
+              <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>DESCRIPTION *</Text>
+              <TextInput
+                style={[
+                  styles.modalInput,
+                  {
+                    backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
+                    borderColor: colors.borderSubtle,
+                    color: colors.text,
+                  },
+                ]}
+                value={expenseDescription}
+                onChangeText={setExpenseDescription}
+                placeholder="e.g. Hydraulic crane hire for 3rd floor solar module lift"
+                placeholderTextColor={colors.textMuted}
+              />
+
+              {/* INVOICE REF */}
+              <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>RECEIPT / BILL REFERENCE</Text>
+              <TextInput
+                style={[
+                  styles.modalInput,
+                  {
+                    backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
+                    borderColor: colors.borderSubtle,
+                    color: colors.text,
+                  },
+                ]}
+                value={expenseInvoiceRef}
+                onChangeText={setExpenseInvoiceRef}
+                placeholder="e.g. CRANE-BILL-9021 or CASH-VCH-4"
+                placeholderTextColor={colors.textMuted}
+              />
+
+              {/* NOTES */}
+              <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>ADDITIONAL NOTES</Text>
+              <TextInput
+                style={[
+                  styles.modalInput,
+                  {
+                    height: 55,
+                    backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
+                    borderColor: colors.borderSubtle,
+                    color: colors.text,
+                  },
+                ]}
+                multiline
+                value={expenseNotes}
+                onChangeText={setExpenseNotes}
+                placeholder="Paid in cash to crane operator after rooftop unloading."
+                placeholderTextColor={colors.textMuted}
+              />
+            </ScrollView>
+
+            <TouchableOpacity
+              style={[styles.submitPayBtn, { backgroundColor: '#D97706' }]}
+              onPress={handleSubmitExpense}
+              disabled={submittingExpense}
+              activeOpacity={0.85}
+            >
+              {submittingExpense ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <>
+                  <CheckCircle2 size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
+                  <Text style={styles.submitPayBtnText}>Post Site Expense</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -2127,5 +2710,143 @@ const styles = StyleSheet.create({
   crossModuleChipText: {
     fontSize: 11,
     fontWeight: '700',
+  },
+  pnlBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  pnlBtnText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#D97706',
+  },
+  upiQrBox: {
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 12,
+    marginVertical: 10,
+    alignItems: 'center',
+  },
+  upiQrHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 2,
+  },
+  upiQrTitle: {
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  upiQrSub: {
+    fontSize: 10,
+    marginBottom: 8,
+  },
+  qrImageWrap: {
+    alignItems: 'center',
+    width: '100%',
+    paddingVertical: 6,
+  },
+  qrImage: {
+    width: 170,
+    height: 170,
+    borderRadius: 8,
+    backgroundColor: '#FFFFFF',
+    marginBottom: 8,
+  },
+  qrPayeeText: {
+    fontSize: 11,
+    marginBottom: 2,
+  },
+  qrVpaText: {
+    fontSize: 10,
+    marginBottom: 10,
+  },
+  launchUpiBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#10B981',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 8,
+    marginTop: 4,
+  },
+  launchUpiBtnText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  autoAllocateWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    padding: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginVertical: 8,
+  },
+  autoAllocateCheckbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 5,
+    borderWidth: 1.5,
+    borderColor: '#94A3B8',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  autoAllocateTitle: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  autoAllocateSub: {
+    fontSize: 9,
+    marginTop: 2,
+  },
+  pnlStatusBanner: {
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginBottom: 14,
+  },
+  pnlStatusTitle: {
+    fontSize: 12,
+    fontWeight: '800',
+    marginBottom: 2,
+  },
+  pnlStatusSub: {
+    fontSize: 10,
+  },
+  pnlSectionHeading: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+    marginTop: 10,
+    marginBottom: 6,
+  },
+  pnlCard: {
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 12,
+    gap: 8,
+    marginBottom: 8,
+  },
+  pnlRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  pnlRowLabel: {
+    fontSize: 11,
+    fontWeight: '500',
+  },
+  pnlRowVal: {
+    fontSize: 12,
+    fontWeight: '800',
+    fontVariant: ['tabular-nums'],
   },
 });

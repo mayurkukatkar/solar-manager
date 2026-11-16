@@ -2287,11 +2287,29 @@ router.patch('/api/tenant/materials/:id', requireTenantAuth, async (req, res) =>
 // CUSTOMERS
 router.get(['/api/tenant/customers', '/api/tenant/crm/customers'], requireTenantAuth, async (req, res) => {
   try {
+    const { search } = req.query;
+    const where = { tenantId: req.user.tenantId };
+    if (search && search.trim()) {
+      const q = search.trim();
+      where.OR = [
+        { name: { contains: q, mode: 'insensitive' } },
+        { mobile: { contains: q, mode: 'insensitive' } },
+        { email: { contains: q, mode: 'insensitive' } },
+        { city: { contains: q, mode: 'insensitive' } },
+        { company: { contains: q, mode: 'insensitive' } }
+      ];
+    }
+
     const customers = await prisma.customer.findMany({
-      where: { tenantId: req.user.tenantId },
+      where,
       orderBy: { createdAt: 'desc' },
       include: {
-        lead: true,
+        lead: {
+          include: {
+            projects: { select: { id: true, name: true, status: true, capacity: true, estimatedValue: true, currentStage: true } },
+            quotations: { select: { id: true, qNumber: true, total: true, status: true } },
+          }
+        },
         projects: { select: { id: true, name: true, status: true, capacity: true, estimatedValue: true, currentStage: true } },
         quotations: { select: { id: true, qNumber: true, total: true, status: true } },
         invoices: { select: { id: true, invoiceNumber: true, amount: true, status: true } },
@@ -2299,7 +2317,28 @@ router.get(['/api/tenant/customers', '/api/tenant/crm/customers'], requireTenant
         tickets: { select: { id: true, subject: true, status: true } }
       }
     });
-    res.json({ customers });
+
+    const unifiedCustomers = customers.map(c => {
+      const allProjects = [...(c.projects || [])];
+      if (Array.isArray(c.lead?.projects)) {
+        c.lead.projects.forEach(p => {
+          if (!allProjects.some(x => x.id === p.id)) allProjects.push(p);
+        });
+      }
+      const allQuotes = [...(c.quotations || [])];
+      if (Array.isArray(c.lead?.quotations)) {
+        c.lead.quotations.forEach(q => {
+          if (!allQuotes.some(x => x.id === q.id)) allQuotes.push(q);
+        });
+      }
+      return {
+        ...c,
+        projects: allProjects,
+        quotations: allQuotes,
+      };
+    });
+
+    res.json({ customers: unifiedCustomers });
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch customers' });
   }
@@ -2307,27 +2346,526 @@ router.get(['/api/tenant/customers', '/api/tenant/crm/customers'], requireTenant
 
 router.get('/api/tenant/customers/:id', requireTenantAuth, async (req, res) => {
   try {
-    const customer = await prisma.customer.findUnique({
-      where: { id: req.params.id, tenantId: req.user.tenantId },
+    const idOrLeadId = req.params.id;
+    const tenantId = req.user.tenantId;
+
+    // 1. Find customer or lead or project
+    let customer = await prisma.customer.findFirst({
+      where: {
+        OR: [{ id: idOrLeadId }, { leadId: idOrLeadId }],
+        tenantId
+      },
       include: {
         lead: {
           include: {
             activities: { orderBy: { createdAt: 'desc' } },
             followUps: { orderBy: { scheduledAt: 'asc' } },
-            notes: { orderBy: { createdAt: 'desc' } }
+            leadNotes: { orderBy: { createdAt: 'desc' } }
           }
-        },
-        surveys: true,
-        quotations: true,
-        projects: true,
-        invoices: true,
-        tickets: true
+        }
       }
     });
-    if (!customer) return res.status(404).json({ error: 'Customer not found' });
-    res.json({ customer });
+
+    let lead = customer?.lead;
+    if (!customer) {
+      lead = await prisma.lead.findFirst({
+        where: { id: idOrLeadId, tenantId },
+        include: {
+          customer: true,
+          activities: { orderBy: { createdAt: 'desc' } },
+          followUps: { orderBy: { scheduledAt: 'asc' } },
+          leadNotes: { orderBy: { createdAt: 'desc' } }
+        }
+      });
+      if (lead?.customer) {
+        customer = lead.customer;
+        customer.lead = lead;
+      }
+    }
+
+    // Check if id is a projectId
+    if (!customer && !lead) {
+      const proj = await prisma.project.findFirst({
+        where: { id: idOrLeadId, tenantId },
+        include: {
+          customer: {
+            include: {
+              lead: {
+                include: {
+                  activities: { orderBy: { createdAt: 'desc' } },
+                  followUps: { orderBy: { scheduledAt: 'asc' } },
+                  leadNotes: { orderBy: { createdAt: 'desc' } }
+                }
+              }
+            }
+          },
+          lead: {
+            include: {
+              customer: true,
+              activities: { orderBy: { createdAt: 'desc' } },
+              followUps: { orderBy: { scheduledAt: 'asc' } },
+              leadNotes: { orderBy: { createdAt: 'desc' } }
+            }
+          }
+        }
+      });
+      if (proj?.customer) {
+        customer = proj.customer;
+        lead = proj.customer.lead || proj.lead;
+      } else if (proj?.lead) {
+        lead = proj.lead;
+        customer = proj.lead.customer;
+      }
+    }
+
+    if (!customer && !lead) return res.status(404).json({ error: 'Customer not found' });
+
+    const customerId = customer?.id || null;
+    const leadId = customer?.leadId || lead?.id || null;
+    const customerName = customer?.name || lead?.name || '';
+
+    // 2. Fetch Projects (both customerId and leadId)
+    const projectWhereOr = [];
+    if (customerId) projectWhereOr.push({ customerId });
+    if (leadId) projectWhereOr.push({ leadId });
+
+    const projects = projectWhereOr.length > 0 ? await prisma.project.findMany({
+      where: { tenantId, OR: projectWhereOr },
+      include: {
+        discomApplication: true,
+        subsidies: true,
+        Document: { include: { documentType: true } },
+        InstallationJob: true,
+        invoices: { include: { payments: true }, orderBy: { createdAt: 'desc' } },
+        quotation: { include: { items: true } },
+        survey: true,
+        timelineEvents: { orderBy: { createdAt: 'desc' } },
+        stageHistory: { orderBy: { createdAt: 'desc' } },
+        tasks: { orderBy: { createdAt: 'desc' } },
+        milestones: { orderBy: { createdAt: 'asc' } }
+      },
+      orderBy: { createdAt: 'desc' }
+    }) : [];
+
+    const projectIds = projects.map(p => p.id);
+    const quoteIdsFromProjects = projects.map(p => p.quotationId).filter(Boolean);
+    const surveyIdsFromProjects = projects.map(p => p.surveyId).filter(Boolean);
+
+    // 3. Fetch Quotations (customerId, leadId, or quoteIdsFromProjects)
+    const quoteWhereOr = [];
+    if (customerId) quoteWhereOr.push({ customerId });
+    if (leadId) quoteWhereOr.push({ leadId });
+    if (quoteIdsFromProjects.length > 0) quoteWhereOr.push({ id: { in: quoteIdsFromProjects } });
+
+    const quotations = quoteWhereOr.length > 0 ? await prisma.quotation.findMany({
+      where: { tenantId, OR: quoteWhereOr },
+      include: { items: true },
+      orderBy: { createdAt: 'desc' }
+    }) : [];
+
+    const seenQuoteIds = new Set();
+    const uniqueQuotations = quotations.filter(q => {
+      if (seenQuoteIds.has(q.id)) return false;
+      seenQuoteIds.add(q.id);
+      return true;
+    });
+
+    // 4. Fetch Surveys
+    const surveyWhereOr = [];
+    if (customerId) surveyWhereOr.push({ customerId });
+    if (leadId) surveyWhereOr.push({ leadId });
+    if (surveyIdsFromProjects.length > 0) surveyWhereOr.push({ id: { in: surveyIdsFromProjects } });
+
+    const surveys = surveyWhereOr.length > 0 ? await prisma.siteSurvey.findMany({
+      where: { tenantId, OR: surveyWhereOr },
+      orderBy: { createdAt: 'desc' }
+    }) : [];
+
+    const seenSurveyIds = new Set();
+    const uniqueSurveys = surveys.filter(s => {
+      if (seenSurveyIds.has(s.id)) return false;
+      seenSurveyIds.add(s.id);
+      return true;
+    });
+
+    // 5. Fetch Invoices (customerId or projectIds)
+    const invoiceWhereOr = [];
+    if (customerId) invoiceWhereOr.push({ customerId });
+    if (projectIds.length > 0) invoiceWhereOr.push({ projectId: { in: projectIds } });
+
+    const invoices = invoiceWhereOr.length > 0 ? await prisma.invoice.findMany({
+      where: { tenantId, OR: invoiceWhereOr },
+      include: { payments: true },
+      orderBy: { createdAt: 'desc' }
+    }) : [];
+
+    // Also collect invoices embedded in projects
+    projects.forEach(p => {
+      if (Array.isArray(p.invoices)) {
+        p.invoices.forEach(inv => {
+          if (!invoices.some(i => i.id === inv.id)) invoices.push(inv);
+        });
+      }
+    });
+
+    const seenInvoiceIds = new Set();
+    const uniqueInvoices = invoices.filter(i => {
+      if (seenInvoiceIds.has(i.id)) return false;
+      seenInvoiceIds.add(i.id);
+      return true;
+    });
+
+    // 6. Fetch Documents (customerId, leadId entity, projectIds, or title prefix)
+    const docWhereOr = [];
+    if (customerId) {
+      docWhereOr.push({ customerId });
+      docWhereOr.push({ entityType: 'CUSTOMER', entityId: customerId });
+    }
+    if (leadId) {
+      docWhereOr.push({ entityType: 'LEAD', entityId: leadId });
+    }
+    if (projectIds.length > 0) {
+      docWhereOr.push({ projectId: { in: projectIds } });
+      docWhereOr.push({ entityType: 'PROJECT', entityId: { in: projectIds } });
+    }
+    if (customerName && customerName.trim().length >= 3) {
+      const cleanName = customerName.trim();
+      docWhereOr.push({ title: { startsWith: `${cleanName} ` } });
+      docWhereOr.push({ title: { startsWith: `${cleanName} -` } });
+      docWhereOr.push({ title: { contains: cleanName, mode: 'insensitive' } });
+    }
+
+    const documents = docWhereOr.length > 0 ? await prisma.document.findMany({
+      where: { tenantId, OR: docWhereOr },
+      include: { documentType: true },
+      orderBy: { createdAt: 'desc' }
+    }) : [];
+
+    // Also collect documents embedded in projects
+    projects.forEach(p => {
+      if (Array.isArray(p.Document)) {
+        p.Document.forEach(doc => {
+          if (!documents.some(d => d.id === doc.id)) documents.push(doc);
+        });
+      }
+    });
+
+    const seenDocIds = new Set();
+    const uniqueDocuments = documents.filter(d => {
+      if (seenDocIds.has(d.id)) return false;
+      seenDocIds.add(d.id);
+      return true;
+    });
+
+    // 7. Subsidies, Loans, AMCs, Tickets
+    const subWhereOr = [];
+    if (customerId) subWhereOr.push({ customerId });
+    if (projectIds.length > 0) subWhereOr.push({ projectId: { in: projectIds } });
+
+    const subsidies = subWhereOr.length > 0 ? await prisma.subsidyApplication.findMany({
+      where: { tenantId, OR: subWhereOr },
+      orderBy: { createdAt: 'desc' }
+    }) : [];
+
+    projects.forEach(p => {
+      if (Array.isArray(p.subsidies)) {
+        p.subsidies.forEach(sub => {
+          if (!subsidies.some(s => s.id === sub.id)) subsidies.push(sub);
+        });
+      }
+    });
+
+    const loans = subWhereOr.length > 0 ? await prisma.loanApplication.findMany({
+      where: { tenantId, OR: subWhereOr },
+      orderBy: { createdAt: 'desc' }
+    }) : [];
+
+    const amcWhereOr = [];
+    if (customerId) amcWhereOr.push({ customerId });
+    if (projectIds.length > 0) amcWhereOr.push({ projectId: { in: projectIds } });
+
+    const amcs = amcWhereOr.length > 0 ? await prisma.aMC.findMany({
+      where: { tenantId, OR: amcWhereOr },
+      orderBy: { createdAt: 'desc' }
+    }) : [];
+
+    const tickets = amcWhereOr.length > 0 ? await prisma.supportTicket.findMany({
+      where: { tenantId, OR: amcWhereOr },
+      orderBy: { createdAt: 'desc' }
+    }) : [];
+
+    // 8. Synthesize Full Chronological Timeline
+    const timeline = [];
+
+    // Lead Notes
+    if (lead?.notes && typeof lead.notes === 'string') {
+      timeline.push({
+        id: `lead-note-scalar`,
+        type: 'FIELD_NOTE',
+        title: lead.notes,
+        date: lead.updatedAt || lead.createdAt,
+        source: 'LEAD',
+        bulletColor: '#0066FF'
+      });
+    }
+    if (Array.isArray(lead?.leadNotes)) {
+      lead.leadNotes.forEach(n => {
+        timeline.push({
+          id: n.id,
+          type: 'FIELD_NOTE',
+          title: n.content,
+          date: n.createdAt,
+          source: 'LEAD',
+          bulletColor: '#0066FF'
+        });
+      });
+    }
+
+    // Lead Activities
+    if (Array.isArray(lead?.activities)) {
+      lead.activities.forEach(a => {
+        timeline.push({
+          id: a.id,
+          type: a.type || 'ACTIVITY',
+          title: a.description,
+          date: a.createdAt,
+          source: 'LEAD',
+          bulletColor: '#10B981'
+        });
+      });
+    }
+
+    // Lead FollowUps
+    if (Array.isArray(lead?.followUps)) {
+      lead.followUps.forEach(f => {
+        timeline.push({
+          id: f.id,
+          type: 'FOLLOW_UP',
+          title: `${f.type} Follow-up: ${f.notes || f.status}`,
+          date: f.scheduledAt || f.createdAt,
+          source: 'LEAD',
+          bulletColor: '#F59E0B'
+        });
+      });
+    }
+
+    // Projects events & history
+    projects.forEach(p => {
+      if (Array.isArray(p.timelineEvents)) {
+        p.timelineEvents.forEach(te => {
+          timeline.push({
+            id: te.id,
+            type: 'PROJECT_EVENT',
+            title: `${p.name}: ${te.title || te.description || 'Milestone update'}`,
+            date: te.createdAt || te.date,
+            source: 'PROJECT',
+            bulletColor: '#8B5CF6'
+          });
+        });
+      }
+      if (Array.isArray(p.stageHistory)) {
+        p.stageHistory.forEach(sh => {
+          timeline.push({
+            id: sh.id,
+            type: 'STAGE_ADVANCE',
+            title: `${p.name}: Stage updated to ${sh.stage || sh.newStage || 'Next Stage'}`,
+            date: sh.createdAt,
+            source: 'PROJECT',
+            bulletColor: '#EC4899'
+          });
+        });
+      }
+      if (Array.isArray(p.milestones)) {
+        p.milestones.forEach(m => {
+          timeline.push({
+            id: m.id,
+            type: 'MILESTONE',
+            title: `Milestone: ${m.title || m.name} (${m.status || 'PENDING'})`,
+            date: m.updatedAt || m.createdAt,
+            source: 'PROJECT',
+            bulletColor: '#06B6D4'
+          });
+        });
+      }
+    });
+
+    // Quotations events
+    uniqueQuotations.forEach(q => {
+      timeline.push({
+        id: `quote-${q.id}`,
+        type: 'QUOTE_ISSUED',
+        title: `Quotation ${q.qNumber} issued (₹${Number(q.total || 0).toLocaleString('en-IN')}) - ${q.status}`,
+        date: q.date || q.createdAt,
+        source: 'QUOTATION',
+        bulletColor: '#6366F1'
+      });
+    });
+
+    // Invoice events
+    uniqueInvoices.forEach(inv => {
+      timeline.push({
+        id: `inv-${inv.id}`,
+        type: 'INVOICE_GENERATED',
+        title: `Invoice ${inv.invoiceNumber} generated: ₹${Number(inv.amount || 0).toLocaleString('en-IN')} (${inv.status})`,
+        date: inv.date || inv.createdAt,
+        source: 'FINANCE',
+        bulletColor: '#10B981'
+      });
+      if (Array.isArray(inv.payments)) {
+        inv.payments.forEach(pay => {
+          timeline.push({
+            id: `pay-${pay.id}`,
+            type: 'PAYMENT_RECEIVED',
+            title: `Payment Received: ₹${Number(pay.amount || 0).toLocaleString('en-IN')} via ${pay.mode || 'BANK'} (Ref: ${pay.reference || 'N/A'})`,
+            date: pay.date || pay.createdAt,
+            source: 'FINANCE',
+            bulletColor: '#059669'
+          });
+        });
+      }
+    });
+
+    // Document events
+    uniqueDocuments.forEach(doc => {
+      timeline.push({
+        id: `doc-${doc.id}`,
+        type: 'DOCUMENT_UPLOADED',
+        title: `Document Uploaded: ${doc.title} [${doc.category || 'General'}]`,
+        date: doc.createdAt,
+        source: 'DOCUMENT',
+        bulletColor: '#3B82F6'
+      });
+    });
+
+    // Sort timeline descending by date
+    timeline.sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
+
+    // 9. Assembled Customer Response
+    const activeSurvey = uniqueSurveys[0] || null;
+    const activeProject = projects[0] || null;
+
+    const consolidatedCustomer = {
+      id: customerId || leadId,
+      tenantId,
+      leadId,
+      name: customerName,
+      company: customer?.company || lead?.company || null,
+      email: customer?.email || lead?.email || null,
+      mobile: customer?.mobile || lead?.mobile || lead?.phone || '',
+      phone: customer?.mobile || lead?.mobile || lead?.phone || '',
+      address: customer?.address || lead?.address || activeProject?.installationAddress || activeSurvey?.address || null,
+      city: customer?.city || lead?.city || activeProject?.city || activeSurvey?.city || null,
+      state: customer?.state || lead?.state || activeProject?.state || activeSurvey?.state || null,
+      pincode: customer?.pincode || lead?.pincode || activeProject?.pincode || activeSurvey?.pincode || null,
+      customerType: customer?.customerType || lead?.customerType || 'RESIDENTIAL',
+      consumerNumber: activeProject?.discomConsumerNo || activeSurvey?.discomConsumerNo || customer?.consumerNumber || lead?.electricityConnection || null,
+      lead: lead || customer?.lead || null,
+      projects,
+      quotations: uniqueQuotations,
+      surveys: uniqueSurveys,
+      invoices: uniqueInvoices,
+      documents: uniqueDocuments,
+      Document: uniqueDocuments,
+      subsidies,
+      loans,
+      amcs,
+      tickets,
+      timeline,
+      createdAt: customer?.createdAt || lead?.createdAt || new Date(),
+      updatedAt: customer?.updatedAt || lead?.updatedAt || new Date()
+    };
+
+    res.json({ customer: consolidatedCustomer });
   } catch (error) {
+    console.error('Fetch customer error:', error);
     res.status(500).json({ error: 'Failed to fetch customer details' });
+  }
+});
+
+router.patch('/api/tenant/customers/:id', requireTenantAuth, async (req, res) => {
+  try {
+    const { name, company, email, mobile, address, city, customerType } = req.body;
+    const existing = await prisma.customer.findFirst({
+      where: {
+        OR: [{ id: req.params.id }, { leadId: req.params.id }],
+        tenantId: req.user.tenantId
+      }
+    });
+
+    if (!existing) {
+      return res.status(404).json({ error: 'Customer not found' });
+    }
+
+    const updated = await prisma.customer.update({
+      where: { id: existing.id },
+      data: {
+        ...(name ? { name } : {}),
+        ...(company !== undefined ? { company } : {}),
+        ...(email !== undefined ? { email } : {}),
+        ...(mobile ? { mobile } : {}),
+        ...(address !== undefined ? { address } : {}),
+        ...(city !== undefined ? { city } : {}),
+        ...(customerType ? { customerType } : {})
+      }
+    });
+
+    // Also sync to lead if linked
+    if (existing.leadId) {
+      await prisma.lead.update({
+        where: { id: existing.leadId },
+        data: {
+          ...(name ? { name } : {}),
+          ...(company !== undefined ? { company } : {}),
+          ...(email !== undefined ? { email } : {}),
+          ...(mobile ? { mobile, phone: mobile } : {}),
+          ...(address !== undefined ? { address } : {}),
+          ...(city !== undefined ? { city } : {}),
+        }
+      }).catch(() => {});
+    }
+
+    res.json({ customer: updated });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to update customer' });
+  }
+});
+
+router.post('/api/tenant/customers/:id/notes', requireTenantAuth, async (req, res) => {
+  try {
+    const { note } = req.body;
+    if (!note || !note.trim()) return res.status(400).json({ error: 'Note content is required' });
+
+    const customer = await prisma.customer.findFirst({
+      where: {
+        OR: [{ id: req.params.id }, { leadId: req.params.id }],
+        tenantId: req.user.tenantId
+      }
+    });
+
+    if (!customer) return res.status(404).json({ error: 'Customer not found' });
+
+    let createdNote = null;
+    if (customer.leadId) {
+      createdNote = await prisma.leadNote.create({
+        data: {
+          leadId: customer.leadId,
+          content: note.trim(),
+          createdBy: req.user.id
+        }
+      });
+      await prisma.leadActivity.create({
+        data: {
+          leadId: customer.leadId,
+          type: 'NOTE',
+          description: `Customer note added: ${note.trim().substring(0, 100)}`,
+          performedBy: req.user.id
+        }
+      }).catch(() => {});
+    }
+
+    res.json({ success: true, note: createdNote });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to add customer note' });
   }
 });
 

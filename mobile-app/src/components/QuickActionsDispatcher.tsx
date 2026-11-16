@@ -16,6 +16,7 @@ import {
   X,
   ChevronRight,
   ShieldAlert,
+  Wrench,
 } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
@@ -31,6 +32,7 @@ export interface QuickActionsDispatcherProps {
   onOpenQuickQuote: () => void;
   onOpenScanHardware: () => void;
   onOpenRecordPayment: () => void;
+  onOpenFieldOps?: () => void;
 }
 
 interface ActionDefinition {
@@ -52,6 +54,7 @@ export const QuickActionsDispatcher: React.FC<QuickActionsDispatcherProps> = ({
   onOpenQuickQuote,
   onOpenScanHardware,
   onOpenRecordPayment,
+  onOpenFieldOps,
 }) => {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
@@ -134,6 +137,25 @@ export const QuickActionsDispatcher: React.FC<QuickActionsDispatcherProps> = ({
         haptics.impactLight();
         onClose();
         onOpenRecordPayment();
+      },
+    },
+    {
+      id: 'field_ops',
+      title: 'Field Operations',
+      description: 'Site execution, CEA checklists & 5-geo proofs',
+      badgeLabel: 'Site QA',
+      badgeVariant: 'warning',
+      icon: <Wrench size={22} color="#f59e0b" strokeWidth={2.2} />,
+      iconBg: isDark ? '#451a03' : '#fef3c7',
+      permissionCheck: (u) =>
+        hasPermission(u, 'operations.view') ||
+        hasPermission(u, 'projects.view') ||
+        hasPermission(u, 'installation') ||
+        hasPermission(u, 'installations'),
+      onPress: () => {
+        haptics.impactLight();
+        onClose();
+        if (onOpenFieldOps) onOpenFieldOps();
       },
     },
   ];

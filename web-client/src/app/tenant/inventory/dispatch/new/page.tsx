@@ -1,11 +1,35 @@
 "use client";
+
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import axios from 'axios';
 import { 
-  Truck, Search, ArrowLeft, Package, Boxes, Check, AlertCircle, Plus, Trash2
+  Truck, Search, ArrowLeft, Package, Boxes, Check, AlertCircle, Plus, Trash2, 
+  Barcode, CheckCircle2, X, ShieldCheck
 } from 'lucide-react';
+
+/**
+ * 2D Barcode Parser and DCR Domestic Content Validator (Matching Mobile App logic)
+ */
+function parseAndValidateSerial(raw: string): { serial: string; dcrCompliant: boolean } {
+  const trimmed = raw.trim().toUpperCase();
+  const dcrPatterns = [
+    /DCR/i,
+    /ALMM/i,
+    /DOMESTIC/i,
+    /^WAA[\-_]?DCR/i,
+    /^ADANI[\-_]?DCR/i,
+    /^TATA[\-_]?DCR/i,
+    /^VIKRAM[\-_]?DCR/i,
+    /^GOLDI[\-_]?DCR/i,
+    /^PREMIER[\-_]?DCR/i,
+    /^RAYZON[\-_]?DCR/i,
+    /^IND[\-_]/i,
+  ];
+  const dcrCompliant = dcrPatterns.some(p => p.test(trimmed));
+  return { serial: trimmed, dcrCompliant };
+}
 
 export default function NewMaterialDispatch() {
   const router = useRouter();
@@ -26,6 +50,11 @@ export default function NewMaterialDispatch() {
   const [items, setItems] = useState<any[]>([]);
   const [selectedProduct, setSelectedProduct] = useState('');
   const [quantity, setQuantity] = useState('1');
+
+  // Serial Entry Modal State
+  const [activeItemIndex, setActiveItemIndex] = useState<number | null>(null);
+  const [tempSerial, setTempSerial] = useState('');
+  const [serialError, setSerialError] = useState('');
 
   useEffect(() => {
     fetchData();
@@ -54,7 +83,6 @@ export default function NewMaterialDispatch() {
     const prod = products.find(p => p.id === selectedProduct);
     if (!prod) return;
     
-    // Check if item already in list
     const existingIndex = items.findIndex(i => i.productId === selectedProduct);
     if (existingIndex > -1) {
       const updated = [...items];
@@ -65,7 +93,7 @@ export default function NewMaterialDispatch() {
         productId: prod.id,
         name: prod.name,
         sku: prod.sku,
-        isSerialized: prod.isSerialized,
+        isSerialized: Boolean(prod.isSerialized),
         quantity: quantity,
         serialNumbers: []
       }]);
@@ -78,6 +106,30 @@ export default function NewMaterialDispatch() {
   const handleRemoveItem = (idx: number) => {
     const updated = [...items];
     updated.splice(idx, 1);
+    setItems(updated);
+  };
+
+  const handleAddSerialToItem = () => {
+    setSerialError('');
+    if (!tempSerial.trim() || activeItemIndex === null) return;
+    const { serial } = parseAndValidateSerial(tempSerial);
+    
+    const item = items[activeItemIndex];
+    if (item.serialNumbers && item.serialNumbers.includes(serial)) {
+      setSerialError('Serial number already recorded in this dispatch batch');
+      return;
+    }
+
+    const updated = [...items];
+    const currentSerials = updated[activeItemIndex].serialNumbers || [];
+    updated[activeItemIndex].serialNumbers = [...currentSerials, serial];
+    setItems(updated);
+    setTempSerial('');
+  };
+
+  const handleRemoveSerial = (itemIdx: number, serialIdx: number) => {
+    const updated = [...items];
+    updated[itemIdx].serialNumbers.splice(serialIdx, 1);
     setItems(updated);
   };
 
@@ -109,18 +161,20 @@ export default function NewMaterialDispatch() {
   };
 
   if (loading) {
-    return <div className="flex justify-center items-center h-64 text-slate-400">Loading form...</div>;
+    return <div className="flex justify-center items-center h-64 text-slate-400">Loading dispatch wizard...</div>;
   }
 
+  const activeItem = activeItemIndex !== null ? items[activeItemIndex] : null;
+
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="max-w-4xl mx-auto space-y-6 pb-12">
       <div className="flex items-center gap-3">
         <Link href="/tenant/inventory" className="p-2 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors text-slate-500">
           <ArrowLeft size={18} />
         </Link>
         <div>
           <h1 className="text-2xl font-bold text-slate-900">New Material Dispatch</h1>
-          <p className="text-sm text-slate-500">Dispatch stock to a project installation site.</p>
+          <p className="text-sm text-slate-500">Dispatch stock to a project installation site with 2D serial tracking.</p>
         </div>
       </div>
 
@@ -146,7 +200,7 @@ export default function NewMaterialDispatch() {
               >
                 <option value="">-- Choose a project --</option>
                 {projects.map(p => (
-                  <option key={p.id} value={p.id}>{p.projectNumber} - {p.name}</option>
+                  <option key={p.id} value={p.id}>{p.projectNumber || 'PRJ'} - {p.name}</option>
                 ))}
               </select>
             </div>
@@ -172,7 +226,7 @@ export default function NewMaterialDispatch() {
                 type="text" 
                 value={receiverName}
                 onChange={e => setReceiverName(e.target.value)}
-                placeholder="e.g. Site Engineer John"
+                placeholder="e.g. Lead Technician Ramesh"
                 className="w-full p-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 text-sm"
               />
             </div>
@@ -183,7 +237,7 @@ export default function NewMaterialDispatch() {
                 type="text" 
                 value={notes}
                 onChange={e => setNotes(e.target.value)}
-                placeholder="e.g. MH-12-AB-1234"
+                placeholder="e.g. MH-12-AB-1234 (Tata Ace)"
                 className="w-full p-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 text-sm"
               />
             </div>
@@ -238,7 +292,7 @@ export default function NewMaterialDispatch() {
                   <tr>
                     <th className="p-4">Product</th>
                     <th className="p-4 text-right">Quantity</th>
-                    <th className="p-4 text-center">Type</th>
+                    <th className="p-4 text-center">Type / Serials</th>
                     <th className="p-4 w-12"></th>
                   </tr>
                 </thead>
@@ -252,7 +306,18 @@ export default function NewMaterialDispatch() {
                       <td className="p-4 text-right font-bold">{item.quantity}</td>
                       <td className="p-4 text-center">
                         {item.isSerialized ? (
-                          <span className="text-[10px] font-bold bg-indigo-50 text-indigo-600 px-2 py-1 rounded">SERIALIZED</span>
+                          <button 
+                            type="button"
+                            onClick={() => {
+                              setActiveItemIndex(idx);
+                              setTempSerial('');
+                              setSerialError('');
+                            }}
+                            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 transition-colors"
+                          >
+                            <Barcode size={13} />
+                            {item.serialNumbers?.length || 0} / {item.quantity} Serials
+                          </button>
                         ) : (
                           <span className="text-[10px] font-bold bg-slate-100 text-slate-600 px-2 py-1 rounded">BULK</span>
                         )}
@@ -285,6 +350,95 @@ export default function NewMaterialDispatch() {
           </button>
         </div>
       </form>
+
+      {/* SERIAL NUMBER RECORDING MODAL */}
+      {activeItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-xl border border-slate-200 p-6 max-w-lg w-full space-y-4">
+            <div className="flex justify-between items-center border-b pb-3">
+              <div>
+                <h3 className="font-bold text-slate-900 text-lg">Record Serial Numbers</h3>
+                <p className="text-xs text-slate-500">{activeItem.name} ({activeItem.serialNumbers?.length || 0}/{activeItem.quantity} recorded)</p>
+              </div>
+              <button onClick={() => setActiveItemIndex(null)} className="p-1 text-slate-400 hover:text-slate-600">
+                <X size={18} />
+              </button>
+            </div>
+
+            {serialError && (
+              <div className="p-2.5 bg-red-50 border border-red-200 text-red-700 rounded-lg text-xs font-semibold">
+                {serialError}
+              </div>
+            )}
+
+            <div className="flex gap-2">
+              <input 
+                type="text" 
+                value={tempSerial}
+                onChange={e => setTempSerial(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleAddSerialToItem();
+                  }
+                }}
+                placeholder="Enter or scan serial (e.g. WAA-DCR-550-001)"
+                className="flex-1 p-2.5 rounded-xl border border-slate-200 font-mono text-sm uppercase"
+              />
+              <button 
+                type="button"
+                onClick={handleAddSerialToItem}
+                disabled={!tempSerial.trim()}
+                className="px-4 py-2.5 bg-indigo-600 text-white font-bold rounded-xl text-sm hover:bg-indigo-700 disabled:opacity-50"
+              >
+                Add
+              </button>
+            </div>
+
+            {/* LIST OF RECORDED SERIALS */}
+            <div className="max-h-60 overflow-y-auto space-y-2 border border-slate-100 p-2 rounded-xl bg-slate-50">
+              {activeItem.serialNumbers && activeItem.serialNumbers.length > 0 ? (
+                activeItem.serialNumbers.map((s: string, sIdx: number) => {
+                  const { dcrCompliant } = parseAndValidateSerial(s);
+                  return (
+                    <div key={sIdx} className="flex justify-between items-center bg-white p-2.5 rounded-lg border border-slate-200 text-xs">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-slate-400">#{sIdx + 1}</span>
+                        <span className="font-mono font-bold text-slate-800">{s}</span>
+                        {dcrCompliant && (
+                          <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-800 font-extrabold text-[9px] rounded">
+                            ✓ DCR
+                          </span>
+                        )}
+                      </div>
+                      <button 
+                        type="button"
+                        onClick={() => handleRemoveSerial(activeItemIndex!, sIdx)}
+                        className="text-slate-400 hover:text-red-600 p-1"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  );
+                })
+              ) : (
+                <p className="text-center text-xs text-slate-400 py-4">No serial numbers entered for this item.</p>
+              )}
+            </div>
+
+            <div className="flex justify-end pt-2">
+              <button 
+                type="button"
+                onClick={() => setActiveItemIndex(null)}
+                className="px-4 py-2 bg-slate-900 text-white font-bold rounded-xl text-sm"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

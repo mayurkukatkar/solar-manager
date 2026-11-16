@@ -152,9 +152,63 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
     setSubmitting(true);
     try {
       const tRate = parseFloat(taxRate) || 13.8;
-      const subtotal = Math.round(amt / (1 + tRate / 100));
-      const taxAmount = amt - subtotal;
       const kw = parseFloat(capacityKw) || 3.3;
+
+      let subtotal = 0;
+      let taxAmount = 0;
+      let items: any[] = [];
+
+      if (Math.abs(tRate - 13.8) < 0.2) {
+        // Statutory 70:30 Composite Supply breakdown (Notification 24/2018 & 8/2021)
+        const goodsGross = Math.round(amt * 0.70);
+        const serviceGross = amt - goodsGross;
+
+        const goodsTaxable = Math.round(goodsGross / 1.12);
+        const goodsTax = goodsGross - goodsTaxable;
+
+        const serviceTaxable = Math.round(serviceGross / 1.18);
+        const serviceTax = serviceGross - serviceTaxable;
+
+        subtotal = goodsTaxable + serviceTaxable;
+        taxAmount = amt - subtotal;
+
+        items = [
+          {
+            description: `Supply of Solar PV Modules, Inverter & BOS Equipment (70% Statutory Value - ${kw} kWp)`,
+            hsn: '8541',
+            qty: 1,
+            unit: 'Lot',
+            rate: goodsTaxable,
+            amount: goodsTaxable,
+            taxAmount: goodsTax,
+            gstRate: 12,
+          },
+          {
+            description: `Turnkey Civil Mounting, Electrical Wiring & Commissioning Services (30% Statutory Value)`,
+            sac: '9954',
+            qty: 1,
+            unit: 'Job',
+            rate: serviceTaxable,
+            amount: serviceTaxable,
+            taxAmount: serviceTax,
+            gstRate: 18,
+          },
+        ];
+      } else {
+        subtotal = Math.round(amt / (1 + tRate / 100));
+        taxAmount = amt - subtotal;
+        items = [
+          {
+            description: `${title.trim()} (${kw} kWp Grid-Tied System Kit)`,
+            hsn: '8541',
+            qty: 1,
+            unit: 'Job',
+            rate: subtotal,
+            amount: subtotal,
+            gstRate: tRate,
+          },
+        ];
+      }
 
       const payload = {
         leadId: initialLead?.id,
@@ -195,7 +249,7 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
           customerName: customerName.trim(),
           projectName: title.trim(),
         });
-      } catch (_) {}
+      } catch (_) { }
 
       setGeneratedInvoiceRecord(createdInvoice);
       setCelebrationData({
@@ -283,8 +337,8 @@ export const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
                   {invoiceType === 'ADVANCE_RECEIPT'
                     ? '20% token advance confirms customer commitment & initiates structure fabrication.'
                     : invoiceType === 'PROFORMA'
-                    ? 'Proforma invoice formatted for nationalized banks & PM Surya Ghar loan sanction.'
-                    : 'Statutory 13.8% composite solar GST auto-calculated per MoF Notification 11/2017.'}
+                      ? 'Proforma invoice formatted for nationalized banks & PM Surya Ghar loan sanction.'
+                      : 'Statutory 13.8% composite solar GST auto-calculated per MoF Notification 11/2017.'}
                 </Text>
               </View>
             </View>
