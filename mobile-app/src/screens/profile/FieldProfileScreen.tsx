@@ -49,6 +49,7 @@ import { AppOnboardingModal } from '../../components/AppOnboardingModal';
 import { InAppProductTour } from '../../components/InAppProductTour';
 import { AppUpdateModal } from '../../components/AppUpdateModal';
 import { CURRENT_APP_VERSION } from '../../services/versionService';
+import { otaUpdateService } from '../../services/otaUpdateService';
 
 interface FinancialStats {
   totalRevenue: number;
@@ -80,6 +81,21 @@ export const FieldProfileScreen: React.FC<{ navigation?: any }> = ({ navigation 
   const [onboardingModalVisible, setOnboardingModalVisible] = useState(false);
   const [spotlightTourVisible, setSpotlightTourVisible] = useState(false);
   const [updateModalVisible, setUpdateModalVisible] = useState(false);
+  const [checkingUpdates, setCheckingUpdates] = useState(false);
+
+  const handleCheckForUpdates = async () => {
+    try {
+      setCheckingUpdates(true);
+      const res = await otaUpdateService.checkAndApplyUpdate({ silent: false });
+      if (!res.reloaded) {
+        setUpdateModalVisible(true);
+      }
+    } catch {
+      setUpdateModalVisible(true);
+    } finally {
+      setCheckingUpdates(false);
+    }
+  };
 
   useEffect(() => {
     refreshStorageCounts();
@@ -765,7 +781,8 @@ export const FieldProfileScreen: React.FC<{ navigation?: any }> = ({ navigation 
               marginTop: 10,
             },
           ]}
-          onPress={() => setUpdateModalVisible(true)}
+          onPress={handleCheckForUpdates}
+          disabled={checkingUpdates}
           activeOpacity={0.85}
         >
           <View style={styles.guideCardLeft}>
@@ -779,7 +796,11 @@ export const FieldProfileScreen: React.FC<{ navigation?: any }> = ({ navigation 
                 alignItems: 'center',
               }}
             >
-              <Download size={20} color="#0066FF" strokeWidth={2.4} />
+              {checkingUpdates ? (
+                <ActivityIndicator size="small" color="#0066FF" />
+              ) : (
+                <Download size={20} color="#0066FF" strokeWidth={2.4} />
+              )}
             </View>
             <View style={styles.guideTextGroup}>
               <View style={styles.guideBadgeRow}>
@@ -787,10 +808,10 @@ export const FieldProfileScreen: React.FC<{ navigation?: any }> = ({ navigation 
                 <Sparkles size={11} color="#0066FF" />
               </View>
               <Text style={[styles.guideTitle, { color: colors.text }]}>
-                Check for App Updates
+                {checkingUpdates ? 'Checking for Updates...' : 'Check for App Updates'}
               </Text>
               <Text style={[styles.guideDesc, { color: colors.textSecondary }]}>
-                Check cloud servers for latest solar engineering features & bugfixes
+                Pull latest OTA features & check for official APK updates
               </Text>
             </View>
           </View>

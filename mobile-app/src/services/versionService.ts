@@ -1,7 +1,7 @@
 import { apiClient, SafeStorage } from '../api/client';
 
-export const CURRENT_APP_VERSION = '1.0.0';
-export const CURRENT_VERSION_CODE = 1;
+export const CURRENT_APP_VERSION = '1.1.0';
+export const CURRENT_VERSION_CODE = 2;
 
 const STORAGE_DISMISSED_VERSION_KEY = '@solar_dismissed_update_version';
 

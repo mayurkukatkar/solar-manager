@@ -8,7 +8,9 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "updates": {
-      "url": "https://u.expo.dev/a777ad42-4a1a-48d3-be30-60d2b263af25"
+      "url": "https://u.expo.dev/a777ad42-4a1a-48d3-be30-60d2b263af25",
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 5000
     },
     "runtimeVersion": {
       "policy": "appVersion"

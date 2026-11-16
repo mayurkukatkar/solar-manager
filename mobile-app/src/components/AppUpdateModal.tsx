@@ -8,6 +8,8 @@ import {
   ScrollView,
   Linking,
   Platform,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import {
   Download,
@@ -17,9 +19,11 @@ import {
   X,
   ExternalLink,
   ShieldCheck,
+  RefreshCw,
 } from 'lucide-react-native';
 import { GuideCharacter } from './GuideCharacter';
 import { versionService, AppUpdateInfo } from '../services/versionService';
+import { otaUpdateService } from '../services/otaUpdateService';
 import { useTheme } from '../theme';
 
 export interface AppUpdateModalProps {
@@ -34,6 +38,8 @@ export const AppUpdateModal: React.FC<AppUpdateModalProps> = ({
   const { colors, isDark } = useTheme();
   const [visible, setVisible] = useState(false);
   const [updateInfo, setUpdateInfo] = useState<AppUpdateInfo | null>(null);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
   useEffect(() => {
     checkVersion();
@@ -53,20 +59,33 @@ export const AppUpdateModal: React.FC<AppUpdateModalProps> = ({
 
   const handleUpdatePress = async () => {
     if (!updateInfo) return;
-    const targetUrl =
-      Platform.OS === 'android' && updateInfo.playStoreUrl
-        ? updateInfo.playStoreUrl
-        : updateInfo.downloadUrl;
 
+    // 1. Try instant OTA Update reload first
+    try {
+      setIsUpdating(true);
+      setStatusMessage('Checking & applying instant update...');
+      const otaRes = await otaUpdateService.checkAndApplyUpdate({ silent: true });
+      if (otaRes.reloaded) {
+        return; // App restarted with new bundle!
+      }
+    } catch (e) {
+      console.warn('OTA attempt failed, opening direct download:', e);
+    } finally {
+      setIsUpdating(false);
+      setStatusMessage(null);
+    }
+
+    // 2. Direct APK download fallback
+    const targetUrl = updateInfo.downloadUrl;
     try {
       const supported = await Linking.canOpenURL(targetUrl);
       if (supported) {
         await Linking.openURL(targetUrl);
       } else {
-        await Linking.openURL(updateInfo.downloadUrl);
+        Alert.alert('Download APK', `Open the following link to install:\n\n${targetUrl}`);
       }
     } catch {
-      await Linking.openURL(updateInfo.downloadUrl);
+      Alert.alert('Download APK', `Open the following link to install:\n\n${targetUrl}`);
     }
   };
 
@@ -159,9 +178,19 @@ export const AppUpdateModal: React.FC<AppUpdateModalProps> = ({
             </ScrollView>
           </View>
 
+          {/* STATUS MESSAGE */}
+          {statusMessage && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
+              <ActivityIndicator size="small" color="#0066FF" style={{ marginRight: 8 }} />
+              <Text style={{ fontSize: 13, color: '#0066FF', fontWeight: '600' }}>
+                {statusMessage}
+              </Text>
+            </View>
+          )}
+
           {/* ACTION BUTTONS */}
           <View style={styles.actionRow}>
-            {!updateInfo.isMandatory && (
+            {!updateInfo.isMandatory && !isUpdating && (
               <TouchableOpacity
                 style={[
                   styles.laterBtn,
@@ -180,13 +209,21 @@ export const AppUpdateModal: React.FC<AppUpdateModalProps> = ({
             )}
 
             <TouchableOpacity
-              style={[styles.updateBtn, { flex: updateInfo.isMandatory ? 1 : 2 }]}
+              style={[
+                styles.updateBtn,
+                { flex: updateInfo.isMandatory || isUpdating ? 1 : 2, opacity: isUpdating ? 0.7 : 1 },
+              ]}
               onPress={handleUpdatePress}
+              disabled={isUpdating}
               activeOpacity={0.88}
             >
-              <Download size={15} color="#FFFFFF" strokeWidth={2.5} style={{ marginRight: 6 }} />
+              {isUpdating ? (
+                <ActivityIndicator size="small" color="#FFFFFF" style={{ marginRight: 8 }} />
+              ) : (
+                <Download size={15} color="#FFFFFF" strokeWidth={2.5} style={{ marginRight: 6 }} />
+              )}
               <Text style={styles.updateBtnText}>
-                Download & Install v{updateInfo.latestVersion}
+                {isUpdating ? 'Applying Update...' : `Update Now (v${updateInfo.latestVersion})`}
               </Text>
             </TouchableOpacity>
           </View>

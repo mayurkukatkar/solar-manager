@@ -54,18 +54,18 @@ app.get('/api/app/version', (req, res) => {
     versionCode: 2,
     minSupportedVersion: '1.0.0',
     isMandatory: false,
-    releaseDate: '2026-11-09',
-    title: 'WhereReady Solar OS v1.1.0 Released!',
-    summary: 'CRM Pipeline bugfix, 10x database query optimization, and new Interactive Button Tour.',
+    releaseDate: '2026-11-17',
+    title: 'WhereReady Solar OS v1.1.0 (Field Operations & Parity)',
+    summary: 'Complete Web & Mobile parity: Field Operations & QA, 5-Geo proofing, CEA Ohmic compliance, and seamless OTA updates.',
     releaseNotes: [
-      'Resolved CRM Sales Pipeline crash and improved lead rendering stability',
-      'Database performance optimization with compound indexing for 10x faster query response',
-      'New Interactive Button-by-Button Tour with animated Sol Guide companion',
-      'Enhanced real-time network detection with instant auto-reconnect & offline banner',
-      'Instant local cache hydration for zero-flicker startup'
+      'Field Operations & QA module with statutory CEA electrical compliance and Ohmic tests',
+      '5-Geo Proofs (Roof, Inverter, Net-Meter, Earthing pit, Customer Handover) with tamper verification',
+      'DCR Domestic Content compliance check & 2D barcode scanner for solar panels',
+      'Direct in-app OTA cloud updates with auto-reload on startup',
+      'Full cross-platform functional parity between Web Client and Mobile App'
     ],
     downloadUrl: process.env.APP_DOWNLOAD_URL || 'https://expo.dev/artifacts/eas/4BqROJ3suiqnNaoMFZRTgLVuZw6fN--SfIZ0cMnQobk.apk',
-    playStoreUrl: 'https://play.google.com/store/apps/details?id=com.whereready.solaros'
+    playStoreUrl: null
   });
 });
 

@@ -11,6 +11,7 @@ import {
 import { GuideCharacter } from '../../components/GuideCharacter';
 import { GridBackground } from '../../components/common/GridBackground';
 import { useTheme } from '../../theme';
+import { otaUpdateService } from '../../services/otaUpdateService';
 
 interface SolSplashScreenProps {
   onFinish?: () => void;
@@ -29,6 +30,9 @@ export const SolSplashScreen: React.FC<SolSplashScreenProps> = ({
   const brandOpacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
+    // 0. Background OTA Update Check on Startup
+    otaUpdateService.checkAndApplyUpdate({ silent: true }).catch(() => {});
+
     // 1. Entrance animation sequence
     Animated.parallel([
       Animated.spring(scaleAnim, {
