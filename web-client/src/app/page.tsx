@@ -6,6 +6,7 @@ import ProductStoryFilm from "@/components/marketing/ProductStoryFilm";
 import QuotationScene from "@/components/marketing/QuotationScene";
 import ProductExperienceScene from "@/components/marketing/ProductExperienceScene";
 import PricingScene from "@/components/marketing/PricingScene";
+import MobileAppCtaSection from "@/components/marketing/MobileAppCtaSection";
 import TrustSecuritySection from "@/components/marketing/TrustSecuritySection";
 import FaqSection from "@/components/marketing/FaqSection";
 import Footer from "@/components/marketing/Footer";
@@ -63,6 +64,9 @@ export default function HomePage() {
 
           {/* Predictable Commercials & Plans */}
           <PricingScene onOpenDemo={handleOpenDemo} />
+
+          {/* Dedicated Field Mobile App Showcase & Direct APK Download */}
+          <MobileAppCtaSection />
 
           {/* DPDP 2023 & Tenant Isolation Safeguards */}
           <TrustSecuritySection />

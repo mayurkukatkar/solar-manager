@@ -64,9 +64,14 @@ app.get('/api/app/version', (req, res) => {
       'Direct in-app OTA cloud updates with auto-reload on startup',
       'Full cross-platform functional parity between Web Client and Mobile App'
     ],
-    downloadUrl: process.env.APP_DOWNLOAD_URL || 'https://expo.dev/artifacts/eas/4BqROJ3suiqnNaoMFZRTgLVuZw6fN--SfIZ0cMnQobk.apk',
+    downloadUrl: process.env.APP_DOWNLOAD_URL || 'https://expo.dev/artifacts/eas/W4k8Hnc6eIBtPhEk9V43oxsTb24eCV4ciSvjj82GQu0.apk',
     playStoreUrl: null
   });
+});
+
+// Direct APK download redirect for web and mobile
+app.get('/download/apk', (req, res) => {
+  res.redirect(process.env.APP_DOWNLOAD_URL || 'https://expo.dev/artifacts/eas/W4k8Hnc6eIBtPhEk9V43oxsTb24eCV4ciSvjj82GQu0.apk');
 });
 
 

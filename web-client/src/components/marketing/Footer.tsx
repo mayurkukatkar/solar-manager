@@ -71,12 +71,18 @@ export default function Footer() {
                 </a>
               </li>
               <li>
-                <a href="#pricing" className="hover:text-blue-600 transition-colors">
+                <a href="/#pricing" className="hover:text-blue-600 transition-colors">
                   Pricing Plans
                 </a>
               </li>
               <li>
-                <Link href="/login" className="text-blue-600 hover:text-blue-700 font-semibold">
+                <Link href="/download" className="text-blue-600 hover:text-blue-700 font-bold flex items-center gap-1">
+                  <span>Download Mobile App</span>
+                  <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.2 rounded font-bold">APK v1.1</span>
+                </Link>
+              </li>
+              <li>
+                <Link href="/login" className="text-slate-700 hover:text-blue-600 font-semibold">
                   Customer Sign In →
                 </Link>
               </li>

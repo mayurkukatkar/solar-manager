@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { Sun, Menu, X, ArrowRight, ArrowUpRight, Phone, ChevronRight } from "lucide-react";
+import { Sun, Menu, X, ArrowRight, ArrowUpRight, Phone, ChevronRight, Smartphone } from "lucide-react";
 
 interface NavbarProps {
   onOpenDemo?: () => void;
@@ -21,11 +21,12 @@ export default function Navbar({ onOpenDemo }: NavbarProps) {
   }, []);
 
   const navLinks = [
-    { label: "Product Film", href: "#story" },
-    { label: "Simulator", href: "#proposal-demo" },
-    { label: "Platform", href: "#product-view" },
-    { label: "Pricing", href: "#pricing" },
-    { label: "FAQ", href: "#faq" },
+    { label: "Product Film", href: "/#story" },
+    { label: "Simulator", href: "/#proposal-demo" },
+    { label: "Platform", href: "/#product-view" },
+    { label: "Pricing", href: "/#pricing" },
+    { label: "Mobile App", href: "/download", isNew: true },
+    { label: "FAQ", href: "/#faq" },
   ];
 
   return (
@@ -64,21 +65,33 @@ export default function Navbar({ onOpenDemo }: NavbarProps) {
             </Link>
 
             {/* Desktop Navigation Links */}
-            <nav className="hidden md:flex items-center gap-8">
+            <nav className="hidden md:flex items-center gap-7">
               {navLinks.map((link) => (
-                <a
+                <Link
                   key={link.label}
                   href={link.href}
-                  className="text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors py-1 relative group"
+                  className="text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors py-1 relative group flex items-center gap-1.5"
                 >
-                  {link.label}
+                  <span>{link.label}</span>
+                  {link.isNew && (
+                    <span className="text-[10px] font-bold uppercase tracking-wider bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full">
+                      APK v1.1
+                    </span>
+                  )}
                   <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-blue-600 transition-all duration-200 group-hover:w-full" />
-                </a>
+                </Link>
               ))}
             </nav>
 
             {/* Right CTAs */}
-            <div className="hidden lg:flex items-center gap-4">
+            <div className="hidden lg:flex items-center gap-3">
+              <Link
+                href="/download"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200/80 rounded-full transition-all shadow-xs"
+              >
+                <Smartphone className="w-3.5 h-3.5" />
+                <span>Download App</span>
+              </Link>
               <Link
                 href="/login"
                 className="text-sm font-semibold text-slate-700 hover:text-blue-600 px-3 py-2 rounded-full hover:bg-slate-50 transition-colors"
